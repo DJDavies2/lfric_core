@@ -25,7 +25,7 @@ $(OBJ_DIR):
 $(OBJ_DIR)/%.mod: $(OBJ_DIR)/%.o
 	@echo "Require $@"
 
-$(OBJ_DIR)/%.o: %.f90 | $(OBJ_DIR)
+$(OBJ_DIR)/%.o: %.F90 | $(OBJ_DIR)
 	@echo "Compile $<"
 	@$(FC95) $(F95FLAGS) \
 	         $(F95_MOD_DESTINATION_ARG) -I $(OBJ_DIR) \

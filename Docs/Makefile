@@ -1,4 +1,4 @@
-DOXYGEN ?= /data/cr1/hadhn/doxygen/bin/doxygen
+DOXYGEN ?= doxygen
 
 .PHONY: doc docs
 doc docs:

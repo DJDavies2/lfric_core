@@ -1,1 +1,5 @@
-ADD_TEST_SUITE(logModuleTest_suite)
+ADD_TEST_SUITE(function_space_modTest_suite)
+ADD_TEST_SUITE(field_modTest_suite)
+ADD_TEST_SUITE(gaussian_quadrature_modTest_suite)
+ADD_TEST_SUITE(v3_kernel_modTest_suite)
+ADD_TEST_SUITE(v3_solver_kernel_modTest_suite)

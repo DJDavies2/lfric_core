@@ -1,0 +1,51 @@
+!-------------------------------------------------------------------------------
+! (c) The copyright relating to this work is owned jointly by the Crown, 
+! Met Office and NERC 2014. 
+! However, it has been created with the help of the GungHo Consortium, 
+! whose members are identified at https://puma.nerc.ac.uk/trac/GungHo/wiki
+!-------------------------------------------------------------------------------
+!
+!-------------------------------------------------------------------------------
+module field_modTest
+  implicit none 
+
+contains
+
+  @test
+  subroutine test_field()
+    use pFUnit_Mod
+    use function_space_mod
+    use field_mod
+    implicit none
+
+    type(function_space_type) :: func_space
+    type(field_type) :: f_field
+    integer :: num_cells, num_dofs, num_unique_dofs, num_layers
+    integer :: testncell, testnlayers
+
+    num_cells = 35
+    num_dofs=4
+    num_unique_dofs = 100
+    num_layers=50
+
+    
+    func_space = function_space_type( &
+         num_cells=num_cells, num_dofs=num_dofs, num_unique_dofs=num_unique_dofs)
+
+    f_field = field_type(vector_space=func_space,num_layers=num_layers)
+
+    
+    ! test the procedures of the type
+    write(*,*) "test field_mod:get_ncell()"
+    testncell = f_field%get_ncell()
+    @assertEqual(testncell,num_cells)
+
+    write(*,*) "test field_mod:get_nlayers()"
+    testnlayers = f_field%get_nlayers()
+    @assertEqual(testnlayers,num_layers)
+    
+    write(*,*) "--------------------------------"
+
+  end subroutine test_field
+
+end module field_modTest

@@ -1,10 +1,11 @@
+export COMPILER?=gfortran
 .PHONY: test
 test: all
 	$(MAKE) -C src/test
 
 .PHONY: all
 all:
-	$(MAKE) -C src/main
+	$(MAKE) -C src/dynamo
 
 .PHONY: run
 run: test
@@ -16,5 +17,5 @@ doc docs:
 
 .PHONY: clean
 clean:
-	$(MAKE) -C src/main clean
+	$(MAKE) -C src/dynamo clean
 	$(MAKE) -C src/test clean

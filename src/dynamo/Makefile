@@ -1,7 +1,7 @@
 ROOT = ../..
 include $(ROOT)/Makefile.inc
 
-export SRC        = $(wildcard *.f90)
+export SRC        = $(wildcard *.F90)
 export OBJ_DIR    = $(BUILD_DIR)/dynamo
 export DEP_FILE   = dependencies.mk
 

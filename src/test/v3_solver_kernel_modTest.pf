@@ -1,0 +1,45 @@
+!-------------------------------------------------------------------------------
+! (c) The copyright relating to this work is owned jointly by the Crown, 
+! Met Office and NERC 2014. 
+! However, it has been created with the help of the GungHo Consortium, 
+! whose members are identified at https://puma.nerc.ac.uk/trac/GungHo/wiki
+!-------------------------------------------------------------------------------
+!
+!-------------------------------------------------------------------------------
+module v3_solver_kernel_modTest
+  implicit none 
+
+contains
+
+  @test
+  subroutine v3_solver_kernel_test()
+    use pFUnit_Mod
+    use v3_solver_kernel_mod
+    use constants_mod
+    implicit none
+
+    integer :: num_layers, ndf, map(1)
+    type(v3_solver_kernel_type) :: v3_sk
+    real(kind=dp) :: xdata(1)
+    real(kind=dp) :: rhsdata(1)
+    real(kind=dp) :: answer, tol
+    
+
+    v3_sk = v3_solver_kernel_type()
+    map(1)=1
+    num_layers=1
+    rhsdata(1)=1.0D0
+    call v3_sk%solver_v3_code(num_layers,map,xdata,rhsdata)
+    
+    write(*,*) "v3_solver_kernel test"
+    answer = 1.0D0
+    tol=1.0e-14
+    write(*,*) "v3_solver_kernel xdata, answer"
+    write(*,*) xdata(1),answer
+    @assertEqual(xdata(1),answer,tol)
+    
+    write(*,*) "--------------------------------"
+
+  end subroutine v3_solver_kernel_test
+  
+end module v3_solver_kernel_modTest
