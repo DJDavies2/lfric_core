@@ -65,25 +65,30 @@ subroutine mesh_generator_init(ncells,nlayers)
 end subroutine mesh_generator_init
 
 
-subroutine mesh_generator_biperiodic(ncells,nx,ny,nlayers,dx,dy,dz)
-!-------------------------------------------------------------------------------
-! Subroutine to generate a biperiodic domain of size nx*ny where nx*ny = ncells
-!-------------------------------------------------------------------------------
+!> Generate a biperiodic domain of size 'nx * ny' where 'nx * ny = ncells'
+!>
+!> @param ncells Number of cells in a layer.
+!> @param nx, ny Number of cells in X and Y.
+!> @param nlayers Number of vertical layers
+!> @param dx, dy, dz Cell width in X, Y and Z direction.
+!>
+subroutine mesh_generator_biperiodic( ncells, nx, ny, nlayers, dx, dy, dz )
 
-! number of cells in a layer
-  integer, intent(in) :: ncells
-! number of cells in x and y direction
-  integer, intent(in) :: nx, ny
-! number of vertical layers
-  integer, intent(in) :: nlayers
-! cell width in x & y & z direction
-  real(kind=dp), intent(in) :: dx, dy, dz
+  use log_mod, only : log_event, log_scratch_space, &
+                      LOG_LEVEL_INFO, LOG_LEVEL_ERROR
 
-! Loop indices
-  integer :: i, j, k, id, jd
-  
-  if (nx*ny /= ncells ) then
-    write(*,*) 'Incorrect number of elements in mesh_generator_biperiodic',nx*ny,ncells
+  integer,           intent( in ) :: ncells
+  integer,           intent( in ) :: nx, ny
+  integer,           intent( in ) :: nlayers
+  real( kind = dp ), intent( in ) :: dx, dy, dz
+
+  ! Loop indices
+  integer         :: i, j, k, id, jd
+
+  if ( nx * ny /= ncells ) then
+    write( log_scratch_space, '( A, I0, A, I0)' ) &
+         'Incorrect number of elements in mesh_generator_biperiodic', &
+         nx * ny, ' cf. ', ncells
     stop
   end if
 
@@ -206,53 +211,67 @@ subroutine mesh_generator_biperiodic(ncells,nx,ny,nlayers,dx,dy,dz)
   end do
   
 ! Diagnostic information  
-  write(*,*) 'grid connectivity'
-  do i=1,nx*ny*nlayers
-    write(*,'(7i6)') i,cell_next(i,1),cell_next(i,2),cell_next(i,3), &
-                       cell_next(i,4),cell_next(i,5),cell_next(i,6)
+  call log_event( 'grid connectivity', LOG_LEVEL_INFO )
+  do i = 1, nx * ny * nlayers
+    write( log_scratch_space,'(7i6)' ) i, &
+                            cell_next(i,1), cell_next(i,2), cell_next(i,3), &
+                            cell_next(i,4), cell_next(i,5), cell_next(i,6)
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
   end do
-  write(*,*) 'verts on cells'
-  do i=1,nx*ny*nlayers
-    write(*,'(9i6)') i,vert_on_cell(i,1),vert_on_cell(i,2),vert_on_cell(i,3),vert_on_cell(i,4), &
-                       vert_on_cell(i,5),vert_on_cell(i,6),vert_on_cell(i,7),vert_on_cell(i,8)
+  call log_event( 'verts on cells', LOG_LEVEL_INFO )
+  do i = 1, nx * ny * nlayers
+    write( log_scratch_space, '(9i6)' ) i, &
+                             vert_on_cell(i,1), vert_on_cell(i,2), &
+                             vert_on_cell(i,3), vert_on_cell(i,4), &
+                             vert_on_cell(i,5), vert_on_cell(i,6), &
+                             vert_on_cell(i,7), vert_on_cell(i,8)
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
   end do
-  
-  write(*,*) 'vert coords'
-  do i=1,nvert_g
-    write(*,'(i6,4f8.4)') i,mesh_vertex(i,1),mesh_vertex(i,2),mesh_vertex(i,3)
+
+  call log_event( 'vert coords', LOG_LEVEL_INFO )
+  do i = 1, nvert_g
+    write( log_scratch_space, '(i6,4f8.4)' ) &
+         i, mesh_vertex(i,1), mesh_vertex(i,2), mesh_vertex(i,3)
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
   end do
 
 end subroutine mesh_generator_biperiodic
-!-------------------------------------------------------------------------------
 
-subroutine mesh_generator_cubedsphere(filename,ncells,nlayers,dz)
-!-------------------------------------------------------------------------------
-! Subroutine to generate a biperiodic domain of size nx*ny where nx*ny = ncells
-! Location of panels:
-!             .....
-!            :  3  |
-!            :     |
-!             -----
-!      -----  .....  .....  -----
-!     |  5  :|  1  :|  2  :|  4  :
-!     |     :|     :|     :|     :
-!      .....  -----  -----  .....
-!             .....
-!            |  6  :
-!            |     :
-!             -----
-!
-!     Solid lines: left and bottom edges of panel
-!     Dotted lines: right and top edges of panel
-!     Currently reads in data created from John Thuburns gengrid_cube program
+!> Generate a biperiodic domain of size nx * ny where nx * ny = ncells.
+!>
+!> <pre>
+!> Location of panels:
+!>             .....
+!>            :  3  |
+!>            :     |
+!>             -----
+!>      -----  .....  .....  -----
+!>     |  5  :|  1  :|  2  :|  4  :
+!>     |     :|     :|     :|     :
+!>      .....  -----  -----  .....
+!>             .....
+!>            |  6  :
+!>            |     :
+!>             -----
+!>
+!>     Solid lines: left and bottom edges of panel
+!>     Dotted lines: right and top edges of panel
+!>     Currently reads in data created from John Thuburns gengrid_cube program
+!> </pre>
+!>
+!> @param filename Data file for cubed sphere data.
+!> @param ncells Total number of cells in horizontal layer.
+!> @param nlayers Number of vertical layers.
+!> @param dz Vertical grid spacing.
+!>
+subroutine mesh_generator_cubedsphere( filename, ncells, nlayers, dz )
 
-! data file for cubed sphere data
+  use log_mod, only : log_event, log_scratch_space, &
+                      LOG_LEVEL_INFO, LOG_LEVEL_ERROR
+
   character(*), intent(in) :: filename
-! Total number of cells in a horzontal layer
   integer, intent(in) :: ncells
-! number of vertical layers
   integer, intent(in) :: nlayers
-! vertical grid spacing
   real(kind=dp), intent(in)    :: dz
 
 ! file unit for mesh data file
@@ -278,13 +297,16 @@ subroutine mesh_generator_cubedsphere(filename,ncells,nlayers,dz)
   open(mesh_data_unit,file=filename,form='formatted')
   read(mesh_data_unit,*) nvert_in, nface_in
   if ( nface_in /= ncells ) then
-    write(*,*) 'Error: number of cells in Cubegrid.dat does not match', &
-                nface_in,ncells
+    write( log_scratch_space, '(A, I0, A, I0)' ) &
+         'Number of cells in Cubegrid.dat does not match: ', &
+         nface_in, ' vs. ', ncells
+    call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     stop
   end if
   if ( nvert_in /= nvert_h_g ) then
-    write(*,*) 'Error: number of vertices in Cubegrid.dat does not match', &
-                nvert_in, nvert_h_g
+    write( log_scratch_space, '(A, I0, A, I0)' ) &
+         'Number of vertices in Cubegrid.dat does not match: ', &
+         nvert_in, ' vs. ', nvert_h_g
     stop
   end if  
 ! read in vertices  
@@ -355,31 +377,47 @@ subroutine mesh_generator_cubedsphere(filename,ncells,nlayers,dz)
 
   
 ! Diagnostic information  
-  write(*,*) 'grid connectivity'
-  do i=1,ncells*nlayers
-    write(*,'(7i6)') i,cell_next(i,1),cell_next(i,2),cell_next(i,3), &
-                       cell_next(i,4),cell_next(i,5),cell_next(i,6)
+  call log_event( 'grid connectivity', LOG_LEVEL_INFO )
+  do i = 1, ncells * nlayers
+    write( log_scratch_space, '(7i6)' ) i, &
+                              cell_next(i,1), cell_next(i,2), cell_next(i,3), &
+                              cell_next(i,4), cell_next(i,5), cell_next(i,6)
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
   end do
-  write(*,*) 'verts on cells'
-  do i=1,ncells*nlayers
-    write(*,'(9i6)') i,vert_on_cell(i,1),vert_on_cell(i,2),vert_on_cell(i,3),vert_on_cell(i,4), &
-                       vert_on_cell(i,5),vert_on_cell(i,6),vert_on_cell(i,7),vert_on_cell(i,8)
+  call log_event( 'verts on cells', LOG_LEVEL_INFO )
+  do i = 1, ncells * nlayers
+    write( log_scratch_space, '(9i6)' ) i, &
+                              vert_on_cell(i,1), vert_on_cell(i,2), &
+                              vert_on_cell(i,3), vert_on_cell(i,4), &
+                              vert_on_cell(i,5), vert_on_cell(i,6), &
+                              vert_on_cell(i,7), vert_on_cell(i,8)
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
   end do
-  
-  write(*,*) 'vert coords'
-  do i=1,nvert_g
-    write(*,'(i6,4f8.4)') i,mesh_vertex(i,1),mesh_vertex(i,2),mesh_vertex(i,3)
+
+  call log_event( 'vert coords', LOG_LEVEL_INFO )
+  do i = 1, nvert_g
+    write( log_scratch_space, '(i6,4f8.4)' ) &
+         i, mesh_vertex(i,1), mesh_vertex(i,2), mesh_vertex(i,3)
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
   end do 
 
 end subroutine mesh_generator_cubedsphere
-!-------------------------------------------------------------------------------
 
-subroutine mesh_connectivity(ncells)
-!-------------------------------------------------------------------------------
-!  Subroutine to compute mesh connectivity: cells->faces (3,2)
-!                                           cells->edges (3,1)
-!------------------------------------------------------------------------------
-  integer, intent(in) :: ncells
+!> Compute mesh connectivity.
+!>
+!> <pre>
+!> cells->faces (3,2)
+!> cells->edges (3,1)
+!> </pre>
+!>
+!> @param ncells Total number of cells in horizontal layer.
+!>
+subroutine mesh_connectivity( ncells )
+
+  use log_mod, only : log_event, log_scratch_space, &
+                      LOG_LEVEL_INFO, LOG_LEVEL_ERROR
+
+  integer, intent( in ) :: ncells
  
   integer :: i, j, k, l, m, n, ij, inxt, inxtnxt, jnxt, vert
 ! Number of entities for a single layer  
@@ -415,7 +453,8 @@ subroutine mesh_connectivity(ncells)
     end do
   end do
   if ( maxval(face_on_cell) /= nface_layer ) then
-    write(*,*) 'Error computing face on cell connectivity'
+    call log_event( 'Error computing face on cell connectivity', &
+                    LOG_LEVEL_ERROR )
     stop
   end if
   
@@ -465,12 +504,14 @@ subroutine mesh_connectivity(ncells)
       end if
     end do
   end do
-  
+
   if ( maxval(edge_on_cell) /= nedge_layer ) then
-    write(*,*) 'Error computing edge on cell connectivity',maxval(edge_on_cell), nedge_layer
+    write( log_scratch_space, '(A, I0, A, I0)' ) &
+         'Error computing edge on cell connectivity: ', &
+         maxval( edge_on_cell ), ' vs. ', nedge_layer
+    call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     stop
   end if
-
 
 end subroutine mesh_connectivity
 
@@ -543,7 +584,5 @@ subroutine xyz2llr(x,y,z,long,lat,r)
   r = sqrt(x*x + y*y + z*z)  
 
 end subroutine xyz2llr
-
-
 
 end module mesh_generator_mod

@@ -1,3 +1,4 @@
+ADD_TEST_SUITE(log_modTest_suite)
 ADD_TEST_SUITE(function_space_modTest_suite)
 ADD_TEST_SUITE(field_modTest_suite)
 ADD_TEST_SUITE(gaussian_quadrature_modTest_suite)

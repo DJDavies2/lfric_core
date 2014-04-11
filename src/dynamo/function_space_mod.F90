@@ -236,12 +236,14 @@ end subroutine get_cell_dofmap
 ! Copy data in the dofmap
 !-----------------------------------------------------------------------------
 subroutine populate_cell_dofmap(self,cell,map)
+
   implicit none
+
   class(function_space_type), intent(inout) :: self
   integer, intent(in) :: cell
   integer, intent(in) :: map(self%ndf)
 
-  integer :: dof
+  integer        :: dof
 
   do dof = 1,self%ndf
      self%dofmap(cell,dof) = map(dof)

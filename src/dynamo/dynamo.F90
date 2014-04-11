@@ -22,11 +22,15 @@
 
 
 program dynamo
+
   use lfric
-!PSY use v3_kernel_mod,           only: v3_kernel_type
-!PSY use v3_solver_kernel_mod,    only: v3_solver_kernel_type
+  use log_mod,                 only: log_event, log_scratch_space, &
+                                     LOG_LEVEL_INFO
+!PSY use v3_kernel_mod,        only: v3_kernel_type
+!PSY use v3_solver_kernel_mod, only: v3_solver_kernel_type
   use psy,                     only: invoke_rhs_v3, invoke_v3_solver_kernel
   use set_up_mod,              only: set_up
+
   implicit none
 
   type(function_space_type)      :: v3_function_space, v2_function_space, & 
@@ -34,10 +38,10 @@ program dynamo
   type(field_type)               :: pressure_density,rhs
   type(gaussian_quadrature_type) :: gq
 
-  integer :: cell
-  integer :: num_cells,num_layers,element_order
-  
-  write(*,'("Dynamo:Hello, World")') 
+  integer        :: cell
+  integer        :: num_cells,num_dofs,num_unique_dofs,num_layers
+
+  call log_event( 'Dynamo running...', LOG_LEVEL_INFO )
 
   call set_up(v0_function_space,v1_function_space,v2_function_space,      &
   v3_function_space, num_layers)
@@ -55,39 +59,49 @@ program dynamo
   !Construct PSy layer given a list of kernels. This is the line the code
   !generator may parse and do its stuff.
 
-  write(*,*) "dynamo:calling 1st kernel"
+  call log_event( "Dynamo: calling 1st kernel", LOG_LEVEL_INFO )
   !PSY call invoke (v3_kernel_type(rhs) )
   call invoke_rhs_v3(rhs)
 
-  write(*,*) "dynamo:calling 2nd kernel"
+  call log_event( "Dynamo:calling 2nd kernel", LOG_LEVEL_INFO )
   !PSY call invoke (v3_solver_kernel_type(pressure_density,rhs) )
   call invoke_v3_solver_kernel(pressure_density,rhs)
 
-  write(*,*) 'RHS field = '
-  call print_field(rhs)
-  write(*,*) 'LHS field = '
-  call print_field(pressure_density)
+  call print_field( 'RHS field...', rhs )
+  call print_field( 'LHS field...', pressure_density )
+
+  call log_event( 'Dynamo completed', LOG_LEVEL_INFO )
 
 end program dynamo
 
-subroutine print_field(field)
-! Subroutine to print field to screen
-use lfric
+!> Send a field to the log.
+!>
+subroutine print_field( title, field )
 
-implicit none
+  use lfric
+  use log_mod, only : log_event, log_scratch_space, LOG_LEVEL_INFO
 
-type(field_type), intent(in)  :: field
+  implicit none
 
-integer :: cell, layer, df
-integer, pointer :: map(:)
+  character( * ),     intent( in ) :: title
+  type( field_type ), intent( in ) :: field
 
-do cell=1,field%vspace%get_ncell()
-  call field%vspace%get_cell_dofmap(cell,map)
-  do df=1,field%vspace%get_ndf()
-    do layer=0,field%get_nlayers()-1
-      write(*,*) cell,df,layer+1,field%data(map(df)+layer)
+  integer                   :: cell
+  integer                   :: layer
+  integer                   :: df
+  integer,          pointer :: map( : )
+
+  call log_event( title, LOG_LEVEL_INFO )
+
+  do cell=1,field%vspace%get_ncell()
+    call field%vspace%get_cell_dofmap(cell,map)
+    do df=1,field%vspace%get_ndf()
+      do layer=0,field%get_nlayers()-1
+        write( log_scratch_space, '( I4, I4, I4, F8.2 )' ) &
+             cell, df, layer+1, field%data( map( df ) + layer )
+        call log_event( log_scratch_space, LOG_LEVEL_INFO )
+      end do
     end do
   end do
-end do
 
 end subroutine print_field

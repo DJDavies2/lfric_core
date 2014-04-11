@@ -1,0 +1,311 @@
+!-------------------------------------------------------------------------------
+! (c) The copyright relating to this work is owned jointly by the Crown, 
+! Met Office and NERC 2014. 
+! However, it has been created with the help of the GungHo Consortium, 
+! whose members are identified at https://puma.nerc.ac.uk/trac/GungHo/wiki
+!-------------------------------------------------------------------------------
+!> @brief Test the functionality of log_mod
+!>
+!> @details A pFUnit test module to exercise the logging facilities.
+!>
+module log_modTest
+
+  use pFUnit_Mod
+  use log_mod
+
+  implicit none 
+
+  private
+  public log_level_test, log_output_test
+
+  integer, parameter :: INFO_UNIT  = 12
+  integer, parameter :: ALERT_UNIT = 13
+
+  @Parameters = [ level, expected_tag ]
+  type, public, extends( AbstractTestParameter ) :: level_parameter_type
+    integer,        public :: level
+    character( 8 ), public :: expected_tag
+  end type level_parameter_type
+
+  @TestCase
+  type, public, extends( ParameterizedTestCase ) :: log_test_type
+
+    integer        :: level
+    character( 8 ) :: expected_tag
+
+    procedure( runMethod ), pointer ::userMethod => null()
+
+  contains
+
+    procedure         :: setUp
+    procedure         :: tearDown
+    procedure, nopass :: getParameters
+    procedure         :: getParameterString
+    procedure         :: runMethod
+
+  end type log_test_type
+
+  interface log_test_type
+    module procedure new_log_test
+  end interface log_test_type
+
+contains
+
+  !> Construct a level test parameter.
+  !>
+  !> @param level The level to test at.
+  !>
+  function new_level_parameter( level, expected_tag ) result( level_parameter )
+
+    implicit none
+
+    integer,        intent( in ) :: level
+    character( 8 ), intent( in ) :: expected_tag
+
+    type( level_parameter_type ) :: level_parameter
+    level_parameter%level        = level
+    level_parameter%expected_tag = expected_tag
+
+  end function new_level_parameter
+
+  !> Construct the log module test case.
+  !>
+  !> @param level The level to test at.
+  !>
+  function new_log_test( name, method, level, expected_tag ) result( log_test )
+
+    implicit none
+
+    character( len = * ),   intent( in ) :: name
+    procedure( runMethod )               :: method
+    integer,                intent( in ) :: level
+    character( 8 ),         intent( in ) :: expected_tag
+
+    type( log_test_type ) :: log_test
+    log_test%level        = level
+    log_test%expected_tag = expected_tag
+
+    call log_test%setName( name )
+    log_test%userMethod => method
+
+  end function new_log_test
+
+  !> Prepare fixtures.
+  !>
+  !> Called before each test method is run. Prepares a known state in which
+  !> the tests can take place.
+  !>
+  subroutine setUp( this )
+
+    implicit none
+
+    class( log_test_type ), intent( inout ) :: this
+
+    integer :: condition
+
+    open( INFO_UNIT, status='scratch', action='readwrite', &
+          iostat=condition )
+    @assertEqual( condition, 0 )
+    open( ALERT_UNIT, status='scratch', action='readwrite', &
+          iostat=condition )
+    @assertEqual( condition, 0 )
+
+  end subroutine setUp
+
+  !> Remove fixtures.
+  !>
+  !> Tidy up the test environment after each test method has run.
+  !>
+  subroutine tearDown( this )
+
+    implicit none
+
+    class( log_test_type ), intent( inout ) :: this
+
+    integer :: condition
+
+    close( INFO_UNIT, iostat=condition )
+    @assertEqual( condition, 0 )
+    close( ALERT_UNIT, iostat=condition )
+    @assertEqual( condition, 0 )
+
+  end subroutine tearDown
+
+  !> Prepare a list of all log levels for parameterised tests.
+  !>
+  function getParameters() result( parameters )
+
+    implicit none
+
+    type( level_parameter_type ), allocatable :: parameters( : )
+    parameters = [ level_parameter_type( LOG_LEVEL_TRACE,   ':TRACE:' ), &
+                   level_parameter_type( LOG_LEVEL_DEBUG,   ':DEBUG:' ), &
+                   level_parameter_type( LOG_LEVEL_INFO,    ':INFO :' ), &
+                   level_parameter_type( LOG_LEVEL_WARNING, ':WARN :' ), &
+                   level_parameter_type( LOG_LEVEL_ERROR,   ':ERROR:' ) ]
+
+  end function getParameters
+
+  !> Get a string representing the current parameter value
+  !>
+  function getParameterString( this ) result( string )
+
+    implicit none
+
+    class( log_test_type ), intent( in ) :: this
+    character( : ), allocatable          :: string
+
+    character( len = 80 ) :: buffer
+
+    write( buffer, '(A,I0)' ) 'Logging level is ', this%level
+    string = trim(buffer)
+
+  end function getParameterString
+
+  !> Invoke the test case.
+  !>
+  subroutine runMethod( this )
+
+    implicit none
+
+    class( log_test_type ), intent( inout ) :: this
+
+    call this%userMethod()
+
+  end subroutine runMethod
+
+  !> Test the default behaviour of the logger.
+  !>
+  !> As part of the test system redirecting the output to alternate units is
+  !> also tested.
+  !>
+  @test
+  subroutine log_output_test( this )
+
+    use, intrinsic :: iso_fortran_env, only : iostat_end
+
+    implicit none
+
+    class ( log_test_type ), intent( inout ) :: this
+
+    integer, parameter :: date_kind = selected_int_kind( 14 )
+
+    character( 28 )           :: current_date_string
+    integer( kind=date_kind ) :: current_stamp
+    integer                   :: current_subseconds
+    integer                   :: current_zone
+    integer( kind=date_kind)  :: found_stamp
+    character                 :: found_point
+    integer                   :: found_subseconds
+    integer                   :: found_zone
+    character(  8 )           :: found_tag
+    character( 80 )           :: found_message
+    integer                   :: status
+
+    call date_and_time( date=current_date_string(1:8), &
+                        time=current_date_string(9:18), &
+                        zone=current_date_string(19:) )
+    read( current_date_string, "(I14,1X,I3,I5)" ) current_stamp, &
+                                                  current_subseconds, &
+                                                  current_zone
+
+    call log_set_info_stream(INFO_UNIT)
+    call log_set_alert_stream(ALERT_UNIT)
+
+    call log_event('cheese', this%level)
+
+    rewind(INFO_UNIT)
+    read( INFO_UNIT, '(I14,A1,I3,I5,A8,A)', iostat = status ) &
+        found_stamp, found_point, found_subseconds, found_zone, &
+        found_tag, found_message
+    if ( ( this%level >= LOG_LEVEL_INFO ) &
+         .and. ( this%level < LOG_LEVEL_WARNING ) ) then
+      @assertEqual( 0,                 status )
+      @assertEqual( '.',               found_point )
+      @assertEqual( this%expected_tag, found_tag )
+      @assertEqual( 'cheese',          found_message )
+      @assertTrue( current_stamp <= found_stamp )
+      @assertEqual( current_zone,      found_zone )
+    else
+      @assertEqual( iostat_end,        status )
+    end if
+
+    rewind( ALERT_UNIT )
+    read( ALERT_UNIT, '(I14,A1,I3,I5,A8,A)', iostat = status ) &
+        found_stamp, found_point, found_subseconds, found_zone, &
+        found_tag, found_message
+    if ( this%level >= LOG_LEVEL_WARNING ) then
+      @assertEqual( 0,                 status )
+      @assertEqual( '.',               found_point )
+      @assertEqual( this%expected_tag, found_tag )
+      @assertEqual( 'cheese',          found_message )
+      @assertTrue( current_stamp <= found_stamp )
+      @assertEqual( current_zone,      found_zone )
+    else
+      @assertEqual( iostat_end,        status )
+    end if
+
+  end subroutine log_output_test
+
+  !> Test the correct things are logged for each log level.
+  !>
+  @test
+  subroutine log_level_test( this )
+
+    use, intrinsic :: iso_fortran_env, only : iostat_end
+
+    implicit none
+
+    class ( log_test_type ), intent( inout ) :: this
+
+    character(  8 ) :: tag
+    character( 80 ) :: message
+    integer         :: status
+
+    call log_set_info_stream( INFO_UNIT )
+    call log_set_alert_stream( ALERT_UNIT )
+
+    call log_set_level( this%level )
+
+    call log_event( 'kraft',      LOG_LEVEL_TRACE )
+    call log_event( 'chedder',    LOG_LEVEL_DEBUG )
+    call log_event( 'wenslydale', LOG_LEVEL_INFO )
+    call log_event( 'gloucester', LOG_LEVEL_WARNING )
+    call log_event( 'stilton',    LOG_LEVEL_ERROR )
+
+    rewind( INFO_UNIT )
+    if ( this%level <= LOG_LEVEL_TRACE ) then
+      read( INFO_UNIT, '(23X,A8,A)' ) tag, message
+      @assertEqual( ':TRACE:', tag )
+      @assertEqual( 'kraft', message )
+    end if
+    if ( this%level <= LOG_LEVEL_DEBUG ) then
+      read( INFO_UNIT, '(23X,A8,A)' ) tag, message
+      @assertEqual( ':DEBUG:', tag )
+      @assertEqual( 'chedder', message )
+    end if
+    if (this%level <= LOG_LEVEL_INFO) then
+      read( INFO_UNIT, '(23X,A8,A)' ) tag, message
+      @assertEqual( ':INFO :', tag )
+      @assertEqual( 'wenslydale', message )
+    end if
+    read( INFO_UNIT, '(A)', iostat = status ) message
+    @assertEqual( iostat_end, status )
+
+    rewind( ALERT_UNIT )
+    if ( this%level <= LOG_LEVEL_WARNING ) then
+      read( ALERT_UNIT, '(23X,A8,A)' ) tag, message
+      @assertEqual( ':WARN :', tag )
+      @assertEqual( 'gloucester', message )
+    end if
+    if ( this%level <= LOG_LEVEL_ERROR ) then
+      read( ALERT_UNIT, '(23X,A8,A)' ) tag, message
+      @assertEqual( ':ERROR:', tag )
+      @assertEqual( 'stilton', message )
+    end if
+    read( ALERT_UNIT, '(A)', iostat = status ) message
+    @assertEqual( iostat_end, status )
+
+  end subroutine log_level_test
+
+end module log_modTest

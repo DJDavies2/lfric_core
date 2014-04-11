@@ -29,8 +29,13 @@ module set_up_mod
   use dofmap_mod,           only: get_dofmap
   implicit none
 contains 
-  
+
   subroutine set_up(v0, v1, v2, v3, num_layers)
+
+    use log_mod, only : log_event, LOG_LEVEL_INFO
+
+    implicit none
+
     type(function_space_type), intent(inout) :: v0, v1, v2, v3
     integer, intent(out)                     :: num_layers
 
@@ -49,8 +54,8 @@ contains
     element_order = 0
     l_spherical = .false.
     filename = '../../data/Cubegrid.dat' 
-    write(*,*) "set_up: generating/reading the mesh"
-   
+    call log_event( "set_up: generating/reading the mesh", LOG_LEVEL_INFO )
+
 !  ----------------------------------------------------------
 !  Mesh generation, really a preprocessor step for reading
 ! -----------------------------------------------------------
@@ -73,7 +78,7 @@ contains
 ! Initialise FE elements on the mesh constructed above
 ! really another pre-processor step
 ! ----------------------------------------------------------
-    write(*,*) "set_up: building function spaces"
+    call log_event( "set_up: building function spaces", LOG_LEVEL_INFO )
     ! initialise numbers of dofs    
     call num_dof_init(num_cells,num_layers,element_order,v_unique_dofs,v_dof_entity)
     ! call the constructors for the vspaces
@@ -100,13 +105,13 @@ contains
          num_unique_dofs = v_unique_dofs(4,1) ,  &
          dim_space = 1, dim_space_p1 = 1,  &
          ngp = 3 )
-    
-    write(*,*) "set_up: computing basis functions"
-    
+
+    call log_event( "set_up: computing basis functions", LOG_LEVEL_INFO )
+
     ! compute the value of the basis functions and populate the
     ! basis_function_type
     call compute_basis(element_order,v0,v1,v2,v3,v_unique_dofs,v_dof_entity)  
-    write(*,*) "set_up: computing the dof_map"
+    call log_event( "set_up: computing the dof_map", LOG_LEVEL_INFO )
     ! compute the dof maps for each function space
     call get_dofmap(num_layers,v0,v_dof_entity(1,:))
     call get_dofmap(num_layers,v1,v_dof_entity(2,:))

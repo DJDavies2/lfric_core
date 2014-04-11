@@ -139,6 +139,9 @@ subroutine test_integrate(self)
   !-----------------------------------------------------------------------------
   !
   !-----------------------------------------------------------------------------
+
+  use log_mod, only: log_event, log_scratch_space, LOG_LEVEL_INFO
+
   implicit none
 
   class(gaussian_quadrature_type) :: self
@@ -154,10 +157,12 @@ subroutine test_integrate(self)
       end do
     end do
   end do
-    
+
   answer = self%integrate(func)
-  write(*,*) 'int(x^2,x=0..1,y=0..1,z=0..1) = ',answer
-  
+  write( log_scratch_space, '(A,F0.0)') 'int(x^2,x=0..1,y=0..1,z=0..1) = ', &
+                                        answer
+  call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
   return
 end subroutine test_integrate
   
