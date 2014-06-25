@@ -27,7 +27,7 @@ pfunit: compilertest $(PFUNIT_BUILD)
 
 $(PFUNIT_BUILD):
 	mkdir $@
-	cd $@; $(CMAKE) -DCMAKE_Fortran_COMPILER=$(FC95) \
+	cd $@; $(CMAKE) -DCMAKE_Fortran_COMPILER=$(FC) \
 	                -DCMAKE_INSTALL_PREFIX=$(PFUNIT_INSTALL) \
 	                $(PFUNIT_SOURCE)
 

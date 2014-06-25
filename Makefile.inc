@@ -53,7 +53,7 @@ else ifeq '$(COMPILER)' 'gfortran'
   FFLAGS += -g -O0
   FWARNINGFLAGS = -Wall -Werror
   F_MOD_DESTINATION_ARG = -J $(OBJ_DIR)
-  GFORTRAN_VERSION = $(shell $(FC95) --version 2>&1 \
+  GFORTRAN_VERSION = $(shell gfortran --version 2>&1 \
                        | sed -n 's/.*[[:space:]]\{1,\}\([[:digit:]]\{1,\}\.[[:digit:]]\{1,\}\.[[:digit:]]\{1,\}\)[[:space:]]\{,\}.*/\1/p' \
                        | awk -F . '{ printf "%02i%02i%02i", $$1, $$2, $$3 }')
   $(info ** Version $(GFORTRAN_VERSION))
