@@ -33,10 +33,10 @@ module argument_mod
   integer, public, parameter :: gh_max   = 7
 
 ! vspace labels
-  integer, public, parameter :: v0 = 1
-  integer, public, parameter :: v1 = 2
-  integer, public, parameter :: v2 = 3
-  integer, public, parameter :: v3 = 4
+  integer, public, parameter :: w0 = 1
+  integer, public, parameter :: w1 = 2
+  integer, public, parameter :: w2 = 3
+  integer, public, parameter :: w3 = 4
   integer, public, parameter :: any_space = 0
 
 ! stencil label

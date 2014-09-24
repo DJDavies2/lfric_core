@@ -14,7 +14,7 @@
 module rrho_kernel_mod
 use kernel_mod,              only : kernel_type
 use argument_mod,            only : arg_type, &          ! the type
-                                    gh_read, gh_write, v0, v2, v3, fe, cells ! the enums
+                                    gh_read, gh_write, w0, w2, w3, fe, cells ! the enums
 use reference_profile_mod,   only : reference_profile
 use constants_mod,           only : n_sq, gravity, r_def
 
@@ -27,12 +27,12 @@ implicit none
 type, public, extends(kernel_type) :: rrho_kernel_type
   private
   type(arg_type) :: meta_args(6) = [  &
-       arg_type(gh_write,v3,fe,.true., .false.,.false.,.true.),       &
-       arg_type(gh_read ,v2,fe,.true., .true. ,.false., .false.),     &
-       arg_type(gh_read ,v0,fe,.false.,.true. ,.false., .false.),     &
-       arg_type(gh_read ,v0,fe,.false.,.false.,.false.,.false.),      &
-       arg_type(gh_read ,v0,fe,.false.,.false.,.false.,.false.),      &
-       arg_type(gh_read ,v3,fe,.false.,.false.,.false.,.false.)       &
+       arg_type(gh_write,w3,fe,.true., .false.,.false.,.true.),       &
+       arg_type(gh_read ,w2,fe,.true., .true. ,.false., .false.),     &
+       arg_type(gh_read ,w0,fe,.false.,.true. ,.false., .false.),     &
+       arg_type(gh_read ,w0,fe,.false.,.false.,.false.,.false.),      &
+       arg_type(gh_read ,w0,fe,.false.,.false.,.false.,.false.),      &
+       arg_type(gh_read ,w3,fe,.false.,.false.,.false.,.false.)       &
        ]
   integer :: iterates_over = cells
 contains
@@ -60,24 +60,24 @@ end function rrho_kernel_constructor
 
 !> @brief The subroutine which is called directly by the Psy layer
 !! @param[in] nlayers Integer the number of layers
-!! @param[in] ndf_v3 The number of degrees of freedom per cell for v3
-!! @param[in] map_v3 Integer array holding the dofmap for the cell at the base of the column for v3
-!! @param[in] v3_basis Real 5-dim array holding basis functions evaluated at gaussian quadrature points 
+!! @param[in] ndf_w3 The number of degrees of freedom per cell for w3
+!! @param[in] map_w3 Integer array holding the dofmap for the cell at the base of the column for w3
+!! @param[in] w3_basis Real 5-dim array holding basis functions evaluated at gaussian quadrature points 
 !! @param[inout] r_rho Real array the data 
-!! @param[in] chi_1 Real array. the physical x coordinate in v0
-!! @param[in] chi_2 Real array. the physical y coordinate in v0
-!! @param[in] chi_3 Real array. the physical z coordinate in v0
-!! @param[in] chi_v3_3 Real array. the physical z coordinate in v3
-!! @param[in] v0_diff_basis Real 5-dim array holding differential of the basis functions for v0 evaluated at gaussian quadrature points 
+!! @param[in] chi_1 Real array. the physical x coordinate in w0
+!! @param[in] chi_2 Real array. the physical y coordinate in w0
+!! @param[in] chi_3 Real array. the physical z coordinate in w0
+!! @param[in] chi_w3_3 Real array. the physical z coordinate in w3
+!! @param[in] w0_diff_basis Real 5-dim array holding differential of the basis functions for w0 evaluated at gaussian quadrature points 
 !! @param[in] u Real array.     the velocity
-!! @param[in] v2_basis Real 5-dim array holding the basis functions for v2 evaluated at gaussian quadrature point
-!! @param[in] v2_diff_basis Real 5-dim array holding differential of the basis functions for v2 evaluated at gaussian quadrature point
+!! @param[in] w2_basis Real 5-dim array holding the basis functions for w2 evaluated at gaussian quadrature point
+!! @param[in] w2_diff_basis Real 5-dim array holding differential of the basis functions for w2 evaluated at gaussian quadrature point
 !! @param[inout] gq The gaussian quadrature rule 
-subroutine rrho_code(nlayers,ndf_v3, map_v3, v3_basis, gq, r_rho,              &
-                             ndf_v2, map_v2, v2_basis, v2_diff_basis,          &
+subroutine rrho_code(nlayers,ndf_w3, map_w3, w3_basis, gq, r_rho,              &
+                             ndf_w2, map_w2, w2_basis, w2_diff_basis,          &
                              orientation, u,                                   &
-                             ndf_v0, map_v0, v0_diff_basis, chi_1, chi_2,      &
-                             chi_3, chi_v3_3                                   &
+                             ndf_w0, map_w0, w0_diff_basis, chi_1, chi_2,      &
+                             chi_3, chi_w3_3                                   &
                              )
                              
   use coordinate_jacobian_mod, only: coordinate_jacobian
@@ -86,28 +86,28 @@ subroutine rrho_code(nlayers,ndf_v3, map_v3, v3_basis, gq, r_rho,              &
   
   !Arguments
   integer, intent(in) :: nlayers
-  integer, intent(in) :: ndf_v0, ndf_v2, ndf_v3
-  integer, intent(in) :: map_v0(ndf_v0), map_v2(ndf_v2), map_v3(ndf_v3)
-  integer, intent(in), dimension(ndf_v2) :: orientation
-  real(kind=r_def), intent(in), dimension(1,ndf_v3,ngp_h,ngp_v) :: v3_basis  
-  real(kind=r_def), intent(in), dimension(3,ndf_v2,ngp_h,ngp_v) :: v2_basis 
-  real(kind=r_def), intent(in), dimension(1,ndf_v2,ngp_h,ngp_v) :: v2_diff_basis
-  real(kind=r_def), intent(in), dimension(3,ndf_v0,ngp_h,ngp_v) :: v0_diff_basis 
+  integer, intent(in) :: ndf_w0, ndf_w2, ndf_w3
+  integer, intent(in) :: map_w0(ndf_w0), map_w2(ndf_w2), map_w3(ndf_w3)
+  integer, intent(in), dimension(ndf_w2) :: orientation
+  real(kind=r_def), intent(in), dimension(1,ndf_w3,ngp_h,ngp_v) :: w3_basis  
+  real(kind=r_def), intent(in), dimension(3,ndf_w2,ngp_h,ngp_v) :: w2_basis 
+  real(kind=r_def), intent(in), dimension(1,ndf_w2,ngp_h,ngp_v) :: w2_diff_basis
+  real(kind=r_def), intent(in), dimension(3,ndf_w0,ngp_h,ngp_v) :: w0_diff_basis 
   real(kind=r_def), intent(inout) :: r_rho(*)
-  real(kind=r_def), intent(in) :: chi_1(*), chi_2(*), chi_3(*), chi_v3_3(*), u(*)
+  real(kind=r_def), intent(in) :: chi_1(*), chi_2(*), chi_3(*), chi_w3_3(*), u(*)
   type(gaussian_quadrature_type), intent(inout) :: gq
 
   !Internal variables
   integer               :: df, k, loc
   integer               :: qp1, qp2
   
-  real(kind=r_def) :: exner_s(ndf_v3), rho_s(ndf_v3), theta_s(ndf_v0)
-  real(kind=r_def), dimension(ndf_v0) :: chi_1_e, chi_2_e, chi_3_e
-  real(kind=r_def), dimension(ndf_v3) :: chi_v3_3_e
-  real(kind=r_def), dimension(ndf_v2) :: u_e
+  real(kind=r_def) :: exner_s(ndf_w3), rho_s(ndf_w3), theta_s(ndf_w0)
+  real(kind=r_def), dimension(ndf_w0) :: chi_1_e, chi_2_e, chi_3_e
+  real(kind=r_def), dimension(ndf_w3) :: chi_w3_3_e
+  real(kind=r_def), dimension(ndf_w2) :: u_e
   real(kind=r_def), dimension(ngp_h,ngp_v)        :: dj
   real(kind=r_def), dimension(3,3,ngp_h,ngp_v)    :: jac
-  real(kind=r_def), dimension(ngp_h,ngp_v,ndf_v3) :: f
+  real(kind=r_def), dimension(ngp_h,ngp_v,ndf_w3) :: f
   real(kind=r_def) :: rho_s_at_quad, div_u_at_quad, div_term, bouy_term
   real(kind=r_def) :: u_at_quad(3), k_vec(3), vec_term
   
@@ -115,47 +115,47 @@ subroutine rrho_code(nlayers,ndf_v3, map_v3, v3_basis, gq, r_rho,              &
   
   do k = 0, nlayers-1
   ! Extract element arrays of chi
-    do df = 1, ndf_v0
-      loc = map_v0(df) + k
+    do df = 1, ndf_w0
+      loc = map_w0(df) + k
       chi_1_e(df) = chi_1( loc )
       chi_2_e(df) = chi_2( loc )
       chi_3_e(df) = chi_3( loc )
     end do
-    do df = 1, ndf_v3
-      chi_v3_3_e(df) = chi_v3_3( map_v3(df) + k )
+    do df = 1, ndf_w3
+      chi_w3_3_e(df) = chi_w3_3( map_w3(df) + k )
     end do
-    call coordinate_jacobian(ndf_v0, ngp_h, ngp_v, chi_1_e, chi_2_e, chi_3_e,  &
-                             v0_diff_basis, jac, dj)
-    call reference_profile(ndf_v0, ndf_v3, exner_s, rho_s, theta_s, chi_3_e,   &
-                           chi_v3_3_e)
-    do df = 1, ndf_v2
-      u_e(df) = u( map_v2(df) + k )*real(orientation(df))
+    call coordinate_jacobian(ndf_w0, ngp_h, ngp_v, chi_1_e, chi_2_e, chi_3_e,  &
+                             w0_diff_basis, jac, dj)
+    call reference_profile(ndf_w0, ndf_w3, exner_s, rho_s, theta_s, chi_3_e,   &
+                           chi_w3_3_e)
+    do df = 1, ndf_w2
+      u_e(df) = u( map_w2(df) + k )*real(orientation(df))
     end do
   ! compute the RHS integrated over one cell
     do qp2 = 1, ngp_v
       do qp1 = 1, ngp_h
         u_at_quad(:) = 0.0_r_def
         div_u_at_quad = 0.0_r_def
-        do df = 1, ndf_v2
-          u_at_quad(:)  = u_at_quad(:)  + u_e(df)*v2_basis(:,df,qp1,qp2)
-          div_u_at_quad = div_u_at_quad + u_e(df)*v2_diff_basis(1,df,qp1,qp2)
+        do df = 1, ndf_w2
+          u_at_quad(:)  = u_at_quad(:)  + u_e(df)*w2_basis(:,df,qp1,qp2)
+          div_u_at_quad = div_u_at_quad + u_e(df)*w2_diff_basis(1,df,qp1,qp2)
         end do
         rho_s_at_quad = 0.0_r_def
-        do df = 1, ndf_v3
-          rho_s_at_quad = rho_s_at_quad + rho_s(df)*v3_basis(1,df,qp1,qp2)
+        do df = 1, ndf_w3
+          rho_s_at_quad = rho_s_at_quad + rho_s(df)*w3_basis(1,df,qp1,qp2)
         end do
        
         div_term  =  - rho_s_at_quad*div_u_at_quad 
         vec_term = dot_product(k_vec,matmul(jac(:,:,qp1,qp2),u_at_quad))                               
         bouy_term =  n_sq/gravity*rho_s_at_quad*vec_term
         
-        do df = 1, ndf_v3
-          f(qp1,qp2,df) = v3_basis(1,df,qp1,qp2)*( bouy_term + div_term )
+        do df = 1, ndf_w3
+          f(qp1,qp2,df) = w3_basis(1,df,qp1,qp2)*( bouy_term + div_term )
         end do
       end do
     end do
-    do df = 1, ndf_v3
-      r_rho( map_v3(df) + k ) =  gq%integrate(f(:,:,df))
+    do df = 1, ndf_w3
+      r_rho( map_w3(df) + k ) =  gq%integrate(f(:,:,df))
     end do 
   end do
   

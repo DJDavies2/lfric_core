@@ -15,7 +15,7 @@
 module initial_theta_kernel_mod
 use kernel_mod,              only : kernel_type
 use argument_mod,            only: arg_type, &          ! the type
-                                   gh_rw, gh_read, v0, fe, cells ! the enums
+                                   gh_rw, gh_read, w0, fe, cells ! the enums
 use constants_mod,           only: pi, r_def
 
 implicit none
@@ -27,10 +27,10 @@ implicit none
 type, public, extends(kernel_type) :: initial_theta_kernel_type
   private
   type(arg_type) :: meta_args(4) = [ &
-       arg_type(gh_rw,  v0,fe,.false.,.false.,.false.,.false.), &
-       arg_type(gh_read,v0,fe,.false.,.false.,.false.,.false.), &
-       arg_type(gh_read,v0,fe,.false.,.false.,.false.,.false.), &
-       arg_type(gh_read,v0,fe,.false.,.false.,.false.,.false.) &
+       arg_type(gh_rw,  w0,fe,.false.,.false.,.false.,.false.), &
+       arg_type(gh_read,w0,fe,.false.,.false.,.false.,.false.), &
+       arg_type(gh_read,w0,fe,.false.,.false.,.false.,.false.), &
+       arg_type(gh_read,w0,fe,.false.,.false.,.false.,.false.) &
        ]
   integer :: iterates_over = cells
 

@@ -11,10 +11,10 @@
 
 !> @details Contains hand-rolled versions of the Psy layer that can be used for
 !> simple testing and development of the scientific code
-!> @param invoke_RHS_V3                     Invoke the RHS for a v3 field
-!> @param invoke_v3_solver_kernel           Invoke the solver for a v3 field kernel
-!> @param invoke_rhs_v2                     Invoke the RHS for a v2 field
-!> @param invoke_rhs_v1                     Invoke the RHS for a v1 field
+!> @param invoke_RHS_W3                     Invoke the RHS for a w3 field
+!> @param invoke_w3_solver_kernel           Invoke the solver for a w3 field kernel
+!> @param invoke_rhs_w2                     Invoke the RHS for a w2 field
+!> @param invoke_rhs_w1                     Invoke the RHS for a w1 field
 !> @param invoke_matrix_vector_w0           Invoke the A*x for x in W0 field
 !> @param invoke_matrix_vector_w1           Invoke the A*x for x in W1 field
 !> @param invoke_matrix_vector_w2           Invoke the A*x for x in W2 field
@@ -37,10 +37,10 @@ module psy
 
 contains
 
-!> Invoke the RHS kernel for a v3 field
-  subroutine invoke_rhs_v3( right_hand_side, chi )
+!> Invoke the RHS kernel for a w3 field
+  subroutine invoke_rhs_w3( right_hand_side, chi )
 
-    use v3_rhs_kernel_mod, only : rhs_v3_code
+    use w3_rhs_kernel_mod, only : rhs_w3_code
 
     implicit none
 
@@ -50,9 +50,9 @@ contains
     type( field_proxy_type)           :: right_hand_side_proxy
     type( field_proxy_type)           :: chi_proxy(3)
     integer :: cell
-    integer, pointer :: map_v3(:), map_v0(:)
+    integer, pointer :: map_w3(:), map_w0(:)
 
-    real(kind=r_def), pointer  :: v3_basis(:,:,:,:), v0_diff_basis(:,:,:,:)
+    real(kind=r_def), pointer  :: w3_basis(:,:,:,:), w0_diff_basis(:,:,:,:)
 
     right_hand_side_proxy = right_hand_side%get_proxy()
     chi_proxy(1) = chi(1)%get_proxy()
@@ -60,41 +60,41 @@ contains
     chi_proxy(3) = chi(3)%get_proxy()
     ! Unpack data
 
-    v3_basis => right_hand_side_proxy%vspace%get_basis( )
-    v0_diff_basis => chi_proxy(1)%vspace%get_diff_basis( )
+    w3_basis => right_hand_side_proxy%vspace%get_basis( )
+    w0_diff_basis => chi_proxy(1)%vspace%get_diff_basis( )
     do cell = 1, right_hand_side_proxy%vspace%get_ncell()
-       map_v3 => right_hand_side_proxy%vspace%get_cell_dofmap( cell )
-       map_v0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
-       call rhs_v3_code( right_hand_side_proxy%vspace%get_nlayers(), &
+       map_w3 => right_hand_side_proxy%vspace%get_cell_dofmap( cell )
+       map_w0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
+       call rhs_w3_code( right_hand_side_proxy%vspace%get_nlayers(), &
                          right_hand_side_proxy%vspace%get_ndf( ), &
-                         map_v3, &
-                         v3_basis, &
+                         map_w3, &
+                         w3_basis, &
                          right_hand_side_proxy%data, &
                          right_hand_side_proxy%gaussian_quadrature, &
                          chi_proxy(1)%vspace%get_ndf( ), &
-                         map_v0, &
+                         map_w0, &
                          chi_proxy(1)%data, &
                          chi_proxy(2)%data, &
                          chi_proxy(3)%data, &
-                         v0_diff_basis)
+                         w0_diff_basis)
     end do
 
-  end subroutine invoke_rhs_v3
+  end subroutine invoke_rhs_w3
   
 !-------------------------------------------------------------------------------  
 
-!> Invoke the solver kernel for a v3 field kernel
-  subroutine invoke_v3_solver_kernel( lhs, rhs, chi )
+!> Invoke the solver kernel for a w3 field kernel
+  subroutine invoke_w3_solver_kernel( lhs, rhs, chi )
 
-    use v3_solver_kernel_mod, only : solver_v3_code
+    use w3_solver_kernel_mod, only : solver_w3_code
 
     type( field_type ), intent( in ) :: lhs
     type( field_type ), intent( in ) :: rhs
     type( field_type ), intent( in ) :: chi(3)
 
     integer                    :: cell
-    integer, pointer           :: map_v3(:), map_v0(:)
-    real(kind=r_def), pointer  :: v3_basis(:,:,:,:), v0_diff_basis(:,:,:,:)
+    integer, pointer           :: map_w3(:), map_w0(:)
+    real(kind=r_def), pointer  :: w3_basis(:,:,:,:), w0_diff_basis(:,:,:,:)
 
     type( field_proxy_type )        :: lhs_proxy
     type( field_proxy_type )        :: rhs_proxy 
@@ -106,34 +106,34 @@ contains
     chi_proxy(2) = chi(2)%get_proxy()
     chi_proxy(3) = chi(3)%get_proxy()
     
-    v3_basis => lhs_proxy%vspace%get_basis( )
+    w3_basis => lhs_proxy%vspace%get_basis( )
     
-    v0_diff_basis => chi_proxy(1)%vspace%get_diff_basis( )
+    w0_diff_basis => chi_proxy(1)%vspace%get_diff_basis( )
     
      do cell = 1, lhs_proxy%vspace%get_ncell()
-       map_v3 => lhs_proxy%vspace%get_cell_dofmap( cell )
-       map_v0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
-       call solver_v3_code( lhs_proxy%vspace%get_nlayers(), &
+       map_w3 => lhs_proxy%vspace%get_cell_dofmap( cell )
+       map_w0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
+       call solver_w3_code( lhs_proxy%vspace%get_nlayers(), &
                             lhs_proxy%vspace%get_ndf( ), &
-                            map_v3, &
-                            v3_basis, &
+                            map_w3, &
+                            w3_basis, &
                             lhs_proxy%data, &
                             rhs_proxy%data, &
                             lhs_proxy%gaussian_quadrature, &
                             chi_proxy(1)%vspace%get_ndf( ), &
-                            map_v0, &                            
-                            v0_diff_basis, &
+                            map_w0, &                            
+                            w0_diff_basis, &
                             chi_proxy(1)%data, &
                             chi_proxy(2)%data, &
                             chi_proxy(3)%data )
     end do 
-  end subroutine invoke_v3_solver_kernel
+  end subroutine invoke_w3_solver_kernel
   
 !-------------------------------------------------------------------------------  
 
-  subroutine invoke_rhs_v2( right_hand_side )
+  subroutine invoke_rhs_w2( right_hand_side )
 
-    use v2_kernel_mod, only : rhs_v2_code
+    use w2_kernel_mod, only : rhs_w2_code
 
     implicit none
 
@@ -150,7 +150,7 @@ contains
     basis => rhs_proxy%vspace%get_basis()
     do cell = 1, rhs_proxy%vspace%get_ncell()
        map=> rhs_proxy%vspace%get_cell_dofmap(cell)
-       call rhs_v2_code( rhs_proxy%vspace%get_nlayers(), &
+       call rhs_w2_code( rhs_proxy%vspace%get_nlayers(), &
                          rhs_proxy%vspace%get_ndf(), &
                          rhs_proxy%vspace%get_undf(), &
                          map, &
@@ -158,13 +158,13 @@ contains
                          rhs_proxy%data, &
                          rhs_proxy%gaussian_quadrature )
     end do
-  end subroutine invoke_rhs_v2
+  end subroutine invoke_rhs_w2
   
 !------------------------------------------------------------------------------- 
 
-  subroutine invoke_rhs_v1( rhs )
+  subroutine invoke_rhs_w1( rhs )
 
-    use v1_kernel_mod, only : rhs_v1_code
+    use w1_kernel_mod, only : rhs_w1_code
 
     implicit none
 
@@ -181,7 +181,7 @@ contains
     basis=>rhs_p%vspace%get_basis()
     do cell = 1, rhs_p%vspace%get_ncell()
        map=> rhs_p%vspace%get_cell_dofmap(cell)
-       call rhs_v1_code( rhs_p%vspace%get_nlayers(), &
+       call rhs_w1_code( rhs_p%vspace%get_nlayers(), &
                          rhs_p%vspace%get_ndf(), &
                          rhs_p%vspace%get_undf(), &
                          map, &
@@ -189,7 +189,7 @@ contains
                          rhs_p%data, &
                          rhs_p%gaussian_quadrature )
     end do
-  end subroutine invoke_rhs_v1
+  end subroutine invoke_rhs_w1
   
 !-------------------------------------------------------------------------------  
 
@@ -340,7 +340,7 @@ contains
     type( field_type ), intent( in ) :: chi(3)
 
     integer                 :: cell
-    integer, pointer        :: map_v0(:)
+    integer, pointer        :: map_w0(:)
 
     type( field_proxy_type )        :: theta_proxy
     type( field_proxy_type )        :: chi_proxy(3)
@@ -351,10 +351,10 @@ contains
     chi_proxy(3) = chi(3)%get_proxy()
     
      do cell = 1, theta_proxy%vspace%get_ncell()
-       map_v0 => theta_proxy%vspace%get_cell_dofmap( cell )
+       map_w0 => theta_proxy%vspace%get_cell_dofmap( cell )
        call initial_theta_code( theta_proxy%vspace%get_nlayers(), &
                                 theta_proxy%vspace%get_ndf( ), &
-                                map_v0, &
+                                map_w0, &
                                 theta_proxy%data, &
                                 chi_proxy(1)%data, &
                                 chi_proxy(2)%data, &
@@ -372,17 +372,17 @@ contains
     type( field_type ), intent( in ) :: u
 
     integer                 :: cell
-    integer, pointer        :: map_v2(:)
+    integer, pointer        :: map_w2(:)
 
     type( field_proxy_type )        :: u_proxy
 
     u_proxy  = u%get_proxy()
     
      do cell = 1, u_proxy%vspace%get_ncell()
-       map_v2 => u_proxy%vspace%get_cell_dofmap( cell )
+       map_w2 => u_proxy%vspace%get_cell_dofmap( cell )
        call initial_u_code( u_proxy%vspace%get_nlayers(), &
                             u_proxy%vspace%get_ndf( ), &
-                            map_v2, &
+                            map_w2, &
                             u_proxy%data &
                            )
     end do 
@@ -397,17 +397,17 @@ contains
     type( field_type ), intent( in ) :: rho
 
     integer                 :: cell
-    integer, pointer        :: map_v3(:)
+    integer, pointer        :: map_w3(:)
 
     type( field_proxy_type )        :: rho_proxy
 
     rho_proxy  = rho%get_proxy()
     
      do cell = 1, rho_proxy%vspace%get_ncell()
-       map_v3 => rho_proxy%vspace%get_cell_dofmap( cell )
+       map_w3 => rho_proxy%vspace%get_cell_dofmap( cell )
        call initial_rho_code( rho_proxy%vspace%get_nlayers(), &
                               rho_proxy%vspace%get_ndf( ), &
-                              map_v3, &
+                              map_w3, &
                               rho_proxy%data &
                             )
     end do 
@@ -415,136 +415,136 @@ contains
   
 !-------------------------------------------------------------------------------  
 
-  subroutine invoke_calc_exner_kernel( exner, rho, theta, chi, chi_v3_3 )
+  subroutine invoke_calc_exner_kernel( exner, rho, theta, chi, chi_w3_3 )
 
     use calc_exner_kernel_mod, only : calc_exner_code
 
     type( field_type ), intent( in ) :: exner, rho, theta
-    type( field_type ), intent( in ) :: chi(3), chi_v3_3
+    type( field_type ), intent( in ) :: chi(3), chi_w3_3
 
     integer                 :: cell
-    integer, pointer        :: map_v3(:), map_v0(:)
+    integer, pointer        :: map_w3(:), map_w0(:)
 
     type( field_proxy_type )        :: exner_proxy, rho_proxy, theta_proxy
-    type( field_proxy_type )        :: chi_proxy(3), chi_v3_3_proxy
+    type( field_proxy_type )        :: chi_proxy(3), chi_w3_3_proxy
     
-    real(kind=r_def), pointer  :: basis_v3(:,:,:,:), &
-                                  basis_v0(:,:,:,:), &
-                                  diff_basis_v0(:,:,:,:)
+    real(kind=r_def), pointer  :: basis_w3(:,:,:,:), &
+                                  basis_w0(:,:,:,:), &
+                                  diff_basis_w0(:,:,:,:)
 
     exner_proxy  = exner%get_proxy()
     rho_proxy    = rho%get_proxy()
     theta_proxy  = theta%get_proxy()
-    chi_v3_3_proxy = chi_v3_3%get_proxy()
+    chi_w3_3_proxy = chi_w3_3%get_proxy()
     chi_proxy(1) = chi(1)%get_proxy()
     chi_proxy(2) = chi(2)%get_proxy()
     chi_proxy(3) = chi(3)%get_proxy()
     
-    basis_v3 => exner_proxy%vspace%get_basis() 
-    basis_v0 => theta_proxy%vspace%get_basis() 
-    diff_basis_v0 => chi_proxy(1)%vspace%get_diff_basis() 
+    basis_w3 => exner_proxy%vspace%get_basis() 
+    basis_w0 => theta_proxy%vspace%get_basis() 
+    diff_basis_w0 => chi_proxy(1)%vspace%get_diff_basis() 
     
     do cell = 1,exner_proxy%vspace%get_ncell()
-       map_v3 => exner_proxy%vspace%get_cell_dofmap( cell )
-       map_v0 => theta_proxy%vspace%get_cell_dofmap( cell )
+       map_w3 => exner_proxy%vspace%get_cell_dofmap( cell )
+       map_w0 => theta_proxy%vspace%get_cell_dofmap( cell )
 
        call calc_exner_code( exner_proxy%vspace%get_nlayers(), &
                              exner_proxy%vspace%get_ndf( ), &
-                             map_v3, &
-                             basis_v3, &
+                             map_w3, &
+                             basis_w3, &
                              exner_proxy%gaussian_quadrature, &
                              exner_proxy%data, &
                              rho_proxy%data, &
                              theta_proxy%vspace%get_ndf( ), &
-                             map_v0, &
-                             basis_v0, &                             
+                             map_w0, &
+                             basis_w0, &                             
                              theta_proxy%data, &
-                             diff_basis_v0, &   
+                             diff_basis_w0, &   
                              chi_proxy(1)%data, &
                              chi_proxy(2)%data, &
                              chi_proxy(3)%data,  &
-                             chi_v3_3_proxy%data  &
+                             chi_w3_3_proxy%data  &
                                )
     end do 
   end subroutine invoke_calc_exner_kernel  
   
 !-------------------------------------------------------------------------------  
 
-  subroutine invoke_rtheta_kernel( r_theta, u,  chi, chi_v3_3 )
+  subroutine invoke_rtheta_kernel( r_theta, u,  chi, chi_w3_3 )
 
     use rtheta_kernel_mod, only : rtheta_code
 
-    type( field_type ), intent( in ) :: r_theta, u, chi_v3_3
+    type( field_type ), intent( in ) :: r_theta, u, chi_w3_3
     type( field_type ), intent( in ) :: chi(3)
 
     integer                 :: cell
-    integer, pointer        :: map_v3(:), map_v2(:), map_v0(:), orientation_v2(:)
+    integer, pointer        :: map_w3(:), map_w2(:), map_w0(:), orientation_w2(:)
 
-    type( field_proxy_type )        :: r_theta_proxy, u_proxy, chi_v3_3_proxy
+    type( field_proxy_type )        :: r_theta_proxy, u_proxy, chi_w3_3_proxy
     type( field_proxy_type )        :: chi_proxy(3)
     
-    real(kind=r_def), pointer  :: basis_v2(:,:,:,:), &
-                                  basis_v0(:,:,:,:), &
-                                  diff_basis_v0(:,:,:,:)
+    real(kind=r_def), pointer  :: basis_w2(:,:,:,:), &
+                                  basis_w0(:,:,:,:), &
+                                  diff_basis_w0(:,:,:,:)
 
     r_theta_proxy   = r_theta%get_proxy()
     u_proxy         = u%get_proxy()
-    chi_v3_3_proxy  = chi_v3_3%get_proxy()
+    chi_w3_3_proxy  = chi_w3_3%get_proxy()
     chi_proxy(1) = chi(1)%get_proxy()
     chi_proxy(2) = chi(2)%get_proxy()
     chi_proxy(3) = chi(3)%get_proxy()
     
-    basis_v2 => u_proxy%vspace%get_basis() 
-    basis_v0 => r_theta_proxy%vspace%get_basis() 
-    diff_basis_v0 => chi_proxy(1)%vspace%get_diff_basis() 
+    basis_w2 => u_proxy%vspace%get_basis() 
+    basis_w0 => r_theta_proxy%vspace%get_basis() 
+    diff_basis_w0 => chi_proxy(1)%vspace%get_diff_basis() 
     
     do cell = 1, r_theta_proxy%vspace%get_ncell()
-       map_v0 => r_theta_proxy%vspace%get_cell_dofmap( cell )
-       map_v2 => u_proxy%vspace%get_cell_dofmap( cell )
-       map_v3 => chi_v3_3_proxy%vspace%get_cell_dofmap( cell )
-       orientation_v2 => u_proxy%vspace%get_cell_orientation ( cell )
+       map_w0 => r_theta_proxy%vspace%get_cell_dofmap( cell )
+       map_w2 => u_proxy%vspace%get_cell_dofmap( cell )
+       map_w3 => chi_w3_3_proxy%vspace%get_cell_dofmap( cell )
+       orientation_w2 => u_proxy%vspace%get_cell_orientation ( cell )
        call rtheta_code( r_theta_proxy%vspace%get_nlayers(), &
                          r_theta_proxy%vspace%get_ndf( ), &
-                         map_v0, &
-                         basis_v0, &
+                         map_w0, &
+                         basis_w0, &
                          r_theta_proxy%gaussian_quadrature, &
                          r_theta_proxy%data, &
                          u_proxy%vspace%get_ndf( ), &
-                         map_v2, &
-                         basis_v2, &
-                         orientation_v2, &
+                         map_w2, &
+                         basis_w2, &
+                         orientation_w2, &
                          u_proxy%data, &                        
-                         diff_basis_v0, &   
+                         diff_basis_w0, &   
                          chi_proxy(1)%data, &
                          chi_proxy(2)%data, &
                          chi_proxy(3)%data, &
-                         chi_v3_3_proxy%vspace%get_ndf( ), &
-                         map_v3, &
-                         chi_v3_3_proxy%data & 
+                         chi_w3_3_proxy%vspace%get_ndf( ), &
+                         map_w3, &
+                         chi_w3_3_proxy%data & 
                          )
     end do 
   end subroutine invoke_rtheta_kernel 
   
 !-------------------------------------------------------------------------------  
 
-  subroutine invoke_ru_kernel( r_u, exner, theta, chi, chi_v3_3 )
+  subroutine invoke_ru_kernel( r_u, exner, theta, chi, chi_w3_3 )
 
     use ru_kernel_mod, only : ru_code
 
     type( field_type ), intent( in ) :: r_u, exner, theta
-    type( field_type ), intent( in ) :: chi(3), chi_v3_3
+    type( field_type ), intent( in ) :: chi(3), chi_w3_3
 
     integer                 :: cell
-    integer, pointer        :: map_v3(:), map_v2(:), map_v0(:), boundary_dofs(:,:)
+    integer, pointer        :: map_w3(:), map_w2(:), map_w0(:), boundary_dofs(:,:)
 
     type( field_proxy_type )        :: r_u_proxy, exner_proxy, theta_proxy
-    type( field_proxy_type )        :: chi_proxy(3), chi_v3_3_proxy
+    type( field_proxy_type )        :: chi_proxy(3), chi_w3_3_proxy
     
-    real(kind=r_def), pointer  :: basis_v3(:,:,:,:), &
-                                  basis_v2(:,:,:,:), &
-                                  basis_v0(:,:,:,:), &
-                                  diff_basis_v0(:,:,:,:), &
-                                  diff_basis_v2(:,:,:,:)
+    real(kind=r_def), pointer  :: basis_w3(:,:,:,:), &
+                                  basis_w2(:,:,:,:), &
+                                  basis_w0(:,:,:,:), &
+                                  diff_basis_w0(:,:,:,:), &
+                                  diff_basis_w2(:,:,:,:)
 
     r_u_proxy  = r_u%get_proxy()
     exner_proxy = exner%get_proxy()
@@ -552,101 +552,101 @@ contains
     chi_proxy(1) = chi(1)%get_proxy()
     chi_proxy(2) = chi(2)%get_proxy()
     chi_proxy(3) = chi(3)%get_proxy()
-    chi_v3_3_proxy = chi_v3_3%get_proxy()
+    chi_w3_3_proxy = chi_w3_3%get_proxy()
     
     boundary_dofs => r_u_proxy%vspace%get_boundary_dofs()
     
-    basis_v3 => exner_proxy%vspace%get_basis() 
-    basis_v2 => r_u_proxy%vspace%get_basis() 
-    diff_basis_v2 => r_u_proxy%vspace%get_diff_basis() 
-    basis_v0 => theta_proxy%vspace%get_basis() 
-    diff_basis_v0 => chi_proxy(1)%vspace%get_diff_basis() 
+    basis_w3 => exner_proxy%vspace%get_basis() 
+    basis_w2 => r_u_proxy%vspace%get_basis() 
+    diff_basis_w2 => r_u_proxy%vspace%get_diff_basis() 
+    basis_w0 => theta_proxy%vspace%get_basis() 
+    diff_basis_w0 => chi_proxy(1)%vspace%get_diff_basis() 
     
     do cell = 1, r_u_proxy%vspace%get_ncell()
-       map_v3 => exner_proxy%vspace%get_cell_dofmap( cell )
-       map_v2 => r_u_proxy%vspace%get_cell_dofmap( cell )
-       map_v0 => theta_proxy%vspace%get_cell_dofmap( cell )
+       map_w3 => exner_proxy%vspace%get_cell_dofmap( cell )
+       map_w2 => r_u_proxy%vspace%get_cell_dofmap( cell )
+       map_w0 => theta_proxy%vspace%get_cell_dofmap( cell )
        call ru_code( r_u_proxy%vspace%get_nlayers(), &
                      r_u_proxy%vspace%get_ndf( ), &
-                     map_v2, &
-                     basis_v2, &
-                     diff_basis_v2, &
+                     map_w2, &
+                     basis_w2, &
+                     diff_basis_w2, &
                      r_u_proxy%gaussian_quadrature, &     
                      boundary_dofs, &
                      r_u_proxy%data, &
                      exner_proxy%vspace%get_ndf( ), &
-                     map_v3, &
-                     basis_v3, &                             
+                     map_w3, &
+                     basis_w3, &                             
                      exner_proxy%data, &
                      theta_proxy%vspace%get_ndf( ), &
-                     map_v0, &
-                     basis_v0, &
+                     map_w0, &
+                     basis_w0, &
                      theta_proxy%data, &                      
-                     diff_basis_v0, &   
+                     diff_basis_w0, &   
                      chi_proxy(1)%data, &
                      chi_proxy(2)%data, &
                      chi_proxy(3)%data,  &
-                     chi_v3_3_proxy%data &
+                     chi_w3_3_proxy%data &
                      )           
     end do 
   end subroutine invoke_ru_kernel   
   
 !-------------------------------------------------------------------------------  
 
-  subroutine invoke_rrho_kernel( r_rho, u, chi, chi_v3_3 )
+  subroutine invoke_rrho_kernel( r_rho, u, chi, chi_w3_3 )
 
     use rrho_kernel_mod, only : rrho_code
 
     type( field_type ), intent( in ) :: r_rho, u
-    type( field_type ), intent( in ) :: chi(3), chi_v3_3
+    type( field_type ), intent( in ) :: chi(3), chi_w3_3
 
     integer                 :: cell
-    integer, pointer        :: map_v3(:), map_v2(:), map_v0(:), orientation_v2(:)
+    integer, pointer        :: map_w3(:), map_w2(:), map_w0(:), orientation_w2(:)
 
     type( field_proxy_type )        :: r_rho_proxy, u_proxy
-    type( field_proxy_type )        :: chi_proxy(3), chi_v3_3_proxy
+    type( field_proxy_type )        :: chi_proxy(3), chi_w3_3_proxy
     
-    real(kind=r_def), pointer  :: basis_v3(:,:,:,:), &
-                                  basis_v2(:,:,:,:), &
-                                  diff_basis_v2(:,:,:,:), &
-                                  diff_basis_v0(:,:,:,:)
+    real(kind=r_def), pointer  :: basis_w3(:,:,:,:), &
+                                  basis_w2(:,:,:,:), &
+                                  diff_basis_w2(:,:,:,:), &
+                                  diff_basis_w0(:,:,:,:)
 
     r_rho_proxy  = r_rho%get_proxy()
     u_proxy      = u%get_proxy()
     chi_proxy(1) = chi(1)%get_proxy()
     chi_proxy(2) = chi(2)%get_proxy()
     chi_proxy(3) = chi(3)%get_proxy()
-    chi_v3_3_proxy = chi_v3_3%get_proxy()
+    chi_w3_3_proxy = chi_w3_3%get_proxy()
     
-    basis_v3 => r_rho_proxy%vspace%get_basis() 
-    basis_v2 => u_proxy%vspace%get_basis() 
-    diff_basis_v2 => u_proxy%vspace%get_diff_basis() 
-    diff_basis_v0 => chi_proxy(1)%vspace%get_diff_basis() 
+    basis_w3 => r_rho_proxy%vspace%get_basis() 
+    basis_w2 => u_proxy%vspace%get_basis() 
+    diff_basis_w2 => u_proxy%vspace%get_diff_basis() 
+    diff_basis_w0 => chi_proxy(1)%vspace%get_diff_basis() 
     
     do cell = 1, r_rho_proxy%vspace%get_ncell()
-       map_v3 => r_rho_proxy%vspace%get_cell_dofmap( cell )
-       map_v2 => u_proxy%vspace%get_cell_dofmap( cell )
-       map_v0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
-       orientation_v2 => u_proxy%vspace%get_cell_orientation( cell )
+       map_w3 => r_rho_proxy%vspace%get_cell_dofmap( cell )
+       map_w2 => u_proxy%vspace%get_cell_dofmap( cell )
+       map_w0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
+       orientation_w2 => u_proxy%vspace%get_cell_orientation( cell )
        call rrho_code( r_rho_proxy%vspace%get_nlayers(), &
                        r_rho_proxy%vspace%get_ndf( ), &
-                       map_v3, &
-                       basis_v3, &
+                       map_w3, &
+                       basis_w3, &
                        r_rho_proxy%gaussian_quadrature, &
                        r_rho_proxy%data, &
                        u_proxy%vspace%get_ndf( ), &
-                       map_v2, &
-                       basis_v2, &
-                       diff_basis_v2, &
-                       orientation_v2, &
+                       map_w2, &
+                       basis_w2, &
+                       diff_basis_w2, &
+                       orientation_w2, &
                        u_proxy%data, &
                        chi_proxy(1)%vspace%get_ndf( ), &
-                       map_v0, &
-                       diff_basis_v0, &   
+                       map_w0, &
+                       diff_basis_w0, &   
                        chi_proxy(1)%data, &
                        chi_proxy(2)%data, &
                        chi_proxy(3)%data, &
-                       chi_v3_3_proxy%data &
+                       chi_w3_3_proxy%data &
                        )
     end do 
   end subroutine invoke_rrho_kernel   
@@ -664,40 +664,40 @@ contains
     type( field_proxy_type )        :: w0_field_proxy
     type( field_proxy_type )        :: chi_proxy(3)
     integer                         :: cell
-    integer, pointer                :: map_v0(:)
-    real(kind=r_def), pointer       :: basis_v0(:,:,:,:), &
-                                       basis_v1(:,:,:,:), &
-                                       basis_v2(:,:,:,:), &
-                                       diff_basis_v0(:,:,:,:)
+    integer, pointer                :: map_w0(:)
+    real(kind=r_def), pointer       :: basis_w0(:,:,:,:), &
+                                       basis_w1(:,:,:,:), &
+                                       basis_w2(:,:,:,:), &
+                                       diff_basis_w0(:,:,:,:)
     
     
     w2_field_proxy  = w2_field%get_proxy()
-    basis_v2 => w2_field_proxy%vspace%get_basis() 
+    basis_w2 => w2_field_proxy%vspace%get_basis() 
     
     w1_field_proxy  = w1_field%get_proxy()
-    basis_v1 => w1_field_proxy%vspace%get_basis() 
+    basis_w1 => w1_field_proxy%vspace%get_basis() 
     
     w0_field_proxy  = w0_field%get_proxy()
-    basis_v0 => w0_field_proxy%vspace%get_basis() 
+    basis_w0 => w0_field_proxy%vspace%get_basis() 
     
     chi_proxy(1) = chi(1)%get_proxy()
     chi_proxy(2) = chi(2)%get_proxy()
     chi_proxy(3) = chi(3)%get_proxy()
-    diff_basis_v0 => chi_proxy(1)%vspace%get_diff_basis() 
+    diff_basis_w0 => chi_proxy(1)%vspace%get_diff_basis() 
     
     do cell = 1, w2_field_proxy%vspace%get_ncell()
-      map_v0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
+      map_w0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
       call compute_mass_matrix(cell, &
                                w0_field_proxy%vspace%get_nlayers(), &
                                w0_field_proxy%vspace%get_ndf( ), &
-                               basis_v0, &
+                               basis_w0, &
                                w1_field_proxy%vspace%get_ndf( ), &
-                               basis_v1, & 
+                               basis_w1, & 
                                w2_field_proxy%vspace%get_ndf( ), &
-                               basis_v2, &
+                               basis_w2, &
                                w0_field_proxy%gaussian_quadrature, &                               
-                               diff_basis_v0, &
-                               map_v0, &
+                               diff_basis_w0, &
+                               map_w0, &
                                chi_proxy(1)%data, &
                                chi_proxy(2)%data, &
                                chi_proxy(3)%data &                            

@@ -14,7 +14,7 @@
 
 module matrix_vector_w1_mod
 use argument_mod,            only : arg_type,                              &
-                                    gh_read, gh_inc, v1, fe, cells 
+                                    gh_read, gh_inc, w1, fe, cells 
 use constants_mod,           only : r_def
 use kernel_mod,              only : kernel_type
 use mass_matrices_mod,       only : w1_mass_matrix
@@ -28,8 +28,8 @@ implicit none
 type, public, extends(kernel_type) :: matrix_vector_kernel_type
   private
   type(arg_type) :: meta_args(2) = [                                       &
-       arg_type(gh_inc,  v1,fe,.false.,.false.,.false.,.false.),           &  
-       arg_type(gh_read ,v1,fe,.false.,.false.,.false.,.false.)            &
+       arg_type(gh_inc,  w1,fe,.false.,.false.,.false.,.false.),           &  
+       arg_type(gh_read ,w1,fe,.false.,.false.,.false.,.false.)            &
        ]
   integer :: iterates_over = cells
 contains

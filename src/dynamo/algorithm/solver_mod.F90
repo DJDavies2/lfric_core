@@ -23,8 +23,8 @@ module solver_mod
                               invoke_matrix_vector_w0,                         &
                               invoke_matrix_vector_w1,                         &
                               invoke_matrix_vector_w2,                         &
-                              invoke_v3_solver_kernel
-  use argument_mod,    only : v0, v1, v2, v3
+                              invoke_w3_solver_kernel
+  use argument_mod,    only : w0, w1, w2, w3
 
   implicit none
   private
@@ -44,8 +44,8 @@ contains
     type(field_type), intent(in)       :: chi(3)
     integer, intent(in)                :: space
     
-    if ( space == v3 ) then
-      call invoke_v3_solver_kernel(lhs, rhs, chi)
+    if ( space == w3 ) then
+      call invoke_w3_solver_kernel(lhs, rhs, chi)
     else
       call bicg_solver_algorithm(lhs, rhs, space)
     end if        
@@ -94,11 +94,11 @@ contains
     call invoke_set_field_scalar(0.0_r_def, v)
 
     select case ( space )
-      case ( v0 )
+      case ( w0 )
         call invoke_matrix_vector_w0(v,lhs )
-      case ( v1 )       
+      case ( w1 )       
         call invoke_matrix_vector_w1(v,lhs )
-      case ( v2 )
+      case ( w2 )
         call invoke_matrix_vector_w2(v,lhs )
     end select
     !PSY call invoke ( inner_prod(v,v,err))
@@ -156,11 +156,11 @@ contains
       !PSY call invoke ( set_field_scalar(0.0_r_def, v))
       call invoke_set_field_scalar(0.0_r_def, v)
       select case ( space )
-        case ( v0 )
+        case ( w0 )
           call invoke_matrix_vector_w0(v,p )
-        case ( v1 )       
+        case ( w1 )       
           call invoke_matrix_vector_w1(v,p )
-        case ( v2 )
+        case ( w2 )
           call invoke_matrix_vector_w2(v,p )
       end select
 
@@ -175,11 +175,11 @@ contains
       !PSY call invoke ( set_field_scalar(0.0_r_def, t))
       call invoke_set_field_scalar(0.0_r_def, t)
       select case ( space )
-        case ( v0 )
+        case ( w0 )
           call invoke_matrix_vector_w0( t, s )
-        case ( v1 )       
+        case ( w1 )       
           call invoke_matrix_vector_w1( t, s )
-        case ( v2 )
+        case ( w2 )
           call invoke_matrix_vector_w2( t, s )
       end select
 

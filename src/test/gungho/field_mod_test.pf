@@ -11,15 +11,15 @@ module field_mod_test
 
   use field_mod,               only : field_type,      &
                                       field_proxy_type
-  use function_space_mod,      only : function_space_type, V0
+  use function_space_mod,      only : function_space_type, W0
   use constants_mod,           only : r_def, i_def
   use mesh_mod,                only : num_cells, v_unique_dofs, num_layers
   use gaussian_quadrature_mod, only : gaussian_quadrature_type, &
                                       ngp_h, ngp_v, GQ3
-  use basis_function_mod,      only : v0_basis, &
-                                      v0_diff_basis, &
-                                      v0_nodal_coords
-  use dofmap_mod,              only : v0_dofmap
+  use basis_function_mod,      only : w0_basis, &
+                                      w0_diff_basis, &
+                                      w0_nodal_coords
+  use dofmap_mod,              only : w0_dofmap
   use pFUnit_Mod
 
   implicit none 
@@ -54,25 +54,25 @@ contains
       v_unique_dofs(i,2)=num_dofs
     enddo
 
-    if ( allocated(v0_basis) ) then
-      deallocate( v0_basis )
-      deallocate( v0_diff_basis )
-      deallocate( v0_nodal_coords )
-      deallocate( v0_dofmap )
+    if ( allocated(w0_basis) ) then
+      deallocate( w0_basis )
+      deallocate( w0_diff_basis )
+      deallocate( w0_nodal_coords )
+      deallocate( w0_dofmap )
     end if
 
-    allocate(v0_basis(1,v_unique_dofs(1,2),ngp_h,ngp_v))
-    allocate(v0_diff_basis(3,v_unique_dofs(1,2),ngp_h,ngp_v))
-    allocate(v0_nodal_coords(3,v_unique_dofs(1,2)))
-    allocate( v0_dofmap(0:num_cells,v_unique_dofs(1,2)) )
+    allocate(w0_basis(1,v_unique_dofs(1,2),ngp_h,ngp_v))
+    allocate(w0_diff_basis(3,v_unique_dofs(1,2),ngp_h,ngp_v))
+    allocate(w0_nodal_coords(3,v_unique_dofs(1,2)))
+    allocate( w0_dofmap(0:num_cells,v_unique_dofs(1,2)) )
 
-    v0_basis=sqrt(2.0)
-    v0_diff_basis=atan(4.0)
-    v0_nodal_coords(1,:)=0.152689632_r_def
-    v0_nodal_coords(2,:)=0.562554751_r_def
-    v0_nodal_coords(3,:)=-0.8234_r_def
+    w0_basis=sqrt(2.0)
+    w0_diff_basis=atan(4.0)
+    w0_nodal_coords(1,:)=0.152689632_r_def
+    w0_nodal_coords(2,:)=0.562554751_r_def
+    w0_nodal_coords(3,:)=-0.8234_r_def
     do i=0,num_cells
-      v0_dofmap(i,:) = i+64
+      w0_dofmap(i,:) = i+64
     end do
 
   end function construct_field_test
@@ -94,7 +94,7 @@ contains
                                         testnlayers
     integer :: fs, gq
 
-    f_field = field_type( vector_space = func_space%get_instance(V0), &
+    f_field = field_type( vector_space = func_space%get_instance(W0), &
                           gq = gaussian_quadrature%get_instance(GQ3) )
 
     f_field_proxy = f_field % get_proxy( )
@@ -107,7 +107,7 @@ contains
     @assertEqual( num_layers, testnlayers )
 
     fs = f_field%which_function_space()
-    @assertEqual(fs,V0)
+    @assertEqual(fs,W0)
 
     gq = f_field%which_gaussian_quadrature()
     @assertEqual(gq,GQ3)
@@ -120,7 +120,7 @@ contains
   subroutine test_half_field( this )
 
     use field_mod,          only: field_type, field_proxy_type
-    use function_space_mod, only: function_space_type, V0
+    use function_space_mod, only: function_space_type, W0
 
     implicit none
 
@@ -131,7 +131,7 @@ contains
     type( field_proxy_type )    :: test_field_accessor
     type( gaussian_quadrature_type ) :: gaussian_quadrature
 
-    test_field          = field_type( function_space%get_instance( V0 ), &
+    test_field          = field_type( function_space%get_instance( W0 ), &
                           gq = gaussian_quadrature%get_instance(GQ3) )
     test_field_accessor = test_field%get_proxy()
 
@@ -140,7 +140,7 @@ contains
 
     @assertEqual( test_field_accessor%vspace%get_nlayers(), num_layers )
 
-    @assertEqual( test_field%which_function_space(), V0 )
+    @assertEqual( test_field%which_function_space(), W0 )
 
     @assertEqual( test_field%which_gaussian_quadrature(), GQ3 )
 

@@ -27,48 +27,48 @@ module basis_function_mod
   implicit none
 
   !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the V0 function space
-  real(kind=r_def), allocatable :: v0_basis(:,:,:,:)
+  !> functions for the W0 function space
+  real(kind=r_def), allocatable :: w0_basis(:,:,:,:)
   !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the V1 function space
-  real(kind=r_def), allocatable :: v1_basis(:,:,:,:)
+  !> functions for the W1 function space
+  real(kind=r_def), allocatable :: w1_basis(:,:,:,:)
   !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the V2 function space
-  real(kind=r_def), allocatable :: v2_basis(:,:,:,:)
+  !> functions for the W2 function space
+  real(kind=r_def), allocatable :: w2_basis(:,:,:,:)
   !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the V3 function space
-  real(kind=r_def), allocatable :: v3_basis(:,:,:,:)
+  !> functions for the W3 function space
+  real(kind=r_def), allocatable :: w3_basis(:,:,:,:)
 
   !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the V0 differential function space
-  real(kind=r_def), allocatable :: v0_diff_basis(:,:,:,:)
+  !> functions for the W0 differential function space
+  real(kind=r_def), allocatable :: w0_diff_basis(:,:,:,:)
   !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the V1 differential function space
-  real(kind=r_def), allocatable :: v1_diff_basis(:,:,:,:)
+  !> functions for the W1 differential function space
+  real(kind=r_def), allocatable :: w1_diff_basis(:,:,:,:)
   !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the V2 differential function space
-  real(kind=r_def), allocatable :: v2_diff_basis(:,:,:,:)
+  !> functions for the W2 differential function space
+  real(kind=r_def), allocatable :: w2_diff_basis(:,:,:,:)
   !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the V3 differential function space
-  real(kind=r_def), allocatable :: v3_diff_basis(:,:,:,:)
+  !> functions for the W3 differential function space
+  real(kind=r_def), allocatable :: w3_diff_basis(:,:,:,:)
 
   !> 2-dim allocatable arrays of reals which hold the values of the nodal
-  !> co-ordinates for the V0 function space
-  real(kind=r_def), allocatable :: v0_nodal_coords(:,:)
+  !> co-ordinates for the W0 function space
+  real(kind=r_def), allocatable :: w0_nodal_coords(:,:)
   !> 2-dim allocatable arrays of reals which hold the values of the nodal
-  !> co-ordinates for the V1 function space
-  real(kind=r_def), allocatable :: v1_nodal_coords(:,:)
+  !> co-ordinates for the W1 function space
+  real(kind=r_def), allocatable :: w1_nodal_coords(:,:)
   !> 2-dim allocatable arrays of reals which hold the values of the nodal
-  !> co-ordinates for the V2 function space
-  real(kind=r_def), allocatable :: v2_nodal_coords(:,:)
+  !> co-ordinates for the W2 function space
+  real(kind=r_def), allocatable :: w2_nodal_coords(:,:)
   !> 2-dim allocatable arrays of reals which hold the values of the nodal
-  !> co-ordinates for the V3 function space
-  real(kind=r_def), allocatable :: v3_nodal_coords(:,:)
+  !> co-ordinates for the W3 function space
+  real(kind=r_def), allocatable :: w3_nodal_coords(:,:)
 
-  integer, allocatable :: v0_dof_on_vert_boundary(:,:)
-  integer, allocatable :: v1_dof_on_vert_boundary(:,:)
-  integer, allocatable :: v2_dof_on_vert_boundary(:,:)
-  integer, allocatable :: v3_dof_on_vert_boundary(:,:)
+  integer, allocatable :: w0_dof_on_vert_boundary(:,:)
+  integer, allocatable :: w1_dof_on_vert_boundary(:,:)
+  integer, allocatable :: w2_dof_on_vert_boundary(:,:)
+  integer, allocatable :: w3_dof_on_vert_boundary(:,:)
 
 contains 
 
@@ -88,34 +88,34 @@ contains
     integer, allocatable :: lx(:), ly(:), lz(:)
     real(kind=r_def)     :: fx, fy, fz, gx, gy, gz, dfx, dfy, dfz
     real(kind=r_def)     :: x1(k+2), x2(k+2)
-    !real(kind=r_def)     :: unit_vec_v2(nv2,3), unit_vec_v1(nv1,3)
-    real(kind=r_def), allocatable    :: unit_vec_v2(:,:), unit_vec_v1(:,:)
+    !real(kind=r_def)     :: unit_vec_w2(nw2,3), unit_vec_w1(nw1,3)
+    real(kind=r_def), allocatable    :: unit_vec_w2(:,:), unit_vec_w1(:,:)
     type( gaussian_quadrature_type ), pointer :: gq
 
-    allocate(v0_basis(1,v_unique_dofs(1,2),ngp_h,ngp_v))
-    allocate(v1_basis(3,v_unique_dofs(2,2),ngp_h,ngp_v))
-    allocate(v2_basis(3,v_unique_dofs(3,2),ngp_h,ngp_v))
-    allocate(v3_basis(1,v_unique_dofs(4,2),ngp_h,ngp_v))
-    allocate(v0_diff_basis(3,v_unique_dofs(1,2),ngp_h,ngp_v))
-    allocate(v1_diff_basis(3,v_unique_dofs(2,2),ngp_h,ngp_v))
-    allocate(v2_diff_basis(1,v_unique_dofs(3,2),ngp_h,ngp_v))
-    allocate(v3_diff_basis(1,v_unique_dofs(4,2),ngp_h,ngp_v))
-    allocate(v0_nodal_coords(3,v_unique_dofs(1,2)))
-    allocate(v1_nodal_coords(3,v_unique_dofs(2,2)))
-    allocate(v2_nodal_coords(3,v_unique_dofs(3,2)))
-    allocate(v3_nodal_coords(3,v_unique_dofs(4,2)))
-    allocate(v0_dof_on_vert_boundary(v_unique_dofs(1,2),2))
-    allocate(v1_dof_on_vert_boundary(v_unique_dofs(2,2),2))
-    allocate(v2_dof_on_vert_boundary(v_unique_dofs(3,2),2))
-    allocate(v3_dof_on_vert_boundary(v_unique_dofs(4,2),2))
+    allocate(w0_basis(1,v_unique_dofs(1,2),ngp_h,ngp_v))
+    allocate(w1_basis(3,v_unique_dofs(2,2),ngp_h,ngp_v))
+    allocate(w2_basis(3,v_unique_dofs(3,2),ngp_h,ngp_v))
+    allocate(w3_basis(1,v_unique_dofs(4,2),ngp_h,ngp_v))
+    allocate(w0_diff_basis(3,v_unique_dofs(1,2),ngp_h,ngp_v))
+    allocate(w1_diff_basis(3,v_unique_dofs(2,2),ngp_h,ngp_v))
+    allocate(w2_diff_basis(1,v_unique_dofs(3,2),ngp_h,ngp_v))
+    allocate(w3_diff_basis(1,v_unique_dofs(4,2),ngp_h,ngp_v))
+    allocate(w0_nodal_coords(3,v_unique_dofs(1,2)))
+    allocate(w1_nodal_coords(3,v_unique_dofs(2,2)))
+    allocate(w2_nodal_coords(3,v_unique_dofs(3,2)))
+    allocate(w3_nodal_coords(3,v_unique_dofs(4,2)))
+    allocate(w0_dof_on_vert_boundary(v_unique_dofs(1,2),2))
+    allocate(w1_dof_on_vert_boundary(v_unique_dofs(2,2),2))
+    allocate(w2_dof_on_vert_boundary(v_unique_dofs(3,2),2))
+    allocate(w3_dof_on_vert_boundary(v_unique_dofs(4,2),2))
 
     ! Allocate to be larger than should be needed
     allocate ( lx(3*(k+2)**3) )
     allocate ( ly(3*(k+2)**3) )
     allocate ( lz(3*(k+2)**3) )
 
-    allocate(unit_vec_v2(v_unique_dofs(3,2),3))
-    allocate(unit_vec_v1(v_unique_dofs(2,2),3))
+    allocate(unit_vec_w2(v_unique_dofs(3,2),3))
+    allocate(unit_vec_w1(v_unique_dofs(2,2),3))
 
     ! Create a gq object for now - Todo: we probably don't need to instantiate
     ! gq as all we ever do is call a method from it. Sort out later
@@ -165,7 +165,7 @@ contains
     j2l_edge(12,:) = (/ 2, 1, 3 /)
 
     !-----------------------------------------------------------------------------
-    ! Section for test/trial functions of v0 fields
+    ! Section for test/trial functions of w0 fields
     !-----------------------------------------------------------------------------
     order = k+1
 
@@ -214,7 +214,7 @@ contains
 
     ! dofs on vertices
     do i=1,nverts
-    !  do j1=1,nv0_vert
+    !  do j1=1,nw0_vert
       do j1=1,v_dof_entity(1,0)
         lx(idx) =  1+(k+1)*int(x_vert(i,1))
         ly(idx) =  1+(k+1)*int(x_vert(i,2))
@@ -223,7 +223,7 @@ contains
       end do
     end do
     do i=1,v_unique_dofs(1,2)
-    !do i=1,nv0
+    !do i=1,nw0
        ! explicitly for quads, as ngp_h = ngp_v * ngp_v
        h_ctr = 1
        do jx=1,ngp_v
@@ -235,29 +235,29 @@ contains
              do jz=1,ngp_v
                 fz = gq%poly1d(order,jz,x1(lz(i)),x1,lz(i))
                 dfz = gq%poly1d_deriv(order,jz,x1(lz(i)),x1,lz(i))
-                v0_basis(1,i,h_ctr,jz)=fx*fy*fz
-                v0_diff_basis(1,i,h_ctr,jz)=dfx*fy*fz
-                v0_diff_basis(2,i,h_ctr,jz)=fx*dfy*fz
-                v0_diff_basis(3,i,h_ctr,jz)=fx*fy*dfz 
+                w0_basis(1,i,h_ctr,jz)=fx*fy*fz
+                w0_diff_basis(1,i,h_ctr,jz)=dfx*fy*fz
+                w0_diff_basis(2,i,h_ctr,jz)=fx*dfy*fz
+                w0_diff_basis(3,i,h_ctr,jz)=fx*fy*dfz 
              end do
              h_ctr = h_ctr + 1 
           end do
        end do
 
-       v0_nodal_coords(1,i)=x1(lx(i))
-       v0_nodal_coords(2,i)=x1(ly(i))
-       v0_nodal_coords(3,i)=x1(lz(i))
+       w0_nodal_coords(1,i)=x1(lx(i))
+       w0_nodal_coords(2,i)=x1(ly(i))
+       w0_nodal_coords(3,i)=x1(lz(i))
     end do
 
     !-----------------------------------------------------------------------------
-    ! section for test/trial functions of v1 fields
+    ! section for test/trial functions of w1 fields
     !-----------------------------------------------------------------------------
     order = k+1
 
-    !do idx=1,nv1
+    !do idx=1,nw1
     do idx = 1,v_unique_dofs(2,2)
       do i=1,3
-        unit_vec_v1(idx,i) = 0.0_r_def
+        unit_vec_w1(idx,i) = 0.0_r_def
       end do
     end do
 
@@ -272,7 +272,7 @@ contains
           lx(idx) =  jx
           ly(idx) =  jy
           lz(idx) =  jz
-          unit_vec_v1(idx,1) = 1.0_r_def
+          unit_vec_w1(idx,1) = 1.0_r_def
           idx = idx + 1
         end do
       end do
@@ -284,7 +284,7 @@ contains
           lx(idx) =  jx
           ly(idx) =  jy
           lz(idx) =  jz
-          unit_vec_v1(idx,2) = 1.0_r_def
+          unit_vec_w1(idx,2) = 1.0_r_def
           idx = idx + 1
         end do
       end do
@@ -296,7 +296,7 @@ contains
           lx(idx) =  jx
           ly(idx) =  jy
           lz(idx) =  jz
-          unit_vec_v1(idx,3) = 1.0_r_def
+          unit_vec_w1(idx,3) = 1.0_r_def
           idx = idx + 1
         end do
       end do
@@ -312,7 +312,7 @@ contains
           lx(idx) = j(j2l_face(i,1))
           ly(idx) = j(j2l_face(i,2))
           lz(idx) = j(j2l_face(i,3))
-          unit_vec_v1(idx,:) = tangent_to_edge(edge_on_face(i,1),:)
+          unit_vec_w1(idx,:) = tangent_to_edge(edge_on_face(i,1),:)
           idx = idx + 1
         end do
       end do
@@ -324,7 +324,7 @@ contains
           lx(idx) = j(j2l_face(i,1))
           ly(idx) = j(j2l_face(i,2))
           lz(idx) = j(j2l_face(i,3))
-          unit_vec_v1(idx,:) = tangent_to_edge(edge_on_face(i,2),:)
+          unit_vec_w1(idx,:) = tangent_to_edge(edge_on_face(i,2),:)
           idx = idx + 1
         end do
       end do  
@@ -339,13 +339,13 @@ contains
         lx(idx) = j(j2l_edge(i,1))
         ly(idx) = j(j2l_edge(i,2))
         lz(idx) = j(j2l_edge(i,3))
-        unit_vec_v1(idx,:) = tangent_to_edge(i,:)
+        unit_vec_w1(idx,:) = tangent_to_edge(i,:)
         idx = idx + 1
       end do
     end do
 
     ! this needs correcting
-    !do i=1,nv1  
+    !do i=1,nw1  
     do i=1,v_unique_dofs(2,2)
        ! Quads only as ngp_h = ngp_v * ngp_v
        h_ctr = 1
@@ -374,41 +374,41 @@ contains
                    gz = 0.0_r_def
                 end if
                 
-                v1_basis(1,i,h_ctr,jz)=gx*fy*fz*unit_vec_v1(i,1)
-                v1_basis(2,i,h_ctr,jz)=fx*gy*fz*unit_vec_v1(i,2)
-                v1_basis(3,i,h_ctr,jz)=fx*fy*gz*unit_vec_v1(i,3)
+                w1_basis(1,i,h_ctr,jz)=gx*fy*fz*unit_vec_w1(i,1)
+                w1_basis(2,i,h_ctr,jz)=fx*gy*fz*unit_vec_w1(i,2)
+                w1_basis(3,i,h_ctr,jz)=fx*fy*gz*unit_vec_w1(i,3)
 
-                v1_diff_basis(1,i,h_ctr,jz)= &
-                     (fx*dfy*gz*unit_vec_v1(i,3) - fx*gy*dfz*unit_vec_v1(i,2) )
-                v1_diff_basis(2,i,h_ctr,jz)= &
-                     (gx*fy*dfz*unit_vec_v1(i,1) - dfx*fy*gz*unit_vec_v1(i,3) )
-                v1_diff_basis(3,i,h_ctr,jz)= &
-                     (dfx*gy*fz*unit_vec_v1(i,2) - gx*dfy*fz*unit_vec_v1(i,1) )
+                w1_diff_basis(1,i,h_ctr,jz)= &
+                     (fx*dfy*gz*unit_vec_w1(i,3) - fx*gy*dfz*unit_vec_w1(i,2) )
+                w1_diff_basis(2,i,h_ctr,jz)= &
+                     (gx*fy*dfz*unit_vec_w1(i,1) - dfx*fy*gz*unit_vec_w1(i,3) )
+                w1_diff_basis(3,i,h_ctr,jz)= &
+                     (dfx*gy*fz*unit_vec_w1(i,2) - gx*dfy*fz*unit_vec_w1(i,1) )
 
              end do
              h_ctr = h_ctr + 1
           end do
        end do
-       v1_nodal_coords(1,i)= &
-             unit_vec_v1(i,1)*x2(lx(i)) + (1.0_r_def - unit_vec_v1(i,1))*x1(lx(i))
-       v1_nodal_coords(2,i)= &
-             unit_vec_v1(i,2)*x2(ly(i)) + (1.0_r_def - unit_vec_v1(i,2))*x1(ly(i))
-       v1_nodal_coords(3,i)= &
-             unit_vec_v1(i,3)*x2(lz(i)) + (1.0_r_def - unit_vec_v1(i,3))*x1(lz(i))
+       w1_nodal_coords(1,i)= &
+             unit_vec_w1(i,1)*x2(lx(i)) + (1.0_r_def - unit_vec_w1(i,1))*x1(lx(i))
+       w1_nodal_coords(2,i)= &
+             unit_vec_w1(i,2)*x2(ly(i)) + (1.0_r_def - unit_vec_w1(i,2))*x1(ly(i))
+       w1_nodal_coords(3,i)= &
+             unit_vec_w1(i,3)*x2(lz(i)) + (1.0_r_def - unit_vec_w1(i,3))*x1(lz(i))
     end do
 
 
     !-----------------------------------------------------------------------------
-    ! Section for test/trial functions of v2 fields
+    ! Section for test/trial functions of w2 fields
     !-----------------------------------------------------------------------------
     order = k + 1
 
-    v2_dof_on_vert_boundary(:,:) = 1
+    w2_dof_on_vert_boundary(:,:) = 1
 
-    !do idx=1,nv2
+    !do idx=1,nw2
     do idx=1,v_unique_dofs(3,2)
       do i=1,3
-        unit_vec_v2(idx,i) = 0.0_r_def
+        unit_vec_w2(idx,i) = 0.0_r_def
       end do
     end do
 
@@ -421,7 +421,7 @@ contains
           lx(idx) =  jx
           ly(idx) =  jy
           lz(idx) =  jz
-          unit_vec_v2(idx,1) = 1.0_r_def
+          unit_vec_w2(idx,1) = 1.0_r_def
           idx = idx + 1
         end do
       end do
@@ -433,7 +433,7 @@ contains
           lx(idx) =  jx
           ly(idx) =  jy
           lz(idx) =  jz
-          unit_vec_v2(idx,2) = 1.0_r_def
+          unit_vec_w2(idx,2) = 1.0_r_def
           idx = idx + 1
         end do
       end do
@@ -445,7 +445,7 @@ contains
           lx(idx) =  jx
           ly(idx) =  jy
           lz(idx) =  jz
-          unit_vec_v2(idx,3) = 1.0_r_def
+          unit_vec_w2(idx,3) = 1.0_r_def
           idx = idx + 1
         end do
       end do
@@ -461,15 +461,15 @@ contains
           lx(idx) = j(j2l_face(i,1))
           ly(idx) = j(j2l_face(i,2))
           lz(idx) = j(j2l_face(i,3))
-          unit_vec_v2(idx,:) = normal_to_face(i,:)
-          if (i == nfaces - 1) v2_dof_on_vert_boundary(idx,1) = 0
-          if (i == nfaces )    v2_dof_on_vert_boundary(idx,2) = 0
+          unit_vec_w2(idx,:) = normal_to_face(i,:)
+          if (i == nfaces - 1) w2_dof_on_vert_boundary(idx,1) = 0
+          if (i == nfaces )    w2_dof_on_vert_boundary(idx,2) = 0
           idx = idx + 1
         end do
       end do
     end do
 
-    !do i=1,nv2
+    !do i=1,nw2
     do i=1,v_unique_dofs(3,2)
        ! Quads only as ngp_h = ngp_h * ngp_h
        h_ctr = 1
@@ -498,27 +498,27 @@ contains
                    gz = 0.0_r_def
                 end if
             
-                v2_basis(1,i,h_ctr,jz)=fx*gy*gz*unit_vec_v2(i,1)
-                v2_basis(2,i,h_ctr,jz)=gx*fy*gz*unit_vec_v2(i,2)
-                v2_basis(3,i,h_ctr,jz)=gx*gy*fz*unit_vec_v2(i,3)
+                w2_basis(1,i,h_ctr,jz)=fx*gy*gz*unit_vec_w2(i,1)
+                w2_basis(2,i,h_ctr,jz)=gx*fy*gz*unit_vec_w2(i,2)
+                w2_basis(3,i,h_ctr,jz)=gx*gy*fz*unit_vec_w2(i,3)
 
-                v2_diff_basis(1,i,h_ctr,jz)= &
-                    ( dfx*gy*gz*unit_vec_v2(i,1) + gx*dfy*gz*unit_vec_v2(i,2) &
-                    + gx*gy*dfz*unit_vec_v2(i,3) )                
+                w2_diff_basis(1,i,h_ctr,jz)= &
+                    ( dfx*gy*gz*unit_vec_w2(i,1) + gx*dfy*gz*unit_vec_w2(i,2) &
+                    + gx*gy*dfz*unit_vec_w2(i,3) )                
             end do
              h_ctr = h_ctr + 1
           end do
        end do
-       v2_nodal_coords(1,i)= &
-             unit_vec_v2(i,1)*x1(lx(i)) + (1.0 - unit_vec_v2(i,1))*x2(lx(i))
-       v2_nodal_coords(2,i)= &
-             unit_vec_v2(i,2)*x1(ly(i)) + (1.0 - unit_vec_v2(i,2))*x2(ly(i))
-       v2_nodal_coords(3,i)= &
-             unit_vec_v2(i,3)*x1(lz(i)) + (1.0 - unit_vec_v2(i,3))*x2(lz(i))
+       w2_nodal_coords(1,i)= &
+             unit_vec_w2(i,1)*x1(lx(i)) + (1.0 - unit_vec_w2(i,1))*x2(lx(i))
+       w2_nodal_coords(2,i)= &
+             unit_vec_w2(i,2)*x1(ly(i)) + (1.0 - unit_vec_w2(i,2))*x2(ly(i))
+       w2_nodal_coords(3,i)= &
+             unit_vec_w2(i,3)*x1(lz(i)) + (1.0 - unit_vec_w2(i,3))*x2(lz(i))
     end do
 
     !-----------------------------------------------------------------------------
-    ! Section for test/trial functions of v3 fields
+    ! Section for test/trial functions of w3 fields
     !-----------------------------------------------------------------------------
     order = k
     ! compute indices of functions
@@ -535,7 +535,7 @@ contains
       end do
     end do
 
-    !do i=1,nv3
+    !do i=1,nw3
     ! For Quads only as ngp_h = ngp_v * ngp_v
     do i=1,v_unique_dofs(4,2)
        h_ctr = 1
@@ -545,14 +545,14 @@ contains
              gy = gq%poly1d(order,jy,x2(ly(i)),x2,ly(i))
              do jz=1,ngp_v
                 gz = gq%poly1d(order,jz,x2(lz(i)),x2,lz(i))
-                v3_basis(1,i,h_ctr,jz)=gx*gy*gz              
+                w3_basis(1,i,h_ctr,jz)=gx*gy*gz              
              end do
              h_ctr = h_ctr + 1
           end do
        end do
-       v3_nodal_coords(1,i)=x2(lx(i))
-       v3_nodal_coords(2,i)=x2(ly(i))
-       v3_nodal_coords(3,i)=x2(lz(i))
+       w3_nodal_coords(1,i)=x2(lx(i))
+       w3_nodal_coords(2,i)=x2(ly(i))
+       w3_nodal_coords(3,i)=x2(lz(i))
     end do
 
     ! tidy up
@@ -560,7 +560,7 @@ contains
     deallocate ( ly )
     deallocate ( lz )
 
-    deallocate ( unit_vec_v2, unit_vec_v1)
+    deallocate ( unit_vec_w2, unit_vec_w1)
 
   end subroutine get_basis
 

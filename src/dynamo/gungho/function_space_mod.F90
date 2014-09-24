@@ -118,16 +118,16 @@ end type function_space_type
 ! Module parameters
 !-------------------------------------------------------------------------------
 !> integer that defines the type of function space required
-integer, public, parameter      :: V0 = 100
-integer, public, parameter      :: V1 = 101
-integer, public, parameter      :: V2 = 102
-integer, public, parameter      :: V3 = 103
+integer, public, parameter      :: W0 = 100
+integer, public, parameter      :: W1 = 101
+integer, public, parameter      :: W2 = 102
+integer, public, parameter      :: W3 = 103
 
 !> These are static copies of all the function spaces that will be required 
-type(function_space_type), target, allocatable, save :: v0_function_space
-type(function_space_type), target, allocatable, save :: v1_function_space
-type(function_space_type), target, allocatable, save :: v2_function_space
-type(function_space_type), target, allocatable, save :: v3_function_space
+type(function_space_type), target, allocatable, save :: w0_function_space
+type(function_space_type), target, allocatable, save :: w1_function_space
+type(function_space_type), target, allocatable, save :: w2_function_space
+type(function_space_type), target, allocatable, save :: w3_function_space
 
 !-------------------------------------------------------------------------------
 ! Contained functions/subroutines
@@ -136,15 +136,15 @@ contains
 
 function get_instance(function_space) result(instance)
   use basis_function_mod,      only : &
-              v0_basis, v1_basis, v2_basis, v3_basis, &
-              v0_diff_basis, v1_diff_basis, v2_diff_basis, v3_diff_basis, &
-              v0_nodal_coords, v1_nodal_coords, v2_nodal_coords, v3_nodal_coords, &
-              v0_dof_on_vert_boundary, v1_dof_on_vert_boundary, &
-              v2_dof_on_vert_boundary, v3_dof_on_vert_boundary
+              w0_basis, w1_basis, w2_basis, w3_basis, &
+              w0_diff_basis, w1_diff_basis, w2_diff_basis, w3_diff_basis, &
+              w0_nodal_coords, w1_nodal_coords, w2_nodal_coords, w3_nodal_coords, &
+              w0_dof_on_vert_boundary, w1_dof_on_vert_boundary, &
+              w2_dof_on_vert_boundary, w3_dof_on_vert_boundary
 
   use dofmap_mod,              only : &
-              v0_dofmap, v1_dofmap, v2_dofmap, v3_dofmap, &
-              v0_orientation, v1_orientation, v2_orientation, v3_orientation
+              w0_dofmap, w1_dofmap, w2_dofmap, w3_dofmap, &
+              w0_orientation, w1_orientation, w2_orientation, w3_orientation
 
   use gaussian_quadrature_mod, only : ngp_h, ngp_v
   use mesh_mod,                only : num_cells, v_unique_dofs, num_layers
@@ -155,70 +155,70 @@ function get_instance(function_space) result(instance)
   type(function_space_type), pointer :: instance
 
   select case (function_space)
-  case (V0)
-    if(.not.allocated(v0_function_space)) then
-      allocate(v0_function_space)   
-      call init_function_space(self=v0_function_space, &
+  case (W0)
+    if(.not.allocated(w0_function_space)) then
+      allocate(w0_function_space)   
+      call init_function_space(self=w0_function_space, &
          num_cells = num_cells , num_layers = num_layers, &
          num_dofs = v_unique_dofs(1,2), &
          num_unique_dofs = v_unique_dofs(1,1) ,  &
          dim_space = 1, dim_space_diff = 3,  &
          ngp_h = ngp_h, ngp_v = ngp_v, &
-         dofmap=v0_dofmap, &
-         basis=v0_basis, diff_basis=v0_diff_basis, &
-         nodal_coords=v0_nodal_coords, &
-         dof_on_vert_boundary=v0_dof_on_vert_boundary, &
-         orientation=v0_orientation, fs=V0) 
+         dofmap=w0_dofmap, &
+         basis=w0_basis, diff_basis=w0_diff_basis, &
+         nodal_coords=w0_nodal_coords, &
+         dof_on_vert_boundary=w0_dof_on_vert_boundary, &
+         orientation=w0_orientation, fs=W0) 
     end if
-    instance => v0_function_space
-  case (V1)
-    if(.not.allocated(v1_function_space)) then
-      allocate(v1_function_space) 
-      call init_function_space(self=v1_function_space, &
+    instance => w0_function_space
+  case (W1)
+    if(.not.allocated(w1_function_space)) then
+      allocate(w1_function_space) 
+      call init_function_space(self=w1_function_space, &
          num_cells = num_cells ,num_layers = num_layers, &
          num_dofs = v_unique_dofs(2,2), &
          num_unique_dofs = v_unique_dofs(2,1) ,  &
          dim_space = 3, dim_space_diff = 3,  &
          ngp_h = ngp_h, ngp_v = ngp_v, &
-         dofmap=v1_dofmap, &
-         basis=v1_basis, diff_basis=v1_diff_basis, &
-         nodal_coords=v1_nodal_coords, &
-         dof_on_vert_boundary=v1_dof_on_vert_boundary, &
-         orientation=v1_orientation, fs=V1 )
+         dofmap=w1_dofmap, &
+         basis=w1_basis, diff_basis=w1_diff_basis, &
+         nodal_coords=w1_nodal_coords, &
+         dof_on_vert_boundary=w1_dof_on_vert_boundary, &
+         orientation=w1_orientation, fs=W1 )
     end if
-    instance => v1_function_space
-  case (V2)
-    if(.not.allocated(v2_function_space)) then 
-      allocate(v2_function_space)
-      call init_function_space(self=v2_function_space, &
+    instance => w1_function_space
+  case (W2)
+    if(.not.allocated(w2_function_space)) then 
+      allocate(w2_function_space)
+      call init_function_space(self=w2_function_space, &
          num_cells = num_cells ,num_layers = num_layers, &
          num_dofs = v_unique_dofs(3,2), &
          num_unique_dofs = v_unique_dofs(3,1) ,  &
          dim_space = 3, dim_space_diff = 1,  &
          ngp_h = ngp_h, ngp_v = ngp_v, &
-         dofmap=v2_dofmap, &
-         basis=v2_basis, diff_basis=v2_diff_basis, &
-         nodal_coords=v2_nodal_coords, &
-         dof_on_vert_boundary=v2_dof_on_vert_boundary, &
-         orientation=v2_orientation, fs=V2 )
+         dofmap=w2_dofmap, &
+         basis=w2_basis, diff_basis=w2_diff_basis, &
+         nodal_coords=w2_nodal_coords, &
+         dof_on_vert_boundary=w2_dof_on_vert_boundary, &
+         orientation=w2_orientation, fs=W2 )
     end if
-    instance => v2_function_space
-  case (V3)
-    if(.not.allocated(v3_function_space)) then
-      allocate(v3_function_space)
-      call init_function_space(self=v3_function_space, &
+    instance => w2_function_space
+  case (W3)
+    if(.not.allocated(w3_function_space)) then
+      allocate(w3_function_space)
+      call init_function_space(self=w3_function_space, &
          num_cells = num_cells ,num_layers = num_layers, &
          num_dofs = v_unique_dofs(4,2), &
          num_unique_dofs = v_unique_dofs(4,1) ,  &
          dim_space = 1, dim_space_diff = 1,  &
          ngp_h = ngp_h, ngp_v = ngp_v, &
-         dofmap=v3_dofmap, &
-         basis=v3_basis, diff_basis=v3_diff_basis, &
-         nodal_coords=v3_nodal_coords, &
-         dof_on_vert_boundary=v3_dof_on_vert_boundary, &
-         orientation=v3_orientation, fs=V3 )
+         dofmap=w3_dofmap, &
+         basis=w3_basis, diff_basis=w3_diff_basis, &
+         nodal_coords=w3_nodal_coords, &
+         dof_on_vert_boundary=w3_dof_on_vert_boundary, &
+         orientation=w3_orientation, fs=W3 )
     end if
-    instance => v3_function_space
+    instance => w3_function_space
   case default
     !not a recognised function space - return a null pointer
     instance => null()

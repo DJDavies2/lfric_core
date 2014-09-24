@@ -6,33 +6,32 @@
 !-------------------------------------------------------------------------------
 !
 !-------------------------------------------------------------------------------
-module v3_solver_kernel_mod_test
+module w3_rhs_kernel_mod_test
   implicit none 
 
 contains
 
   @test
-  subroutine v3_solver_kernel_test()
+  subroutine w3_rhs_kernel_test()
     use pFUnit_Mod
-    use v3_solver_kernel_mod,    only : solver_v3_code
-    use constants_mod,           only : r_def
+    use w3_rhs_kernel_mod,        only : RHS_w3_code
     use gaussian_quadrature_mod,  only : gaussian_quadrature_type, ngp_h, ngp_v, GQ3
+    use constants_mod,            only : r_def
     implicit none
 
-    integer :: num_layers, ndf, map(1),undf
+    integer :: num_layers, ndf, map(1), undf
     type(gaussian_quadrature_type) :: gq, gaussq
     real(kind=r_def) :: xdata(1)
-    real(kind=r_def) :: rhsdata(1)
     real(kind=r_def) :: answer, tol
     real(kind=r_def) :: basis(1,8,9,3)
     
-    integer :: ndf_v0, map_v0(8)
+    integer :: ndf_w0, map_w0(8)
     real(kind=r_def) :: chi(8,3)
     real(kind=r_def) :: diff_basis(3,8,9,3) 
     real(kind=r_def) :: x_vert(8,3)
     real(kind=r_def) :: xgp_h(9,2), xgp_v(3)
     real(kind=r_def) :: fx, fy, fz
-    integer :: df, dim, gp1, gp2, gp3
+    integer :: df, dim, gp1, gp2
     
     gq=gaussq%get_instance(GQ3)
     
@@ -48,9 +47,9 @@ contains
     x_vert(7,:) = (/ 1.0_r_def, 1.0_r_def, 1.0_r_def /)
     x_vert(8,:) = (/ 0.0_r_def, 1.0_r_def, 1.0_r_def /)    
     
-    ndf_v0 = 8
-    do df = 1,ndf_v0
-      map_v0(df) = df
+    ndf_w0 = 8
+    do df = 1,ndf_w0
+      map_w0(df) = df
       do gp2 = 1,ngp_v
         do gp1 = 1,ngp_h
           fx = (1.0_r_def - x_vert(df,1)) + (-1.0_r_def)**(int(x_vert(df,1))+1)*xgp_h(gp1,1)
@@ -67,19 +66,18 @@ contains
       end do
     end do
     chi(:,:) = x_vert(:,:)
-
-    basis=1.0D0
+ 
     map(1)=1
     num_layers=1
-    ndf=1
-    rhsdata(1)=1.0D0
-    call solver_v3_code(num_layers,ndf,map,basis,xdata,rhsdata,gq, &
-                     ndf_v0,map_v0,diff_basis,chi(:,1),chi(:,2),chi(:,3))
+    ndf = 1
+    basis=1.0D0
+    call RHS_w3_code(num_layers,ndf,map,basis,xdata,gq, &
+                     ndf_w0,map_w0,diff_basis,chi(:,1),chi(:,2),chi(:,3))
 
-    answer = 1.0_r_def / ( 6000.0_r_def * 2000.0_r_def * 1000.0_r_def )
-    tol    = 1.0e-14_r_def
-    @assertEqual( answer, xdata(1), tol )
+    answer = ( 6000.0_r_def * 2000.0_r_def * 1000.0_r_def )
+    tol    = 1.0e-2_r_def
+    @assertEqual(answer, xdata(1), tol)
 
-  end subroutine v3_solver_kernel_test
+  end subroutine w3_rhs_kernel_test
 
-end module v3_solver_kernel_mod_test
+end module w3_rhs_kernel_mod_test

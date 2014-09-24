@@ -25,12 +25,12 @@ module set_up_mod
                                          mesh_connectivity
   use num_dof_mod,                only : num_dof_init
   use basis_function_mod,         only : get_basis, &
-              v0_basis, v1_basis, v2_basis, v3_basis, &
-              v0_diff_basis, v1_diff_basis, v2_diff_basis, v3_diff_basis, &
-              v0_nodal_coords, v1_nodal_coords, v2_nodal_coords, v3_nodal_coords
+              w0_basis, w1_basis, w2_basis, w3_basis, &
+              w0_diff_basis, w1_diff_basis, w2_diff_basis, w3_diff_basis, &
+              w0_nodal_coords, w1_nodal_coords, w2_nodal_coords, w3_nodal_coords
 
   use dofmap_mod,                 only : get_dofmap, get_orientation, &
-              v0_dofmap, v1_dofmap, v2_dofmap, v3_dofmap
+              w0_dofmap, w1_dofmap, w2_dofmap, w3_dofmap
   use gaussian_quadrature_mod,    only : ngp_h, ngp_v
   use mass_matrices_mod,          only : mass_matrix_init
   implicit none

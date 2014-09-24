@@ -27,30 +27,30 @@ use mesh_generator_mod, only: nedge_h_g, nvert_h_g, face_on_cell, edge_on_cell, 
 implicit none
 
 !> A two dim integer arrays which hold the indirection maps (or dofmaps)
-!! for the whole V0 function space over the bottom level of the domain.
-integer, allocatable :: v0_dofmap(:,:)
+!! for the whole W0 function space over the bottom level of the domain.
+integer, allocatable :: w0_dofmap(:,:)
 !> A two dim integer arrays which hold the indirection maps (or dofmaps)
-!! for the whole V1 function space over the bottom level of the domain.
-integer, allocatable :: v1_dofmap(:,:)
+!! for the whole W1 function space over the bottom level of the domain.
+integer, allocatable :: w1_dofmap(:,:)
 !> A two dim integer arrays which hold the indirection maps (or dofmaps)
-!! for the whole V2 function space over the bottom level of the domain.
-integer, allocatable :: v2_dofmap(:,:)
+!! for the whole W2 function space over the bottom level of the domain.
+integer, allocatable :: w2_dofmap(:,:)
 !> A two dim integer arrays which hold the indirection maps (or dofmaps)
-!! for the whole V3 function space over the bottom level of the domain.
-integer, allocatable :: v3_dofmap(:,:)
+!! for the whole W3 function space over the bottom level of the domain.
+integer, allocatable :: w3_dofmap(:,:)
 
 !> A two dim integer array which holds the orientation data for the
-!> V0 function space
-integer, allocatable :: v0_orientation(:,:)
+!> W0 function space
+integer, allocatable :: w0_orientation(:,:)
 !> A two dim integer array which holds the orientation data for the
-!> V1 function space
-integer, allocatable :: v1_orientation(:,:)
+!> W1 function space
+integer, allocatable :: w1_orientation(:,:)
 !> A two dim integer array which holds the orientation data for the
-!> V2 function space
-integer, allocatable :: v2_orientation(:,:)
+!> W2 function space
+integer, allocatable :: w2_orientation(:,:)
 !> A two dim integer array which holds the orientation data for the
-!> V3 function space
-integer, allocatable :: v3_orientation(:,:)
+!> W3 function space
+integer, allocatable :: w3_orientation(:,:)
 
 !-------------------------------------------------------------------------------
 ! Contained functions/subroutines
@@ -71,19 +71,19 @@ subroutine get_dofmap(nlayers, v_dof_entity, &
   integer, intent(in)       :: ncell
   integer, intent(in)       :: v_unique_dofs(4,2) 
 
-  allocate( v0_dofmap(0:ncell,v_unique_dofs(1,2)) )
-  allocate( v1_dofmap(0:ncell,v_unique_dofs(2,2)) )
-  allocate( v2_dofmap(0:ncell,v_unique_dofs(3,2)) )
-  allocate( v3_dofmap(0:ncell,v_unique_dofs(4,2)) )
+  allocate( w0_dofmap(0:ncell,v_unique_dofs(1,2)) )
+  allocate( w1_dofmap(0:ncell,v_unique_dofs(2,2)) )
+  allocate( w2_dofmap(0:ncell,v_unique_dofs(3,2)) )
+  allocate( w3_dofmap(0:ncell,v_unique_dofs(4,2)) )
   
   call dofmap_populate(ncell, nlayers, &
-                       v_unique_dofs(1,2), v_dof_entity(1,:), v0_dofmap)
+                       v_unique_dofs(1,2), v_dof_entity(1,:), w0_dofmap)
   call dofmap_populate(ncell, nlayers, &
-                       v_unique_dofs(2,2), v_dof_entity(2,:), v1_dofmap)
+                       v_unique_dofs(2,2), v_dof_entity(2,:), w1_dofmap)
   call dofmap_populate(ncell, nlayers, &
-                       v_unique_dofs(3,2), v_dof_entity(3,:), v2_dofmap)
+                       v_unique_dofs(3,2), v_dof_entity(3,:), w2_dofmap)
   call dofmap_populate(ncell, nlayers, &
-                       v_unique_dofs(4,2), v_dof_entity(4,:), v3_dofmap)
+                       v_unique_dofs(4,2), v_dof_entity(4,:), w3_dofmap)
 
 end subroutine get_dofmap
 
@@ -269,15 +269,15 @@ subroutine get_orientation(ncell,v_unique_dofs)
   integer, intent(in) :: ncell
   integer, intent(in) :: v_unique_dofs(4,2)
 
-  allocate( v0_orientation(0:ncell,v_unique_dofs(1,2)) )
-  allocate( v1_orientation(0:ncell,v_unique_dofs(2,2)) )
-  allocate( v2_orientation(0:ncell,v_unique_dofs(3,2)) )
-  allocate( v3_orientation(0:ncell,v_unique_dofs(4,2)) )
+  allocate( w0_orientation(0:ncell,v_unique_dofs(1,2)) )
+  allocate( w1_orientation(0:ncell,v_unique_dofs(2,2)) )
+  allocate( w2_orientation(0:ncell,v_unique_dofs(3,2)) )
+  allocate( w3_orientation(0:ncell,v_unique_dofs(4,2)) )
 
-  call orientation_populate(ncell, v_unique_dofs(1,2), v0_orientation)
-  call orientation_populate(ncell, v_unique_dofs(2,2), v1_orientation)
-  call orientation_populate(ncell, v_unique_dofs(3,2), v2_orientation)
-  call orientation_populate(ncell, v_unique_dofs(4,2), v3_orientation)
+  call orientation_populate(ncell, v_unique_dofs(1,2), w0_orientation)
+  call orientation_populate(ncell, v_unique_dofs(2,2), w1_orientation)
+  call orientation_populate(ncell, v_unique_dofs(3,2), w2_orientation)
+  call orientation_populate(ncell, v_unique_dofs(4,2), w3_orientation)
 
 end subroutine get_orientation
 

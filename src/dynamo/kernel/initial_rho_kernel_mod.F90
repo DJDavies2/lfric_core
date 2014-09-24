@@ -16,7 +16,7 @@ module initial_rho_kernel_mod
 use kernel_mod,              only : kernel_type
 use constants_mod,           only: r_def
 use argument_mod,            only: arg_type, &          ! the type
-                                   gh_rw, v3, fe, cells ! the enums
+                                   gh_rw, w3, fe, cells ! the enums
 
 implicit none
 
@@ -27,7 +27,7 @@ implicit none
 type, public, extends(kernel_type) :: initial_rho_kernel_type
   private
   type(arg_type) :: meta_args(1) = [ &
-       arg_type(gh_rw,v3,fe,.false.,.false.,.false.,.false.) &
+       arg_type(gh_rw,w3,fe,.false.,.false.,.false.,.false.) &
        ]
   integer :: iterates_over = cells
 

@@ -6,7 +6,7 @@
 !-------------------------------------------------------------------------------
 !
 !> @brief Computes the global and local number of dofs for the 4 element spaces
-!>        V0..V3
+!>        W0..W3
 !>
 module num_dof_mod
 
@@ -34,89 +34,89 @@ contains
     integer, intent( out ) :: v_dof_entity(4,0:3)
 
     ! numbers of dofs in each space for an element 
-    integer :: nv0,nv0_cell,nv0_face,nv0_edge,nv0_vert,            &
-               nv1,nv1_cell,nv1_face,nv1_edge,                     &
-               nv2,nv2_cell,nv2_face,                              &
-               nv3,nv3_cell
+    integer :: nw0,nw0_cell,nw0_face,nw0_edge,nw0_vert,            &
+               nw1,nw1_cell,nw1_face,nw1_edge,                     &
+               nw2,nw2_cell,nw2_face,                              &
+               nw3,nw3_cell
 
     ! global numbers of unique dofs
-    integer :: nv0_g, nv1_g, nv2_g, nv3_g
+    integer :: nw0_g, nw1_g, nw2_g, nw3_g
 
-    integer :: ndof_entity_v0(0:3), ndof_entity_v1(0:3),           &
-               ndof_entity_v2(0:3), ndof_entity_v3(0:3)
+    integer :: ndof_entity_w0(0:3), ndof_entity_w1(0:3),           &
+               ndof_entity_w2(0:3), ndof_entity_w3(0:3)
 
     ! local values
-    nv0 = (k+2)*(k+2)*(k+2)
-    nv0_cell = k*k*k
-    nv0_face = k*k
-    nv0_edge = k
-    nv0_vert = 1
+    nw0 = (k+2)*(k+2)*(k+2)
+    nw0_cell = k*k*k
+    nw0_face = k*k
+    nw0_edge = k
+    nw0_vert = 1
 
-    nv1 = 3*(k+2)*(k+2)*(k+1)
-    nv1_cell = 3*k*k*(k+1)
-    nv1_face = 2  *k*(k+1)
-    nv1_edge =       (k+1)
+    nw1 = 3*(k+2)*(k+2)*(k+1)
+    nw1_cell = 3*k*k*(k+1)
+    nw1_face = 2  *k*(k+1)
+    nw1_edge =       (k+1)
 
-    nv2  = 3*(k+2)*(k+1)*(k+1)
-    nv2_cell = 3*k*(k+1)*(k+1)
-    nv2_face =     (k+1)*(k+1)
+    nw2  = 3*(k+2)*(k+1)*(k+1)
+    nw2_cell = 3*k*(k+1)*(k+1)
+    nw2_face =     (k+1)*(k+1)
 
-    nv3 = (k+1)*(k+1)*(k+1)
-    nv3_cell = nv3
+    nw3 = (k+1)*(k+1)*(k+1)
+    nw3_cell = nw3
 
     ! global numbers of dofs per function space
-    nv3_g = ncells*nlayers*nv3_cell
-    nv2_g = ncells*nlayers*nv2_cell + nface_g*nv2_face
-    nv1_g = ncells*nlayers*nv1_cell + nface_g*nv1_face + nedge_g*nv1_edge
-    nv0_g = ncells*nlayers*nv0_cell + nface_g*nv0_face + nedge_g*nv0_edge + nvert_g*nv0_vert
+    nw3_g = ncells*nlayers*nw3_cell
+    nw2_g = ncells*nlayers*nw2_cell + nface_g*nw2_face
+    nw1_g = ncells*nlayers*nw1_cell + nface_g*nw1_face + nedge_g*nw1_edge
+    nw0_g = ncells*nlayers*nw0_cell + nface_g*nw0_face + nedge_g*nw0_edge + nvert_g*nw0_vert
 
     ! populate the returned arrays
-    v_unique_dofs(1,1) = nv0_g
-    v_unique_dofs(2,1) = nv1_g
-    v_unique_dofs(3,1) = nv2_g
-    v_unique_dofs(4,1) = nv3_g
+    v_unique_dofs(1,1) = nw0_g
+    v_unique_dofs(2,1) = nw1_g
+    v_unique_dofs(3,1) = nw2_g
+    v_unique_dofs(4,1) = nw3_g
 
-    v_unique_dofs(1,2) = nv0
-    v_unique_dofs(2,2) = nv1
-    v_unique_dofs(3,2) = nv2
-    v_unique_dofs(4,2) = nv3
+    v_unique_dofs(1,2) = nw0
+    v_unique_dofs(2,2) = nw1
+    v_unique_dofs(3,2) = nw2
+    v_unique_dofs(4,2) = nw3
 
     ! Number of dofs per mesh entity for each space
-    ndof_entity_v0(:) = (/ nv0_vert, nv0_edge, nv0_face, nv0_cell /)
-    ndof_entity_v1(:) = (/ 0       , nv1_edge, nv1_face, nv1_cell /)
-    ndof_entity_v2(:) = (/ 0       , 0       , nv2_face, nv2_cell /)
-    ndof_entity_v3(:) = (/ 0       , 0       , 0       , nv3_cell /)
+    ndof_entity_w0(:) = (/ nw0_vert, nw0_edge, nw0_face, nw0_cell /)
+    ndof_entity_w1(:) = (/ 0       , nw1_edge, nw1_face, nw1_cell /)
+    ndof_entity_w2(:) = (/ 0       , 0       , nw2_face, nw2_cell /)
+    ndof_entity_w3(:) = (/ 0       , 0       , 0       , nw3_cell /)
 
     !populate the returned arrays
-    v_dof_entity(1,:) = ndof_entity_v0(:)
-    v_dof_entity(2,:) = ndof_entity_v1(:)
-    v_dof_entity(3,:) = ndof_entity_v2(:)
-    v_dof_entity(4,:) = ndof_entity_v3(:)
+    v_dof_entity(1,:) = ndof_entity_w0(:)
+    v_dof_entity(2,:) = ndof_entity_w1(:)
+    v_dof_entity(3,:) = ndof_entity_w2(:)
+    v_dof_entity(4,:) = ndof_entity_w3(:)
 
     ! diagnostic output
     write( log_scratch_space, '(A, I0, A, I0)' ) &
         'ncells = ', ncells, ', nlayers = ', nlayers
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
-    call log_event( '   space     |   V0   |   V1   |   V2   |   V3   |', &
+    call log_event( '   space     |   W0   |   W1   |   W2   |   W3   |', &
                     LOG_LEVEL_INFO )
     write( log_scratch_space, '(a,i6,a,i6,a,i6,a,i6)' ) &
-        'global dof    ', nv0_g, '   ', nv1_g, '   ', nv2_g, '   ', nv3_g
+        'global dof    ', nw0_g, '   ', nw1_g, '   ', nw2_g, '   ', nw3_g
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
     write( log_scratch_space, '(a,i6,a,i6,a,i6,a,i6)' ) &
-        'local dof     ', nv0, '   ', nv1, '   ', nv2, '   ', nv3
+        'local dof     ', nw0, '   ', nw1, '   ', nw2, '   ', nw3
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
     write( log_scratch_space, '(a,i6,a,i6,a,i6,a,i6)' ) &
-        'dof in volume ', nv0_cell, '   ', nv1_cell, '   ', nv2_cell, &
-        '   ', nv3
+        'dof in volume ', nw0_cell, '   ', nw1_cell, '   ', nw2_cell, &
+        '   ', nw3
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
     write( log_scratch_space, '(a,i6,a,i6,a,i6,a,i6)' ) &
-        'dof on face   ', nv0_face, '   ', nv1_face, '   ', nv2_face, '   ', 0
+        'dof on face   ', nw0_face, '   ', nw1_face, '   ', nw2_face, '   ', 0
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
     write( log_scratch_space, '(a,i6,a,i6,a,i6,a,i6)' ) &
-        'dof on edge   ', nv0_edge, '   ', nv1_edge, '   ', 0, '   ', 0
+        'dof on edge   ', nw0_edge, '   ', nw1_edge, '   ', 0, '   ', 0
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
     write( log_scratch_space, '(a,i6,a,i6,a,i6,a,i6)' ) &
-        'dof on vert   ', nv0_vert, '   ', 0, '   ', 0, '   ', 0
+        'dof on vert   ', nw0_vert, '   ', 0, '   ', 0, '   ', 0
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
   end subroutine num_dof_init

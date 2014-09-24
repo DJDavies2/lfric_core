@@ -14,20 +14,20 @@ contains
   @test
   subroutine test_func_space()
     use pFUnit_Mod
-    use function_space_mod, only : function_space_type, V0, V1, V2, V3
+    use function_space_mod, only : function_space_type, W0, W1, W2, W3
     use constants_mod, only : r_def
     use mesh_mod, only : num_cells, v_unique_dofs, num_layers
     use gaussian_quadrature_mod, only : ngp_h, ngp_v
     use basis_function_mod,         only : &
-              v0_basis, v1_basis, v2_basis, v3_basis, &
-              v0_diff_basis, v1_diff_basis, v2_diff_basis, v3_diff_basis, &
-              v0_nodal_coords, v1_nodal_coords, v2_nodal_coords, v3_nodal_coords
+              w0_basis, w1_basis, w2_basis, w3_basis, &
+              w0_diff_basis, w1_diff_basis, w2_diff_basis, w3_diff_basis, &
+              w0_nodal_coords, w1_nodal_coords, w2_nodal_coords, w3_nodal_coords
     use dofmap_mod,                 only : &
-              v0_dofmap, v1_dofmap, v2_dofmap, v3_dofmap
+              w0_dofmap, w1_dofmap, w2_dofmap, w3_dofmap
     implicit none
 
-    type(function_space_type) :: v0_func_space, v1_func_space, &
-                                 v2_func_space, v3_func_space
+    type(function_space_type) :: w0_func_space, w1_func_space, &
+                                 w2_func_space, w3_func_space
 
     integer          :: num_dofs, num_unique_dofs
     integer          :: testncell, testundf, test_fs
@@ -37,45 +37,45 @@ contains
     real(kind=r_def) :: epsilon
     real(kind=r_def), pointer, dimension(:,:) :: test_nodes
 
-    integer          :: test_v0_dofmap_result_1,&
-                        test_v0_dofmap_result_2
+    integer          :: test_w0_dofmap_result_1,&
+                        test_w0_dofmap_result_2
 
-    real(kind=r_def) :: test_v0_basis_result, &
-                        test_v0_diff_basis_result
+    real(kind=r_def) :: test_w0_basis_result, &
+                        test_w0_diff_basis_result
 
-    real(kind=r_def) :: test_v0_nodal_coords_1, &
-                        test_v0_nodal_coords_2, &
-                        test_v0_nodal_coords_3
+    real(kind=r_def) :: test_w0_nodal_coords_1, &
+                        test_w0_nodal_coords_2, &
+                        test_w0_nodal_coords_3
 
-    integer          :: test_v1_dofmap_result_1,&
-                        test_v1_dofmap_result_2
+    integer          :: test_w1_dofmap_result_1,&
+                        test_w1_dofmap_result_2
 
-    real(kind=r_def) :: test_v1_basis_result, &
-                        test_v1_diff_basis_result
+    real(kind=r_def) :: test_w1_basis_result, &
+                        test_w1_diff_basis_result
 
-    real(kind=r_def) :: test_v1_nodal_coords_1, &
-                        test_v1_nodal_coords_2, &
-                        test_v1_nodal_coords_3
+    real(kind=r_def) :: test_w1_nodal_coords_1, &
+                        test_w1_nodal_coords_2, &
+                        test_w1_nodal_coords_3
 
-    integer          :: test_v2_dofmap_result_1,&
-                        test_v2_dofmap_result_2
+    integer          :: test_w2_dofmap_result_1,&
+                        test_w2_dofmap_result_2
 
-    real(kind=r_def) :: test_v2_basis_result, &
-                        test_v2_diff_basis_result
+    real(kind=r_def) :: test_w2_basis_result, &
+                        test_w2_diff_basis_result
 
-    real(kind=r_def) :: test_v2_nodal_coords_1, &
-                        test_v2_nodal_coords_2, &
-                        test_v2_nodal_coords_3
+    real(kind=r_def) :: test_w2_nodal_coords_1, &
+                        test_w2_nodal_coords_2, &
+                        test_w2_nodal_coords_3
 
-    integer          :: test_v3_dofmap_result_1,&
-                        test_v3_dofmap_result_2
+    integer          :: test_w3_dofmap_result_1,&
+                        test_w3_dofmap_result_2
 
-    real(kind=r_def) :: test_v3_basis_result, &
-                        test_v3_diff_basis_result
+    real(kind=r_def) :: test_w3_basis_result, &
+                        test_w3_diff_basis_result
 
-    real(kind=r_def) :: test_v3_nodal_coords_1, &
-                        test_v3_nodal_coords_2, &
-                        test_v3_nodal_coords_3
+    real(kind=r_def) :: test_w3_nodal_coords_1, &
+                        test_w3_nodal_coords_2, &
+                        test_w3_nodal_coords_3
     
     ! set some sizes ...
     num_cells = 35
@@ -87,244 +87,244 @@ contains
       v_unique_dofs(i,2)=num_dofs
     enddo
 
-    if ( allocated( v0_basis ) ) then
-      deallocate( v0_basis )
-      deallocate( v0_diff_basis )
-      deallocate( v0_nodal_coords )
-      deallocate( v0_dofmap )
+    if ( allocated( w0_basis ) ) then
+      deallocate( w0_basis )
+      deallocate( w0_diff_basis )
+      deallocate( w0_nodal_coords )
+      deallocate( w0_dofmap )
     end if
-    if ( allocated( v1_basis ) ) then
-      deallocate( v1_basis )
-      deallocate( v1_diff_basis )
-      deallocate( v1_nodal_coords )
-      deallocate( v1_dofmap )
+    if ( allocated( w1_basis ) ) then
+      deallocate( w1_basis )
+      deallocate( w1_diff_basis )
+      deallocate( w1_nodal_coords )
+      deallocate( w1_dofmap )
     end if
-    if ( allocated( v2_basis ) ) then
-      deallocate( v2_basis )
-      deallocate( v2_diff_basis )
-      deallocate( v2_nodal_coords )
-      deallocate( v2_dofmap )
+    if ( allocated( w2_basis ) ) then
+      deallocate( w2_basis )
+      deallocate( w2_diff_basis )
+      deallocate( w2_nodal_coords )
+      deallocate( w2_dofmap )
     end if
-    if ( allocated( v3_basis ) ) then
-      deallocate( v3_basis )
-      deallocate( v3_diff_basis )
-      deallocate( v3_nodal_coords )
-      deallocate( v3_dofmap )
+    if ( allocated( w3_basis ) ) then
+      deallocate( w3_basis )
+      deallocate( w3_diff_basis )
+      deallocate( w3_nodal_coords )
+      deallocate( w3_dofmap )
     end if
 
-    allocate(v0_basis(1,v_unique_dofs(1,2),ngp_h,ngp_v))
-    allocate(v1_basis(3,v_unique_dofs(2,2),ngp_h,ngp_v))
-    allocate(v2_basis(3,v_unique_dofs(3,2),ngp_h,ngp_v))
-    allocate(v3_basis(1,v_unique_dofs(4,2),ngp_h,ngp_v))
-    allocate(v0_diff_basis(3,v_unique_dofs(1,2),ngp_h,ngp_v))
-    allocate(v1_diff_basis(3,v_unique_dofs(2,2),ngp_h,ngp_v))
-    allocate(v2_diff_basis(1,v_unique_dofs(3,2),ngp_h,ngp_v))
-    allocate(v3_diff_basis(1,v_unique_dofs(4,2),ngp_h,ngp_v))
-    allocate(v0_nodal_coords(3,v_unique_dofs(1,2)))
-    allocate(v1_nodal_coords(3,v_unique_dofs(2,2)))
-    allocate(v2_nodal_coords(3,v_unique_dofs(3,2)))
-    allocate(v3_nodal_coords(3,v_unique_dofs(4,2)))
-    allocate( v0_dofmap(0:num_cells,v_unique_dofs(1,2)) )
-    allocate( v1_dofmap(0:num_cells,v_unique_dofs(2,2)) )
-    allocate( v2_dofmap(0:num_cells,v_unique_dofs(3,2)) )
-    allocate( v3_dofmap(0:num_cells,v_unique_dofs(4,2)) )
+    allocate(w0_basis(1,v_unique_dofs(1,2),ngp_h,ngp_v))
+    allocate(w1_basis(3,v_unique_dofs(2,2),ngp_h,ngp_v))
+    allocate(w2_basis(3,v_unique_dofs(3,2),ngp_h,ngp_v))
+    allocate(w3_basis(1,v_unique_dofs(4,2),ngp_h,ngp_v))
+    allocate(w0_diff_basis(3,v_unique_dofs(1,2),ngp_h,ngp_v))
+    allocate(w1_diff_basis(3,v_unique_dofs(2,2),ngp_h,ngp_v))
+    allocate(w2_diff_basis(1,v_unique_dofs(3,2),ngp_h,ngp_v))
+    allocate(w3_diff_basis(1,v_unique_dofs(4,2),ngp_h,ngp_v))
+    allocate(w0_nodal_coords(3,v_unique_dofs(1,2)))
+    allocate(w1_nodal_coords(3,v_unique_dofs(2,2)))
+    allocate(w2_nodal_coords(3,v_unique_dofs(3,2)))
+    allocate(w3_nodal_coords(3,v_unique_dofs(4,2)))
+    allocate( w0_dofmap(0:num_cells,v_unique_dofs(1,2)) )
+    allocate( w1_dofmap(0:num_cells,v_unique_dofs(2,2)) )
+    allocate( w2_dofmap(0:num_cells,v_unique_dofs(3,2)) )
+    allocate( w3_dofmap(0:num_cells,v_unique_dofs(4,2)) )
 
-    v0_basis=sqrt(2.0)
-    v1_basis=sqrt(2.0)
-    v2_basis=sqrt(2.0)
-    v3_basis=sqrt(2.0)
-    v0_diff_basis=atan(4.0)
-    v1_diff_basis=atan(4.0)
-    v2_diff_basis=atan(4.0)
-    v3_diff_basis=atan(4.0)
-    v0_nodal_coords(1,:)=0.152689632_r_def
-    v0_nodal_coords(2,:)=0.562554751_r_def
-    v0_nodal_coords(3,:)=-0.8234_r_def
-    v1_nodal_coords(1,:)=0.152689632_r_def
-    v1_nodal_coords(2,:)=0.562554751_r_def
-    v1_nodal_coords(3,:)=-0.8234_r_def
-    v2_nodal_coords(1,:)=0.152689632_r_def
-    v2_nodal_coords(2,:)=0.562554751_r_def
-    v2_nodal_coords(3,:)=-0.8234_r_def
-    v3_nodal_coords(1,:)=0.152689632_r_def
-    v3_nodal_coords(2,:)=0.562554751_r_def
-    v3_nodal_coords(3,:)=-0.8234_r_def
+    w0_basis=sqrt(2.0)
+    w1_basis=sqrt(2.0)
+    w2_basis=sqrt(2.0)
+    w3_basis=sqrt(2.0)
+    w0_diff_basis=atan(4.0)
+    w1_diff_basis=atan(4.0)
+    w2_diff_basis=atan(4.0)
+    w3_diff_basis=atan(4.0)
+    w0_nodal_coords(1,:)=0.152689632_r_def
+    w0_nodal_coords(2,:)=0.562554751_r_def
+    w0_nodal_coords(3,:)=-0.8234_r_def
+    w1_nodal_coords(1,:)=0.152689632_r_def
+    w1_nodal_coords(2,:)=0.562554751_r_def
+    w1_nodal_coords(3,:)=-0.8234_r_def
+    w2_nodal_coords(1,:)=0.152689632_r_def
+    w2_nodal_coords(2,:)=0.562554751_r_def
+    w2_nodal_coords(3,:)=-0.8234_r_def
+    w3_nodal_coords(1,:)=0.152689632_r_def
+    w3_nodal_coords(2,:)=0.562554751_r_def
+    w3_nodal_coords(3,:)=-0.8234_r_def
     do i=0,num_cells
-       v0_dofmap(i,:) = i+64
-       v1_dofmap(i,:) = i+64
-       v2_dofmap(i,:) = i+64
-       v3_dofmap(i,:) = i+64
+       w0_dofmap(i,:) = i+64
+       w1_dofmap(i,:) = i+64
+       w2_dofmap(i,:) = i+64
+       w3_dofmap(i,:) = i+64
     end do
 
 ! Grab some of the contents of the module data for later testing
 ! before it is moved into the function space 
-    test_v0_dofmap_result_1=v0_dofmap(0,1)
-    test_v0_dofmap_result_2=v0_dofmap(num_cells-2,1)
+    test_w0_dofmap_result_1=w0_dofmap(0,1)
+    test_w0_dofmap_result_2=w0_dofmap(num_cells-2,1)
 
-    test_v0_basis_result=v0_basis(1,1,1,1)
-    test_v0_diff_basis_result=v0_diff_basis(1,1,1,1)
+    test_w0_basis_result=w0_basis(1,1,1,1)
+    test_w0_diff_basis_result=w0_diff_basis(1,1,1,1)
 
-    test_v0_nodal_coords_1=v0_nodal_coords(1,1)
-    test_v0_nodal_coords_2=v0_nodal_coords(2,1)
-    test_v0_nodal_coords_3=v0_nodal_coords(3,1)
+    test_w0_nodal_coords_1=w0_nodal_coords(1,1)
+    test_w0_nodal_coords_2=w0_nodal_coords(2,1)
+    test_w0_nodal_coords_3=w0_nodal_coords(3,1)
 
-    test_v1_dofmap_result_1=v1_dofmap(0,1)
-    test_v1_dofmap_result_2=v1_dofmap(num_cells-2,1)
+    test_w1_dofmap_result_1=w1_dofmap(0,1)
+    test_w1_dofmap_result_2=w1_dofmap(num_cells-2,1)
 
-    test_v1_basis_result=v1_basis(1,1,1,1)
-    test_v1_diff_basis_result=v1_diff_basis(1,1,1,1)
+    test_w1_basis_result=w1_basis(1,1,1,1)
+    test_w1_diff_basis_result=w1_diff_basis(1,1,1,1)
 
-    test_v1_nodal_coords_1=v1_nodal_coords(1,1)
-    test_v1_nodal_coords_2=v1_nodal_coords(2,1)
-    test_v1_nodal_coords_3=v1_nodal_coords(3,1)
+    test_w1_nodal_coords_1=w1_nodal_coords(1,1)
+    test_w1_nodal_coords_2=w1_nodal_coords(2,1)
+    test_w1_nodal_coords_3=w1_nodal_coords(3,1)
 
-    test_v2_dofmap_result_1=v2_dofmap(0,1)
-    test_v2_dofmap_result_2=v2_dofmap(num_cells-2,1)
+    test_w2_dofmap_result_1=w2_dofmap(0,1)
+    test_w2_dofmap_result_2=w2_dofmap(num_cells-2,1)
 
-    test_v2_basis_result=v2_basis(1,1,1,1)
-    test_v2_diff_basis_result=v2_diff_basis(1,1,1,1)
+    test_w2_basis_result=w2_basis(1,1,1,1)
+    test_w2_diff_basis_result=w2_diff_basis(1,1,1,1)
 
-    test_v2_nodal_coords_1=v2_nodal_coords(1,1)
-    test_v2_nodal_coords_2=v2_nodal_coords(2,1)
-    test_v2_nodal_coords_3=v2_nodal_coords(3,1)
+    test_w2_nodal_coords_1=w2_nodal_coords(1,1)
+    test_w2_nodal_coords_2=w2_nodal_coords(2,1)
+    test_w2_nodal_coords_3=w2_nodal_coords(3,1)
 
-    test_v3_dofmap_result_1=v3_dofmap(0,1)
-    test_v3_dofmap_result_2=v3_dofmap(num_cells-2,1)
+    test_w3_dofmap_result_1=w3_dofmap(0,1)
+    test_w3_dofmap_result_2=w3_dofmap(num_cells-2,1)
 
-    test_v3_basis_result=v3_basis(1,1,1,1)
-    test_v3_diff_basis_result=v3_diff_basis(1,1,1,1)
+    test_w3_basis_result=w3_basis(1,1,1,1)
+    test_w3_diff_basis_result=w3_diff_basis(1,1,1,1)
 
-    test_v3_nodal_coords_1=v3_nodal_coords(1,1)
-    test_v3_nodal_coords_2=v3_nodal_coords(2,1)
-    test_v3_nodal_coords_3=v3_nodal_coords(3,1)
+    test_w3_nodal_coords_1=w3_nodal_coords(1,1)
+    test_w3_nodal_coords_2=w3_nodal_coords(2,1)
+    test_w3_nodal_coords_3=w3_nodal_coords(3,1)
 
-!v0
-    v0_func_space = v0_func_space%get_instance(V0)
+!w0
+    w0_func_space = w0_func_space%get_instance(W0)
 
     ! test the procedures of the type
-    testncell = v0_func_space%get_ncell()
+    testncell = w0_func_space%get_ncell()
     @assertEqual( num_cells, testncell )
 
-    testundf = v0_func_space%get_undf()
+    testundf = w0_func_space%get_undf()
     @assertEqual( num_unique_dofs, testundf )
 
-    testmap => v0_func_space%get_cell_dofmap(0)
-    @assertEqual( test_v0_dofmap_result_1, testmap(1) )
+    testmap => w0_func_space%get_cell_dofmap(0)
+    @assertEqual( test_w0_dofmap_result_1, testmap(1) )
 
-    testmap => v0_func_space%get_cell_dofmap(num_cells-2)    
-    @assertEqual( test_v0_dofmap_result_2, testmap(1) )
+    testmap => w0_func_space%get_cell_dofmap(num_cells-2)    
+    @assertEqual( test_w0_dofmap_result_2, testmap(1) )
 
     epsilon = 1.0e-14
 
-    test_basis => v0_func_space%get_basis( )
-    @assertEqual( test_v0_basis_result , test_basis(1,1,1,1), epsilon )
+    test_basis => w0_func_space%get_basis( )
+    @assertEqual( test_w0_basis_result , test_basis(1,1,1,1), epsilon )
 
-    test_basis => v0_func_space%get_diff_basis()
-    @assertEqual( test_v0_diff_basis_result, test_basis(1,1,1,1), epsilon )
+    test_basis => w0_func_space%get_diff_basis()
+    @assertEqual( test_w0_diff_basis_result, test_basis(1,1,1,1), epsilon )
 
-    test_nodes => v0_func_space%get_nodes( )
-    @assertEqual( test_v0_nodal_coords_1, test_nodes(1,1), epsilon )
-    @assertEqual( test_v0_nodal_coords_2, test_nodes(2,1), epsilon )
-    @assertEqual( test_v0_nodal_coords_3, test_nodes(3,1), epsilon )
+    test_nodes => w0_func_space%get_nodes( )
+    @assertEqual( test_w0_nodal_coords_1, test_nodes(1,1), epsilon )
+    @assertEqual( test_w0_nodal_coords_2, test_nodes(2,1), epsilon )
+    @assertEqual( test_w0_nodal_coords_3, test_nodes(3,1), epsilon )
 
-    test_fs = v0_func_space%which()
-    @assertEqual(test_fs,V0)
+    test_fs = w0_func_space%which()
+    @assertEqual(test_fs,W0)
 
-!v1
-    v1_func_space = v1_func_space%get_instance(V1)
+!w1
+    w1_func_space = w1_func_space%get_instance(W1)
 
     ! test the procedures of the type
-    testncell = v1_func_space%get_ncell()
+    testncell = w1_func_space%get_ncell()
     @assertEqual( num_cells, testncell )
 
-    testundf = v1_func_space%get_undf()
+    testundf = w1_func_space%get_undf()
     @assertEqual( num_unique_dofs, testundf )
 
-    testmap => v1_func_space%get_cell_dofmap(0)
-    @assertEqual( test_v1_dofmap_result_1, testmap(1) )
+    testmap => w1_func_space%get_cell_dofmap(0)
+    @assertEqual( test_w1_dofmap_result_1, testmap(1) )
 
-    testmap => v1_func_space%get_cell_dofmap(num_cells-2)    
-    @assertEqual( test_v1_dofmap_result_2, testmap(1) )
+    testmap => w1_func_space%get_cell_dofmap(num_cells-2)    
+    @assertEqual( test_w1_dofmap_result_2, testmap(1) )
 
     epsilon = 1.0e-14
 
-    test_basis => v1_func_space%get_basis( )
-    @assertEqual( test_v1_basis_result, test_basis(1,1,1,1), epsilon )
+    test_basis => w1_func_space%get_basis( )
+    @assertEqual( test_w1_basis_result, test_basis(1,1,1,1), epsilon )
 
-    test_basis => v1_func_space%get_diff_basis()
-    @assertEqual( test_v1_diff_basis_result, test_basis(1,1,1,1), epsilon )
+    test_basis => w1_func_space%get_diff_basis()
+    @assertEqual( test_w1_diff_basis_result, test_basis(1,1,1,1), epsilon )
 
-    test_nodes => v1_func_space%get_nodes( )
-    @assertEqual( test_v1_nodal_coords_1, test_nodes(1,1), epsilon )
-    @assertEqual( test_v1_nodal_coords_2, test_nodes(2,1), epsilon )
-    @assertEqual( test_v1_nodal_coords_3, test_nodes(3,1), epsilon )
+    test_nodes => w1_func_space%get_nodes( )
+    @assertEqual( test_w1_nodal_coords_1, test_nodes(1,1), epsilon )
+    @assertEqual( test_w1_nodal_coords_2, test_nodes(2,1), epsilon )
+    @assertEqual( test_w1_nodal_coords_3, test_nodes(3,1), epsilon )
 
-    test_fs = v1_func_space%which()
-    @assertEqual(test_fs,V1)
+    test_fs = w1_func_space%which()
+    @assertEqual(test_fs,W1)
 
-!v2
-    v2_func_space = v2_func_space%get_instance(V2)
+!w2
+    w2_func_space = w2_func_space%get_instance(W2)
 
     ! test the procedures of the type
-    testncell = v2_func_space%get_ncell()
+    testncell = w2_func_space%get_ncell()
     @assertEqual( num_cells, testncell )
 
-    testundf = v2_func_space%get_undf()
+    testundf = w2_func_space%get_undf()
     @assertEqual( num_unique_dofs, testundf )
 
-    testmap => v2_func_space%get_cell_dofmap(0)
-    @assertEqual( test_v2_dofmap_result_1, testmap(1) )
+    testmap => w2_func_space%get_cell_dofmap(0)
+    @assertEqual( test_w2_dofmap_result_1, testmap(1) )
 
-    testmap => v2_func_space%get_cell_dofmap(num_cells-2)    
-    @assertEqual( test_v2_dofmap_result_2, testmap(1) )
+    testmap => w2_func_space%get_cell_dofmap(num_cells-2)    
+    @assertEqual( test_w2_dofmap_result_2, testmap(1) )
 
     epsilon = 1.0e-14
 
-    test_basis => v2_func_space%get_basis( )
-    @assertEqual( test_v2_basis_result, test_basis(1,1,1,1), epsilon )
+    test_basis => w2_func_space%get_basis( )
+    @assertEqual( test_w2_basis_result, test_basis(1,1,1,1), epsilon )
 
-    test_basis => v2_func_space%get_diff_basis()
-    @assertEqual( test_v2_diff_basis_result, test_basis(1,1,1,1), epsilon )
+    test_basis => w2_func_space%get_diff_basis()
+    @assertEqual( test_w2_diff_basis_result, test_basis(1,1,1,1), epsilon )
 
-    test_nodes => v2_func_space%get_nodes( )
-    @assertEqual( test_v2_nodal_coords_1, test_nodes(1,1), epsilon )
-    @assertEqual( test_v2_nodal_coords_2, test_nodes(2,1), epsilon )
-    @assertEqual( test_v2_nodal_coords_3, test_nodes(3,1), epsilon )
+    test_nodes => w2_func_space%get_nodes( )
+    @assertEqual( test_w2_nodal_coords_1, test_nodes(1,1), epsilon )
+    @assertEqual( test_w2_nodal_coords_2, test_nodes(2,1), epsilon )
+    @assertEqual( test_w2_nodal_coords_3, test_nodes(3,1), epsilon )
 
-    test_fs = v2_func_space%which()
-    @assertEqual(test_fs,V2)
+    test_fs = w2_func_space%which()
+    @assertEqual(test_fs,W2)
 
-!v3
-    v3_func_space = v3_func_space%get_instance(V3)
+!w3
+    w3_func_space = w3_func_space%get_instance(W3)
 
     ! test the procedures of the type
-    testncell = v3_func_space%get_ncell()
+    testncell = w3_func_space%get_ncell()
     @assertEqual( num_cells, testncell )
 
-    testundf = v3_func_space%get_undf()
+    testundf = w3_func_space%get_undf()
     @assertEqual( num_unique_dofs, testundf )
 
-    testmap => v3_func_space%get_cell_dofmap(0)
-    @assertEqual( test_v3_dofmap_result_1, testmap(1) )
+    testmap => w3_func_space%get_cell_dofmap(0)
+    @assertEqual( test_w3_dofmap_result_1, testmap(1) )
 
-    testmap => v3_func_space%get_cell_dofmap(num_cells-2)    
-    @assertEqual( test_v3_dofmap_result_2, testmap(1) )
+    testmap => w3_func_space%get_cell_dofmap(num_cells-2)    
+    @assertEqual( test_w3_dofmap_result_2, testmap(1) )
 
     epsilon = 1.0e-14
 
-    test_basis => v3_func_space%get_basis( )
-    @assertEqual( test_v3_basis_result, test_basis(1,1,1,1), epsilon )
+    test_basis => w3_func_space%get_basis( )
+    @assertEqual( test_w3_basis_result, test_basis(1,1,1,1), epsilon )
 
-    test_basis => v3_func_space%get_diff_basis()
-    @assertEqual( test_v3_diff_basis_result, test_basis(1,1,1,1), epsilon )
+    test_basis => w3_func_space%get_diff_basis()
+    @assertEqual( test_w3_diff_basis_result, test_basis(1,1,1,1), epsilon )
 
-    test_nodes => v3_func_space%get_nodes( )
-    @assertEqual( test_v3_nodal_coords_1, test_nodes(1,1), epsilon )
-    @assertEqual( test_v3_nodal_coords_2, test_nodes(2,1), epsilon )
-    @assertEqual( test_v3_nodal_coords_3, test_nodes(3,1), epsilon )
+    test_nodes => w3_func_space%get_nodes( )
+    @assertEqual( test_w3_nodal_coords_1, test_nodes(1,1), epsilon )
+    @assertEqual( test_w3_nodal_coords_2, test_nodes(2,1), epsilon )
+    @assertEqual( test_w3_nodal_coords_3, test_nodes(3,1), epsilon )
 
-    test_fs = v3_func_space%which()
-    @assertEqual(test_fs,V3)
+    test_fs = w3_func_space%which()
+    @assertEqual(test_fs,W3)
 
 
   end subroutine test_func_space
