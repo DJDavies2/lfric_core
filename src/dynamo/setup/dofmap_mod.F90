@@ -259,7 +259,7 @@ end subroutine dofmap_populate
 !> Subroutine to compute the orientation of vectors
 !> @param[in] ncell the number of horizontal cells
 !> @param[in] w_unique_dofs The number of dofs in each function space
-subroutine get_orientation(ncell,w_unique_dofs)
+subroutine get_orientation(ncell,w_unique_dofs, w_dof_entity)
 !-----------------------------------------------------------------------------
 ! Subroutine to read orientation
 !-----------------------------------------------------------------------------
@@ -268,38 +268,164 @@ subroutine get_orientation(ncell,w_unique_dofs)
 
   integer, intent(in) :: ncell
   integer, intent(in) :: w_unique_dofs(4,2)
+  integer, intent(in) :: w_dof_entity(4,0:3)
 
   allocate( w0_orientation(0:ncell,w_unique_dofs(1,2)) )
   allocate( w1_orientation(0:ncell,w_unique_dofs(2,2)) )
   allocate( w2_orientation(0:ncell,w_unique_dofs(3,2)) )
   allocate( w3_orientation(0:ncell,w_unique_dofs(4,2)) )
 
-  call orientation_populate(ncell, w_unique_dofs(1,2), w0_orientation)
-  call orientation_populate(ncell, w_unique_dofs(2,2), w1_orientation)
-  call orientation_populate(ncell, w_unique_dofs(3,2), w2_orientation)
-  call orientation_populate(ncell, w_unique_dofs(4,2), w3_orientation)
+  call orientation_populate( ncell,                                       &
+                             w_unique_dofs(1,2),                          &
+                             w_dof_entity(1,:),                           &
+                             w0_orientation )
+
+  call orientation_populate( ncell,                                       &
+                            w_unique_dofs(2,2),                           &
+                            w_dof_entity(2,:),                            &
+                            w1_orientation )
+  call orientation_populate( ncell,                                       &
+                             w_unique_dofs(3,2),                          &
+                             w_dof_entity(3,:),                           &
+                             w2_orientation )
+  call orientation_populate( ncell,                                       &
+                             w_unique_dofs(4,2),                          &
+                             w_dof_entity(4,:),                           &
+                             w3_orientation )
 
 end subroutine get_orientation
 
 !> Subroutine to compute the orientation of vectors
 !> @param[in] ncells the number of horizontal cells
-!> @param[in] ndof_sum the total number of dofs associated with a single cell
+!> @param[in] ndf the total number of dofs associated with a single cell
+!> @param[in] ndf_entity the number of dofs associated with each grid entity in a single cell
 !> @param[out] orientation The output orientation
-subroutine orientation_populate(ncells,ndof_sum,orientation)
+subroutine orientation_populate(ncells, ndf, ndf_entity, orientation)
 
-! total number of cells
-  integer, intent(in) :: ncells
-! total number of dofs associated with each cell  
-  integer, intent(in) :: ndof_sum
-! output orientation 
-  integer, intent(out) :: orientation(0:ncells,ndof_sum)
+  use reference_element_mod, only: nfaces_h, nedges_h
+  use mesh_generator_mod,    only: cell_next, vert_on_cell
+  
+  implicit none
+  
+  integer, intent(in)  :: ncells
+  integer, intent(in)  :: ndf
+  integer, intent(in)  :: ndf_entity(0:3)
+  integer, intent(out) :: orientation(0:ncells,ndf)
+  
 
-  integer :: cell, df
+  integer, allocatable :: face_orientation(:,:), edge_orientation(:,:)
+  
+  integer :: next_cell
+  integer :: next_face, common_face, df_on_face  
+  integer :: next_edge, common_edge, df_on_edge  
+  integer :: cell, face, edge, df
+  integer :: vert_1, vert_1_next
 
+  allocate( face_orientation(nfaces_h, ncells) )
+  allocate( edge_orientation(nedges_h, ncells) )
+
+! Check if this is vector or scalar space
+  if ( (ndf_entity(1) == 0 .and. ndf_entity(2) == 0) &
+  .or. ndf_entity(0) /= 0 ) then
+! orientation is not needed for scalar spaces (but set them to 1 anyway)  
+    do cell = 0, ncells
+      do df = 1,ndf
+       orientation(cell,df) = 1   
+      end do
+    end do 
+    return
+  end if
+
+! initialise all face and edge orientations to 0
+  do cell = 1,ncells
+    do face = 1,nfaces_h
+      face_orientation(face,cell) = 0
+    end do
+    do edge = 1,nedges_h
+      edge_orientation(edge,cell) = 0
+    end do    
+  end do
+   
+  do cell = 1,ncells
+! Face orientation for this cell  
+    do face = 1,nfaces_h
+      if ( face_orientation(face,cell) == 0 ) then
+        next_cell = cell_next(cell,face)
+        common_face = 0
+        do next_face = 1,nfaces_h
+          if ( cell_next(next_cell,next_face) == cell) common_face = next_face
+        end do
+        face_orientation(face,cell) = 1
+! if neighbouring faces are in set (1,1),(1,4),(2,2),(2,3),(3,3),(3,2),(4,4),(4,1)
+! then reverse orientation of one element
+        if ( face == common_face .or. face + common_face == 5 ) then
+          face_orientation(common_face,next_cell) = -1
+        else
+          face_orientation(common_face,next_cell) = 1
+        end if
+      end if   
+    end do
+! Edge orientation of this cell
+    do edge = 1,nedges_h
+! This works as horizontal edges == horizontal faces    
+      if ( edge_orientation(edge,cell) == 0 ) then
+        next_cell = cell_next(cell,edge)
+        common_edge = 0
+        do next_edge = 1,nedges_h
+          if ( cell_next(next_cell,next_edge) == cell) common_edge = next_edge 
+        end do
+        edge_orientation(edge,cell) = 1
+        
+        vert_1 = vert_on_cell(cell,edge)
+        vert_1_next = vert_on_cell(next_cell,common_edge)      
+! if neighbouring edges are (1,2), (2,1) or (3,4), (4,3) then
+        if ( max(edge,common_edge) < 3 .or. min(edge,common_edge) > 2 ) then 
+          if ( vert_1 == vert_1_next ) then
+            edge_orientation(common_edge,next_cell) = 1
+! if edges are in the opposite direction then reverse orientation            
+          else
+            edge_orientation(common_edge,next_cell) = -1
+          end if  
+        else
+! else if neighbouring edges are (1,3), (1,4) or (2,3), (2,4) + sy,metric changes then        
+! if edges are in the same direction then reverse orientation         
+          if ( vert_1 == vert_1_next ) then
+            edge_orientation(common_edge,next_cell) = -1
+          else
+            edge_orientation(common_edge,next_cell) = 1
+          end if           
+        end if
+      end if
+    end do
+  end do
+  
+! Populate cell orientation  
   do cell = 0, ncells
-     do df = 1, ndof_sum
-       orientation(cell,df) = 1
-     end do
+! initialise all orientations to 1
+    do df = 1,ndf
+     orientation(cell,df) = 1   
+    end do
+  end do
+  
+  do cell = 1, ncells 
+! Overwrite dof orientation with face orientation 
+! only applicable if ndf_entity(2) > 0
+    df = ndf_entity(3) + 1 
+    do face = 1,nfaces_h
+      do df_on_face = 1,ndf_entity(2) 
+        orientation(cell,df) = face_orientation(face,cell)
+        df = df + 1
+      end do
+    end do
+! ! Overwrite dof orientation with edge orientation
+! only applicable if ndf_entity(1) > 0
+    df = ndf_entity(3) + nfaces*ndf_entity(2) + 1 
+    do edge = 1,nedges_h
+      do df_on_edge = 1,ndf_entity(1) 
+        orientation(cell,df) = edge_orientation(edge,cell)
+        df = df + 1
+      end do
+    end do 
   end do
 
 end subroutine orientation_populate

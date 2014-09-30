@@ -110,7 +110,7 @@ contains
                     ncell=num_cells,w_unique_dofs=w_unique_dofs)
     
     ! compute cell local orientations for vector spaces
-    call get_orientation(num_cells, w_unique_dofs)
+    call get_orientation(num_cells, w_unique_dofs, w_dof_entity)
 
     return
 
