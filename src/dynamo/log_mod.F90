@@ -140,10 +140,10 @@ contains
           tag  = 'DEBUG'
         case ( LOG_LEVEL_INFO : LOG_LEVEL_WARNING - 1 )
           unit = info_unit
-          tag  = 'INFO'
+          tag  = 'INFO '
         case ( LOG_LEVEL_WARNING : LOG_LEVEL_ERROR - 1)
           unit = alert_unit
-          tag  = 'WARN'
+          tag  = 'WARN '
         case ( LOG_LEVEL_ERROR : )
           unit = alert_unit
           tag  = 'ERROR'
@@ -154,7 +154,7 @@ contains
 
       ! If the severity level of the event is serious enough, stop the code.
       if ( level >= LOG_LEVEL_ERROR )then
-        error stop EXIT_CODE_ON_ERROR
+        stop EXIT_CODE_ON_ERROR
       end if
 
     end if

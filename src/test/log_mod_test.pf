@@ -16,7 +16,10 @@ module log_mod_test
   implicit none 
 
   private
-  public log_test_constructor, getParameters, log_level_test, log_output_test
+  !> @todo We shouldn't have to explicitly export setUp and tearDown but
+  !>       ifort 14 borks badly if you don't.
+  public log_test_constructor, getParameters, &
+         log_level_test, log_output_test, setUp, tearDown
 
   integer, parameter :: INFO_UNIT  = 12
   integer, parameter :: ALERT_UNIT = 13
@@ -43,7 +46,7 @@ module log_mod_test
 
 contains
 
-!> Construct the log module test case.
+  !> Construct the log module test case.
   !>
   !> @param level The level to test at.
   !>
@@ -233,48 +236,60 @@ contains
 
     class ( log_test_type ), intent( inout ) :: this
 
-    character(  8 ) :: tag
-    character( 80 ) :: message
-    integer         :: status
+    integer, parameter :: number_of_levels = 4
+
+    integer         :: levels( number_of_levels )
+    character( 22 ) :: messages( number_of_levels )
+    integer         :: level_index
+    character(  8 ) :: info_tag, alert_tag
+    character( 80 ) :: info_message, alert_message
+    integer         :: info_status, alert_status
+
+    levels  = [ LOG_LEVEL_TRACE, LOG_LEVEL_DEBUG, &
+                LOG_LEVEL_INFO, LOG_LEVEL_WARNING ]
+    messages  = [ 'kraft cheeselike slice', &
+                  'generic cheddar       ', &
+                  'wensleydale           ', &
+                  'double gloucester     ']
 
     call log_set_info_stream( INFO_UNIT )
     call log_set_alert_stream( ALERT_UNIT )
 
     call log_set_level( this%level )
 
-    call log_event( 'kraft',      LOG_LEVEL_TRACE )
-    call log_event( 'chedder',    LOG_LEVEL_DEBUG )
-    call log_event( 'wenslydale', LOG_LEVEL_INFO )
-    call log_event( 'gloucester', LOG_LEVEL_WARNING )
+    log_loop: do level_index = 1, number_of_levels
+      call log_event( trim( messages(level_index) ), levels(level_index) )
+    end do log_loop
 
     rewind( INFO_UNIT )
-    if ( this%level <= LOG_LEVEL_TRACE ) then
-      read( INFO_UNIT, '(23X,A8,A)' ) tag, message
-      @assertEqual( ':TRACE:', tag )
-      @assertEqual( 'kraft', message )
-    end if
-    if ( this%level <= LOG_LEVEL_DEBUG ) then
-      read( INFO_UNIT, '(23X,A8,A)' ) tag, message
-      @assertEqual( ':DEBUG:', tag )
-      @assertEqual( 'chedder', message )
-    end if
-    if (this%level <= LOG_LEVEL_INFO) then
-      read( INFO_UNIT, '(23X,A8,A)' ) tag, message
-      @assertEqual( ':INFO :', tag )
-      @assertEqual( 'wenslydale', message )
-    end if
-    read( INFO_UNIT, '(A)', iostat = status ) message
-    @assertEqual( iostat_end, status )
-
     rewind( ALERT_UNIT )
-    if ( this%level <= LOG_LEVEL_WARNING ) then
-      read( ALERT_UNIT, '(23X,A8,A)' ) tag, message
-      @assertEqual( ':WARN :', tag )
-      @assertEqual( 'gloucester', message )
-    end if
+    read_loop: do level_index = 1, number_of_levels
+      if ( levels(level_index) >= this%level ) then
+        info_tag = ""
+        info_message = ""
+        read( INFO_UNIT,  '(23X,A8,A)', iostat = info_status ) info_tag, &
+                                                              info_message
+        read( ALERT_UNIT, '(23X,A8,A)', iostat = alert_status ) alert_tag, &
+                                                                alert_message
 
-    read( ALERT_UNIT, '(A)', iostat = status ) message
-    @assertEqual( iostat_end, status )
+        select case (levels(level_index))
+          case (LOG_LEVEL_TRACE)
+            @assertEqual( ':TRACE:', info_tag )
+            @assertEqual( messages(level_index), info_message )
+          case (LOG_LEVEL_DEBUG)
+            @assertEqual( ':DEBUG:', info_tag )
+            @assertEqual( messages(level_index), info_message )
+          case (LOG_LEVEL_INFO)
+            @assertEqual( ':INFO :', info_tag )
+            @assertEqual( messages(level_index), info_message )
+          case (LOG_LEVEL_WARNING)
+            @assertEqual( ':WARN :', alert_tag )
+            @assertEqual( messages(level_index), alert_message )
+          case default
+            @assertTrue( .false. )
+        end select
+      end if
+    end do read_loop
 
   end subroutine log_level_test
 
