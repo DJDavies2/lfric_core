@@ -6,34 +6,36 @@
 !-------------------------------------------------------------------------------
 !
 !-------------------------------------------------------------------------------
-module gaussian_quadrature_mod_test
+module quadrature_mod_test
   implicit none 
 
 contains
 
   @test
-  subroutine test_gaussian_quadrature()
+  subroutine test_quadrature()
     use pFUnit_Mod
-    use gaussian_quadrature_mod, only : gaussian_quadrature_type, GQ3, &
-                                        ngp_h, ngp_v
+    use quadrature_mod, only : quadrature_type, QR3
     use constants_mod, only : r_def
     implicit none
 
-    real(kind=r_def) :: polynomial(ngp_h,ngp_v)
+    real(kind=r_def) :: polynomial(9,3)
     real(kind=r_def) :: result, answer, epsilon
-    real(kind=r_def) :: basis_func
-    integer          :: test_gq
+    integer          :: test_qr
+    
+    integer :: nqp_h, nqp_v
+    type(quadrature_type), pointer :: qr => null()
 
-    type(gaussian_quadrature_type) :: gaussian_quadrature
+    nqp_h=9
+    nqp_v=3
 
-    gaussian_quadrature  = gaussian_quadrature%get_instance(GQ3)
+    qr => qr%get_instance(QR3, nqp_h, nqp_v)
 
-    test_gq = gaussian_quadrature%which()
-    @assertEqual(test_gq,GQ3)
+    test_qr = qr%which()
+    @assertEqual(test_qr,QR3)
 
     polynomial = 0.33333333333333333333333_r_def
 
-    result = gaussian_quadrature%integrate(polynomial)
+    result = qr%integrate(polynomial)
 
     answer = 0.33333333333333333333333_r_def
 
@@ -41,6 +43,6 @@ contains
 
     @assertEqual( answer, result, epsilon )
 
-  end subroutine test_gaussian_quadrature
+  end subroutine test_quadrature
 
-end module gaussian_quadrature_mod_test
+end module quadrature_mod_test

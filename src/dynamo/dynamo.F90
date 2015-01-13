@@ -27,7 +27,6 @@ program dynamo
   use function_space_mod,      only : function_space_type, W0, W1, W2, W3
   use log_mod,                 only : log_event, LOG_LEVEL_INFO
   use set_up_mod,              only : set_up
-  use gaussian_quadrature_mod, only : gaussian_quadrature_type, GQ3
   use field_io_mod,            only : write_state_netcdf                      &
                                     , write_state_plain_text
   use mesh_mod,                only : total_ranks, local_rank
@@ -40,7 +39,6 @@ program dynamo
 ! prognostic fields    
   type( field_type ) :: u, rho, theta, exner, xi
                                      
-  type( gaussian_quadrature_type ) :: gq
   integer                          :: coord
 
   type( field_type ), allocatable  :: state(:)
@@ -55,24 +53,19 @@ program dynamo
   call set_up( )
 
   do coord = 1,3
-    chi(coord) = field_type( vector_space = function_space%get_instance( W0 ),&
-                             gq = gq%get_instance(GQ3) )
+    chi(coord) = field_type( vector_space = function_space%get_instance( W0 ) )
   end do
                
-  theta = field_type( vector_space = function_space%get_instance( W0 ),       &
-                      gq = gq%get_instance(GQ3) )
+  theta = field_type( vector_space = function_space%get_instance( W0 ) )
                     
-  xi = field_type( vector_space = function_space%get_instance( W1 ),          &
-                      gq = gq%get_instance(GQ3) )
+  xi = field_type( vector_space = function_space%get_instance( W1 ) )
                     
-  u = field_type( vector_space = function_space%get_instance( W2 ),           &
-                      gq = gq%get_instance(GQ3) )
+  u = field_type( vector_space = function_space%get_instance( W2 ) )
 
-  rho = field_type( vector_space = function_space%get_instance( W3 ),         &
-                      gq = gq%get_instance(GQ3) )
+  rho = field_type( vector_space = function_space%get_instance( W3 ) )
 
-  exner = field_type( vector_space = function_space%get_instance( W3 ),       &
-                      gq = gq%get_instance(GQ3) )
+  exner = field_type( vector_space = function_space%get_instance( W3 ) )
+
                                            
 
   n_fields = 1

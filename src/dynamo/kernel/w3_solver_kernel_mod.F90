@@ -12,9 +12,8 @@
 module w3_solver_kernel_mod
 use kernel_mod,              only : kernel_type
 use constants_mod,           only : r_def
-use gaussian_quadrature_mod, only : ngp_h, ngp_v, gaussian_quadrature_type
 use argument_mod,            only : arg_type, &          ! the type
-                                    gh_read, gh_write, w0, w3, fe, cells ! the enums
+                                    gh_read, gh_write, w0, w3, fe, cells 
 
 implicit none
 
@@ -69,25 +68,32 @@ end function w3_solver_kernel_constructor
 !! @param[inout] chi_1 Real array, the x component of the w0 coordinate field
 !! @param[inout] chi_2 Real array, the y component of the w0 coordinate field
 !! @param[inout] chi_3 Real array, the z component of the w0 coordinate field
-subroutine solver_w3_code(nlayers, ndf_w3, map_w3, w3_basis, x, rhs, gq, &
-                          ndf_w0, map_w0, w0_diff_basis, chi_1, chi_2, chi_3 &
+subroutine solver_w3_code(nlayers, ndf_w3, undf_w3, map_w3, w3_basis, &
+                          x, rhs, &
+                          ndf_w0, undf_w0, map_w0, w0_diff_basis,     &
+                          chi_1, chi_2, chi_3, &
+                          nqp_h, nqp_v, wqp_h, wqp_v                  &
                          )
                          
-   use matrix_invert_mod,       only : matrix_invert 
-   use coordinate_jacobian_mod, only : coordinate_jacobian 
-
+  use matrix_invert_mod,       only : matrix_invert 
+  use coordinate_jacobian_mod, only : coordinate_jacobian 
+  
   ! needs to compute the integral of rho_df * P 
   ! P_analytic over a single column    
   
   !Arguments
-  integer, intent(in) :: nlayers, ndf_w3, ndf_w0
-  integer, intent(in) :: map_w3(ndf_w3), map_w0(ndf_w0)
-  real(kind=r_def), intent(in), dimension(1,ndf_w3,ngp_h,ngp_v) :: w3_basis  
-  real(kind=r_def), intent(inout) :: x(*)
-  real(kind=r_def), intent(in) :: rhs(*)
-  real(kind=r_def), intent(in)    :: chi_1(*), chi_2(*), chi_3(*)
-  type(gaussian_quadrature_type), intent(in)                 :: gq
-  real(kind=r_def), intent(in), dimension(3,ndf_w0,ngp_h,ngp_v) :: w0_diff_basis 
+  integer, intent(in) :: nlayers, nqp_h, nqp_v
+  integer, intent(in) :: ndf_w3, undf_w3, ndf_w0, undf_w0
+  integer, dimension(ndf_w3), intent(in) :: map_w3
+  integer, dimension(ndf_w0), intent(in) :: map_w0
+  real(kind=r_def), intent(in), dimension(1,ndf_w3,nqp_h,nqp_v) :: w3_basis
+  real(kind=r_def), intent(in), dimension(3,ndf_w0,nqp_h,nqp_v) :: w0_diff_basis  
+  real(kind=r_def), dimension(undf_w3), intent(inout) :: x
+  real(kind=r_def), dimension(undf_w3), intent(in)    :: rhs
+  real(kind=r_def), dimension(undf_w0), intent(in)    :: chi_1, chi_2, chi_3
+
+  real(kind=r_def), dimension(nqp_h), intent(in)      ::  wqp_h
+  real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v  
 
   !Internal variables
   integer               :: df1, df2, k
@@ -96,13 +102,10 @@ subroutine solver_w3_code(nlayers, ndf_w3, map_w3, w3_basis, x, rhs, gq, &
   real(kind=r_def) :: x_e(ndf_w3), rhs_e(ndf_w3)
   real(kind=r_def) :: integrand
   real(kind=r_def), dimension(ndf_w3,ndf_w3) :: mass_matrix_w3, inv_mass_matrix_w3
-  real(kind=r_def), dimension(ngp_h,ngp_v)     :: dj
-  real(kind=r_def), dimension(3,3,ngp_h,ngp_v) :: jac
+  real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
+  real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
   real(kind=r_def), dimension(ndf_w0) :: chi_1_e, chi_2_e, chi_3_e
-  real(kind=r_def), pointer           :: wgp_h(:), wgp_v(:)
 
-  wgp_h => gq%get_wgp_h()
-  wgp_v => gq%get_wgp_v() 
   ! compute the LHS integrated over one cell and solve
   do k = 0, nlayers-1
     do df1 = 1, ndf_w0
@@ -110,16 +113,16 @@ subroutine solver_w3_code(nlayers, ndf_w3, map_w3, w3_basis, x, rhs, gq, &
       chi_2_e(df1) = chi_2( map_w0(df1) + k)
       chi_3_e(df1) = chi_3( map_w0(df1) + k)
     end do
-    call coordinate_jacobian(ndf_w0, ngp_h, ngp_v, chi_1_e, chi_2_e, chi_3_e, w0_diff_basis, jac, dj)
+    call coordinate_jacobian(ndf_w0, nqp_h, nqp_v, chi_1_e, chi_2_e, chi_3_e, w0_diff_basis, jac, dj)
     do df1 = 1, ndf_w3
        do df2 = 1, ndf_w3
           mass_matrix_w3(df1,df2) = 0.0_r_def
-          do qp2 = 1, ngp_v
-             do qp1 = 1, ngp_h
+          do qp2 = 1, nqp_v
+             do qp1 = 1, nqp_h
                 integrand =  w3_basis(1,df1,qp1,qp2) * &
                              w3_basis(1,df2,qp1,qp2) * dj(qp1,qp2)
                  mass_matrix_w3(df1,df2) = mass_matrix_w3(df1,df2) &
-                                         + 0.125_r_def*wgp_h(qp1)*wgp_v(qp2)*integrand
+                                         + 0.125_r_def*wqp_h(qp1)*wqp_v(qp2)*integrand
              end do
           end do
        end do

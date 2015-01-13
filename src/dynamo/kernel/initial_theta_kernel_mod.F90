@@ -62,20 +62,21 @@ end function initial_theta_kernel_constructor
 !> @brief The subroutine which is called directly by the psy layer
 !! @param[in] nlayers Integer the number of layers
 !! @param[in] ndf The number of degrees of freedom per cell
+!! @param[in] undf The number of unique degrees of freedom
 !! @param[in] map Integer array holding the dofmap for the cell at the base of the column
 !! @param[inout] theta Real array, the actual data
 !! @param[in] chi_1 Real array, the physical x coordinates
 !! @param[in] chi_2 Real array, the physical y coordinates
 !! @param[in] chi_3 Real array, the physical z coordinates
-subroutine initial_theta_code(nlayers,ndf,map,theta,chi_1,chi_2,chi_3)
+subroutine initial_theta_code(nlayers,ndf,undf,map,theta,chi_1,chi_2,chi_3)
   
   !Arguments
-  integer, intent(in) :: nlayers, ndf
-  integer, intent(in) :: map(ndf)
-  real(kind=r_def), intent(inout) :: theta(*)
-  real(kind=r_def), intent(in)    :: chi_1(*)
-  real(kind=r_def), intent(in)    :: chi_2(*)
-  real(kind=r_def), intent(in)    :: chi_3(*)
+  integer, intent(in) :: nlayers, ndf, undf
+  integer, dimension(ndf), intent(in) :: map
+  real(kind=r_def), dimension(undf), intent(inout) :: theta
+  real(kind=r_def), dimension(undf), intent(in)    :: chi_1
+  real(kind=r_def), dimension(undf), intent(in)    :: chi_2
+  real(kind=r_def), dimension(undf), intent(in)    :: chi_3
 
   !Internal variables
   integer               :: df, k

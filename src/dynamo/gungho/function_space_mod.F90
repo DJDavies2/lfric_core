@@ -28,32 +28,30 @@ private
   
 type, public :: function_space_type
   private
-  integer              :: ndf, ncell, undf, ngp_h, ngp_v, fs, nlayers
+  integer              :: ndf, ncell, undf, fs, nlayers
   integer              :: dim_space, dim_space_diff
   !> A two dimensional, allocatable array which holds the indirection map 
   !! or dofmap for the whole function space over the bottom level of the domain.
   integer, allocatable :: dofmap(:,:)
-  !> 4-dim allocatable array of reals which hold the values of the basis function
-  real(kind=r_def), allocatable :: basis(:,:,:,:)
-  !> 4-dim allocatable array of reals which hold the values of the basis function
-  !! for the differential  functions space
-  real(kind=r_def), allocatable :: diff_basis(:,:,:,:)
-
   !> A two dimensional, allocatable array of reals which holds the coordinates
   !! of the function_space degrees of freedom
   real(kind=r_def), allocatable :: nodal_coords(:,:)
   !> A two dimensional, allocatable array which holds the local orientation of
   !! vector degrees of freedom
   integer, allocatable :: orientation(:,:)
-  !> 3-dim allocatable array of reals which hold the mass matrix
-  real(kind=r_def), allocatable :: mass_matrix(:,:,:)  
   
+  !> A two dimensional, allocatable, integer array which specifies which 
+  !! dofs are on vertex boundarys
   integer, allocatable :: dof_on_vert_boundary(:,:)
 
   !> Arrays needed for on the fly basis evaluations
+  !! integer 2 dimesional, allocatable array containing the basis order
   integer, allocatable          :: basis_order(:,:)
+  !! integer 2 dimesional, allocatable array containing the basis index
   integer, allocatable          :: basis_index(:,:)
+  !! real, 2 dimesional, allocatable array containing the basis vector
   real(kind=r_def), allocatable :: basis_vector(:,:)
+  !! real 2 dimesional, allocatable array containing the basis x
   real(kind=r_def), allocatable :: basis_x(:,:,:)
 
 contains
@@ -89,18 +87,6 @@ contains
 !! return an integer, the number of dofs per cell
   procedure :: get_ndf
 
-!>  Accessor procedure for the basis function
-!! @param[in] self the calling function space
-!! @return A pointer to the array to hold the values of the basis function 
-  procedure :: get_basis
-
-!> Accessor procedure for the basis function for the
-!! differential function space
-!! @param[in] self the calling function space
-!! @return A pointer to the real array to hold the values of the
-!!  basis function 
-  procedure :: get_diff_basis
-
 !> Accessor function to get the coordinates of the function space
 !! @return A pointer to the two dimensional array, (xyz,ndf)
   procedure :: get_nodes
@@ -123,6 +109,33 @@ contains
   procedure evaluate_basis
 !> Accessor function to evaluate the differential of a basis function
   procedure evaluate_diff_basis
+
+  !> Subroutine to evaluate the basis function for a given quadrature
+  !> @param[out] basis real 3 dimensional array holding the evaluated basis 
+  !! functions
+  !> @param[in] ndf integer number of dofs
+  !> @param[in] qp_h integer number of quadrature points in the horizontal
+  !> @param[in] qp_v integer number of quadrature points in the vertical
+  !> @param[in] x_qp real two dimensional array holding the x's horizontal
+  !> @param[in] z_qp real two dimensional array holding the x's vertical
+  procedure compute_basis_function
+  !> Subroutine to evaluate the differential basis function for a given quadrature
+  !> @param[out] dbasis real 3 dimensional array holding the evaluated basis 
+  !! functions
+  !> @param[in] ndf integer number of dofs
+  !> @param[in] qp_h integer number of quadrature points in the horizontal
+  !> @param[in] qp_v integer number of quadrature points in the vertical
+  !> @param[in] x_qp real two dimensional array holding the x's horizontal
+  !> @param[in] z_qp real two dimensional array holding the x's vertical
+  procedure compute_diff_basis_function
+
+  !> Accessor function to get the size of the space 
+  !!(1 is scalar 3 is vector). Returns dim
+  !> @param
+  procedure get_dim_space
+  !> Accessor function to get the size of the differential space 
+  !! (1 is scalar 3 is vector). Returns dim
+  procedure get_dim_space_diff
 
 end type function_space_type
 !-------------------------------------------------------------------------------
@@ -147,8 +160,6 @@ contains
 
 function get_instance(function_space) result(instance)
   use basis_function_mod,      only : &
-              w0_basis, w1_basis, w2_basis, w3_basis, &
-              w0_diff_basis, w1_diff_basis, w2_diff_basis, w3_diff_basis, &
               w0_nodal_coords, w1_nodal_coords, w2_nodal_coords, w3_nodal_coords, &
               w0_dof_on_vert_boundary, w1_dof_on_vert_boundary, &
               w2_dof_on_vert_boundary, w3_dof_on_vert_boundary, &
@@ -161,13 +172,12 @@ function get_instance(function_space) result(instance)
               w0_dofmap, w1_dofmap, w2_dofmap, w3_dofmap, &
               w0_orientation, w1_orientation, w2_orientation, w3_orientation
 
-  use gaussian_quadrature_mod, only : ngp_h, ngp_v
   use mesh_mod,                only : num_cells, w_unique_dofs, num_layers
 
   implicit none
 
   integer :: function_space
-  type(function_space_type), pointer :: instance
+  type(function_space_type), pointer :: instance 
 
   select case (function_space)
   case (W0)
@@ -178,9 +188,7 @@ function get_instance(function_space) result(instance)
          num_dofs = w_unique_dofs(1,2), &
          num_unique_dofs = w_unique_dofs(1,1) ,  &
          dim_space = 1, dim_space_diff = 3,  &
-         ngp_h = ngp_h, ngp_v = ngp_v, &
          dofmap=w0_dofmap, &
-         basis=w0_basis, diff_basis=w0_diff_basis, &
          nodal_coords=w0_nodal_coords, &
          dof_on_vert_boundary=w0_dof_on_vert_boundary, &
          orientation=w0_orientation, fs=W0, &
@@ -196,9 +204,7 @@ function get_instance(function_space) result(instance)
          num_dofs = w_unique_dofs(2,2), &
          num_unique_dofs = w_unique_dofs(2,1) ,  &
          dim_space = 3, dim_space_diff = 3,  &
-         ngp_h = ngp_h, ngp_v = ngp_v, &
          dofmap=w1_dofmap, &
-         basis=w1_basis, diff_basis=w1_diff_basis, &
          nodal_coords=w1_nodal_coords, &
          dof_on_vert_boundary=w1_dof_on_vert_boundary, &
          orientation=w1_orientation, fs=W1, &
@@ -214,9 +220,7 @@ function get_instance(function_space) result(instance)
          num_dofs = w_unique_dofs(3,2), &
          num_unique_dofs = w_unique_dofs(3,1) ,  &
          dim_space = 3, dim_space_diff = 1,  &
-         ngp_h = ngp_h, ngp_v = ngp_v, &
          dofmap=w2_dofmap, &
-         basis=w2_basis, diff_basis=w2_diff_basis, &
          nodal_coords=w2_nodal_coords, &
          dof_on_vert_boundary=w2_dof_on_vert_boundary, &
          orientation=w2_orientation, fs=W2, &
@@ -232,9 +236,7 @@ function get_instance(function_space) result(instance)
          num_dofs = w_unique_dofs(4,2), &
          num_unique_dofs = w_unique_dofs(4,1) ,  &
          dim_space = 1, dim_space_diff = 1,  &
-         ngp_h = ngp_h, ngp_v = ngp_v, &
          dofmap=w3_dofmap, &
-         basis=w3_basis, diff_basis=w3_diff_basis, &
          nodal_coords=w3_nodal_coords, &
          dof_on_vert_boundary=w3_dof_on_vert_boundary, &
          orientation=w3_orientation, fs=W3, &
@@ -264,9 +266,7 @@ subroutine init_function_space(self, &
                                num_dofs, &
                                num_unique_dofs,  &
                                dim_space, dim_space_diff,  &
-                               ngp_h,ngp_v, &
                                dofmap, &
-                               basis, diff_basis, &
                                nodal_coords, &
                                dof_on_vert_boundary, &
                                orientation ,fs, &
@@ -277,30 +277,22 @@ subroutine init_function_space(self, &
   class(function_space_type) :: self
   integer, intent(in) :: num_cells, num_layers, num_dofs, num_unique_dofs
   integer, intent(in) :: dim_space, dim_space_diff
-  integer, intent(in) :: ngp_h,ngp_v
 ! The following four arrays have intent inout because the move_allocs in the
 ! code need access to the arrays to free them in their original locations
   integer,          intent(inout), allocatable  :: dofmap(:,:)
-  real(kind=r_def), intent(inout), allocatable  :: basis(:,:,:,:)
-  real(kind=r_def), intent(inout), allocatable  :: diff_basis(:,:,:,:)
   real(kind=r_def), intent(inout), allocatable  :: nodal_coords(:,:)
   integer,          intent(inout), allocatable  :: dof_on_vert_boundary(:,:)
   integer,          intent(inout), allocatable  :: orientation(:,:)
   integer,          intent(in)                  :: fs
   integer,          intent(inout), allocatable  :: basis_order(:,:),  basis_index(:,:)
   real(kind=r_def), intent(inout), allocatable  :: basis_vector(:,:), basis_x(:,:,:)
-
   self%ncell           =  num_cells
   self%nlayers         =  num_layers
   self%ndf             =  num_dofs
   self%undf            =  num_unique_dofs
   self%dim_space       =  dim_space
   self%dim_space_diff  =  dim_space_diff
-  self%ngp_h           =  ngp_h
-  self%ngp_v           =  ngp_v  
   call move_alloc(dofmap, self%dofmap)
-  call move_alloc(basis , self%basis)
-  call move_alloc(diff_basis , self%diff_basis)
   call move_alloc(nodal_coords , self%nodal_coords) 
   call move_alloc(dof_on_vert_boundary , self%dof_on_vert_boundary) 
   call move_alloc(orientation , self%orientation) 
@@ -312,7 +304,6 @@ subroutine init_function_space(self, &
 
   return
 end subroutine init_function_space
-
 !-----------------------------------------------------------------------------
 ! Get total unique dofs for this space
 !-----------------------------------------------------------------------------
@@ -338,7 +329,6 @@ end function get_undf
 integer function get_ncell(self)
   implicit none
   class(function_space_type), intent(in) :: self
-
   get_ncell=self%ncell
 
   return
@@ -379,43 +369,11 @@ function get_cell_dofmap(self,cell) result(map)
   implicit none
   class(function_space_type), target, intent(in) :: self
   integer,                            intent(in) :: cell
-  integer, pointer                               :: map(:)
+  integer, pointer                               :: map(:) 
 
   map => self%dofmap(:,cell)
   return
 end function get_cell_dofmap
-
-!-----------------------------------------------------------------------------
-! Get the basis function
-!-----------------------------------------------------------------------------
-!> Subroutine to return the basis functions for this space
-!! @param[in] self The calling function_space
-!! @return The pointer which points to the basis functions
-function get_basis(self)  result(basis)
-  implicit none
-  class(function_space_type), target, intent(in)  :: self  
-  real(kind=r_def),              pointer          :: basis(:,:,:,:)
-
-  basis => self%basis
-
-  return
-end function get_basis
-
-!-----------------------------------------------------------------------------
-! Get the differential of the basis function
-!-----------------------------------------------------------------------------
-!> Subroutine to return the differential basis functions for this space
-!! @param[in] self The calling function_space
-!! @return The pointer which points to the differenrtial basis functions
-function get_diff_basis(self) result(diff_basis)
-  implicit none
-  class(function_space_type), target, intent(in)  :: self  
-  real(kind=r_def),              pointer          :: diff_basis(:,:,:,:)
-
-  diff_basis => self%diff_basis
-
-  return
-end function get_diff_basis
 
 ! ----------------------------------------------------------------
 ! Get the nodal coordinates of the function_space
@@ -426,7 +384,7 @@ end function get_diff_basis
 function get_nodes(self) result(nodal_coords)
   implicit none
   class(function_space_type), target, intent(in)  :: self
-  real(kind=r_def),              pointer          :: nodal_coords(:,:)
+  real(kind=r_def),              pointer          :: nodal_coords(:,:) 
   
   nodal_coords => self%nodal_coords
   
@@ -459,7 +417,7 @@ end function get_cell_orientation
 function get_boundary_dofs(self) result(boundary_dofs)
   implicit none
   class(function_space_type), target, intent(in) :: self
-  integer, pointer                               :: boundary_dofs(:,:)
+  integer, pointer                               :: boundary_dofs(:,:) 
   
   boundary_dofs => self%dof_on_vert_boundary(:,:) 
   return
@@ -474,6 +432,22 @@ function which(self) result(fs)
   return
 end function which
 
+function get_dim_space(self) result(dim)
+  implicit none
+  class(function_space_type), intent(in) :: self
+  integer :: dim
+  dim = self%dim_space
+  return
+end function get_dim_space
+
+function get_dim_space_diff(self) result(dim)
+  implicit none
+  class(function_space_type), intent(in) :: self
+  integer :: dim
+  dim = self%dim_space_diff
+  return
+end function get_dim_space_diff
+
 !-----------------------------------------------------------------------------
 ! Evaluate a basis function at a point
 !-----------------------------------------------------------------------------
@@ -481,7 +455,7 @@ end function which
 !> @param[in] self The calling function space
 !> @param[in] df The dof to compute the basis function of
 !> @param[in] xi The (x,y,z) coodinates to evaluate the basis function
-pure function evaluate_basis(self, df, xi) result(p)
+ function evaluate_basis(self, df, xi) result(p)
   use polynomial_mod, only: poly1d
 
   class(function_space_type), intent(in)  :: self
@@ -540,5 +514,65 @@ pure function evaluate_diff_basis(self, df, xi) result(dp)
   end if
 
 end function evaluate_diff_basis
+
+subroutine compute_basis_function(self, &
+     basis, ndf,qp_h, qp_v, x_qp, z_qp)
+  implicit none
+  class(function_space_type), intent(in)  :: self
+  integer,                                             intent(in)  :: ndf
+  integer,                                             intent(in)  :: qp_h
+  integer,                                             intent(in)  :: qp_v
+  real(kind=r_def), dimension(qp_h,2),                 intent(in)  :: x_qp
+  real(kind=r_def), dimension(qp_v),                   intent(in)  :: z_qp
+  real(kind=r_def), dimension(self%dim_space,ndf,qp_h,qp_v), intent(out) :: basis
+
+  ! local variables - loop counters
+  integer :: df
+  real(kind=r_def) :: xyz(3)
+  integer :: qp1
+  integer :: qp2
+
+  do qp2 = 1, qp_v
+     xyz(3)=z_qp(qp2)
+     do qp1 = 1, qp_h
+        xyz(1) = x_qp(qp1,1)
+        xyz(2) = x_qp(qp1,2)
+        do df = 1, ndf
+           basis(:,df,qp1,qp2) = self%evaluate_basis(df,xyz)
+        end do
+     end do
+  end do
+  
+end subroutine compute_basis_function
+
+subroutine compute_diff_basis_function(self, &
+     dbasis, ndf, qp_h, qp_v, x_qp, z_qp )
+  implicit none
+  class(function_space_type), intent(in)  :: self
+  integer,                                             intent(in)  :: ndf
+  integer,                                             intent(in)  :: qp_h
+  integer,                                             intent(in)  :: qp_v
+  real(kind=r_def), dimension(qp_h,2),                 intent(in)  :: x_qp
+  real(kind=r_def), dimension(qp_v),                   intent(in)  :: z_qp
+  real(kind=r_def), dimension(self%dim_space_diff,ndf,qp_h,qp_v), intent(out) :: dbasis
+
+! local variables - loop counters
+  integer :: df
+  real(kind=r_def) :: xyz(3)
+  integer :: qp1
+  integer :: qp2
+  
+  do qp2 = 1, qp_v
+     xyz(3)=z_qp(qp2)
+     do qp1 = 1, qp_h
+        xyz(1) = x_qp(qp1,1)
+        xyz(2) = x_qp(qp1,2)
+        do df = 1, ndf
+           dbasis(:,df,qp1,qp2) = self%evaluate_diff_basis(df,xyz)
+        end do
+     end do
+  end do
+
+end subroutine compute_diff_basis_function
 
 end module function_space_mod

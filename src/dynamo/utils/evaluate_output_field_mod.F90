@@ -101,8 +101,8 @@ subroutine evaluate_output_field( field, chi, x_in, cell, nz, field_out)
                               chi_cell(3,:), &
                               dgamma, &
                               jac, &
-                              dj)  
-    call coordinate_jacobian_inverse(1, 1, jac, jac_inv)
+                              dj)
+    call coordinate_jacobian_inverse(1, 1, jac, dj, jac_inv)
 ! compute g(xi^n) - [x,y,z]
     g_func = - x_loc(:)
     do df = 1, ndf

@@ -21,37 +21,8 @@ module basis_function_mod
   use reference_element_mod
 
   use constants_mod, only: r_def
-  use gaussian_quadrature_mod, only: gaussian_quadrature_type, GQ3, &
-                                     ngp_v, ngp_h !parameter for how many GQ points
-  use polynomial_mod, only: poly1d, poly1d_deriv
      
   implicit none
-
-  !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the W0 function space
-  real(kind=r_def), allocatable :: w0_basis(:,:,:,:)
-  !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the W1 function space
-  real(kind=r_def), allocatable :: w1_basis(:,:,:,:)
-  !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the W2 function space
-  real(kind=r_def), allocatable :: w2_basis(:,:,:,:)
-  !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the W3 function space
-  real(kind=r_def), allocatable :: w3_basis(:,:,:,:)
-
-  !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the W0 differential function space
-  real(kind=r_def), allocatable :: w0_diff_basis(:,:,:,:)
-  !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the W1 differential function space
-  real(kind=r_def), allocatable :: w1_diff_basis(:,:,:,:)
-  !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the W2 differential function space
-  real(kind=r_def), allocatable :: w2_diff_basis(:,:,:,:)
-  !> 4-dim allocatable arrays of reals which hold the values of the basis
-  !> functions for the W3 differential function space
-  real(kind=r_def), allocatable :: w3_diff_basis(:,:,:,:)
 
   !> 2-dim allocatable arrays of reals which hold the values of the nodal
   !> co-ordinates for the W0 function space
@@ -94,23 +65,12 @@ contains
     integer, intent(in) :: k
     integer, intent(in) :: w_unique_dofs(4,2), w_dof_entity(4,0:3)
 
-    integer :: i, jx, jy, jz, order, idx, j1, j2, h_ctr
+    integer :: i, jx, jy, jz, order, idx, j1, j2
     integer :: j(3), j2l_edge(12,3), j2l_face(6,3), face_idx(6), edge_idx(12,2)
     integer, allocatable :: lx(:), ly(:), lz(:)
-    real(kind=r_def)     :: fx, fy, fz, gx, gy, gz, dfx, dfy, dfz
     real(kind=r_def)     :: x1(k+2), x2(k+2)
     real(kind=r_def), allocatable    :: unit_vec_w2(:,:), unit_vec_w1(:,:)
-    type( gaussian_quadrature_type ), pointer :: gq
-    real(kind=r_def), pointer :: xqp(:)
 
-    allocate(w0_basis(1,w_unique_dofs(1,2),ngp_h,ngp_v))
-    allocate(w1_basis(3,w_unique_dofs(2,2),ngp_h,ngp_v))
-    allocate(w2_basis(3,w_unique_dofs(3,2),ngp_h,ngp_v))
-    allocate(w3_basis(1,w_unique_dofs(4,2),ngp_h,ngp_v))
-    allocate(w0_diff_basis(3,w_unique_dofs(1,2),ngp_h,ngp_v))
-    allocate(w1_diff_basis(3,w_unique_dofs(2,2),ngp_h,ngp_v))
-    allocate(w2_diff_basis(1,w_unique_dofs(3,2),ngp_h,ngp_v))
-    allocate(w3_diff_basis(1,w_unique_dofs(4,2),ngp_h,ngp_v))
     allocate(w0_nodal_coords(3,w_unique_dofs(1,2)))
     allocate(w1_nodal_coords(3,w_unique_dofs(2,2)))
     allocate(w2_nodal_coords(3,w_unique_dofs(3,2)))
@@ -148,12 +108,6 @@ contains
  
 
 
-    ! Create a gq object for now - Todo: we probably don't need to instantiate
-    ! gq as all we ever do is call a method from it. Sort out later
-    gq=>gq%get_instance(GQ3)
-
-    ! Fetch quadrature point arrays for precomputed basis functions
-    xqp => gq%get_xgp_v()
 
     ! positional arrays - need two, i.e quadratic and linear for RT1
     do i=1,k+2
@@ -257,27 +211,7 @@ contains
       end do
     end do
     do i=1,w_unique_dofs(1,2)
-    !do i=1,nw0
        ! explicitly for quads, as ngp_h = ngp_v * ngp_v
-       h_ctr = 1
-       do jx=1,ngp_v
-          fx = poly1d(order,xqp(jx),x1,lx(i))
-          dfx = poly1d_deriv(order,xqp(jx),x1,lx(i))
-          do jy=1,ngp_v
-             fy = poly1d(order,xqp(jy),x1,ly(i))
-             dfy = poly1d_deriv(order,xqp(jy),x1,ly(i))
-             do jz=1,ngp_v
-                fz = poly1d(order,xqp(jz),x1,lz(i))
-                dfz = poly1d_deriv(order,xqp(jz),x1,lz(i))
-                w0_basis(1,i,h_ctr,jz)=fx*fy*fz
-                w0_diff_basis(1,i,h_ctr,jz)=dfx*fy*fz
-                w0_diff_basis(2,i,h_ctr,jz)=fx*dfy*fz
-                w0_diff_basis(3,i,h_ctr,jz)=fx*fy*dfz 
-             end do
-             h_ctr = h_ctr + 1 
-          end do
-       end do
-
        w0_nodal_coords(1,i)=x1(lx(i))
        w0_nodal_coords(2,i)=x1(ly(i))
        w0_nodal_coords(3,i)=x1(lz(i))
@@ -298,7 +232,6 @@ contains
     !-----------------------------------------------------------------------------
     order = k+1
 
-    !do idx=1,nw1
     do idx = 1,w_unique_dofs(2,2)
       do i=1,3
         unit_vec_w1(idx,i) = 0.0_r_def
@@ -389,50 +322,8 @@ contains
     end do
 
     ! this needs correcting
-    !do i=1,nw1  
     do i=1,w_unique_dofs(2,2)
-       ! Quads only as ngp_h = ngp_v * ngp_v
-       h_ctr = 1
-       do jx=1,ngp_v
-          fx = poly1d(order,xqp(jx),x1,lx(i))
-          dfx = poly1d_deriv(order,xqp(jx),x1,lx(i))
-          if (lx(i) <= order) then
-             gx = poly1d(order-1,xqp(jx),x2,lx(i))
-          else
-             gx = 0.0_r_def
-          end if
-          do jy=1,ngp_v
-             fy = poly1d(order,xqp(jy),x1,ly(i))
-             dfy = poly1d_deriv(order,xqp(jy),x1,ly(i))
-             if (ly(i) <= order) then 
-                gy = poly1d(order-1,xqp(jy),x2,ly(i))
-             else
-                gy = 0.0_r_def
-             end if
-             do jz=1,ngp_v
-                fz = poly1d(order,xqp(jz),x1,lz(i))
-                dfz = poly1d_deriv(order,xqp(jz),x1,lz(i))
-                if (lz(i) <= order) then     
-                   gz = poly1d(order-1,xqp(jz),x2,lz(i))
-                else
-                   gz = 0.0_r_def
-                end if
-                
-                w1_basis(1,i,h_ctr,jz)=gx*fy*fz*unit_vec_w1(i,1)
-                w1_basis(2,i,h_ctr,jz)=fx*gy*fz*unit_vec_w1(i,2)
-                w1_basis(3,i,h_ctr,jz)=fx*fy*gz*unit_vec_w1(i,3)
-
-                w1_diff_basis(1,i,h_ctr,jz)= &
-                     (fx*dfy*gz*unit_vec_w1(i,3) - fx*gy*dfz*unit_vec_w1(i,2) )
-                w1_diff_basis(2,i,h_ctr,jz)= &
-                     (gx*fy*dfz*unit_vec_w1(i,1) - dfx*fy*gz*unit_vec_w1(i,3) )
-                w1_diff_basis(3,i,h_ctr,jz)= &
-                     (dfx*gy*fz*unit_vec_w1(i,2) - gx*dfy*fz*unit_vec_w1(i,1) )
-
-             end do
-             h_ctr = h_ctr + 1
-          end do
-       end do
+ 
        w1_nodal_coords(1,i)= &
              unit_vec_w1(i,1)*x2(lx(i)) + (1.0_r_def - unit_vec_w1(i,1))*x1(lx(i))
        w1_nodal_coords(2,i)= &
@@ -463,7 +354,6 @@ contains
 
     w2_dof_on_vert_boundary(:,:) = 1
 
-    !do idx=1,nw2
     do idx=1,w_unique_dofs(3,2)
       do i=1,3
         unit_vec_w2(idx,i) = 0.0_r_def
@@ -527,46 +417,8 @@ contains
       end do
     end do
 
-    !do i=1,nw2
     do i=1,w_unique_dofs(3,2)
-       ! Quads only as ngp_h = ngp_h * ngp_h
-       h_ctr = 1
-       do jx=1,ngp_v
-          fx = poly1d(order,xqp(jx),x1,lx(i))
-          dfx = poly1d_deriv(order,xqp(jx),x1,lx(i))
-          if (lx(i) <= order) then
-             gx = poly1d(order-1,xqp(jx),x2,lx(i))
-          else
-             gx = 0.0_r_def
-          end if
-          do jy=1,ngp_v
-             fy = poly1d(order,xqp(jy),x1,ly(i))
-             dfy = poly1d_deriv(order,xqp(jy),x1,ly(i))
-             if (ly(i) <= order) then
-                gy = poly1d(order-1,xqp(jy),x2,ly(i))
-             else
-                gy = 0.0_r_def
-             end if
-             do jz=1,ngp_v
-                fz = poly1d(order,xqp(jz),x1,lz(i))
-                dfz = poly1d_deriv(order,xqp(jz),x1,lz(i))
-                if (lz(i) <= order) then
-                   gz = poly1d(order-1,xqp(jz),x2,lz(i))
-                else
-                   gz = 0.0_r_def
-                end if
-            
-                w2_basis(1,i,h_ctr,jz)=fx*gy*gz*unit_vec_w2(i,1)
-                w2_basis(2,i,h_ctr,jz)=gx*fy*gz*unit_vec_w2(i,2)
-                w2_basis(3,i,h_ctr,jz)=gx*gy*fz*unit_vec_w2(i,3)
 
-                w2_diff_basis(1,i,h_ctr,jz)= &
-                    ( dfx*gy*gz*unit_vec_w2(i,1) + gx*dfy*gz*unit_vec_w2(i,2) &
-                    + gx*gy*dfz*unit_vec_w2(i,3) )                
-            end do
-             h_ctr = h_ctr + 1
-          end do
-       end do
        w2_nodal_coords(1,i)= &
              unit_vec_w2(i,1)*x1(lx(i)) + (1.0_r_def - unit_vec_w2(i,1))*x2(lx(i))
        w2_nodal_coords(2,i)= &
@@ -607,34 +459,21 @@ contains
       end do
     end do
 
-    !do i=1,nw3
-    ! For Quads only as ngp_h = ngp_v * ngp_v
     do i=1,w_unique_dofs(4,2)
-       h_ctr = 1
-       do jx=1,ngp_v
-          gx = poly1d(order,xqp(jx),x2,lx(i))
-          do jy=1,ngp_v
-             gy = poly1d(order,xqp(jy),x2,ly(i))
-             do jz=1,ngp_v
-                gz = poly1d(order,xqp(jz),x2,lz(i))
-                w3_basis(1,i,h_ctr,jz)=gx*gy*gz              
-             end do
-             h_ctr = h_ctr + 1
-          end do
-       end do
+
        w3_nodal_coords(1,i)=x2(lx(i))
        w3_nodal_coords(2,i)=x2(ly(i))
        w3_nodal_coords(3,i)=x2(lz(i))
-
-       w3_basis_order(:,i) = order
-       w3_basis_x(:,1,i) = x2(:)
-       w3_basis_x(:,2,i) = x2(:)
-       w3_basis_x(:,3,i) = x2(:)
- end do
+       w3_basis_x(:,1,i) = x2
+       w3_basis_x(:,2,i) = x2
+       w3_basis_x(:,3,i) = x2
+       
+    end do
     w3_basis_index(1,:) = lx(1:w_unique_dofs(4,2))
     w3_basis_index(2,:) = ly(1:w_unique_dofs(4,2))
     w3_basis_index(3,:) = lz(1:w_unique_dofs(4,2))
     w3_basis_vector(1,:) = 1.0_r_def
+    w3_basis_order(:,:) = order
 
     ! tidy up
     deallocate ( lx )

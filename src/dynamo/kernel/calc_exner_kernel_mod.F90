@@ -61,37 +61,49 @@ end function calc_exner_kernel_constructor
 !> @brief The subroutine which is called directly by the Psy layer
 !! @param[in] nlayers Integer the number of layers
 !! @param[in] ndf_w3 The number of degrees of freedom per cell for w3
+!! @param[in] undf_w3 The number of (local) unique degrees of freedom
 !! @param[in] map_w3 Integer array holding the dofmap for the cell at the base of the column for w3
-!! @param[in] w3_basis Real 5-dim array holding basis functions evaluated at gaussian quadrature points 
+!! @param[in] w3_basis Real 4-dim array holding basis functions evaluated at gaussian quadrature points 
 !! @param[inout] exner Real array the data 
+!! @param[in] rho Real array.   the density
+!! @param[in] ndf_w0 The number of degrees of freedom per cell
+!! @param[in] undf_w0 The number of (local) unique degrees of freedom
+!! @param[in] map_w0 Integer array holding the dofmap for the cell at the base of the column
+!! @param[in] w0_basis Real 4-dim array holding basis functions evaluated at  quadrature points
+!! @param[in] theta Real array. the potential temperature
+!! @param[in] w0_diff_basis Real 4-dim array holding basis functions evaluated at  quadrature points
 !! @param[in] chi_1 Real array. the physical x coordinate in w0
 !! @param[in] chi_2 Real array. the physical y coordinate in w0
 !! @param[in] chi_3 Real array. the physical z coordinate in w0
-!! @param[in] rho Real array.   the density
-!! @param[in] theta Real array. the potential temperature
-!! @param[inout] gq The gaussian quadrature rule 
-subroutine calc_exner_code(nlayers,ndf_w3,map_w3,w3_basis,gq,exner, &
-                                                             rho,   &                                                          
-                                   ndf_w0,map_w0,w0_basis,   theta, &
-                                            w0_diff_basis,   chi_1, &
-                                                             chi_2, &
-                                                             chi_3  &                                                                                                                   
-                                                                       )
+!! @param[in] nqp_h Integer number of horizontal quadrature points
+!! @param[in] nqp_v Integer number of vertical quadrature points
+!! @param[in] wqp_h Real array. Quadrature weights horizontal
+!! @param[in] wqp_v Real array. Quadrature weights vertical
+subroutine calc_exner_code(nlayers,ndf_w3,undf_w3, & ! integers
+                           map_w3, w3_basis, &  ! arrays
+                           exner, rho, & !data
+                           ndf_w0, undf_w0, & !integers
+                           map_w0,w0_basis, & ! arrays  
+                           theta, & ! data
+                           w0_diff_basis, & ! arrays 
+                           chi_1, chi_2, chi_3,  & ! data
+                           nqp_h, nqp_v, & !integers
+                           wqp_h, wqp_v ) ! quadrature weights
 
   use coordinate_jacobian_mod, only: coordinate_jacobian
   use reference_profile_mod,   only: reference_profile
-  use gaussian_quadrature_mod, only: ngp_h, ngp_v, gaussian_quadrature_type
   
   !Arguments
-  integer, intent(in) :: nlayers, ndf_w0, ndf_w3
+  integer, intent(in) :: nlayers, ndf_w0, ndf_w3, undf_w3, undf_w0, nqp_h, nqp_v
   integer, intent(in) :: map_w0(ndf_w0), map_w3(ndf_w3)
-  real(kind=r_def), intent(in), dimension(1,ndf_w3,ngp_h,ngp_v) :: w3_basis  
-  real(kind=r_def), intent(in), dimension(1,ndf_w0,ngp_h,ngp_v) :: w0_basis 
-  real(kind=r_def), intent(in), dimension(3,ndf_w0,ngp_h,ngp_v) :: w0_diff_basis 
-  real(kind=r_def), intent(inout) :: exner(*)
-  real(kind=r_def), intent(in)    :: rho(*), theta(*)
-  real(kind=r_def), intent(in)    :: chi_1(*), chi_2(*), chi_3(*)
-  type(gaussian_quadrature_type), intent(inout) :: gq
+  real(kind=r_def), intent(in), dimension(1,ndf_w3,nqp_h,nqp_v) :: w3_basis  
+  real(kind=r_def), intent(in), dimension(1,ndf_w0,nqp_h,nqp_v) :: w0_basis 
+  real(kind=r_def), intent(in), dimension(3,ndf_w0,nqp_h,nqp_v) :: w0_diff_basis 
+  real(kind=r_def), dimension(undf_w3), intent(inout) :: exner, rho
+  real(kind=r_def), dimension(undf_w0), intent(in)    :: theta, &
+                                                         chi_1, chi_2, chi_3
+  real(kind=r_def), dimension(nqp_h), intent(in)      ::  wqp_h
+  real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
 
   !Internal variables
   integer               :: df1, df2, k
@@ -100,17 +112,13 @@ subroutine calc_exner_code(nlayers,ndf_w3,map_w3,w3_basis,gq,exner, &
   real(kind=r_def), dimension(ndf_w3) :: exner_e, rho_e, rhs_e   
   real(kind=r_def), dimension(ndf_w0) :: theta_e
   real(kind=r_def), dimension(ndf_w0) :: chi_1_e, chi_2_e, chi_3_e
-  real(kind=r_def), dimension(ngp_h,ngp_v)     :: dj
-  real(kind=r_def), dimension(3,3,ngp_h,ngp_v) :: jac
+  real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
+  real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
   real(kind=r_def), dimension(ndf_w3,ndf_w3) :: mass_matrix_w3, inv_mass_matrix_w3
   real(kind=r_def) :: rho_at_quad, rho_s_at_quad,                                 &
                    theta_at_quad, theta_s_at_quad,                             &
-                   exner_s_at_quad
+                  exner_s_at_quad
   real(kind=r_def) :: rhs_eos, x_at_quad(3)
-  real(kind=r_def), pointer :: wgp_h(:), wgp_v(:)
-
-  wgp_h => gq%get_wgp_h()
-  wgp_v => gq%get_wgp_v()
 
   do k = 0, nlayers-1
   ! Extract element arrays of rho & theta
@@ -123,13 +131,13 @@ subroutine calc_exner_code(nlayers,ndf_w3,map_w3,w3_basis,gq,exner, &
       chi_2_e(df1) = chi_2( map_w0(df1) + k )
       chi_3_e(df1) = chi_3( map_w0(df1) + k )
     end do
-    call coordinate_jacobian(ndf_w0, ngp_h, ngp_v, chi_1_e, chi_2_e, chi_3_e,  &
+    call coordinate_jacobian(ndf_w0, nqp_h, nqp_v, chi_1_e, chi_2_e, chi_3_e,  &
                              w0_diff_basis, jac, dj)
   ! compute the RHS integrated over one cell
     do df1 = 1, ndf_w3  
       rhs_e(df1) = 0.0_r_def
-      do qp2 = 1, ngp_v
-        do qp1 = 1, ngp_h
+      do qp2 = 1, nqp_v
+        do qp1 = 1, nqp_h
           x_at_quad(:) = 0.0_r_def
           do df2 = 1, ndf_w0
             x_at_quad(1) = x_at_quad(1) + chi_1_e(df2)*w0_basis(1,df2,qp1,qp2)
@@ -148,7 +156,7 @@ subroutine calc_exner_code(nlayers,ndf_w3,map_w3,w3_basis,gq,exner, &
           end do
           rhs_eos = kappa / (1.0_r_def - kappa) * exner_s_at_quad                 &
                   *( rho_at_quad/rho_s_at_quad + theta_at_quad/theta_s_at_quad )
-          rhs_e(df1) = rhs_e(df1) + 0.125_r_def*wgp_h(qp1)*wgp_v(qp2)*w3_basis(1,df1,qp1,qp2) * rhs_eos * dj(qp1,qp2)
+          rhs_e(df1) = rhs_e(df1) + 0.125_r_def*wqp_h(qp1)*wqp_v(qp2)*w3_basis(1,df1,qp1,qp2) * rhs_eos * dj(qp1,qp2)
         end do
       end do
     end do
@@ -156,10 +164,10 @@ subroutine calc_exner_code(nlayers,ndf_w3,map_w3,w3_basis,gq,exner, &
     do df1 = 1, ndf_w3
        do df2 = 1, ndf_w3
           mass_matrix_w3(df1,df2) = 0.0_r_def
-          do qp2 = 1, ngp_v
-             do qp1 = 1, ngp_h
+          do qp2 = 1, nqp_v
+             do qp1 = 1, nqp_h
                  mass_matrix_w3(df1,df2) = mass_matrix_w3(df1,df2) &
-                                         + 0.125_r_def*wgp_h(qp1)*wgp_v(qp2)* &
+                                         + 0.125_r_def*wqp_h(qp1)*wqp_v(qp2)* &
                                          w3_basis(1,df1,qp1,qp2) * &
                                          w3_basis(1,df2,qp1,qp2) * dj(qp1,qp2)
              end do

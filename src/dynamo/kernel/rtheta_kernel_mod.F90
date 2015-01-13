@@ -71,45 +71,47 @@ end function rtheta_kernel_constructor
 !! @param[in] chi_3 Real array. the physical x coordinate in w0
 !! @param[in] u Real array. the velocity
 !! @param[inout] gq The gaussian quadrature rule 
-subroutine rtheta_code(nlayers,ndf_w0, map_w0, w0_basis, gq, r_theta,          &
-                               ndf_w2, map_w2, w2_basis, orientation, u,       &
-                               w0_diff_basis, chi_1, chi_2, chi_3              &
-                               )
+subroutine rtheta_code(nlayers,                                                &
+                       ndf_w0, undf_w0, map_w0, w0_basis,  r_theta,            &
+                       ndf_w2, undf_w2, map_w2, w2_basis, orientation, u,      &
+                       w0_diff_basis, chi_1, chi_2, chi_3,                     &
+                       nqp_h, nqp_v, wqp_h, wqp_v )
                                
   use coordinate_jacobian_mod, only: coordinate_jacobian
   use reference_profile_mod,   only: reference_profile                               
-  use gaussian_quadrature_mod, only: ngp_h, ngp_v, gaussian_quadrature_type
   
   !Arguments
-  integer, intent(in) :: nlayers
-  integer, intent(in) :: ndf_w0, ndf_w2
-  integer, intent(in) :: map_w0(ndf_w0), map_w2(ndf_w2)
-  integer, intent(in), dimension(ndf_w2) :: orientation
-  real(kind=r_def), intent(in), dimension(1,ndf_w0,ngp_h,ngp_v) :: w0_basis  
-  real(kind=r_def), intent(in), dimension(3,ndf_w0,ngp_h,ngp_v) :: w0_diff_basis  
-  real(kind=r_def), intent(in), dimension(3,ndf_w2,ngp_h,ngp_v) :: w2_basis 
-  real(kind=r_def), intent(inout) :: r_theta(*)
-  real(kind=r_def), intent(in) :: chi_1(*), chi_2(*), chi_3(*), u(*)
-  type(gaussian_quadrature_type), intent(inout) :: gq
+  integer, intent(in) :: nlayers, nqp_h, nqp_v
+  integer, intent(in) :: ndf_w0, ndf_w2, undf_w0, undf_w2
+
+  integer, dimension(ndf_w0), intent(in) :: map_w0
+  integer, dimension(ndf_w2), intent(in) :: map_w2, orientation
+
+  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis  
+  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis  
+  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis 
+
+  real(kind=r_def), dimension(undf_w0), intent(inout) :: r_theta
+  real(kind=r_def), dimension(undf_w0), intent(in)    :: chi_1, chi_2, chi_3
+  real(kind=r_def), dimension(undf_w2), intent(in)    :: u
+
+  real(kind=r_def), dimension(nqp_h), intent(in)      ::  wqp_h
+  real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
 
   !Internal variables
   integer               :: df, k, loc 
   integer               :: qp1, qp2
   
   real(kind=r_def), dimension(ndf_w0) :: chi_1_e, chi_2_e, chi_3_e
-  real(kind=r_def), dimension(ngp_h,ngp_v)     :: dj
-  real(kind=r_def), dimension(3,3,ngp_h,ngp_v) :: jac
+  real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
+  real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
   real(kind=r_def) :: rtheta_e(ndf_w0),  u_e(ndf_w2)
   real(kind=r_def) :: u_at_quad(3), k_sphere(3), k_cart(3), x_at_quad(3), llr(3) 
   real(kind=r_def) :: theta_s_at_quad, exner_s_at_quad, rho_s_at_quad                    
   real(kind=r_def) :: buoy_term, vec_term
-  real(kind=r_def), pointer :: wgp_h(:), wgp_v(:)
   
   k_sphere(:) = (/ 0.0_r_def, 0.0_r_def, 1.0_r_def /)
 
-  wgp_h => gq%get_wgp_h()
-  wgp_v => gq%get_wgp_v()
- 
   do k = 0, nlayers-1
   ! Extract element arrays of chi
     do df = 1, ndf_w0
@@ -119,14 +121,14 @@ subroutine rtheta_code(nlayers,ndf_w0, map_w0, w0_basis, gq, r_theta,          &
       chi_3_e(df) = chi_3( loc )
       rtheta_e(df) = 0.0_r_def
     end do
-    call coordinate_jacobian(ndf_w0, ngp_h, ngp_v, chi_1_e, chi_2_e, chi_3_e,  &
+    call coordinate_jacobian(ndf_w0, nqp_h, nqp_v, chi_1_e, chi_2_e, chi_3_e,  &
                              w0_diff_basis, jac, dj)
     do df = 1, ndf_w2
       u_e(df) = u( map_w2(df) + k )*real(orientation(df))
     end do
   ! compute the RHS integrated over one cell
-    do qp2 = 1, ngp_v
-      do qp1 = 1, ngp_h
+    do qp2 = 1, nqp_v
+      do qp1 = 1, nqp_h
         u_at_quad(:) = 0.0_r_def
         do df = 1, ndf_w2
           u_at_quad(:)  = u_at_quad(:)  + u_e(df)*w2_basis(:,df,qp1,qp2)
@@ -150,7 +152,7 @@ subroutine rtheta_code(nlayers,ndf_w0, map_w0, w0_basis, gq, r_theta,          &
         buoy_term = -n_sq/gravity*theta_s_at_quad*vec_term
 
         do df = 1, ndf_w0
-          rtheta_e(df) = rtheta_e(df) + wgp_h(qp1)*wgp_v(qp2)*w0_basis(1,df,qp1,qp2)*buoy_term
+          rtheta_e(df) = rtheta_e(df) + wqp_h(qp1)*wqp_v(qp2)*w0_basis(1,df,qp1,qp2)*buoy_term
         end do
       end do
     end do

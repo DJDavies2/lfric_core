@@ -19,9 +19,7 @@ module solver_mod
   use log_mod,                 only : log_event, LOG_LEVEL_INFO, LOG_LEVEL_ERROR, &
                                       LOG_LEVEL_DEBUG, log_scratch_space
   use field_mod,               only : field_type
-  use function_space_mod,      only : function_space_type
-  use gaussian_quadrature_mod, only : gaussian_quadrature_type, GQ3
-
+  use function_space_mod,      only : function_space_type, W0, W1, W2, W3
   use psy,             only : invoke_inner_prod,              &
                               invoke_axpy,                    &
                               invoke_minus_field_data,        &
@@ -30,10 +28,10 @@ module solver_mod
                               invoke_w3_solver_kernel,        &
                               invoke_divide_field,            &
                               invoke_copy_scaled_field_data,  &
-                              invoke_matrix_vector_kernel_w0, &
-                              invoke_matrix_vector_kernel_w1, &
-                              invoke_matrix_vector_kernel_w2
-  use argument_mod,    only : w0, w1, w2, w3
+                              invoke_matrix_vector_mm 
+
+  use quadrature_mod,  only : quadrature_type
+  use operator_mod,    only : operator_type
 
   implicit none
   private
@@ -54,41 +52,67 @@ contains
 !> @param[inout] lhs The field to be solved for (x)
 !> @param[inout] rhs The right hand side field (b)
 !> @param[in]    chi The coordinate array fields
-!> @param[in]    space The function space that lhs and rhs are defined on
 !> @param[in]    solver_type (optional) The type of iterative solver to use for 
 !>               continuous systems
-  subroutine solver_algorithm(lhs, rhs, chi, space, solver_type)
+!> @param[in] mm Operator type, optional. This is the mass matrix
+!> @param[in] qr Quadrature type, optional. The quadrature rule. 
+!! Either qr or mm are required, but not both.
+
+  subroutine solver_algorithm(lhs, rhs, chi, solver_type, qr, mm)
     implicit none
     type(field_type), intent(inout)    :: lhs
     type(field_type), intent(inout)    :: rhs
     type(field_type), intent(in)       :: chi(3)
-    integer, intent(in)                :: space
     integer, intent(in)                :: solver_type
+    type(quadrature_type), optional, intent(in) :: qr
+    type(operator_type), optional, intent(in) :: mm
+    
     integer, parameter                 :: num_jacobi_iters = 5
+    integer :: fs_l, fs_r
 
-    select case ( space )
-      case ( w3 ) 
-        call invoke_w3_solver_kernel(lhs, rhs, chi)
-      case ( w0, w1, w2 )
-        select case ( solver_type )
+    fs_l = lhs%which_function_space()                                           
+    fs_r = rhs%which_function_space()    
+    ! check the arguments qr .or. mm not both or neither 
+    if( present(qr) .and. .not.present(mm) ) then
+       ! quadrature present, only for W3 
+       if( (fs_l.eq.W3) .and. (fs_r.eq.W3) ) then
+          ! we are on the right space
+          call invoke_w3_solver_kernel(lhs, rhs, chi, qr)
+       else
+          write( log_scratch_space, '(A,I3,",",I3)' )  'quadrature required for w3 solver, stopping',fs_l,fs_r
+          call log_event( log_scratch_space, LOG_LEVEL_ERROR )          
+       end if
+    else if( .not.present(qr) .and. present(mm) ) then
+       ! mass matrix 
+       if(fs_l.eq.W3) then                                                      
+          write(log_scratch_space,'(A)') "solver_algorithm: mass-matrix not implemented for W3, stopping"                                    
+          call log_event(log_scratch_space, LOG_LEVEL_ERROR)                    
+       else    
+       select case ( solver_type )
           case ( cg_solver )
-            call cg_solver_algorithm(lhs, rhs, space)
+            call cg_solver_algorithm(lhs, rhs, mm)
           case ( bicg_solver ) 
-            call bicg_solver_algorithm(lhs, rhs, space)
+            call bicg_solver_algorithm(lhs, rhs, mm)
           case ( jacobi_solver ) 
-            call jacobi_solver_algorithm(lhs, rhs, space, num_jacobi_iters)
+            call jacobi_solver_algorithm(lhs, rhs, mm, num_jacobi_iters)
           case ( gmres_solver )
-            call gmres_solver_algorithm(lhs, rhs, space) 
+            call gmres_solver_algorithm(lhs, rhs, mm) 
           case ( gcr_solver )
-            call gcr_solver_algorithm(lhs, rhs, space)        
+            call gcr_solver_algorithm(lhs, rhs, mm)        
           case default
             write( log_scratch_space, '(A)' )  'Invalid linear solver choice, stopping'
             call log_event( log_scratch_space, LOG_LEVEL_ERROR )
         end select
-      case default
-       write( log_scratch_space, '(A)' )  'Invalid space for linear solver, stopping'
-       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-    end select
+       end if
+    else if( present(qr) .and. present(mm) ) then
+       ! both - bork
+       write( log_scratch_space, '(A)' )  'quadrature OR mass matrix required for solver not both. Whats a guy to do?, stopping'
+       call log_event( log_scratch_space, LOG_LEVEL_ERROR )          
+    else
+       ! neither - bork
+       write( log_scratch_space, '(A)' )  'quadrature OR mass matrix required for solver. Gimme something to work with, stopping'
+    end if
+       
   end subroutine solver_algorithm
 
 !> @brief BiCGStab solver with no preconditioning. 
@@ -97,12 +121,12 @@ contains
 !! encoded in the matrix vector kernel that is called
 !! @param[in]  rhs_field The input b
 !! @param[inout] lhs_field The answer, x
-!! @param[in] space The function space lhs and rhs are defined on
-  subroutine bicg_solver_algorithm(lhs, rhs, space)
+!! @param[in] mm operator type, the mass matrix
+  subroutine bicg_solver_algorithm(lhs, rhs, mm)
     implicit none
     type(field_type), intent(inout)    :: lhs
     type(field_type), intent(in)       :: rhs
-    integer, intent(in)                :: space
+    type(operator_type), intent(in)    :: mm
 
     character(len=str_def)             :: cmessage
     ! The temporary fields
@@ -115,31 +139,26 @@ contains
     ! others
     real(kind=r_def)                   :: err,sc_err, init_err
     integer                            :: iter
-    integer                            :: rhs_fs, rhs_gq
+    integer                            :: rhs_fs
     type(function_space_type)          :: fs
-    type( gaussian_quadrature_type )   :: gq 
 
     ! compute the residual this is a global sum to the PSy ---
     !PSY call invoke ( inner_prod(rhs,rhs,sc_err))
     call invoke_inner_prod(rhs,rhs,sc_err)
     sc_err = max(sqrt(sc_err), 0.1_r_def)
-    write(cmessage,'("solver_algorithm: starting ... ||b|| = ",E15.8)') sc_err
+    write(cmessage,'("solver_algorithm: bicgstab starting ... ||b|| = ",E15.8)') sc_err
     call log_event(trim(cmessage), LOG_LEVEL_INFO)
     !PSY call invoke ( set_field_scalar(0.0_r_def, lhs))
     call invoke_set_field_scalar(0.0_r_def, lhs)
 
     rhs_fs = rhs%which_function_space()
-    rhs_gq = rhs%which_gaussian_quadrature()
-    v = field_type(vector_space = fs%get_instance(rhs_fs), &
-                   gq = gq%get_instance(rhs_gq) )
+    v = field_type(vector_space = fs%get_instance(rhs_fs) )
+    call invoke_set_field_scalar(0.0_r_def, v)
+    call invoke_set_field_scalar(0.0_r_def, v)
+    call invoke_matrix_vector_mm(v,lhs,mm )
+    
 
-    call mat_ax( v, lhs, space )
-
-    !PSY call invoke ( inner_prod(v,v,err))
-    call invoke_inner_prod(v,v,err)
-
-    res = field_type(vector_space = fs%get_instance(rhs_fs), &
-                     gq = gq%get_instance(rhs_gq) )
+    res = field_type(vector_space = fs%get_instance(rhs_fs) )
     !PSY call invoke ( minus_field_data(rhs,v,res))
     call invoke_minus_field_data(rhs,v,res)
 
@@ -157,22 +176,20 @@ contains
     omega  = 1.0_r_def
     norm   = 1.0_r_def
 
-    cr = field_type(vector_space = fs%get_instance(rhs_fs), &
-                    gq = gq%get_instance(rhs_gq) )
+    cr = field_type(vector_space = fs%get_instance(rhs_fs) ) 
+
     !PSY call invoke ( copy_field_data(res,cr))
     call invoke_copy_field_data(res,cr)
 
-    p = field_type(vector_space = fs%get_instance(rhs_fs), &
-                   gq = gq%get_instance(rhs_gq) )
+    p = field_type(vector_space = fs%get_instance(rhs_fs) ) 
     !PSY call invoke ( set_field_scalar(0.0_r_def, p))
     call invoke_set_field_scalar(0.0_r_def, p)
 
-    t = field_type(vector_space = fs%get_instance(rhs_fs), &
-                   gq = gq%get_instance(rhs_gq) )
-    s = field_type(vector_space = fs%get_instance(rhs_fs), &
-                   gq = gq%get_instance(rhs_gq) )
-    cs = field_type(vector_space = fs%get_instance(rhs_fs), &
-                   gq = gq%get_instance(rhs_gq) )
+    t = field_type(vector_space = fs%get_instance(rhs_fs) ) 
+
+    s = field_type(vector_space = fs%get_instance(rhs_fs) ) 
+
+    cs = field_type(vector_space = fs%get_instance(rhs_fs) ) 
                    
     !PSY call invoke ( set_field_scalar(0.0_r_def, v))
     call invoke_set_field_scalar(0.0_r_def, v)
@@ -186,9 +203,13 @@ contains
       call invoke_axpy((-beta*omega),v,res,t)
 
       call preconditioner( s, t, no_pre_cond )
+
       !PSY call invoke ( axpy(beta,p,s,p))
       call invoke_axpy(beta,p,s,p)
-      call mat_ax( v, p, space )
+
+      call invoke_set_field_scalar(0.0_r_def,v)
+      call invoke_matrix_vector_mm(v,p,mm )
+
       !PSY call invoke ( inner_prod(cr,v,norm))
       call invoke_inner_prod(cr,v,norm)
       alpha = rho/norm
@@ -196,7 +217,9 @@ contains
       call invoke_axpy(-alpha,v,res,s)
 
       call preconditioner( cs, s, no_pre_cond )
-      call mat_ax(t, cs, space )
+
+      call invoke_set_field_scalar(0.0_r_def,t)
+      call invoke_matrix_vector_mm(t,cs,mm ) 
 
       !PSY call invoke ( inner_prod(t,t,tt), &
       !PSY               inner_prod(t,s,ts))
@@ -247,12 +270,12 @@ contains
 !! encoded in the matrix vector kernel that is called. 
 !! @param[in] rhs_field The input b
 !! @param[inout] lhs_field The answer, x
-!! @param[in] space The function space lhs and rhs are defined on
-  subroutine cg_solver_algorithm(lhs, rhs, space)
+!! @param[in] mm The mass matrix
+  subroutine cg_solver_algorithm(lhs, rhs, mm)
     implicit none
     type(field_type), intent(inout)    :: lhs
     type(field_type), intent(in)       :: rhs
-    integer, intent(in)                :: space
+    type(operator_type), intent(in)    :: mm
 
     character(len=str_def)             :: cmessage
     ! The temporary fields
@@ -264,24 +287,18 @@ contains
     ! others
     real(kind=r_def)                   :: err,sc_err, init_err
     integer                            :: iter
-    integer                            :: rhs_fs, rhs_gq
+    integer                            :: rhs_fs 
     type(function_space_type)          :: fs
-    type( gaussian_quadrature_type )   :: gq 
 
     call invoke_inner_prod( rhs, rhs, rs_old )
 
     ! compute the residual this is a global sum to the PSy ---
 
     rhs_fs = rhs%which_function_space()
-    rhs_gq = rhs%which_gaussian_quadrature()
 
-
-    res = field_type(vector_space = fs%get_instance(rhs_fs), &
-                     gq = gq%get_instance(rhs_gq) )
-    p   = field_type(vector_space = fs%get_instance(rhs_fs), &
-                     gq = gq%get_instance(rhs_gq) )
-    Ap   = field_type(vector_space = fs%get_instance(rhs_fs), &
-                     gq = gq%get_instance(rhs_gq) )  
+    res = field_type(vector_space = fs%get_instance(rhs_fs) )
+    p   = field_type(vector_space = fs%get_instance(rhs_fs) )
+    Ap   = field_type(vector_space = fs%get_instance(rhs_fs) )
 
 !! First guess: lhs = rhs  
 !    !PSY call invoke ( copy_field_data(rhs,lhs))
@@ -290,7 +307,7 @@ contains
     !PSY call invoke ( set_field_scalar(0.0_r_def, lhs))
     call invoke_set_field_scalar(0.0_r_def, lhs)
 
-    call mat_ax( Ap, lhs, space )
+    call invoke_matrix_vector_mm(Ap,lhs,mm )
 
     !PSY call invoke ( minus_field_data(rhs,Ap,res))
     call invoke_minus_field_data( rhs, Ap, res )
@@ -311,7 +328,9 @@ contains
     end if 
     
     do iter = 1, max_iter
-      call mat_ax( Ap, p, space )
+       call invoke_set_field_scalar(0.0_r_def, Ap)
+       call invoke_matrix_vector_mm(Ap,p,mm )
+       
       !PSY call invoke ( inner_prod(p,Ap,rs_new))
       call invoke_inner_prod( p, Ap, rs_new )
       alpha = rs_old/rs_new 
@@ -362,38 +381,35 @@ contains
 !! after (n_iter) iterations
 !! @param[in] rhs_field The input b
 !! @param[inout] lhs_field The answser, x
-!! @param[in] space The function space lhs and rhs are defined on
+!! @param[in] mm operator type, the mass matrix
 !! @param[in] n_iter The number of Jacobi iterations to perform
-  subroutine jacobi_solver_algorithm(lhs, rhs, space, n_iter)
+  subroutine jacobi_solver_algorithm(lhs, rhs, mm, n_iter)
 
 
   implicit none
 
-  integer,          intent(in)    :: space, n_iter
+  integer,          intent(in)    :: n_iter
   type(field_type), intent(inout) :: lhs, rhs
+  type(operator_type), intent(in) :: mm
   type(field_type)                :: Ax, lumped_weight, res
 
   real(kind=r_def), parameter :: mu = 0.9_r_def
 
   integer :: iter
-  integer                            :: rhs_fs, rhs_gq
+  integer                            :: rhs_fs 
   type( function_space_type )        :: fs
-  type( gaussian_quadrature_type )   :: gq
 
   rhs_fs = rhs%which_function_space()
-  rhs_gq = rhs%which_gaussian_quadrature()
 
-  Ax = field_type(vector_space = fs%get_instance(rhs_fs), &
-                  gq = gq%get_instance(rhs_gq) )
-  lumped_weight = field_type(vector_space = fs%get_instance(rhs_fs), &
-                        gq = gq%get_instance(rhs_gq) )
-  res = field_type(vector_space = fs%get_instance(rhs_fs), &
-                   gq = gq%get_instance(rhs_gq) )
+  Ax = field_type(vector_space = fs%get_instance(rhs_fs) )
+
+  lumped_weight = field_type(vector_space = fs%get_instance(rhs_fs) )
+  res = field_type(vector_space = fs%get_instance(rhs_fs) )
 
 ! Compute mass lump
   !PSY call invoke ( set_field_scalar(1.0_r_def, Ax))
   call invoke_set_field_scalar(1.0_r_def, Ax)
-  call mat_ax( lumped_weight, Ax, space )
+  call invoke_matrix_vector_mm(lumped_weight,Ax,mm )  
 
   !PSY call invoke ( divide_field(rhs, lumped_weight, lhs))
   call invoke_divide_field( rhs, lumped_weight, lhs )
@@ -404,7 +420,9 @@ contains
 !  !PSY call invoke ( copy_field_data(lhs,Ax))
 !  call invoke_copy_field_data( lhs, Ax )
   do iter = 1,n_iter
-    call mat_ax( Ax, lhs, space )
+    call invoke_set_field_scalar(0.0_r_def, Ax)
+     call invoke_matrix_vector_mm(Ax,lhs,mm )  
+
     !PSY call invoke ( minus_field_data(rhs,Ax,res))
     call invoke_minus_field_data( rhs, Ax, res )
     !PSY call invoke ( divide_field(res, lumped_weight, res))
@@ -427,16 +445,15 @@ contains
 !! after (n_iter) iterations
 !! @param[in] rhs_field The input b
 !! @param[inout] lhs_field The answser, x
-!! @param[in] space The function space lhs and rhs are defined on
-!! @param[in] n_iter The number of Jacobi iterations to perform
-  subroutine gmres_solver_algorithm(lhs, rhs, space)
+!! @param[in] mm The mass matrix
+  subroutine gmres_solver_algorithm(lhs, rhs, mm)
 
     use constants_mod, only: gcrk
    
     implicit none
     type(field_type), intent(inout)    :: lhs
     type(field_type), intent(in)       :: rhs
-    integer, intent(in)                :: space
+    type(operator_type), intent(in)    :: mm
 
     character(len=str_def)             :: cmessage
     ! The temporary fields
@@ -448,24 +465,18 @@ contains
     ! others
     real(kind=r_def)                   :: err, sc_err, init_err
     integer                            :: iter, i, j, k, m
-    integer                            :: rhs_fs, rhs_gq
+    integer                            :: rhs_fs
     type(function_space_type)          :: fs
-    type( gaussian_quadrature_type )   :: gq
 
     rhs_fs = rhs%which_function_space()
-    rhs_gq = rhs%which_gaussian_quadrature()
+    Ax = field_type(vector_space = fs%get_instance(rhs_fs) )
 
-    Ax = field_type(vector_space = fs%get_instance(rhs_fs), &
-                    gq = gq%get_instance(rhs_gq) )
-    r  = field_type(vector_space = fs%get_instance(rhs_fs), &
-                    gq = gq%get_instance(rhs_gq) )
-    s  = field_type(vector_space = fs%get_instance(rhs_fs), &
-                    gq = gq%get_instance(rhs_gq) )
-    w   = field_type(vector_space = fs%get_instance(rhs_fs), &
-                    gq = gq%get_instance(rhs_gq) )
+    r  = field_type(vector_space = fs%get_instance(rhs_fs) )
+    s  = field_type(vector_space = fs%get_instance(rhs_fs) )
+    w   = field_type(vector_space = fs%get_instance(rhs_fs) ) 
+
     do iter = 1,gcrk
-      v(iter) = field_type(vector_space = fs%get_instance(rhs_fs), &
-                           gq = gq%get_instance(rhs_gq) )        
+      v(iter) = field_type(vector_space = fs%get_instance(rhs_fs) )
     end do
 
     !PSY call invoke ( inner_prod(rhs,rhs,err))
@@ -478,8 +489,8 @@ contains
       call log_event(trim(cmessage),LOG_LEVEL_INFO)
       return
     end if
-
-    call mat_ax( Ax, lhs, space )
+    call invoke_set_field_scalar(0.0_r_def, Ax)
+    call invoke_matrix_vector_mm(Ax,lhs,mm )   
 
     !PSY call invoke ( minus_field_data(rhs,Ax,r))
     call invoke_minus_field_data( rhs, Ax, r )
@@ -506,7 +517,9 @@ contains
 
 ! This is the correct settings => call Precon(w,v(:,:,j),pstit,pstcnd)
         call preconditioner( w, v(j), no_pre_cond )
-        call mat_ax( s, w, space)
+        call invoke_set_field_scalar(0.0_r_def, s)
+        call invoke_matrix_vector_mm(s,w,mm )   
+
 ! This is the correct settings => call Precon(w,s,preit,precnd)
         call preconditioner( w, s, no_pre_cond )
 
@@ -559,7 +572,8 @@ contains
       end do
 
 ! Check for convergence
-      call mat_ax( Ax, lhs, space ) 
+      call invoke_set_field_scalar(0.0_r_def, Ax)
+      call invoke_matrix_vector_mm(Ax,lhs,mm )   
      !PSY call invoke ( minus_field_data(rhs,Ax,r))
       call invoke_minus_field_data( rhs, Ax, r )    
      
@@ -604,16 +618,15 @@ contains
 !! after (n_iter) iterations
 !! @param[in] rhs_field The input b
 !! @param[inout] lhs_field The answser, x
-!! @param[in] space The function space lhs and rhs are defined on
-!! @param[in] n_iter The number of Jacobi iterations to perform
-  subroutine gcr_solver_algorithm(lhs, rhs, space)
+!! @param[in] mm operator type, the mass matrix
+  subroutine gcr_solver_algorithm(lhs, rhs, mm)
 
     use constants_mod, only: gcrk
    
     implicit none
     type(field_type), intent(inout)    :: lhs
     type(field_type), intent(in)       :: rhs
-    integer, intent(in)                :: space
+    type(operator_type), intent(in)    :: mm
 
     character(len=str_def)             :: cmessage
     ! The temporary fields
@@ -624,23 +637,19 @@ contains
     ! others
     real(kind=r_def)                   :: err, sc_err, init_err
     integer                            :: iter, m, n
-    integer                            :: rhs_fs, rhs_gq
+    integer                            :: rhs_fs
     type(function_space_type)          :: fs
-    type( gaussian_quadrature_type )   :: gq
 
     rhs_fs = rhs%which_function_space()
-    rhs_gq = rhs%which_gaussian_quadrature()
 
-    Ax = field_type(vector_space = fs%get_instance(rhs_fs), &
-                    gq = gq%get_instance(rhs_gq) )
-    r  = field_type(vector_space = fs%get_instance(rhs_fs), &
-                    gq = gq%get_instance(rhs_gq) )
+    Ax = field_type(vector_space = fs%get_instance(rhs_fs) )
+
+    r  = field_type(vector_space = fs%get_instance(rhs_fs) )
 
     do iter = 1,gcrk
-      s(iter)  = field_type(vector_space = fs%get_instance(rhs_fs), &
-                            gq = gq%get_instance(rhs_gq) )
-      v(iter)  = field_type(vector_space = fs%get_instance(rhs_fs), &
-                            gq = gq%get_instance(rhs_gq) )   
+      s(iter)  = field_type(vector_space = fs%get_instance(rhs_fs) )
+
+      v(iter)  = field_type(vector_space = fs%get_instance(rhs_fs) )
     end do
     !PSY call invoke ( inner_prod(rhs,rhs,err))
     call invoke_inner_prod( rhs, rhs, err )
@@ -652,8 +661,8 @@ contains
       call log_event(trim(cmessage),LOG_LEVEL_INFO)
       return
     end if
-
-    call mat_ax(Ax, lhs, space)
+    call invoke_set_field_scalar(0.0_r_def, Ax)
+    call invoke_matrix_vector_mm(Ax,lhs,mm )  
 
     !PSY call invoke ( minus_field_data(rhs,Ax,r))
     call invoke_minus_field_data( rhs, Ax, r )
@@ -662,7 +671,9 @@ contains
       do m = 1, GCRk
 ! This is the correct settings -> call Precon(s(:,:,m),r,prit,prec)
         call preconditioner( s(m), r, no_pre_cond )
-        call mat_ax( v(m), s(m), space )
+        call invoke_set_field_scalar(0.0_r_def, v(m))
+        call invoke_matrix_vector_mm(v(m),s(m),mm )   
+
 
         do n = 1, m-1
           !PSY call invoke ( inner_prod(v(m),v(n),alpha) )
@@ -708,38 +719,6 @@ contains
 
 end subroutine gcr_solver_algorithm
 
-!--------------------------------------------------
-
-!> @brief wrapper for computing  A.x  
-!! @details Wrapper routine for calling the appropriate matrix
-!! vector routine for computing A*x for matrix A and vector x
-!! @param[in]    x The input field
-!! @param[inout] Ax The output field
-!! @param[in] space The function space that x is in, defines the matrix_vector 
-!! routine to use
-  subroutine mat_Ax(Ax, x, space) 
-   
-    implicit none
-    type(field_type), intent(inout) :: Ax
-    type(field_type), intent(in)    :: x
-    integer,          intent(in)    :: space
-
-    !PSY call invoke ( set_field_scalar(0.0_r_def, Ax))
-    call invoke_set_field_scalar(0.0_r_def, Ax)
-
-    select case ( space )
-      case ( w0 )
-        call invoke_matrix_vector_kernel_w0( Ax, x )
-      case ( w1 )       
-        call invoke_matrix_vector_kernel_w1( Ax, x )
-      case ( w2 )
-        call invoke_matrix_vector_kernel_w2( Ax, x )
-    end select
-
-    return
-  end subroutine mat_Ax
-
-!--------------------------------------------------
 
 !> @brief Applies a selected prconditioner to a vector x  
 !! @details Applies one of s number of preconditioners to a field x

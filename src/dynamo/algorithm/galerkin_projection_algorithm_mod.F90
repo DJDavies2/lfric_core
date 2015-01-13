@@ -16,10 +16,9 @@ module galerkin_projection_algorithm_mod
   use psy,                     only: invoke_copy_field_data, invoke_set_field_scalar, &
                                      invoke_gp_rhs, invoke_gp_vector_rhs
   use field_mod,               only: field_type
-  use gaussian_quadrature_mod, only: gaussian_quadrature_type
-  use function_space_mod,      only: function_space_type
-  use argument_mod,            only: w0
-
+  use quadrature_mod,          only: quadrature_type
+  use function_space_mod,      only: function_space_type, W0
+  use operator_mod,            only: operator_type
                 
   implicit none
 
@@ -38,7 +37,7 @@ contains
 !> @param[in]  f_in  The field to project
 !> @param[in]  chi   A 3D coordinate field
 !> @param[in]  space_dimension The dimension of the space f_in (scalar or vector)
-  subroutine galerkin_projection_algorithm(f_out, f_in, chi, space_dimension) 
+  subroutine galerkin_projection_algorithm(f_out, f_in, chi, space_dimension, qr, mm) 
     
     implicit none
 
@@ -50,38 +49,48 @@ contains
     type( field_type ), intent(inout) :: f_in  
 ! Coodinate fields
     type( field_type ), intent(inout) :: chi(3)  
+    type( quadrature_type ), intent(in) :: qr
+    type( operator_type ), optional, intent(in) :: mm
 
-    integer                          :: out_fs, out_gq
+    integer                          :: out_fs
     type( field_type )               :: rhs(space_dimension)
     integer                          :: dir 
     type(function_space_type)        :: fs
-    type( gaussian_quadrature_type ) :: gq
+
 
 ! Create continuous fields to project data into
     out_fs = f_out(1)%which_function_space()
-    out_gq = f_out(1)%which_gaussian_quadrature()
     do dir = 1,space_dimension
-      rhs(dir) = field_type( vector_space = fs%get_instance(out_fs), &
-                             gq = gq%get_instance(out_gq) )
+      rhs(dir) = field_type( vector_space = fs%get_instance(out_fs) )
       call invoke_set_field_scalar(0.0_r_def, rhs(dir))
     end do
     
 ! Project field into continuous space
+    write( log_scratch_space, '(A)' ) 'Computing Galerkin projection...'
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )  
     if ( f_in%which_function_space() == out_fs ) then
-      call invoke_copy_field_data(f_in, f_out(1))
-    else    
-      write( log_scratch_space, '(A)' ) 'Computing Galerkin projection... '
-      call log_event( log_scratch_space, LOG_LEVEL_INFO )
-      if ( space_dimension == 1 ) then
-        call invoke_gp_rhs( rhs(1), f_in, chi )
-      else
-        call invoke_gp_vector_rhs( rhs, f_in, chi ) 
-      end if
-      do dir = 1,space_dimension
-        call solver_algorithm( f_out(dir), rhs(dir), chi, w0, solver_option)
-      end do
+       write( log_scratch_space, '(A)' ) '   continuous field, no projection needed'
+       call log_event( log_scratch_space, LOG_LEVEL_INFO )
+       call invoke_copy_field_data(f_in, f_out(1))
+    else
+       if ( space_dimension == 1 ) then
+          write( log_scratch_space, '(A)' ) '    scalar field ... '
+          call log_event( log_scratch_space, LOG_LEVEL_INFO )
+          call invoke_gp_rhs( rhs(1), f_in, chi, qr)
+       else
+          write( log_scratch_space, '(A)' ) '    vector field ... '
+          call log_event( log_scratch_space, LOG_LEVEL_INFO )
+          call invoke_gp_vector_rhs( rhs, f_in, chi, qr )
+       end if
+       do dir = 1,space_dimension
+          if(present(mm)) then
+             call solver_algorithm( f_out(dir), rhs(dir), chi,  solver_option, mm=mm )
+          else
+             call solver_algorithm( f_out(dir), rhs(dir), chi,  solver_option, qr=qr )
+          end if
+       end do
     end if
 
-  end subroutine galerkin_projection_algorithm  
-
+  end subroutine galerkin_projection_algorithm
+  
 end module galerkin_projection_algorithm_mod

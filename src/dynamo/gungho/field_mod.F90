@@ -16,7 +16,6 @@ module field_mod
 
   use constants_mod,            only : r_def
   use function_space_mod,       only : function_space_type
-  use gaussian_quadrature_mod,  only : gaussian_quadrature_type
 
   implicit none
 
@@ -37,10 +36,6 @@ module field_mod
 
     !> Each field has a pointer to the function space on which it lives
     type( function_space_type ), pointer         :: vspace => null( )
-    !> Each field has a pointer to the gaussian quadrature rule which will be
-    !! used to integrate over its values
-    type( gaussian_quadrature_type ), pointer         &
-                                      :: gaussian_quadrature => null( )
     !> Allocatable array of type real which holds the values of the field
     real(kind=r_def), allocatable         :: data( : )
 
@@ -60,10 +55,6 @@ module field_mod
     !> function returns the enumerated integer for the functions_space on which
     !! the field lives
     procedure         :: which_function_space
-
-    !> function returns the enumerated integer for the Gaussian quadrature
-    !! associated with this field 
-    procedure         :: which_gaussian_quadrature
 
     !> Routine to read field
     procedure         :: read_field
@@ -91,13 +82,10 @@ module field_mod
     private
 
     !> Each field has a pointer to the function space on which it lives
-    type( function_space_type ), pointer, public :: vspace
-    !> Each field has a pointer to the gaussian quadrature rule which will be
-    !! used to integrate over its values
-    type( gaussian_quadrature_type ), pointer, public &
-                                      :: gaussian_quadrature
+    type( function_space_type ), pointer, public :: vspace => null()
+
     !> Allocatable array of type real which holds the values of the field
-    real(kind=r_def), public, pointer         :: data( : )
+    real(kind=r_def), public, pointer         :: data( : ) => null()
 
   contains
   end type field_proxy_type 
@@ -113,7 +101,6 @@ contains
     class(field_type), target, intent(in)  :: self
 
     get_proxy % vspace                 => self % vspace
-    get_proxy % gaussian_quadrature    => self % gaussian_quadrature
     get_proxy %  data                  => self % data
 
   end function get_proxy
@@ -121,18 +108,15 @@ contains
   !> Construct a <code>field_type</code> object.
   !>
   !> @param [in] vector_space the function space that the field lives on
-  !> @param [in] gq the gaussian quadrature rule
   !> @return self the field
   !>
-  function field_constructor( vector_space, gq ) result(self)
+  function field_constructor( vector_space ) result(self)
 
     type(function_space_type), target, intent(in) :: vector_space
-    type(gaussian_quadrature_type), target, intent(in) :: gq
 
     type(field_type), target :: self
 
     self%vspace => vector_space
-    self%gaussian_quadrature => gq
 
     ! allocate the array in memory
     allocate(self%data(self%vspace%get_undf()))
@@ -159,7 +143,7 @@ contains
     integer                   :: cell
     integer                   :: layer
     integer                   :: df
-    integer,          pointer :: map( : )
+    integer,          pointer :: map( : ) => null()
 
     call log_event( title, LOG_LEVEL_INFO )
 
@@ -224,15 +208,6 @@ contains
     fs = self%vspace%which()
     return
   end function which_function_space
-
-  function which_gaussian_quadrature(self) result(gq)
-    implicit none
-    class(field_type), intent(in) :: self
-    integer :: gq
-    
-    gq = self%gaussian_quadrature%which()
-    return
-  end function which_gaussian_quadrature
 
   !> Reads the field
   !! @param[in] io_strategy An IO strategy method to use for this read.

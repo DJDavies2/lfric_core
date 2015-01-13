@@ -82,7 +82,7 @@ ifeq '$(COMPILER_NAME)' 'ifort'
   FFLAGS_COMPILER       = -xhost
   FFLAGS_OPTIMISATION   = -O0
   FFLAGS_DEBUG          = -g -traceback
-  FFLAGS_WARNINGS       = -warn all -warn errors
+  FFLAGS_WARNINGS       = -warn all  -warn errors
   FFLAGS_INIT           = -ftrapuv
   FFLAGS_RUNTIME        = -check all -fpe0
   FFLAGS_TESTS          = -assume realloc_lhs
@@ -104,9 +104,9 @@ else ifeq ($(findstring xlf,$(COMPILER_NAME) ), xlf)
 else ifeq '$(COMPILER_NAME)' 'gfortran'
   $(info ** Chosen GNU Fortran compiler)
 
-  FFLAGS_OPTIMISATION   = -O0
+  FFLAGS_OPTIMISATION   = -O0 
   FFLAGS_DEBUG          = -g
-  FFLAGS_WARNINGS       = -Wall -Werror
+  FFLAGS_WARNINGS       = -Wall  -Werror
   FFLAGS_INIT           = -finit-integer=31173 -finit-real=snan \
                           -finit-logical=true -finit-character=85
   FFLAGS_RUNTIME        = -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow

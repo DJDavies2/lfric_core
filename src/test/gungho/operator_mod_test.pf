@@ -1,0 +1,56 @@
+!-----------------------------------------------------------------------------
+! (c) The copyright relating to this work is owned jointly by the Crown, 
+! Met Office and NERC 2014. 
+! However, it has been created with the help of the GungHo Consortium, 
+! whose members are identified at https://puma.nerc.ac.uk/trac/GungHo/wiki
+!-----------------------------------------------------------------------------
+
+!> Test the Operator representation
+!>
+
+module operator_mod_test
+  implicit none
+
+  contains
+
+    @test
+    subroutine operator_test()
+      use constants_mod,            only : r_def
+      use operator_mod,             only : operator_type,      &
+           operator_proxy_type
+      use function_space_mod,       only : function_space_type, W1,W2
+      use function_space_build_mod, only : fs_build, fs_destroy
+      use pFUnit_Mod
+     
+      implicit none
+      type( operator_type ) :: Op
+      type( operator_proxy_type ) :: Op_p
+      type( function_space_type ) :: fs1, fs2
+      integer :: ncell_3d_1, ncell_3d_2, ls_size
+
+      ! build some function spaces
+      call fs_build()
+      ! make an operator 
+                                 ! to                   ! from
+      Op = operator_type( fs1%get_instance( W2 ), fs2%get_instance( W1 ) )
+      ! get the proxy
+      Op_p = Op%get_proxy()
+
+      ! check we get back what we sowed
+      @assertEqual( Op%which_fs_from(), W1 )
+      @assertEqual( Op%which_fs_to(),   W2 )
+
+      ! only meaningful test without PSy and Kernel layers is to check array 
+      ! sizes on the proxy.
+      ncell_3d_1 = Op_p%fs_from%get_ncell() * Op_p%fs_from%get_nlayers() 
+      ncell_3d_2 = Op_p%fs_to%get_ncell() * Op_p%fs_to%get_nlayers() 
+      @assertEqual( Op_p%ncell_3d, ncell_3d_1 )
+      @assertEqual( Op_p%ncell_3d, ncell_3d_2 )
+      ls_size = ncell_3d_1 * Op_p%fs_from%get_ndf() * Op_p%fs_to%get_ndf() 
+      @assertEqual( size( Op_p%local_stencil ), ls_size )
+
+      ! tear down
+      call fs_destroy()
+
+    end  subroutine operator_test
+end module operator_mod_test

@@ -7,15 +7,15 @@
 !
 !-------------------------------------------------------------------------------
 
-!> @brief Contains the routines used for Gaussian quadrature.
+!> @brief Contains the routines used for (Gaussian) quadrature.
 
-!> @details This module has a type for the Gaussian quadrature and a static
-!> copy of the Gaussian quadrature that is used throughout the model. The first
-!> time the Gaussian quadrature is required, it is created and a pointer to it
-!> returned. Subsequent times, the pointer to the already created Guassian
+!> @details This module has a type for the (Gaussian) quadrature and a static
+!> copy of the quadrature that is used throughout the model. The first
+!> time the quadrature is required, it is created and a pointer to it
+!> returned. Subsequent times, the pointer to the already created 
 !> quadrature is returned.
 
-module gaussian_quadrature_mod
+module quadrature_mod
 use constants_mod, only: r_def, pi, eps
 implicit none
 private
@@ -23,15 +23,22 @@ private
 !-------------------------------------------------------------------------------
 ! Public types
 !-------------------------------------------------------------------------------
-type, public :: gaussian_quadrature_type
+type, public :: quadrature_type
   private
   !> allocatable arrays which holds the values of the gaussian quadrature
-  real(kind=r_def), allocatable :: xgp(:), xgp_h(:,:), wgp(:), wgp_h(:)
+  real(kind=r_def), allocatable :: xqp(:), xqp_h(:,:), wqp(:), wqp_h(:)
 
-  !> enumerated integer representing this instance of the gaussian_quadrature
-  integer :: gq
+  !> enumerated integer representing this instance of the quadrature rule
+  integer :: qr
+
+  !> integer Number of quadrature points in the horizontal
+  integer :: nqp_h
+
+    !> integer Number of quadrature points in the vertical
+  integer :: nqp_v
+
 contains
-  !> Function returns a pointer to the Gaussian quadrature. If a Gaussian quadrature
+  !> Function returns a pointer to the quadrature. If a quadrature
   !> quadrature had not yet been created, it creates one before returning the pointer
   !> to it
   procedure, nopass :: get_instance
@@ -40,7 +47,7 @@ contains
   !! @param self the calling gaussian quadrature
   procedure :: test_integrate
 
-  !> Function quassian quadrature integration of a function f 
+  !> Function quadrature integration of a function f 
   !! @param self the calling gp type
   !! @param f real 3D array each of size ngp which holds the sample values of the
   !! function to be integrated
@@ -48,21 +55,23 @@ contains
   procedure :: integrate
 
   !> function returns the 2-d array of horizontal quadrature points
-  procedure :: get_xgp_h
+  procedure :: get_xqp_h
   
   !> function returns the 1-d array of vertical quadrature points
-  procedure :: get_xgp_v
+  procedure :: get_xqp_v
 
   !> function returns the enumerated integer for the gaussian_quadrature
   !! which is this gaussian_quadrature
   procedure :: which
 
   !> function returns the 1-d array of horizontal quadrature weights
-  procedure :: get_wgp_h
+  procedure :: get_wqp_h
   
   !> function returns the 1-d array of vertical quadrature weights
-  procedure :: get_wgp_v
-
+  procedure :: get_wqp_v
+  
+  procedure :: get_nqp_v
+  procedure :: get_nqp_h
 
 end type
 
@@ -70,74 +79,72 @@ end type
 ! Module parameters
 !-------------------------------------------------------------------------------
 !> integer that defines the type of Gaussian quadrature required
-integer, public, parameter      :: GQ3 = 203
+integer, public, parameter      :: QR3 = 303
 
-!> integer The number of gaussian quadrature points in the vertical
-integer, public, parameter      :: ngp_v = 2
-!> integer The number of gaussian quadrature points in the horizontal
-!! nqp_h=ngp_v*ngp_v for quads. They can be different (triangles or hexes)
-!! but there is no setup code for this
-integer, public, parameter      :: ngp_h = 4
 !> All fields are integrated onto a fixed Guassian quadrature.
 !> This is a static copy of that Gaussian quadrature object 
-type(gaussian_quadrature_type), target, allocatable, save :: gq_3
+type(quadrature_type), target, allocatable, save :: qr_3
 
 !-------------------------------------------------------------------------------
 ! Contained functions/subroutines
 !-------------------------------------------------------------------------------
 contains
 
-function get_instance(gaussian_quadrature) result(instance)
+function get_instance(quadrature,nqp_h,nqp_v) result(instance)
 
   use log_mod, only : log_event, LOG_LEVEL_ERROR
 
   implicit none
 
-  integer :: gaussian_quadrature
-  type(gaussian_quadrature_type), pointer :: instance
-
-  select case (gaussian_quadrature)
-  case (GQ3)
-    if(.not.allocated(gq_3)) then
-      allocate(gq_3)
-      call init_gauss(gq_3, GQ3) 
+  integer :: quadrature
+  type(quadrature_type), pointer :: instance 
+  integer, intent(in) :: nqp_h, nqp_v
+!  write(*,*) "HW"
+  select case (quadrature)
+  case (QR3)
+    if(.not.allocated(qr_3)) then
+      allocate(qr_3)
+      call init_quadrature(qr_3, QR3, nqp_h,nqp_v) 
     end if
-    instance => gq_3
+    instance => qr_3
   case default
-    ! Not a recognised Gaussian quadrature. Logging an event with severity:
+    ! Not a recognised  quadrature. Logging an event with severity:
     ! LOG_LEVEL_ERROR will cause execution to abort
-    call log_event( 'Gaussian quadrature type not recognised in '// &
-                    'gaussian_quadrature%get_instance', LOG_LEVEL_ERROR )
+    call log_event( 'Quadrature type not recognised in '// &
+                    'quadrature%get_instance', LOG_LEVEL_ERROR )
   end select
 
   return
 end function get_instance
  
-subroutine init_gauss(self, gq)
+subroutine init_quadrature(self, qr, nqp_h, nqp_v)
   !-----------------------------------------------------------------------------
-  ! Subroutine to compute the Gaussian points (xgp) and (wgp) wgphts 
+  ! Subroutine to compute the quadrature points (xqp) and (wqp) wgphts 
   !-----------------------------------------------------------------------------
   implicit none
 
-  class(gaussian_quadrature_type) :: self
-
+  class(quadrature_type) :: self
+  integer,intent(in)  :: nqp_h,nqp_v
   integer             :: i, j, m
   real(kind=r_def)    :: p1, p2, p3, pp, z, z1
-  integer, intent(in) :: gq
+  integer, intent(in) :: qr
+
+  self%nqp_h = nqp_h
+  self%nqp_v = nqp_v
   
-  allocate( self%xgp(ngp_v) )
-  allocate( self%wgp(ngp_v) ) 
-  allocate( self%xgp_h(ngp_h,2) ) 
-  allocate( self%wgp_h(ngp_h) ) 
+  allocate( self%xqp(nqp_v) )
+  allocate( self%wqp(nqp_v) ) 
+  allocate( self%xqp_h(nqp_h,2) ) 
+  allocate( self%wqp_h(nqp_h) ) 
 
   z1 = 0.0_r_def
-  m = (ngp_v + 1) / 2
+  m = (nqp_v + 1) / 2
 
   !Roots are symmetric in the interval - so only need to find half of them  
 
   do i = 1, m ! Loop over the desired roots 
 
-    z = cos( pi * (i - 0.25_r_def) / (ngp_v + 0.5_r_def) )
+    z = cos( pi * (i - 0.25_r_def) / (nqp_v + 0.5_r_def) )
 
     !Starting with the above approximation to the ith root, we enter the main
     !loop of refinement by NEWTON'S method   
@@ -147,7 +154,7 @@ subroutine init_gauss(self, gq)
 
       !Loop up the recurrence relation to get the Legendre polynomial evaluated
       !at z                 
-      do j = 1, ngp_v
+      do j = 1, nqp_v
         p3 = p2
         p2 = p1
         p1 = ((2.0_r_def * j - 1.0_r_def) * z * p2 - (j - 1.0_r_def) * p3) / j
@@ -156,39 +163,39 @@ subroutine init_gauss(self, gq)
       !p1 is now the desired Legendre polynomial. We next compute pp, its
       !derivative, by a standard relation involving also p2, the polynomial of one
       !lower order.      
-      pp = ngp_v * (z * p1 - p2)/(z*z - 1.0_r_def)
+      pp = nqp_v * (z * p1 - p2)/(z*z - 1.0_r_def)
       z1 = z
       z = z1 - p1/pp             ! Newton's Method  
     end do
 
-    self%xgp(i) =  - z                                  ! Roots will be bewteen -1.0 & 1.0 
-    self%xgp(ngp_v+1-i) =  + z                          ! and symmetric about the origin  
-    self%wgp(i) = 2.0_r_def/((1.0_r_def - z*z) * pp*pp) ! Compute the wgpht and its       
-    self%wgp(ngp_v+1-i) = self%wgp(i)                   ! symmetric counterpart         
+    self%xqp(i) =  - z                                  ! Roots will be bewteen -1.0 & 1.0 
+    self%xqp(nqp_v+1-i) =  + z                          ! and symmetric about the origin  
+    self%wqp(i) = 2.0_r_def/((1.0_r_def - z*z) * pp*pp) ! Compute the wgpht and its       
+    self%wqp(nqp_v+1-i) = self%wqp(i)                   ! symmetric counterpart         
 
   end do     ! i loop
       
   !Shift quad points from [-1,1] to [0,1]
-  do i=1,ngp_v
-    self%xgp(i) = 0.5_r_def*(self%xgp(i) + 1.0_r_def)
+  do i=1,nqp_v
+    self%xqp(i) = 0.5_r_def*(self%xqp(i) + 1.0_r_def)
   end do
 
 ! This is correct for quads (will need modification for hexes/triangles)
   m = 1
-  do i=1,ngp_v
-    do j=1,ngp_v 
-      self%xgp_h(m,1) = self%xgp(i)
-      self%xgp_h(m,2) = self%xgp(j)
-      self%wgp_h(m) = self%wgp(i)*self%wgp(j)
+  do i=1,nqp_v
+    do j=1,nqp_v 
+      self%xqp_h(m,1) = self%xqp(i)
+      self%xqp_h(m,2) = self%xqp(j)
+      self%wqp_h(m) = self%wqp(i)*self%wqp(j)
       
       m = m + 1
     end do
   end do
 
-  self%gq = gq
+  self%qr = qr
 
   return
-end subroutine init_gauss
+end subroutine init_quadrature
 
 subroutine test_integrate(self)
   !-----------------------------------------------------------------------------
@@ -199,15 +206,15 @@ subroutine test_integrate(self)
 
   implicit none
 
-  class(gaussian_quadrature_type) :: self
+  class(quadrature_type) :: self
 
   integer          :: i, k
-  real(kind=r_def) :: func(ngp_v*ngp_v, ngp_v)
+  real(kind=r_def) :: func(self%nqp_h, self%nqp_v)
   real(kind=r_def) :: answer
 
-  do i=1,ngp_h
-    do k=1,ngp_v
-      func(i,k) = self%xgp_h(i,1)*self%xgp_h(i,2)*1.0_r_def*1.0_r_def
+  do i=1,self%nqp_h
+    do k=1,self%nqp_v
+      func(i,k) = self%xqp_h(i,1)*self%xqp_h(i,2)*1.0_r_def*1.0_r_def
     end do
   end do
 
@@ -220,7 +227,7 @@ subroutine test_integrate(self)
 end subroutine test_integrate
   
 !-----------------------------------------------------------------------------
-! Compute 3D Gaussian integration of function f  
+! Compute 3D quadrature integration of function f  
 !-----------------------------------------------------------------------------  
 !> Function to integrate a function f
 !> @param[in] self the calling quadrature rule
@@ -228,17 +235,17 @@ end subroutine test_integrate
 function integrate(self,f)
   implicit none
 
-  class(gaussian_quadrature_type), intent(in) :: self
+  class(quadrature_type), intent(in) :: self
 
-  real(kind=r_def), intent(in) :: f(ngp_h,ngp_v)
+  real(kind=r_def), intent(in) :: f(self%nqp_h,self%nqp_v)
   real(kind=r_def)             :: integrate
 
   integer :: i,k
 
   integrate = 0.0_r_def
-  do k=1,ngp_v 
-    do i=1,ngp_h
-      integrate = integrate + self%wgp_h(i)*self%wgp(k)*f(i,k)
+  do k=1,self%nqp_v 
+    do i=1,self%nqp_h
+      integrate = integrate + self%wqp_h(i)*self%wqp(k)*f(i,k)
     end do
   end do
   
@@ -248,71 +255,90 @@ function integrate(self,f)
 end function integrate
 
 !-----------------------------------------------------------------------------
-! Return Gaussian quadrature points
+! Return quadrature points
 !-----------------------------------------------------------------------------
 !> Function to return the quadrature points in the horizontal
 !> @param[in] self the calling quadrature rule
 !> @param[in] xgp_h the array to copy the quadrature points into
-function get_xgp_h(self) result(xgp_h)
+function get_xqp_h(self) result(xqp_h)
   implicit none
-  class(gaussian_quadrature_type), target, intent(in) :: self
-  real(kind=r_def), pointer :: xgp_h(:,:)
+  class(quadrature_type), target, intent(in) :: self
+  real(kind=r_def), pointer :: xqp_h(:,:) 
 
-  xgp_h => self%xgp_h(:,:)
+  xqp_h => self%xqp_h(:,:)
   return
-end function get_xgp_h 
+end function get_xqp_h 
 
 !> Function to return the quadrature points in the vertical
 !> @param[in] self the calling quadrature rule
-!> @param[in] xgp_v the array to copy the quadrature points into
-function get_xgp_v(self) result(xgp_v)
+!> @param[in] xqp_v the array to copy the quadrature points into
+function get_xqp_v(self) result(xqp_v)
   implicit none
-  class(gaussian_quadrature_type), target, intent(in) :: self
-  real(kind=r_def), pointer :: xgp_v(:)
+  class(quadrature_type), target, intent(in) :: self
+  real(kind=r_def), pointer :: xqp_v(:) 
 
-  xgp_v => self%xgp(:)
+  xqp_v => self%xqp(:)
   return
-end function get_xgp_v
+end function get_xqp_v
 
-function which(self) result(gq)
+function which(self) result(qr)
   implicit none
-  class(gaussian_quadrature_type),  intent(in) :: self
-  integer :: gq
+  class(quadrature_type),  intent(in) :: self
+  integer :: qr
   
-  gq = self%gq
+  qr = self%qr
   return
 end function which
 
+function get_nqp_v(self) result(nqp_v)
+  implicit none
+  class(quadrature_type), intent(in) :: self
+  integer :: nqp_v
+  
+  nqp_v = self%nqp_v
+  return
+end function get_nqp_v
+
+function get_nqp_h(self) result(nqp_h)
+  implicit none
+  class(quadrature_type), intent(in) :: self
+  integer :: nqp_h
+  
+  nqp_h = self%nqp_h
+  return
+end function get_nqp_h
+
+
 !-----------------------------------------------------------------------------
-! Return Horizontal Gaussian quadrature weights 
+! Return Horizontal quadrature weights 
 !-----------------------------------------------------------------------------
 !> Function to return the quadrature points in the horizontal
 !> @param[in] self the calling quadrature rule
-!> @param[in] wgp_h the pointer to the quadrature weights
-function get_wgp_h(self) result(wgp_h)
+!> @param[in] wqp_h the pointer to the quadrature weights
+function get_wqp_h(self) result(wqp_h)
   implicit none
-  class(gaussian_quadrature_type), target, intent(in) :: self
-  real(kind=r_def), pointer :: wgp_h(:)
+  class(quadrature_type), target, intent(in) :: self
+  real(kind=r_def), pointer :: wqp_h(:) 
 
-  wgp_h => self%wgp_h(:)
+  wqp_h => self%wqp_h(:)
   return
-end function get_wgp_h 
+end function get_wqp_h 
 
 !-----------------------------------------------------------------------------
-! Return Vertical Gaussian quadrature weights 
+! Return Vertical quadrature weights 
 !-----------------------------------------------------------------------------
 !> Function to return the quadrature points in the horizontal
 !> @param[in] self the calling quadrature rule
 !> @param[in] wgp_v the pointer to the quadrature weights
-function get_wgp_v(self) result(wgp_v)
+function get_wqp_v(self) result(wqp_v)
   implicit none
-  class(gaussian_quadrature_type), target, intent(in) :: self
-  real(kind=r_def), pointer :: wgp_v(:)
+  class(quadrature_type), target, intent(in) :: self
+  real(kind=r_def), pointer :: wqp_v(:) 
 
-  wgp_v => self%wgp(:)
+  wqp_v => self%wqp(:)
   return
-end function get_wgp_v 
+end function get_wqp_v 
 
 
 
-end module gaussian_quadrature_mod
+end module quadrature_mod

@@ -74,6 +74,7 @@ do j = 1,ngp_v
 end do
 
 end subroutine coordinate_jacobian
+
 !> @brief Subroutine Computes the inverse of the Jacobian of the coordinate transform from
 !! reference space \hat{\chi} to physical space \chi 
 !! @param[in] ngp_h      Integer. The number of quadrature points in horizontal direction
@@ -82,7 +83,7 @@ end subroutine coordinate_jacobian
 !!                       on quadrature points
 !! @param[out] jac_inv   Real 3-dim array  Holds the values of the inverse of the Jacobian
 !!                       on quadrature points
-subroutine coordinate_jacobian_inverse(ngp_h, ngp_v, jac, jac_inv)
+subroutine coordinate_jacobian_inverse(ngp_h, ngp_v, jac, dj, jac_inv)
 !-------------------------------------------------------------------------------
 ! Compute the inverse of the Jacobian J^{i,j} = d chi_i / d \hat{chi_j} and the 
 ! derterminant det(J)
@@ -94,9 +95,15 @@ implicit none
 
 integer,          intent(in)  :: ngp_h, ngp_v
 real(kind=r_def), intent(in)  :: jac(3,3,ngp_h,ngp_v)
+real(kind=r_def), intent(in)  :: dj(ngp_h,ngp_v)
 real(kind=r_def), intent(out) :: jac_inv(3,3,ngp_h,ngp_v)
 
+real(r_def) :: dummy
 integer :: i, k
+
+!> @todo This is here to maintain the API. If it turns out we don't want this it should
+!> be removed.
+dummy = dj(1,1)
 
 ! Calculates the inverse Jacobian from the analytic inversion formula
 do k = 1,ngp_v

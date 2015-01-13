@@ -21,6 +21,9 @@ export DRIVER_OBJ=$(OBJ_DIR)/driver.o
 TEST_SOURCES = $(shell find -name "*.pf")
 TEST_OBJECTS = $(patsubst %.pf,$(OBJ_DIR)/%.o,$(TEST_SOURCES))
 
+SUPPORT_SOURCE  = $(shell find -name "*.[Ff]90")
+SUPPORT_OBJECTS = $(addprefix $(OBJ_DIR)/,$(addsuffix .o,$(basename $(SUPPORT_SOURCE))))
+
 SUBJECT_DIR     = $(BUILD_DIR)/dynamo
 SUBJECT_SUBDIRS = $(shell find $(SUBJECT_DIR) -type d)
 SUBJECT_MODINC  = $(patsubst %,-I %,$(SUBJECT_SUBDIRS))
@@ -41,13 +44,22 @@ $(OBJ_DIR)/%.o: $(OBJ_DIR)/%.F90
 	            $(SUBJECT_MODINC) -I$(PFUNIT_INSTALL)/mod \
 	            -c -o $@ $<
 
-$(OBJ_DIR)/test: $(DRIVER_OBJ) $(TEST_OBJECTS)
+$(OBJ_DIR)/test: $(DRIVER_OBJ) $(SUPPORT_OBJECTS) $(TEST_OBJECTS)
 	@echo Linking $@
 	$(Q)$(FCOM) $(LDFLAGS) -o $@ \
 	            $^ \
 	            $(SUBJECT_DIR)/modules.a \
 	            $(PFUNIT_INSTALL)/lib/libpfunit.a \
 	            $(patsubst %,-l%,$(EXTERNAL_LIBRARIES))
+
+# Replace OBJ_SUBDIR with mangling of % ?
+$(OBJ_DIR)/%.o: %.F90 | $(OBJ_SUBDIRS)
+	$(FCOM) $(FPPFLAGS) $(F_MOD_DESTINATION_ARG)$(OBJ_DIR)/$(dir $@) \
+	        $(SUBJECT_MODINC) -c -o $@ $<
+
+$(OBJ_DIR)/%.o: %.f90 | $(OBJ_SUBDIRS)
+	$(FCOM) $(FPPFLAGS) $(F_MOD_DESTINATION_ARG)$(OBJ_DIR)/$(dir $@) \
+	        $(SUBJECT_MODINC) -c -o $@ $<
 
 $(DRIVER_OBJ):
 	$(MAKE) -f pfunit.mk $(DRIVER_OBJ)

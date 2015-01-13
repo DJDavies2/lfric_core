@@ -43,7 +43,7 @@ contains
     end do
     
     call coordinate_jacobian(ndf, ngp, ngp, x, y, z, diff_basis, jac, dj)
-    call coordinate_jacobian_inverse(ngp,ngp, jac, jac_inv)
+    call coordinate_jacobian_inverse(ngp,ngp, jac, dj, jac_inv)
        
     err = maxval( abs( matmul( jac_inv,jac)-identity(:,:) ) )
     

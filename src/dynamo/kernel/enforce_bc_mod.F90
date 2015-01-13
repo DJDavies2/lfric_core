@@ -26,13 +26,13 @@ contains
 !! @param[in] map Integer array holding the dofmap for the cell at the base of the column
 !! @param[in] boundary_value integer array holding flag =0 for dofs on top and bottom faces of an cell
 !! @param[inout] u Real array, the actual data
-subroutine enforce_bc_w2(nlayers,ndf,map,boundary_value,u)
+subroutine enforce_bc_w2(nlayers,ndf,undf, map,boundary_value,u)
   
   !Arguments
-  integer, intent(in) :: nlayers, ndf
+  integer, intent(in) :: nlayers, ndf, undf
   integer, intent(in) :: map(ndf)
   integer, intent(in) :: boundary_value(ndf,2)
-  real(kind=r_def), intent(inout) :: u(*)
+  real(kind=r_def), intent(inout) :: u(undf)
 
   !Internal variables
   integer               :: df, k

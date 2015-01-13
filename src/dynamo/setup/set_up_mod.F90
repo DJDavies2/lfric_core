@@ -25,14 +25,10 @@ module set_up_mod
                                          mesh_connectivity
   use num_dof_mod,                only : num_dof_init
   use basis_function_mod,         only : get_basis, &
-              w0_basis, w1_basis, w2_basis, w3_basis, &
-              w0_diff_basis, w1_diff_basis, w2_diff_basis, w3_diff_basis, &
               w0_nodal_coords, w1_nodal_coords, w2_nodal_coords, w3_nodal_coords
 
   use dofmap_mod,                 only : get_dofmap, get_orientation, &
               w0_dofmap, w1_dofmap, w2_dofmap, w3_dofmap
-  use gaussian_quadrature_mod,    only : ngp_h, ngp_v
-  use mass_matrices_mod,          only : mass_matrix_init
   implicit none
   
 contains 
@@ -111,8 +107,6 @@ contains
     ! initialise numbers of dofs    
     call num_dof_init(num_cells,num_layers,element_order,w_unique_dofs,w_dof_entity)
          
-    call mass_matrix_init(w_unique_dofs(1,2),w_unique_dofs(2,2),w_unique_dofs(3,2),num_cells*num_layers)
-
     call log_event( "set_up: computing basis functions", LOG_LEVEL_INFO )
 
     ! read the values of the basis functions. 

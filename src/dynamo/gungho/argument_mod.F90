@@ -21,6 +21,8 @@
 !> all the dofs.
 
 module argument_mod
+
+  use function_space_mod, only : W0, W1, W2, W3
   implicit none
 
 ! access descriptors
@@ -32,12 +34,7 @@ module argument_mod
   integer, public, parameter :: gh_min   = 6
   integer, public, parameter :: gh_max   = 7
 
-! vspace labels
-  integer, public, parameter :: w0 = 1
-  integer, public, parameter :: w1 = 2
-  integer, public, parameter :: w2 = 3
-  integer, public, parameter :: w3 = 4
-  integer, public, parameter :: any_space = 0
+  integer, public, parameter :: any_space = 0    
 
 ! stencil label
   integer, public, parameter :: fe = 1 

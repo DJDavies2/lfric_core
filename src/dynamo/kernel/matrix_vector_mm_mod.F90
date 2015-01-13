@@ -7,16 +7,15 @@
 !
 !-------------------------------------------------------------------------------
 
-!> @brief Provides access to the members of the W1_solver_kernel  
+!> @brief Provides access to the members of the W2_solver_kernel  
 
-!> @details Accessor functions for the W1 solver_kernel class are defined in this module.
+!> @details Accessor functions for the W2_solver_kernel class are defined in this module.
 
-module matrix_vector_kernel_w1_mod
+module matrix_vector_mm_mod
 use argument_mod,            only : arg_type,                              &
-                                    gh_read, gh_inc, w1, fe, cells 
+                                    gh_read, gh_inc, w2, fe, cells 
 use constants_mod,           only : r_def
 use kernel_mod,              only : kernel_type
-use mass_matrices_mod,       only : w1_mass_matrix
 
 implicit none
 
@@ -24,15 +23,15 @@ implicit none
 ! Public types
 !-------------------------------------------------------------------------------
 
-type, public, extends(kernel_type) :: matrix_vector_kernel_type
+type, public, extends(kernel_type) :: matrix_vector_kernel_mm_type
   private
   type(arg_type) :: meta_args(2) = [                                       &
-       arg_type(gh_inc,  w1,fe,.false.,.false.,.false.,.false.),           &  
-       arg_type(gh_read ,w1,fe,.false.,.false.,.false.,.false.)            &
+       arg_type(gh_inc,  w2,fe,.false.,.false.,.false.,.false.),           &  
+       arg_type(gh_read ,w2,fe,.false.,.false.,.false.,.false.)            &
        ]
   integer :: iterates_over = cells
 contains
-  procedure, nopass ::matrix_vector_w1_code
+  procedure, nopass ::matrix_vector_mm_code
 end type
 
 !-------------------------------------------------------------------------------
@@ -40,52 +39,55 @@ end type
 !-------------------------------------------------------------------------------
 
 ! overload the default structure constructor for function space
-interface matrix_vector_kernel_type
-   module procedure matrix_vector_kernel_constructor
+interface matrix_vector_kernel_mm_type
+   module procedure matrix_vector_kernel_mm_constructor
 end interface
 
 !-------------------------------------------------------------------------------
 ! Contained functions/subroutines
 !-------------------------------------------------------------------------------
-public matrix_vector_w1_code
+public matrix_vector_mm_code
 contains
 
-type(matrix_vector_kernel_type) function matrix_vector_kernel_constructor() result(self)
+  type(matrix_vector_kernel_mm_type) function matrix_vector_kernel_mm_constructor() result(self)
   return
-end function matrix_vector_kernel_constructor
+end function matrix_vector_kernel_mm_constructor
 
 !> @brief The subroutine which is called directly by the Psy layer, computes mass_matrix*x
 !> @param[in]  cell the horizontal cell index
 !! @param[in] nlayers Integer the number of layers
 !! @param[in] ndf The number of degrees of freedom per cell
+!! @param[in] undf The unique number of degrees of freedom 
 !! @param[in] map Integer array holding the dofmap for the cell at the base of the column
 !! @param[in] x Real array the data
 !> @param[inout] lhs Real array, the output lhs (A*x)
-subroutine matrix_vector_w1_code(cell,nlayers,ndf,map,lhs,x)
+!! @param[in] ncell_3d total number of cells
+!! @param[in] mass_matrix Real: Array holding mass matrix values
+subroutine matrix_vector_mm_code(cell,nlayers,ndf,undf,map,lhs,x,ncell_3d,mass_matrix)
+ 
   !Arguments
-  integer,                    intent(in)    :: cell, nlayers, ndf
-  integer,                    intent(in)    :: map(ndf)
-  real(kind=r_def),           intent(in)    :: x(*)
-  real(kind=r_def),           intent(inout) :: lhs(*)
+  integer,                   intent(in)    :: cell, nlayers, ndf
+  integer,                   intent(in)    :: undf, ncell_3d
+  integer, dimension(ndf),   intent(in)    :: map
+  real(kind=r_def), dimension(undf), intent(in)    :: x
+  real(kind=r_def), dimension(undf), intent(inout) :: lhs
+  real(kind=r_def), dimension(ndf,ndf,ncell_3d), intent(in) :: mass_matrix
 
   !Internal variables
-  integer                                   :: df, k, ik  
-  
-  real(kind=r_def), dimension(ndf)          :: x_e, lhs_e
-
-  ! compute the LHS integrated over one cell and solve
-  do k = 0, nlayers-1    
-    do df = 1, ndf
+  integer                                  :: df, k, ik 
+  real(kind=r_def), dimension(ndf)         :: x_e, lhs_e
+ 
+  do k = 0, nlayers-1
+    do df = 1, ndf  
       x_e(df) = x(map(df)+k)
     end do
     ik = (cell-1)*nlayers + k + 1
-    lhs_e = matmul(w1_mass_matrix(:,:,ik),x_e)
-    ! push data to global array    
+    lhs_e = matmul(mass_matrix(:,:,ik),x_e)
     do df = 1,ndf
-      lhs(map(df)+k) = lhs(map(df)+k) + lhs_e(df) 
+       lhs(map(df)+k) = lhs(map(df)+k) + lhs_e(df) 
     end do
- end do
+  end do
+ 
+end subroutine matrix_vector_mm_code
 
-end subroutine matrix_vector_w1_code
-
-end module matrix_vector_kernel_w1_mod
+end module matrix_vector_mm_mod
