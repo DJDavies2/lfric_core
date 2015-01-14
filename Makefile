@@ -25,3 +25,8 @@ doc docs:
 clean:
 	$(MAKE) -C src/dynamo clean
 	$(MAKE) -C src/test clean
+
+.PHONY: clean-all
+clean-all:
+	$(MAKE) -C src/dynamo clean ALL=1
+	$(MAKE) -C src/test clean ALL=1
