@@ -1634,6 +1634,643 @@ Semi-Implicit Timestepping
 
 \begin_layout Standard
 To be populated
+\end_layout
+
+\begin_layout Section
+Results
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Results"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This section gives some indicative results obtained using dynamo
+\end_layout
+
+\begin_layout Subsection
+Vertical Slice Tests
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k0_Dx6Dz2_theta.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k0_Dx3Dz1_theta.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k0_Dx6Dz2_u.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k0_Dx3Dz1_u.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k0_Dx6Dz2_w.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k0_Dx3Dz1_w.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Gravity_wave_k0_results"
+
+\end_inset
+
+Results for the 2D gravity wave test simulated using the linear equations
+ with
+\begin_inset Formula $\Delta x=6\,{\rm km},$
+\end_inset
+
+ and 
+\begin_inset Formula $\Delta z=2\,{\rm km}$
+\end_inset
+
+ (left panels) and 
+\begin_inset Formula $\Delta x=3\,{\rm km},$
+\end_inset
+
+ and 
+\begin_inset Formula $\Delta z=1\,{\rm km}$
+\end_inset
+
+ (right panels) all for 
+\begin_inset Formula $3000$
+\end_inset
+
+ s with 
+\begin_inset Formula $\Delta t=1$
+\end_inset
+
+ s using lowest order 
+\begin_inset Formula $k=0$
+\end_inset
+
+ quadrilateral elements.
+ (a) and (b) 
+\begin_inset Formula $\theta'$
+\end_inset
+
+, contour intervals 
+\begin_inset Formula $5\times10^{-4}$
+\end_inset
+
+ K ranging from 
+\begin_inset Formula $-10^{-3}$
+\end_inset
+
+ K to 
+\begin_inset Formula $2.5\times10^{-3}$
+\end_inset
+
+ K, (c) and (d) 
+\begin_inset Formula $u'$
+\end_inset
+
+, contour intervals 
+\begin_inset Formula $10^{-3}\,{\rm ms}^{-1}$
+\end_inset
+
+ ranging from 
+\begin_inset Formula $-10^{-2}\,{\rm ms}^{-1}$
+\end_inset
+
+ to 
+\begin_inset Formula $10^{-2}\,{\rm ms}^{-1}$
+\end_inset
+
+ , (e) and (f) 
+\begin_inset Formula $w'$
+\end_inset
+
+, contour intervals 
+\begin_inset Formula $4\times10^{-4}\,{\rm ms}^{-1}$
+\end_inset
+
+ ranging from 
+\begin_inset Formula $-2\times10^{-3}\,{\rm ms}^{-1}$
+\end_inset
+
+ to 
+\begin_inset Formula $2\times10^{-3}\,{\rm ms}^{-1}$
+\end_inset
+
+.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+To simulate a Cartesian vertical slice model dynamo is run on a biperiodic
+ domain and all fields are initiated so that there is no variation in the
+ 
+\begin_inset Formula $y$
+\end_inset
+
+ direction and so the results remain 2-dimensional (for various technical
+ reasons dynamo cannot be run in a true 2D mode, each horizontal direction
+ requires an even number of cells > 2, i.e the minimum sized permissible
+ domain is 4x4x1 cells).
+ Results for the non-hydrostatic gravity wave test 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "skamarock94"
+
+\end_inset
+
+ are shown in Figure 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Gravity_wave_k0_results"
+
+\end_inset
+
+ for lowest order (
+\begin_inset Formula $k=0$
+\end_inset
+
+) elements on a domain of size 300x10 km and Figure 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Gravity_wave_k1_results"
+
+\end_inset
+
+ for order 
+\begin_inset Formula $k=1$
+\end_inset
+
+ elements with a domain size of 480x10 km, the horizontal domain size has
+ been increased to stop interference from the spuriously fast gravity waves
+ wrapping around the domain and interfering with the results.
+ For comparison the results using the full nonlinear ENDGame vertical slice
+ model can be found in 
+\begin_inset CommandInset citation
+LatexCommand citet
+key "meldubwsz09"
+
+\end_inset
+
+ (their Figure 2).
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k1_Dx6Dz2_theta.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k1_Dx3Dz1_theta.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k1_Dx6Dz2_u.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k1_Dx3Dz1_u.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k1_Dx6Dz2_w.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/GW_k1_Dx3Dz1_w.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Gravity_wave_k1_results"
+
+\end_inset
+
+Results for the 2D gravity wave test simulated using the linear equations
+ with
+\begin_inset Formula $\Delta x=6\,{\rm km},$
+\end_inset
+
+ 
+\begin_inset Formula $\Delta z=2\,{\rm km}$
+\end_inset
+
+ and 
+\begin_inset Formula $\Delta t=1$
+\end_inset
+
+ s (left panels) and 
+\begin_inset Formula $\Delta x=3\,{\rm km},$
+\end_inset
+
+ 
+\begin_inset Formula $\Delta z=1\,{\rm km}$
+\end_inset
+
+ and 
+\begin_inset Formula $\Delta t=2/5$
+\end_inset
+
+ s (right panels) all for 
+\begin_inset Formula $3000$
+\end_inset
+
+ s using order 
+\begin_inset Formula $k=1$
+\end_inset
+
+ quadrilateral elements.
+ (a) and (b) 
+\begin_inset Formula $\theta'$
+\end_inset
+
+, contour intervals 
+\begin_inset Formula $5\times10^{-4}$
+\end_inset
+
+ K ranging from 
+\begin_inset Formula $-10^{-3}$
+\end_inset
+
+ K to 
+\begin_inset Formula $2.5\times10^{-3}$
+\end_inset
+
+ K, (c) and (d) 
+\begin_inset Formula $u'$
+\end_inset
+
+, contour intervals 
+\begin_inset Formula $10^{-3}\,{\rm ms}^{-1}$
+\end_inset
+
+ ranging from 
+\begin_inset Formula $-10^{-2}\,{\rm ms}^{-1}$
+\end_inset
+
+ to 
+\begin_inset Formula $10^{-2}\,{\rm ms}^{-1}$
+\end_inset
+
+, (e) and (f) 
+\begin_inset Formula $w'$
+\end_inset
+
+, contour intervals 
+\begin_inset Formula $4\times10^{-4}\,{\rm ms}^{-1}$
+\end_inset
+
+ ranging from 
+\begin_inset Formula $-2\times10^{-3}\,{\rm ms}^{-1}$
+\end_inset
+
+ to 
+\begin_inset Formula $2\times10^{-3}\,{\rm ms}^{-1}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
 \begin_inset CommandInset bibtex
 LatexCommand bibtex
 bibfiles "/net/home/h01/dynamics/BiB_Styles/master"
