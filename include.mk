@@ -66,6 +66,7 @@ COMPILER_NAME = $(shell basename $(FC))
 ifeq '$(COMPILER_NAME)' 'ifort'
   $(info ** Chosen Intel Fortran compiler)
 
+  FFLAGS_COMPILER           = -openmp
   FFLAGS_NO_OPTIMISATION    = -O0
   FFLAGS_SAFE_OPTIMISATION  = -O2 -fp-model precise
   FFLAGS_RISKY_OPTIMISATION = -O3 -xhost
@@ -98,7 +99,7 @@ else ifeq ($(findstring xlf,$(COMPILER_NAME) ), xlf)
 else ifeq '$(COMPILER_NAME)' 'gfortran'
   $(info ** Chosen GNU Fortran compiler)
 
-  FFLAGS_COMPILER           = $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS)
+  FFLAGS_COMPILER           = -fopenmp
   FFLAGS_NO_OPTIMISATION    = -O0
   FFLAGS_SAFE_OPTIMISATION  = -Og
   FFLAGS_RISKY_OPTIMISATION = -Ofast
@@ -119,6 +120,7 @@ else ifeq '$(COMPILER_NAME)' 'gfortran'
 else ifeq '$(COMPILER_NAME)' 'nagfor'
   $(info ** Chosen NAG Fortran compiler)
 
+  FFLAGS_COMPILER           = -openmp
   FFLAGS_NO_OPTIMISATION    = -O0
   FFLAGS_SAFE_OPTIMISATION  = -O2
   FFLAGS_RISKY_OPTIMISATION = -O4
@@ -130,6 +132,7 @@ else ifeq '$(COMPILER_NAME)' 'nagfor'
 else ifeq '$(COMPILER_NAME)' 'pgfortran'
   $(info ** Chosen Portland Fortran compiler)
 
+  FFLAGS_COMPILER           = -mp
   FFLAGS_NO_OPTIMISATION    = -O0
   FFLAGS_SAFE_OPTIMISATION  = -O2
   FFLAGS_RISKY_OPTIMISATION = -O4
@@ -140,6 +143,7 @@ else ifeq '$(COMPILER_NAME)' 'pgfortran'
 else ifeq '$(COMPILER_NAME)' 'crayftn'
   $(info ** Chosen Cray Fortran compiler)
 
+  FFLAGS_COMPILER           = -h omp
   FFLAGS_COMPILER           = -em $(ESMF_F90COMPILEOPTS) $(ESMF_F90COMPILEPATHS)
   FFLAGS_NO_OPTIMISATION    = -O0
   FFLAGS_SAFE_OPTIMISATION  = -O2

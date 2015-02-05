@@ -5,8 +5,8 @@
 # https://puma.nerc.ac.uk/trac/GungHo/wiki
 ##############################################################################
 
-IGNORE_DEPENDENCIES = netcdf
-EXTERNAL_LIBRARIES = netcdff
+IGNORE_DEPENDENCIES = netcdf ESMF
+EXTERNAL_LIBRARIES = netcdff esmf
 
 export ROOT = ../..
 
