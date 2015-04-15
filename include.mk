@@ -62,7 +62,7 @@ endif
 
 FLDFLAGS = $(LDFLAGS)
 
-COMPILER_NAME = $(shell basename $(FC))
+COMPILER_NAME := $(shell basename $(FC))
 ifeq '$(COMPILER_NAME)' 'ifort'
   $(info ** Chosen Intel Fortran compiler)
 
@@ -87,6 +87,7 @@ ifeq '$(COMPILER_NAME)' 'ifort'
 else ifeq ($(findstring xlf,$(COMPILER_NAME) ), xlf)
   $(info ** Chosen IBM XL Fortran compiler)
 
+  COMPILER_NAME             = xlf
   FFLAGS_NO_OPTIMISATION    = -O0
   FFLAGS_SAFE_OPTIMISATION  = -O2
   FFLAGS_RISKY_OPTIMISATION = -O4
@@ -96,9 +97,10 @@ else ifeq ($(findstring xlf,$(COMPILER_NAME) ), xlf)
   FFLAGS_RUNTIME            = -qddim -qstackprotect=all -qfloat=nans -qflttrap=enable:invalid:nanq:overflow:underflow:zerodivide
   F_MOD_DESTINATION_ARG     = -qmoddir=
 
-else ifeq '$(COMPILER_NAME)' 'gfortran'
+else ifeq ($(findstring gfortran,$(COMPILER_NAME)), gfortran)
   $(info ** Chosen GNU Fortran compiler)
 
+  COMPILER_NAME             = gfortran
   FFLAGS_COMPILER           = -fopenmp
   FFLAGS_NO_OPTIMISATION    = -O0
   FFLAGS_SAFE_OPTIMISATION  = -Og
@@ -113,7 +115,7 @@ else ifeq '$(COMPILER_NAME)' 'gfortran'
   FLINK = mpif90
   FLDFLAGS += $(FFLAGS_DEBUG)
 
-  GFORTRAN_VERSION     := $(shell gfortran -dumpversion 2>&1 \
+  GFORTRAN_VERSION     := $(shell $(FC) -dumpversion 2>&1 \
                           | awk -F . '{ printf "%02i%02i%02i", $$1, $$2, $$3 }')
   $(info ** Version $(GFORTRAN_VERSION))
 
@@ -156,7 +158,7 @@ else ifeq '$(COMPILER_NAME)' 'crayftn'
   FLDFLAGS += $(FFLAGS_DEBUG)
 
 else
-  $(error Unrecognised Fortran compiler $(FC))
+  $(error Unrecognised Fortran compiler $(COMPILER_NAME))
 
 endif
 

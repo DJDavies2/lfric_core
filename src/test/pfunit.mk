@@ -12,7 +12,6 @@ PFUNIT_BUILD_DIR = $(BUILD_DIR)/pfunit
 
 include $(ROOT)/include.mk
 
-COMPILER_NAME = $(shell basename $(FC))
 ifeq '$(COMPILER_NAME)' 'ifort'
   PFUNIT_COMPILER_ID = Intel
   ifeq ($(shell test $(IFORT_VERSION) -lt 0130000; echo $$?), 0)
@@ -33,7 +32,7 @@ else ifeq '$(COMPILER_NAME)' 'nagfor'
 else ifeq '$(COMPILER_NAME)' 'xlf'
   PFUNIT_COMPILER_ID = XL
 else
-  $(error Unrecognised compiler "$(FC)")
+  $(error Unrecognised compiler "$(COMPILER_NAME)")
 endif
 
 DRIVER_DIR = $(dir $(DRIVER_OBJ))
