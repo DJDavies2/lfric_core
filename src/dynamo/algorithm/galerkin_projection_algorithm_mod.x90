@@ -18,7 +18,7 @@ module galerkin_projection_algorithm_mod
   use gp_vector_rhs_kernel_mod,only: gp_vector_rhs_kernel_type
   use field_mod,               only: field_type
   use quadrature_mod,          only: quadrature_type
-  use function_space_mod,      only: function_space_type, W0
+  use function_space_mod,      only: function_space_type, W0, W3
   use operator_mod,            only: operator_type
                 
   implicit none
@@ -55,7 +55,7 @@ contains
 
     integer                          :: out_fs
     type( field_type )               :: rhs(space_dimension)
-    integer                          :: dir 
+    integer                          :: dir, space 
     type(function_space_type)        :: fs
 
 
@@ -70,7 +70,7 @@ contains
     write( log_scratch_space, '(A)' ) 'Computing Galerkin projection...'
     call log_event( log_scratch_space, LOG_LEVEL_INFO )  
     if ( f_in%which_function_space() == out_fs ) then
-       write( log_scratch_space, '(A)' ) '   continuous field, no projection needed'
+       write( log_scratch_space, '(A)' ) '   function spaces match, no projection needed'
        call log_event( log_scratch_space, LOG_LEVEL_INFO )
        call invoke_copy_field_data(f_in, f_out(1))
     else
@@ -85,8 +85,9 @@ contains
           !call invoke_gp_vector_rhs( rhs, f_in, chi, qr )
           call invoke( gp_vector_rhs_kernel_type(rhs, f_in, chi, qr) )
        end if
+       space = f_out(1)%which_function_space()
        do dir = 1,space_dimension
-          if(present(mm)) then
+          if( present(mm) .and. space /= W3 ) then
              call solver_algorithm( f_out(dir), rhs(dir), chi,  SOLVER_OPTION, mm=mm )
           else
              call solver_algorithm( f_out(dir), rhs(dir), chi,  SOLVER_OPTION, qr=qr )
