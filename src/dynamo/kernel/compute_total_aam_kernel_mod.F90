@@ -118,7 +118,7 @@ subroutine compute_total_aam_code(                                              
   real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis   
 
   real(kind=r_def), dimension(undf_w3), intent(out)   :: aam
-  real(kind=r_def), dimension(undf_w2), intent(inout) :: u
+  real(kind=r_def), dimension(undf_w2), intent(in)    :: u
   real(kind=r_def), dimension(undf_w3), intent(in)    :: rho
   real(kind=r_def), dimension(undf_w0), intent(in)    :: chi_1, chi_2, chi_3
 

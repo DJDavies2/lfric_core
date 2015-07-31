@@ -75,12 +75,12 @@ contains
     ! Compute Ertel PV
     pv = field_type( vector_space = fs%get_instance( mesh, W3) )
     call invoke( compute_total_pv_kernel_type(pv, xi, theta, chi, qr) )
-    call invoke_sum_field(energy, total_pv)
+    call invoke_sum_field(pv, total_pv)
 
     ! Compute axial angular momentum
     aam = field_type( vector_space = fs%get_instance( mesh, W3) )
     call invoke( compute_total_aam_kernel_type(aam, u, rho, chi, qr) )
-    call invoke_sum_field(energy, total_aam)
+    call invoke_sum_field(aam, total_aam)
 
     write( log_scratch_space, '(A,I4,4E32.24)')  &
            'Conservation  = ',&
