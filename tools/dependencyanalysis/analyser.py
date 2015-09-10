@@ -24,7 +24,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 
 '''
 Examine Fortran source and build dependency information for use by "make".
@@ -52,15 +51,6 @@ class Analyser():
             raise Exception( 'No Fortran preprocessor provided in $FPP' )
         self._fpp = self._fpp.split()
 
-        self._temporaryDirectory = tempfile.mkdtemp()
-
-    ###########################################################################
-    # Destructor.
-    #
-    def __del__( self ):
-        if self._temporaryDirectory:
-            shutil.rmtree( self._temporaryDirectory )
-
     ###########################################################################
     # Scan the source tree.
     #
@@ -72,53 +62,56 @@ class Analyser():
             raise Exception( 'File doesn''t look like a Fortran file: ' \
                             + sourceFilename )
 
-        temporaryDirectory = None
+        processedSource = ""
         if sourceFilename.endswith( '.F90' ):
             self._logger.logEvent( '  Preprocessing ' + sourceFilename )
-            processedSourceFile = os.path.join( self._temporaryDirectory, \
-                                                'processed.f90' )
-            commandLine = list(self._fpp)
-            commandLine.extend( [sourceFilename, processedSourceFile] )
-            subprocess.check_call( commandLine )
+            preprocessCommand = self._fpp + [sourceFilename]
+            preprocessor = subprocess.Popen( preprocessCommand, \
+                                             stdout=subprocess.PIPE, \
+                                             stderr=subprocess.PIPE )
+            processedSource, errors = preprocessor.communicate()
+            if preprocessor.returncode:
+                raise subprocess.CalledProcessError( preprocessor.returncode, \
+                                              " ".join( preprocessCommand ) )
+
         else:
-            processedSourceFile = sourceFilename
+            with open( sourceFilename, 'r' ) as sourceFile:
+                processedSource = sourceFile.read()
 
         self._logger.logEvent( '  Scanning ' + sourceFilename )
-
         self._database.removeSourceFile( sourceFilename )
 
         programUnit = None
         modules = []
         dependencies = []
-        with open( processedSourceFile, 'r' ) as sourceFile:
-            for line in sourceFile:
-                match = re.match( r'^\s*PROGRAM\s+(\S+)', line, \
-                                  flags=re.IGNORECASE)
-                if match is not None:
-                    programUnit = match.group( 1 )
-                    self._logger.logEvent( '    Contains program: ' + programUnit )
-                    self._database.addProgram( programUnit, sourceFilename )
+        for line in processedSource.splitlines():
+            match = re.match( r'^\s*PROGRAM\s+(\S+)', line, \
+                                flags=re.IGNORECASE)
+            if match is not None:
+                programUnit = match.group( 1 )
+                self._logger.logEvent( '    Contains program: ' + programUnit )
+                self._database.addProgram( programUnit, sourceFilename )
 
-                match = re.match( r'^\s*MODULE\s+(?!PROCEDURE)(\S+)', line, \
-                                  flags=re.IGNORECASE)
-                if match is not None:
-                    programUnit = match.group( 1 )
-                    self._logger.logEvent( '    Contains module ' + programUnit )
-                    modules.append( programUnit )
-                    self._database.addModule( programUnit, sourceFilename )
+            match = re.match( r'^\s*MODULE\s+(?!PROCEDURE)(\S+)', line, \
+                                flags=re.IGNORECASE)
+            if match is not None:
+                programUnit = match.group( 1 )
+                self._logger.logEvent( '    Contains module ' + programUnit )
+                modules.append( programUnit )
+                self._database.addModule( programUnit, sourceFilename )
 
-                match = re.match( r'^\s*USE\s+([^,\s]+)', line, \
-                                  flags=re.IGNORECASE)
-                if match is not None:
-                    moduleName = match.group( 1 )
-                    self._logger.logEvent( '    Depends on module ' + moduleName )
-                    if moduleName in self._ignoreModules :
-                        self._logger.logEvent( '      - Ignored 3rd party module' )
-                    elif moduleName in modules:
-                        self._logger.logEvent( '      - Ignored self' )
-                    else :
-                        if moduleName in dependencies:
-                            self._logger.logEvent( '      - Ignoring duplicate module' )
-                        else:
-                            dependencies.append( moduleName )
-                            self._database.addDependency( programUnit, moduleName )
+            match = re.match( r'^\s*USE\s+([^,\s]+)', line, \
+                                flags=re.IGNORECASE)
+            if match is not None:
+                moduleName = match.group( 1 )
+                self._logger.logEvent( '    Depends on module ' + moduleName )
+                if moduleName in self._ignoreModules :
+                    self._logger.logEvent( '      - Ignored 3rd party module' )
+                elif moduleName in modules:
+                    self._logger.logEvent( '      - Ignored self' )
+                else :
+                    if moduleName in dependencies:
+                        self._logger.logEvent( '      - Ignoring duplicate module' )
+                    else:
+                        dependencies.append( moduleName )
+                        self._database.addDependency( programUnit, moduleName )
