@@ -127,15 +127,11 @@ module constants_mod
   ! Missing data indicators
   real    (r_def), parameter :: RMDI = -huge(0.0_r_def)        !< Missing data indicator value for real numbers
   integer (i_def), parameter :: IMDI = -huge(0_i_def)          !< Missing data indicator value for integer numbers
-
-  ! Grid Types
-  integer(i_def), parameter :: PLANE             = 1
-  integer(i_def), parameter :: PLANE_BI_PERIODIC = 2
   
   !> @}
   !> @name Formulation switches
   logical, parameter :: L_NONLINEAR     = .true.  !< Solve the full nonlinear equation set
-  logical, parameter :: L_SEMI_IMPLICIT = .true.  !< Use the iterative timestepping method or runge kutta method
+  logical, parameter :: L_SEMI_IMPLICIT = .true.  !< Use the iterative timestepping method or Runge-Kutta method
   logical, parameter :: L_ROTATING      = .true.  !< Turn on/off Coriolis terms
   logical, parameter :: L_NEWTON_KRYLOV = .false. !< Use Newton-Krylov method to compute lhs
   logical, parameter :: L_SUPG          = .false. !< Use Streamline-Upwind-Petrov-Galerkin method for stabilisation of CG advection
@@ -151,6 +147,7 @@ module constants_mod
   logical, parameter :: L_COLD_BUBBLE  = .false. ! Straka density current test (planer domain only)
   logical, parameter :: L_GRAVITY_WAVE = .true.  ! Gravity wave test (either planer or spherical)
   !> @}
+
   !> @}
   !> @name Iterative timestepping options
   integer, parameter :: N_OUTER_ITER = 2 !< Number of outer (advection) iterations to do

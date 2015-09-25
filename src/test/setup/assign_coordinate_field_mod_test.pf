@@ -16,15 +16,14 @@ contains
     use pFUnit_Mod
     use assign_coordinate_field_mod, only : assign_coordinate
     use constants_mod,               only : r_def
-    use slush_mod,                   only : l_spherical    
+    use slush_mod,                   only : l_spherical
 
     implicit none
     
     real(kind=r_def) :: tol, one
-    
     integer :: nlayers, ndf, nverts, i, undf
     integer :: map(1)
-    real(kind=r_def) :: x(1),y(1),z(1), dz
+    real(kind=r_def) :: x(1),y(1),z(1), dz(1)
     real(kind=r_def) :: vertices_phys(3,8,1), vertices_comp(8,3), nodal_coord(3,1)
 
     l_spherical = .false.

@@ -14,12 +14,12 @@
 
 module slush_mod
 
-  use constants_mod,  only : r_def
+  use constants_mod,  only : r_def, i_def
 
   implicit none
 
   !> Order of the function space
-  integer :: element_order
+  integer(i_def) :: element_order
   !> Flag for whether mesh is on a sphere or not
   logical :: l_spherical
   !> Flag for whether a plane is with constant f (omega)
@@ -27,9 +27,9 @@ module slush_mod
 
   !> Number of unique dofs in a particular function space (5,:),
   !> either globally (:,1) or per cell (:,2)
-  integer :: w_unique_dofs(7,4)
+  integer(i_def) :: w_unique_dofs(7,4)
   !> Number of dofs in a particular function space (5,:) per entity (:,0:5)
-  integer :: w_dof_entity(7,0:5)
+  integer(i_def) :: w_dof_entity(7,0:5)
 
 
   real(kind=r_def)  :: f_lat            ! Latitude for f-plane tests

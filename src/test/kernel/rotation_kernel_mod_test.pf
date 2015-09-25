@@ -23,12 +23,13 @@ contains
                                            field_proxy_type
     use function_space_mod,         only : function_space_type, W0, W2
     use rotation_kernel_mod,        only : rotation_code
-    use constants_mod,              only : r_def, PI, omega, PLANE_BI_PERIODIC
+    use constants_mod,              only : r_def, PI, omega
     use quadrature_mod,             only : quadrature_type, QR3
     use slush_mod,                  only : l_spherical, f_lat
-    use mesh_mod,                   only : mesh_type
+    use mesh_mod,                   only : mesh_type, PLANE_BI_PERIODIC
 
-   implicit none
+    implicit none
+
     type(field_type)                :: chi(3)
     type(field_proxy_type )         :: chi_p(3)
     type(function_space_type)       :: fs
@@ -41,7 +42,7 @@ contains
     integer :: i, j, k, cell, df
     real(kind=r_def), parameter :: dx = 6000.0_r_def, &
                                    dy = 1000.0_r_def
-    real(r_def) :: dz
+    real(r_def) :: dz, dz_test(3)
 
     real(kind=r_def) :: junk1, junk2
 
@@ -67,14 +68,14 @@ contains
     real(kind=r_def), pointer :: wh(:), wv(:) => null()
 
     tol = 1.0e-3_r_def  
-    qr => qr%get_instance(QR3,9,3)
     l_spherical = .false.
-    f_lat = PI/4.0_r_def
+    f_lat = PI/4.0_r_def 
+    qr => qr%get_instance(QR3,9,3)
 
-
-    ! Dummy mesh mod has 9 cells, 3 layers
+    ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
     mesh = mesh_type(PLANE_BI_PERIODIC)
-    dz   = mesh%get_dz()
+    call mesh%get_dz(dz_test)
+    dz = dz_test(1)
 
     ! Build some function spaces ...
     call fs_build(mesh)
@@ -174,7 +175,7 @@ contains
     @assertEqual(answer, r_u_proxy%data(map_w2(5)+1), tol)
     @assertEqual(answer, r_u_proxy%data(map_w2(6)+1), tol)
 
-    !tear down ...
+    ! Tear down ...
     call fs_destroy()
 
   end subroutine rotation_kernel_test

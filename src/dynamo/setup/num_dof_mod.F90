@@ -51,7 +51,7 @@ contains
 
     integer :: ndof_entity_w0(0:5), ndof_entity_w1(0:5),           &
                ndof_entity_w2(0:5), ndof_entity_w3(0:5),           &
-               ndof_entity_wtheta(0:5),                             &
+               ndof_entity_wtheta(0:5),                            &
                ndof_entity_w2v(0:5), ndof_entity_w2h(0:5)
 
     ! Local variables for Mesh Properties
@@ -149,7 +149,8 @@ contains
     nw3_g = ncells*nlayers*nw3_cell
     nw2_g = ncells*nlayers*nw2_cell + nface_g*nw2_face
     nw1_g = ncells*nlayers*nw1_cell + nface_g*nw1_face + nedge_g*nw1_edge
-    nw0_g = ncells*nlayers*nw0_cell + nface_g*nw0_face + nedge_g*nw0_edge + nvert_g*nw0_vert
+    nw0_g = ncells*nlayers*nw0_cell + nface_g*nw0_face + nedge_g*nw0_edge + &
+            nvert_g*nw0_vert
     nwtheta_g = ncells*nlayers*nwtheta_cell + ncells*(nlayers+1)*nwtheta_face
     nw2v_g = nwtheta_g
     nw2h_g = nw2_g-nw2v_g
@@ -218,8 +219,8 @@ contains
     write( log_scratch_space, '(A, I0, A, I0)' ) &
         'ncells = ', ncells, ', nlayers = ', nlayers
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
-    call log_event( '   space       |   W0   |   W1   |   W2   |   W3   |   &
-                    Wtheta   |   W2V   |   W2H   |', LOG_LEVEL_INFO )
+    call log_event( '   space       |   W0   |   W1   |   W2   |   W3   |   '//&
+                    'Wtheta   |   W2V   |   W2H   |', LOG_LEVEL_INFO )
     write( log_scratch_space, '(a,i6,a,i6,a,i6,a,i6,a,i6,a,i6,a,i6)' ) &
         'global dof     ', nw0_g, '   ', nw1_g, '   ', nw2_g, '   ', nw3_g,    & 
         '   ', nwtheta_g, '       ', nw2v_g, '    ', nw2h_g

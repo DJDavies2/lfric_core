@@ -48,7 +48,7 @@ end type
 
 ! overload the default structure constructor for function space
 interface pert_pressure_gradient_kernel_type
-   module procedure pert_pressure_gradient_kernel_constructor
+  module procedure pert_pressure_gradient_kernel_constructor
 end interface
 
 !-------------------------------------------------------------------------------
@@ -107,7 +107,6 @@ subroutine pert_pressure_gradient_code(nlayers,                                 
   integer, dimension(ndf_w3), intent(in) :: map_w3
   
   integer, dimension(ndf_w2), intent(in) :: orientation_w2
-
 
   real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v), intent(in) :: w3_basis  
   real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis 
@@ -192,7 +191,6 @@ subroutine pert_pressure_gradient_code(nlayers,                                 
                       theta_ref_at_quad * dv                         &
                     + dot_product( grad_theta_ref_at_quad(:),v)      &
                                          )
-
 
           ru_e(df) = ru_e(df) +  wqp_h(qp1)*wqp_v(qp2)*grad_term
 

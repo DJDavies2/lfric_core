@@ -94,10 +94,16 @@ module mesh_mod
     !>                   (long, lat, radius) for spherical
     type (domain_limits), private :: domain_size
 
-    integer(i_def), private :: mesh_id     !< Mesh id number
-    integer(i_def), private :: nlayers     !< Number of 3d-cell layers in mesh object
-    real(r_def),    private :: domain_top  !< Top of atmosphere above surface
-    real(r_def),    private :: dz          !< Depth of 3d-cell layer [m]
+    !< Mesh id number 
+    integer(i_def), private :: mesh_id    
+    !< Number of 3d-cell layers in mesh object
+    integer(i_def), private :: nlayers 
+    !< Top of atmosphere above surface   
+    real(r_def),    private :: domain_top  
+    !< Non-dimensional vertical coordinate eta[0,1], eta(0:nlayers)
+    real(r_def), allocatable, private :: eta(:) 
+    !< Depth of 3d-cell layer [m], dz(nlayers)
+    real(r_def), allocatable, private :: dz(:)  
 
     !> Vertex Coordinates
     !> The x-, y- and z-coordinates of vertices on the mesh [m]
@@ -120,9 +126,9 @@ module mesh_mod
     integer(i_def), private :: nfaces            !< Total number of faces in mesh
 
     ! 3D-element properties
-    integer(i_def), private :: nverts_per_cell   !< Number of verts on 3d-cell
-    integer(i_def), private :: nedges_per_cell   !< Number of edges on 3d-cell
-    integer(i_def), private :: nfaces_per_cell   !< Number of faces on 3d-cell
+    integer(i_def), private :: nverts_per_cell  !< Number of verts on 3d-cell
+    integer(i_def), private :: nedges_per_cell  !< Number of edges on 3d-cell
+    integer(i_def), private :: nfaces_per_cell  !< Number of faces on 3d-cell
 
 
     !==========================================================================
@@ -173,7 +179,7 @@ module mesh_mod
     ! Colouring storage: these form the arguments to set_colours().
     !==========================================================================
     integer(i_def), private                   :: ncolours
-    integer(i_def), allocatable, private       :: ncells_per_colour_w0(:)
+    integer(i_def), allocatable, private      :: ncells_per_colour_w0(:)
     integer(i_def), allocatable, private      :: ncells_per_colour_w1(:)
     integer(i_def), allocatable, private      :: ncells_per_colour_w2(:)
     integer(i_def), allocatable, private      :: cells_in_colour_w0(:,:)
@@ -207,6 +213,7 @@ module mesh_mod
     procedure, public :: get_domain_size
     procedure, public :: get_domain_top
     procedure, public :: get_dz
+    procedure, public :: get_eta
     !> Gets the local id of the cell the "owns" a particular vertex entity
     procedure, public :: get_vertex_cell_owner
     !> Gets the local id of the cell the "owns" a particular edge entity
@@ -221,16 +228,17 @@ module mesh_mod
     !> @return core_cells The total number of core cells on the local partition
     procedure, public :: get_num_cells_core
     !> Get the number of owned cells from the partition object
-    !> @return owned_cells The total number of core cells on the local partition
+    !> @return owned_cells The total number of core cells on the 
+    !> local partition
     procedure, public :: get_num_cells_owned
     !> Returns the maximum depth of the halo from the partition object
     !> @return halo_depth The maximum depth of halo cells
     procedure, public :: get_halo_depth
-    !> Returns the total number of halo cells in a particular depth of halo in a 2d
-    !> slice from the partition object
+    !> Returns the total number of halo cells in a particular depth of halo in 
+    !> a 2d slice from the partition object
     !> @param[in] depth The depth of the halo being queried
-    !> @return halo_cells The total number of halo cells of the particular depth 
-    !> on the local partition
+    !> @return halo_cells The total number of halo cells of the particular  
+    !> depth on the local partition
     procedure, public :: get_num_cells_halo
     !> Get the total number of ghost cells in a slice around the local partition
     !> @return ghost_cells The total number of ghost cells around the local partition
@@ -248,6 +256,29 @@ module mesh_mod
     procedure, public :: is_coloured
 
   end type mesh_type
+
+  !============================================================================
+  ! Switches for Horizontal and Vertical Mesh Type Grids
+  !============================================================================
+  !
+  !> @}
+  !> @nameVertical Grid Types
+  !< Uniform grid spacing
+  integer(i_def), parameter :: VGRID_UNIFORM      = 1 
+  !< Quadratic grid spacing 
+  integer(i_def), parameter :: VGRID_QUADRATIC    = 2 
+  !< Geometric grid spacing with stretching factor prescribed 
+  integer(i_def), parameter :: VGRID_GEOMETRIC    = 3  
+  !< DCMIP grid spacing (DCMIP document, App. F.2.) with flattening
+  !< parameter prescribed
+  integer(i_def), parameter :: VGRID_DCMIP        = 4                                                  
+  !> @}
+
+  !> @}
+  !> @name Horizontal Grid Types for pFunit tests
+  integer(i_def), parameter :: PLANE             = 1
+  integer(i_def), parameter :: PLANE_BI_PERIODIC = 2
+  !> @}
 
 contains
 
@@ -669,19 +700,36 @@ contains
   end function get_domain_top
 
 
-  !> Type-bound function
-  !> @return Vertical thickness of layer in [m]
-  function get_dz(self) result (dz)
+   !> Type-bound  subroutine
+   !> @param [out] dz Vertical thickness of layers in [m], array of length nz
+   subroutine get_dz(self,dz)
 
-    ! Returns 3d-cell thickness (currently uniform)
+    ! Returns 3d-cell thickness
 
     implicit none
     class (mesh_type), intent(in) :: self
-    real  (r_def)                 :: dz
+    real(r_def),      intent(out) :: dz(:)
 
-    dz = self%dz
+    ! Get the thickness of layers
+    dz(:) = self%dz(:)
 
-  end function get_dz
+  end subroutine get_dz
+
+
+   !> Type-bound  subroutine
+   !> @param [out] eta Non-dimensional vertical coordinate, array of dim (0:nz) 
+   subroutine get_eta(self,eta)
+
+    ! Returns non-dimensional vertical coordinate eta[0,1]
+
+    implicit none
+    class (mesh_type), intent(in) :: self
+    real(r_def),      intent(out) :: eta(:)
+
+    ! Get the thickness of layers
+    eta(:) = self%eta(:)
+
+  end subroutine get_eta
 
 
   !> Type-bound function
@@ -730,8 +778,9 @@ contains
     integer, intent( in ) :: cell, vertex
     logical               :: owner
 
-    owner=.false.
-    if (self%vertex_ownership( vertex, cell )==self%partition%get_local_rank())owner=.true.
+  owner = .false.
+  if (self%vertex_ownership( vertex, cell )==self%partition%get_local_rank()) &
+      owner = .true.
 
   end function is_vertex_owned
 
@@ -743,8 +792,9 @@ contains
     integer, intent( in ) :: cell, edge
     logical               :: owner
 
-    owner=.false.
-    if(self%edge_ownership( edge, cell )==self%partition%get_local_rank())owner=.true.
+  owner = .false.
+  if(self%edge_ownership( edge, cell )==self%partition%get_local_rank()) &
+      owner = .true.
 
   end function is_edge_owned
 
@@ -756,8 +806,9 @@ contains
     integer, intent( in ) :: cell
     logical               :: owner
 
-    owner=.false.
-    if(self%partition%get_cell_owner(cell)==self%partition%get_local_rank())owner=.true.
+  owner = .false.
+  if(self%partition%get_cell_owner(cell)==self%partition%get_local_rank()) &
+     owner = .true.
 
   end function is_cell_owned
 
@@ -873,12 +924,12 @@ contains
 
 
     allocate(ncells_per_colour(size(self%ncells_per_colour_w0)), stat=astat)
-    if(astat/=0) call log_event("[Mesh Mod] Unable to allocate "//&
+    if(astat /= 0) call log_event("[Mesh Mod] Unable to allocate "//&
                                   "ncells_per_colour_w0.", LOG_LEVEL_ERROR)
 
     allocate(colour_map(self%ncolours, size(self%cells_in_colour_w0, 2)), &
              stat=astat)
-    if(astat/=0) call log_event("[Mesh Mod] Unable to allocate "//&
+    if(astat /= 0) call log_event("[Mesh Mod] Unable to allocate "//&
                                   "w0 colour_map.", LOG_LEVEL_ERROR)
 
     ncolours = self%ncolours
@@ -905,12 +956,12 @@ contains
 
 
     allocate(ncells_per_colour(size(self%ncells_per_colour_w1)), stat=astat)
-    if(astat/=0) call log_event("[Mesh Mod] Unable to allocate "//&
+    if(astat /= 0) call log_event("[Mesh Mod] Unable to allocate "//&
                                   "ncells_per_colour_w1.", LOG_LEVEL_ERROR)
 
     allocate(colour_map(self%ncolours, size(self%cells_in_colour_w1, 2)), &
              stat=astat)
-    if(astat/=0) call log_event("[Mesh Mod] Unable to allocate "//&
+    if(astat /= 0) call log_event("[Mesh Mod] Unable to allocate "//&
                                   "w1 colour_map.", LOG_LEVEL_ERROR)
 
     ncolours = self%ncolours
@@ -937,12 +988,12 @@ contains
 
 
     allocate(ncells_per_colour(size(self%ncells_per_colour_w2)), stat=astat)
-    if(astat/=0) call log_event("[Mesh Mod] Unable to allocate "//&
+    if(astat /= 0) call log_event("[Mesh Mod] Unable to allocate "//&
                                   "ncells_per_colour_w2.", LOG_LEVEL_ERROR)
 
     allocate(colour_map(self%ncolours, size(self%cells_in_colour_w2, 2)), &
              stat=astat)
-    if(astat/=0) call log_event("[Mesh Mod] Unable to allocate "//&
+    if(astat /= 0) call log_event("[Mesh Mod] Unable to allocate "//&
                                   "w2 colour_map.", LOG_LEVEL_ERROR)
 
     ncolours = self%ncolours
@@ -995,16 +1046,22 @@ contains
 
   !============================================================================
   !> @brief Stucture-Constructor
-  !> @param [in] partition   Partition object to base 3D-Mesh on
-  !> @param [in] global_mesh Global mesh object on which the partition is
-  !>                         applied
-  !> @param [in] nlayers_in  Number of 3D-cell layers in the 3D-Mesh object
-  !> @param [in] dz          Spacing (in metres) of each 3D-cell layerl
-  !> @return                 3D-Mesh object based on the list of partitioned
-  !>                         cells on the given global mesh
+  !> @param [in] partition     Partition object to base 3D-Mesh on
+  !> @param [in] global_mesh   Global mesh object on which the partition is
+  !>                           applied
+  !> @param [in] nlayers_in    Number of 3D-cell layers in the 3D-Mesh object
+  !> @param [in] domain_top    Top of atmosphere above surface
+  !> @param [in] vgrid_option  Choice of vertical grid 
+  !> @return                   3D-Mesh object based on the list of partitioned
+  !>                           cells on the given global mesh
   !============================================================================
-  function mesh_constructor (partition, global_mesh, nlayers_in, dz) &
-           result(self)
+
+  function mesh_constructor ( partition,     &
+                              global_mesh,   &
+                              nlayers_in,    &
+                              domain_top,    &
+                              vgrid_option ) &
+                            result( self )
 
     ! User structure constructor function for 3d-mesh object
     ! for given 2d-partition of global skin.
@@ -1017,7 +1074,8 @@ contains
     type (global_mesh_type), intent(in) :: global_mesh
 
     integer(i_def), intent(in) :: nlayers_in
-    real(r_def),    intent(in) :: dz
+    integer(i_def), intent(in) :: vgrid_option 
+    real(r_def),    intent(in) :: domain_top
 
     type(mesh_type) :: self
 
@@ -1033,11 +1091,10 @@ contains
     mesh_id_counter = mesh_id_counter+1
     self%mesh_id    = mesh_id_counter
 
-    self%dz         = dz
     self%nlayers    = nlayers_in
     self%ncells_2d  = partition%get_num_cells_in_layer()
     self%ncells     = self%ncells_2d * self%nlayers
-    self%domain_top = dz * real(self%nlayers)
+    self%domain_top = domain_top
     self%ncolours   = -1     ! Initialise ncolours to error status
     self%ncells_2d_with_ghost = self%ncells_2d + partition%get_num_cells_ghost()
     self%ncells_with_ghost = ( self%ncells_2d + &
@@ -1047,7 +1104,10 @@ contains
     ncells          = self%ncells_with_ghost
     nlayers         = self%nlayers
 
+    ! Calculate vertical coordinates eta[0,1] and dz in a separate subroutine
+    call set_vertical_coordinate(self, vgrid_option)
 
+    ! Calculate next-to cells and vertices on cells
     allocate ( self % cell_next    ( nfaces, ncells ) )
     allocate ( self % vert_on_cell ( nverts, ncells ) )
 
@@ -1118,12 +1178,14 @@ contains
   ! This routine is only available when setting data for unit testing.
   !============================================================================
   !> @brief   Stucture-Constructor (for unit testing)
+  !> @param [in] mesh_cfg  Horizontal mesh configuration
   !> @returns A 3D-Mesh object based on a 9-cell global mesh with one
   !>          partition (non-periodic) which has 5 3D-cell layers
   !============================================================================
+
   function mesh_constructor_unit_test_data(mesh_cfg) result (self)
 
-    use constants_mod, only: PI, PLANE, PLANE_BI_PERIODIC
+    use constants_mod, only: PI
 
     implicit none
 
@@ -1133,7 +1195,6 @@ contains
     integer(i_def), parameter :: nverts_per_cell = 8
     integer(i_def), parameter :: nedges_per_cell = 12
 
-    self%dz              = 2000.0_r_def
     self%nverts_per_cell = 8
     self%nedges_per_cell = 12
     self%nfaces_per_cell = 6
@@ -1165,6 +1226,10 @@ contains
       self%nedges  = 99
     end if
 
+    ! Calculate vertical coordinates eta[0,1] and dz in a separate subroutine 
+    ! for the unit tests.
+    ! Uniform vertical grid is used for pFunit tests (hard-wired).
+    call  set_vertical_coordinate(self, VGRID_UNIFORM)
 
     allocate( self%cell_next         ( self%nfaces_per_cell, self%ncells) )
     allocate( self%cell_lid_gid_map  ( self%ncells_2d) )
@@ -1375,112 +1440,208 @@ contains
       ! Assign [x,y,z] vertex coords in (m), with [0,0,0] at centre
       ! of planet (radius=30000.0).
       ! Level 0
-      self%vertex_coords (:, 1) = [  5195.345687_r_def,  11352.037430_r_def, -27278.922805_r_def ]
-      self%vertex_coords (:, 2) = [ -6745.352861_r_def,  10505.264651_r_def, -27278.922805_r_def ]    
-      self%vertex_coords (:, 3) = [  8757.797452_r_def, -13639.461402_r_def, -25244.129544_r_def ]
-      self%vertex_coords (:, 4) = [ -6745.352861_r_def, -14738.864893_r_def, -25244.129544_r_def ]
-      self%vertex_coords (:, 5) = [ -6745.352861_r_def, -10505.264651_r_def, -27278.922805_r_def ]    
-      self%vertex_coords (:, 6) = [  8757.797452_r_def,  13639.461402_r_def, -25244.129544_r_def ]
-      self%vertex_coords (:, 7) = [  5195.345687_r_def, -11352.037430_r_def, -27278.922805_r_def ]    
-      self%vertex_coords (:, 8) = [ -6745.352861_r_def,  14738.864893_r_def, -25244.129544_r_def ]
-      self%vertex_coords (:, 9) = [  8757.797452_r_def, -13639.461402_r_def,  25244.129544_r_def ]
-      self%vertex_coords (:,10) = [ -6745.352861_r_def, -14738.864893_r_def,  25244.129544_r_def ]
-      self%vertex_coords (:,11) = [  8757.797452_r_def,  13639.461402_r_def,  25244.129544_r_def ]
-      self%vertex_coords (:,12) = [ -6745.352861_r_def,  14738.864893_r_def,  25244.129544_r_def ]
-      self%vertex_coords (:,13) = [ -6745.352861_r_def,  10505.264651_r_def,  27278.922805_r_def ]    
-      self%vertex_coords (:,14) = [  5195.345687_r_def,  11352.037430_r_def,  27278.922805_r_def ]   
-      self%vertex_coords (:,15) = [ -6745.352861_r_def, -10505.264651_r_def,  27278.922805_r_def ]  
-      self%vertex_coords (:,16) = [  5195.345687_r_def, -11352.037430_r_def,  27278.922805_r_def ] 
+      self%vertex_coords (:, 1) = [  5195.345687_r_def,  11352.037430_r_def, & 
+                                    -27278.922805_r_def ]
+      self%vertex_coords (:, 2) = [ -6745.352861_r_def,  10505.264651_r_def, & 
+                                    -27278.922805_r_def ]    
+      self%vertex_coords (:, 3) = [  8757.797452_r_def, -13639.461402_r_def, & 
+                                    -25244.129544_r_def ]
+      self%vertex_coords (:, 4) = [ -6745.352861_r_def, -14738.864893_r_def, & 
+                                    -25244.129544_r_def ]
+      self%vertex_coords (:, 5) = [ -6745.352861_r_def, -10505.264651_r_def, & 
+                                    -27278.922805_r_def ]    
+      self%vertex_coords (:, 6) = [  8757.797452_r_def,  13639.461402_r_def, & 
+                                    -25244.129544_r_def ]
+      self%vertex_coords (:, 7) = [  5195.345687_r_def, -11352.037430_r_def, & 
+                                    -27278.922805_r_def ]    
+      self%vertex_coords (:, 8) = [ -6745.352861_r_def,  14738.864893_r_def, & 
+                                    -25244.129544_r_def ]
+      self%vertex_coords (:, 9) = [  8757.797452_r_def, -13639.461402_r_def, & 
+                                     25244.129544_r_def ]
+      self%vertex_coords (:,10) = [ -6745.352861_r_def, -14738.864893_r_def, & 
+                                     25244.129544_r_def ]
+      self%vertex_coords (:,11) = [  8757.797452_r_def,  13639.461402_r_def, & 
+                                     25244.129544_r_def ]
+      self%vertex_coords (:,12) = [ -6745.352861_r_def,  14738.864893_r_def, & 
+                                     25244.129544_r_def ]
+      self%vertex_coords (:,13) = [ -6745.352861_r_def,  10505.264651_r_def, & 
+                                     27278.922805_r_def ]    
+      self%vertex_coords (:,14) = [  5195.345687_r_def,  11352.037430_r_def, & 
+                                     27278.922805_r_def ]   
+      self%vertex_coords (:,15) = [ -6745.352861_r_def, -10505.264651_r_def, & 
+                                     27278.922805_r_def ]  
+      self%vertex_coords (:,16) = [  5195.345687_r_def, -11352.037430_r_def, & 
+                                     27278.922805_r_def ] 
 
       ! Level 1
-      self%vertex_coords (:,17) = [  5541.702066_r_def,  12108.839925_r_def, -29097.517658_r_def ]
-      self%vertex_coords (:,18) = [ -7195.043052_r_def,  11205.615628_r_def, -29097.517658_r_def ]
-      self%vertex_coords (:,19) = [  9341.650615_r_def, -14548.758829_r_def, -26927.071514_r_def ]
-      self%vertex_coords (:,20) = [ -7195.043052_r_def, -15721.455886_r_def, -26927.071514_r_def ]
-      self%vertex_coords (:,21) = [ -7195.043052_r_def, -11205.615628_r_def, -29097.517658_r_def ]
-      self%vertex_coords (:,22) = [  9341.650615_r_def,  14548.758829_r_def, -26927.071514_r_def ]
-      self%vertex_coords (:,23) = [  5541.702066_r_def, -12108.839925_r_def, -29097.517658_r_def ]
-      self%vertex_coords (:,24) = [ -7195.043052_r_def,  15721.455886_r_def, -26927.071514_r_def ]
-      self%vertex_coords (:,25) = [  9341.650615_r_def, -14548.758829_r_def,  26927.071514_r_def ]
-      self%vertex_coords (:,26) = [ -7195.043052_r_def, -15721.455886_r_def,  26927.071514_r_def ]
-      self%vertex_coords (:,27) = [  9341.650615_r_def,  14548.758829_r_def,  26927.071514_r_def ]
-      self%vertex_coords (:,28) = [ -7195.043052_r_def,  15721.455886_r_def,  26927.071514_r_def ]
-      self%vertex_coords (:,29) = [ -7195.043052_r_def,  11205.615628_r_def,  29097.517658_r_def ]
-      self%vertex_coords (:,30) = [  5541.702066_r_def,  12108.839925_r_def,  29097.517658_r_def ]
-      self%vertex_coords (:,31) = [ -7195.043052_r_def, -11205.615628_r_def,  29097.517658_r_def ]
-      self%vertex_coords (:,32) = [  5541.702066_r_def, -12108.839925_r_def,  29097.517658_r_def ]
+      self%vertex_coords (:,17) = [  5541.702066_r_def,  12108.839925_r_def, &
+                                    -29097.517658_r_def ]
+      self%vertex_coords (:,18) = [ -7195.043052_r_def,  11205.615628_r_def, &
+                                    -29097.517658_r_def ]
+      self%vertex_coords (:,19) = [  9341.650615_r_def, -14548.758829_r_def, &
+                                    -26927.071514_r_def ]
+      self%vertex_coords (:,20) = [ -7195.043052_r_def, -15721.455886_r_def, &
+                                    -26927.071514_r_def ]
+      self%vertex_coords (:,21) = [ -7195.043052_r_def, -11205.615628_r_def, &
+                                    -29097.517658_r_def ]
+      self%vertex_coords (:,22) = [  9341.650615_r_def,  14548.758829_r_def, &
+                                    -26927.071514_r_def ]
+      self%vertex_coords (:,23) = [  5541.702066_r_def, -12108.839925_r_def, &
+                                    -29097.517658_r_def ]
+      self%vertex_coords (:,24) = [ -7195.043052_r_def,  15721.455886_r_def, &
+                                    -26927.071514_r_def ]
+      self%vertex_coords (:,25) = [  9341.650615_r_def, -14548.758829_r_def, &
+                                     26927.071514_r_def ]
+      self%vertex_coords (:,26) = [ -7195.043052_r_def, -15721.455886_r_def, &
+                                     26927.071514_r_def ]
+      self%vertex_coords (:,27) = [  9341.650615_r_def,  14548.758829_r_def, &
+                                     26927.071514_r_def ]
+      self%vertex_coords (:,28) = [ -7195.043052_r_def,  15721.455886_r_def, &
+                                     26927.071514_r_def ]
+      self%vertex_coords (:,29) = [ -7195.043052_r_def,  11205.615628_r_def, &
+                                     29097.517658_r_def ]
+      self%vertex_coords (:,30) = [  5541.702066_r_def,  12108.839925_r_def, &
+                                     29097.517658_r_def ]
+      self%vertex_coords (:,31) = [ -7195.043052_r_def, -11205.615628_r_def, &
+                                     29097.517658_r_def ]
+      self%vertex_coords (:,32) = [  5541.702066_r_def, -12108.839925_r_def, &
+                                     29097.517658_r_def ]
       
       ! Level 2
-      self%vertex_coords (:,33) = [  5888.058445_r_def,  12865.642420_r_def, -30916.112512_r_def ]
-      self%vertex_coords (:,34) = [ -7644.733242_r_def,  11905.966605_r_def, -30916.112512_r_def ]
-      self%vertex_coords (:,35) = [  9925.503779_r_def, -15458.056256_r_def, -28610.013483_r_def ]
-      self%vertex_coords (:,36) = [ -7644.733242_r_def, -16704.046879_r_def, -28610.013483_r_def ]
-      self%vertex_coords (:,37) = [ -7644.733242_r_def, -11905.966605_r_def, -30916.112512_r_def ]
-      self%vertex_coords (:,38) = [  9925.503779_r_def,  15458.056256_r_def, -28610.013483_r_def ]
-      self%vertex_coords (:,39) = [  5888.058445_r_def, -12865.642420_r_def, -30916.112512_r_def ]
-      self%vertex_coords (:,40) = [ -7644.733242_r_def,  16704.046879_r_def, -28610.013483_r_def ]
-      self%vertex_coords (:,41) = [  9925.503779_r_def, -15458.056256_r_def,  28610.013483_r_def ]
-      self%vertex_coords (:,42) = [ -7644.733242_r_def, -16704.046879_r_def,  28610.013483_r_def ]
-      self%vertex_coords (:,43) = [  9925.503779_r_def,  15458.056256_r_def,  28610.013483_r_def ]
-      self%vertex_coords (:,44) = [ -7644.733242_r_def,  16704.046879_r_def,  28610.013483_r_def ]
-      self%vertex_coords (:,45) = [ -7644.733242_r_def,  11905.966605_r_def,  30916.112512_r_def ]
-      self%vertex_coords (:,46) = [  5888.058445_r_def,  12865.642420_r_def,  30916.112512_r_def ]
-      self%vertex_coords (:,47) = [ -7644.733242_r_def, -11905.966605_r_def,  30916.112512_r_def ]
-      self%vertex_coords (:,48) = [  5888.058445_r_def, -12865.642420_r_def,  30916.112512_r_def ]
+      self%vertex_coords (:,33) = [  5888.058445_r_def,  12865.642420_r_def, &
+                                    -30916.112512_r_def ]
+      self%vertex_coords (:,34) = [ -7644.733242_r_def,  11905.966605_r_def, &
+                                    -30916.112512_r_def ]
+      self%vertex_coords (:,35) = [  9925.503779_r_def, -15458.056256_r_def, &
+                                    -28610.013483_r_def ]
+      self%vertex_coords (:,36) = [ -7644.733242_r_def, -16704.046879_r_def, &
+                                    -28610.013483_r_def ]
+      self%vertex_coords (:,37) = [ -7644.733242_r_def, -11905.966605_r_def, &
+                                    -30916.112512_r_def ]
+      self%vertex_coords (:,38) = [  9925.503779_r_def,  15458.056256_r_def, &
+                                    -28610.013483_r_def ]
+      self%vertex_coords (:,39) = [  5888.058445_r_def, -12865.642420_r_def, &
+                                    -30916.112512_r_def ]
+      self%vertex_coords (:,40) = [ -7644.733242_r_def,  16704.046879_r_def, &
+                                    -28610.013483_r_def ]
+      self%vertex_coords (:,41) = [  9925.503779_r_def, -15458.056256_r_def, &
+                                     28610.013483_r_def ]
+      self%vertex_coords (:,42) = [ -7644.733242_r_def, -16704.046879_r_def, &
+                                     28610.013483_r_def ]
+      self%vertex_coords (:,43) = [  9925.503779_r_def,  15458.056256_r_def, &
+                                     28610.013483_r_def ]
+      self%vertex_coords (:,44) = [ -7644.733242_r_def,  16704.046879_r_def, &
+                                     28610.013483_r_def ]
+      self%vertex_coords (:,45) = [ -7644.733242_r_def,  11905.966605_r_def, &
+                                     30916.112512_r_def ]
+      self%vertex_coords (:,46) = [  5888.058445_r_def,  12865.642420_r_def, &
+                                     30916.112512_r_def ]
+      self%vertex_coords (:,47) = [ -7644.733242_r_def, -11905.966605_r_def, &
+                                     30916.112512_r_def ]
+      self%vertex_coords (:,48) = [  5888.058445_r_def, -12865.642420_r_def, &
+                                     30916.112512_r_def ]
 
       ! Level 3
-      self%vertex_coords (:,49) = [  6234.414824_r_def,  13622.444916_r_def, -32734.707366_r_def ]
-      self%vertex_coords (:,50) = [ -8094.423433_r_def,  12606.317581_r_def, -32734.707366_r_def ]
-      self%vertex_coords (:,51) = [ 10509.356942_r_def, -16367.353683_r_def, -30292.955453_r_def ]
-      self%vertex_coords (:,52) = [ -8094.423433_r_def, -17686.637872_r_def, -30292.955453_r_def ]
-      self%vertex_coords (:,53) = [ -8094.423433_r_def, -12606.317581_r_def, -32734.707366_r_def ]
-      self%vertex_coords (:,54) = [ 10509.356942_r_def,  16367.353683_r_def, -30292.955453_r_def ]
-      self%vertex_coords (:,55) = [  6234.414824_r_def, -13622.444916_r_def, -32734.707366_r_def ]
-      self%vertex_coords (:,56) = [ -8094.423433_r_def,  17686.637872_r_def, -30292.955453_r_def ]
-      self%vertex_coords (:,57) = [ 10509.356942_r_def, -16367.353683_r_def,  30292.955453_r_def ]
-      self%vertex_coords (:,58) = [ -8094.423433_r_def, -17686.637872_r_def,  30292.955453_r_def ]
-      self%vertex_coords (:,59) = [ 10509.356942_r_def,  16367.353683_r_def,  30292.955453_r_def ]
-      self%vertex_coords (:,60) = [ -8094.423433_r_def,  17686.637872_r_def,  30292.955453_r_def ]
-      self%vertex_coords (:,61) = [ -8094.423433_r_def,  12606.317581_r_def,  32734.707366_r_def ]
-      self%vertex_coords (:,62) = [  6234.414824_r_def,  13622.444916_r_def,  32734.707366_r_def ]
-      self%vertex_coords (:,63) = [ -8094.423433_r_def, -12606.317581_r_def,  32734.707366_r_def ]
-      self%vertex_coords (:,64) = [  6234.414824_r_def, -13622.444916_r_def,  32734.707366_r_def ]
+      self%vertex_coords (:,49) = [  6234.414824_r_def,  13622.444916_r_def, &
+                                    -32734.707366_r_def ]
+      self%vertex_coords (:,50) = [ -8094.423433_r_def,  12606.317581_r_def, &
+                                    -32734.707366_r_def ]
+      self%vertex_coords (:,51) = [ 10509.356942_r_def, -16367.353683_r_def, &
+                                    -30292.955453_r_def ]
+      self%vertex_coords (:,52) = [ -8094.423433_r_def, -17686.637872_r_def, &
+                                    -30292.955453_r_def ]
+      self%vertex_coords (:,53) = [ -8094.423433_r_def, -12606.317581_r_def, &
+                                    -32734.707366_r_def ]
+      self%vertex_coords (:,54) = [ 10509.356942_r_def,  16367.353683_r_def, &
+                                    -30292.955453_r_def ]
+      self%vertex_coords (:,55) = [  6234.414824_r_def, -13622.444916_r_def, &
+                                    -32734.707366_r_def ]
+      self%vertex_coords (:,56) = [ -8094.423433_r_def,  17686.637872_r_def, &
+                                    -30292.955453_r_def ]
+      self%vertex_coords (:,57) = [ 10509.356942_r_def, -16367.353683_r_def, &
+                                     30292.955453_r_def ]
+      self%vertex_coords (:,58) = [ -8094.423433_r_def, -17686.637872_r_def, &
+                                     30292.955453_r_def ]
+      self%vertex_coords (:,59) = [ 10509.356942_r_def,  16367.353683_r_def, &
+                                     30292.955453_r_def ]
+      self%vertex_coords (:,60) = [ -8094.423433_r_def,  17686.637872_r_def, &
+                                     30292.955453_r_def ]
+      self%vertex_coords (:,61) = [ -8094.423433_r_def,  12606.317581_r_def, &
+                                     32734.707366_r_def ]
+      self%vertex_coords (:,62) = [  6234.414824_r_def,  13622.444916_r_def, &
+                                     32734.707366_r_def ]
+      self%vertex_coords (:,63) = [ -8094.423433_r_def, -12606.317581_r_def, &
+                                     32734.707366_r_def ]
+      self%vertex_coords (:,64) = [  6234.414824_r_def, -13622.444916_r_def, &
+                                     32734.707366_r_def ]
 
       ! Level 4
-      self%vertex_coords (:,65) = [  6580.771204_r_def,  14379.247411_r_def, -34553.302219_r_def ]
-      self%vertex_coords (:,66) = [ -8544.113624_r_def,  13306.668558_r_def, -34553.302219_r_def ]
-      self%vertex_coords (:,67) = [ 11093.210106_r_def, -17276.651110_r_def, -31975.897423_r_def ]
-      self%vertex_coords (:,68) = [ -8544.113624_r_def, -18669.228864_r_def, -31975.897423_r_def ]
-      self%vertex_coords (:,69) = [ -8544.113624_r_def, -13306.668558_r_def, -34553.302219_r_def ]
-      self%vertex_coords (:,70) = [ 11093.210106_r_def,  17276.651110_r_def, -31975.897423_r_def ]
-      self%vertex_coords (:,71) = [  6580.771204_r_def, -14379.247411_r_def, -34553.302219_r_def ]
-      self%vertex_coords (:,72) = [ -8544.113624_r_def,  18669.228864_r_def, -31975.897423_r_def ]
-      self%vertex_coords (:,73) = [ 11093.210106_r_def, -17276.651110_r_def,  31975.897423_r_def ]
-      self%vertex_coords (:,74) = [ -8544.113624_r_def, -18669.228864_r_def,  31975.897423_r_def ]
-      self%vertex_coords (:,75) = [ 11093.210106_r_def,  17276.651110_r_def,  31975.897423_r_def ]
-      self%vertex_coords (:,76) = [ -8544.113624_r_def,  18669.228864_r_def,  31975.897423_r_def ]
-      self%vertex_coords (:,77) = [ -8544.113624_r_def,  13306.668558_r_def,  34553.302219_r_def ]
-      self%vertex_coords (:,78) = [  6580.771204_r_def,  14379.247411_r_def,  34553.302219_r_def ]
-      self%vertex_coords (:,79) = [ -8544.113624_r_def, -13306.668558_r_def,  34553.302219_r_def ]
-      self%vertex_coords (:,80) = [  6580.771204_r_def, -14379.247411_r_def,  34553.302219_r_def ]
+      self%vertex_coords (:,65) = [  6580.771204_r_def,  14379.247411_r_def, &
+                                    -34553.302219_r_def ]
+      self%vertex_coords (:,66) = [ -8544.113624_r_def,  13306.668558_r_def, &
+                                    -34553.302219_r_def ]
+      self%vertex_coords (:,67) = [ 11093.210106_r_def, -17276.651110_r_def, &
+                                    -31975.897423_r_def ]
+      self%vertex_coords (:,68) = [ -8544.113624_r_def, -18669.228864_r_def, &
+                                    -31975.897423_r_def ]
+      self%vertex_coords (:,69) = [ -8544.113624_r_def, -13306.668558_r_def, &
+                                    -34553.302219_r_def ]
+      self%vertex_coords (:,70) = [ 11093.210106_r_def,  17276.651110_r_def, &
+                                    -31975.897423_r_def ]
+      self%vertex_coords (:,71) = [  6580.771204_r_def, -14379.247411_r_def, &
+                                    -34553.302219_r_def ]
+      self%vertex_coords (:,72) = [ -8544.113624_r_def,  18669.228864_r_def, &
+                                    -31975.897423_r_def ]
+      self%vertex_coords (:,73) = [ 11093.210106_r_def, -17276.651110_r_def, &
+                                     31975.897423_r_def ]
+      self%vertex_coords (:,74) = [ -8544.113624_r_def, -18669.228864_r_def, &
+                                     31975.897423_r_def ]
+      self%vertex_coords (:,75) = [ 11093.210106_r_def,  17276.651110_r_def, &
+                                     31975.897423_r_def ]
+      self%vertex_coords (:,76) = [ -8544.113624_r_def,  18669.228864_r_def, &
+                                     31975.897423_r_def ]
+      self%vertex_coords (:,77) = [ -8544.113624_r_def,  13306.668558_r_def, &
+                                     34553.302219_r_def ]
+      self%vertex_coords (:,78) = [  6580.771204_r_def,  14379.247411_r_def, &
+                                     34553.302219_r_def ]
+      self%vertex_coords (:,79) = [ -8544.113624_r_def, -13306.668558_r_def, &
+                                     34553.302219_r_def ]
+      self%vertex_coords (:,80) = [  6580.771204_r_def, -14379.247411_r_def, &
+                                     34553.302219_r_def ]
 
       ! Level 5
-      self%vertex_coords (:,81) = [  6927.127583_r_def,  15136.049906_r_def, -36371.897073_r_def ]
-      self%vertex_coords (:,82) = [ -8993.803815_r_def,  14007.019535_r_def, -36371.897073_r_def ]
-      self%vertex_coords (:,83) = [ 11677.063269_r_def, -18185.948537_r_def, -33658.839392_r_def ]
-      self%vertex_coords (:,84) = [ -8993.803815_r_def, -19651.819857_r_def, -33658.839392_r_def ]
-      self%vertex_coords (:,85) = [ -8993.803815_r_def, -14007.019535_r_def, -36371.897073_r_def ]
-      self%vertex_coords (:,86) = [ 11677.063269_r_def,  18185.948537_r_def, -33658.839392_r_def ]
-      self%vertex_coords (:,87) = [  6927.127583_r_def, -15136.049906_r_def, -36371.897073_r_def ]
-      self%vertex_coords (:,88) = [ -8993.803815_r_def,  19651.819857_r_def, -33658.839392_r_def ]
-      self%vertex_coords (:,89) = [ 11677.063269_r_def, -18185.948536_r_def,  33658.839392_r_def ]
-      self%vertex_coords (:,90) = [ -8993.803815_r_def, -19651.819857_r_def,  33658.839392_r_def ]
-      self%vertex_coords (:,91) = [ 11677.063269_r_def,  18185.948536_r_def,  33658.839392_r_def ]
-      self%vertex_coords (:,92) = [ -8993.803815_r_def,  19651.819857_r_def,  33658.839392_r_def ]
-      self%vertex_coords (:,93) = [ -8993.803815_r_def,  14007.019535_r_def,  36371.897073_r_def ]
-      self%vertex_coords (:,94) = [  6927.127583_r_def,  15136.049906_r_def,  36371.897073_r_def ]
-      self%vertex_coords (:,95) = [ -8993.803815_r_def, -14007.019535_r_def,  36371.897073_r_def ]
-      self%vertex_coords (:,96) = [  6927.127582_r_def, -15136.049906_r_def,  36371.897073_r_def ]  
+      self%vertex_coords (:,81) = [  6927.127583_r_def,  15136.049906_r_def, &
+                                    -36371.897073_r_def ]
+      self%vertex_coords (:,82) = [ -8993.803815_r_def,  14007.019535_r_def, &
+                                    -36371.897073_r_def ]
+      self%vertex_coords (:,83) = [ 11677.063269_r_def, -18185.948537_r_def, &
+                                    -33658.839392_r_def ]
+      self%vertex_coords (:,84) = [ -8993.803815_r_def, -19651.819857_r_def, &
+                                    -33658.839392_r_def ]
+      self%vertex_coords (:,85) = [ -8993.803815_r_def, -14007.019535_r_def, &
+                                    -36371.897073_r_def ]
+      self%vertex_coords (:,86) = [ 11677.063269_r_def,  18185.948537_r_def, &
+                                    -33658.839392_r_def ]
+      self%vertex_coords (:,87) = [  6927.127583_r_def, -15136.049906_r_def, &
+                                    -36371.897073_r_def ]
+      self%vertex_coords (:,88) = [ -8993.803815_r_def,  19651.819857_r_def, &
+                                    -33658.839392_r_def ]
+      self%vertex_coords (:,89) = [ 11677.063269_r_def, -18185.948536_r_def, &
+                                     33658.839392_r_def ]
+      self%vertex_coords (:,90) = [ -8993.803815_r_def, -19651.819857_r_def, &
+                                     33658.839392_r_def ]
+      self%vertex_coords (:,91) = [ 11677.063269_r_def,  18185.948536_r_def, &
+                                     33658.839392_r_def ]
+      self%vertex_coords (:,92) = [ -8993.803815_r_def,  19651.819857_r_def, &
+                                     33658.839392_r_def ]
+      self%vertex_coords (:,93) = [ -8993.803815_r_def,  14007.019535_r_def, &
+                                     36371.897073_r_def ]
+      self%vertex_coords (:,94) = [  6927.127583_r_def,  15136.049906_r_def, &
+                                     36371.897073_r_def ]
+      self%vertex_coords (:,95) = [ -8993.803815_r_def, -14007.019535_r_def, &
+                                     36371.897073_r_def ]
+      self%vertex_coords (:,96) = [  6927.127582_r_def, -15136.049906_r_def, &
+                                     36371.897073_r_def ]  
 
 
       ! Domain limits
@@ -2009,10 +2170,15 @@ contains
       base_z = 0.0_r_def
     end if
     do j=1, nverts_2d
-      do k=0, nlayers
+     ! k = 0
+     self%vertex_coords(1,j) = vertex_coords_2d(1,j)
+     self%vertex_coords(2,j) = vertex_coords_2d(2,j)
+     self%vertex_coords(3,j) = base_z
+     ! k = 1, nlayers
+      do k=1, nlayers
         self%vertex_coords(1,j+k*nverts_2d) = vertex_coords_2d(1,j)
         self%vertex_coords(2,j+k*nverts_2d) = vertex_coords_2d(2,j)
-        self%vertex_coords(3,j+k*nverts_2d) = base_z + real(k)*self%dz
+        self%vertex_coords(3,j+k*nverts_2d) = base_z + real(k)*self%dz(k)
       end do
     end do
 
@@ -2314,6 +2480,101 @@ contains
 
   end subroutine set_domain_size
 
+
+
+  !----------------------------------------------------------------------------
+  !> @brief   Set up and calculate vertical coordinate.
+  !> @details Called during <code>mesh_object<code>_construction, this routine
+  !>          sets up the vertical grid layers and type of vertical grid
+  !> @param [inout] self       The mesh_object with set up vertical coordinate 
+  !>                           eta and layer spacing dz
+  !> @param [in] vgrid_option  Choice of vertical grid
+  subroutine set_vertical_coordinate(self, vgrid_option)
+
+    use constants_mod,   only: i_def, r_def
+    use log_mod,         only: log_event, LOG_LEVEL_ERROR
+
+    implicit none
+
+    class(mesh_type), intent(inout)  :: self
+    integer(i_def), intent(in) :: vgrid_option
+    integer(i_def) :: k, alloc_error
+    real(kind=r_def) :: stretching_factor, phi_flatten, delta_eta, eta_uni
+
+    ! Get the number of layers
+    nlayers = self%nlayers
+
+    ! Allocate arrays for general vertical coordinate eta[0,1] and thickness 
+    ! of layers dz
+    if ( allocated( self%eta ) ) deallocate( self%eta )
+    if ( allocated( self%dz ) )  deallocate( self%dz )
+    allocate( self%eta(0:nlayers), STAT = alloc_error )
+    if ( alloc_error /= 0 ) then
+      call log_event( "[Mesh Mod] set_vertical_coordinate: Unable to "// &
+                      "allocate self%eta(0:nlayers) ", LOG_LEVEL_ERROR )
+
+    end if    
+    allocate( self%dz(nlayers), STAT = alloc_error )
+    if ( alloc_error /= 0 ) then
+      call log_event( "[Mesh Mod] set_vertical_coordinate: Unable to  "// &
+                      "allocate self%dz(nlayers)", LOG_LEVEL_ERROR )
+    end if
+
+    ! Calculate eta depending on uniform/stretching option
+    select case(vgrid_option)
+
+      !> UNIFORM GRID (constant delta_eta)
+      case( VGRID_UNIFORM )  
+        do k = 0, nlayers
+          self%eta(k) = real(k,r_def)/real(nlayers,r_def)
+        end do
+
+      !> QUADRATIC GRID: eta(k) = (k/numlayers)^2
+      case( VGRID_QUADRATIC )  
+        do k = 0, nlayers
+          self%eta(k) = ( real(k,r_def)/real(nlayers,r_def) )**2_i_def
+        end do
+
+      !> GEOMETRIC GRID
+      !> Source: John Thuburn's ENDGame code for staggered grid. 
+      !>         deta = (stretch - 1.0d0)/(stretch**(2*nz) - 1.0d0)
+      !> Here:   The grid is non-staggered grid so it must be 
+      !>         deta = (stretch - 1.0d0)/(stretch**(nz) - 1.0d0)
+      case( VGRID_GEOMETRIC ) 
+        stretching_factor = 1.03_r_def
+        self%eta(0) = 0.0_r_def
+        delta_eta = ( stretching_factor - 1.0_r_def ) / &
+                    ( stretching_factor**(nlayers) - 1.0_r_def )
+        do k = 1, nlayers
+          self%eta(k) = self%eta(k-1) + delta_eta
+          delta_eta = delta_eta*stretching_factor
+        end do
+
+      !> DCMIP GRID
+      !> Source: DCMIP-TestCaseDocument_v1.7.pdf, Appendix F.2. - Eq. 229)
+      !> phi_flatten is a flattening parameter (usually phi_flatten = 15)
+      case( VGRID_DCMIP )  
+        phi_flatten = 15.0_r_def
+        do k = 0, nlayers
+          eta_uni = real(k,r_def)/real(nlayers,r_def)
+          self%eta(k) = ( sqrt(phi_flatten*(eta_uni**2_i_def) + 1.0_r_def) &
+                          - 1.0_r_def ) / &
+                        ( sqrt(phi_flatten + 1.0_r_def) - 1.0_r_def )
+        end do
+
+      !> Default case - automatically make the uniform grid
+      case default 
+        do k = 0, nlayers
+          self%eta(k) = real(k,r_def)/real(nlayers,r_def)
+        end do
+      end select
+
+    ! Calculate dz
+    do k = 1, nlayers
+       self%dz(k) = ( self%eta(k) - self%eta(k-1) )*self%domain_top
+    end do
+
+  end subroutine set_vertical_coordinate
 
 
 end module mesh_mod

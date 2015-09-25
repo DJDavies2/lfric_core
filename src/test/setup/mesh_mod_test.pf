@@ -10,10 +10,12 @@
 module mesh_mod_test
 
   use pFUnit_Mod
-  use reference_element_mod, only: reference_cube,       &
-                                   deallocate_reference, &
+  use reference_element_mod, only: reference_cube,                 &
+                                   deallocate_reference,           &
                                    reference_element
   use constants_mod,         only: r_def, i_def, QUAD, PI
+  use mesh_mod,              only: VGRID_UNIFORM, VGRID_QUADRATIC, &
+                                   VGRID_GEOMETRIC, VGRID_DCMIP
   use coord_transform_mod,   only: llr2xyz
 
   implicit none
@@ -63,11 +65,12 @@ contains
 
     type (global_mesh_type)  :: global_mesh
     type (partition_type)    :: partition
-    type (mesh_type)         :: mesh_1, mesh_2
+    type (mesh_type)         :: mesh_1, mesh_2, mesh_3, mesh_4, mesh_5
     type (domain_limits)     :: domain
 
     integer (i_def) :: nlayers
-    real    (r_def) :: dz
+    real    (r_def) :: dz_uni, dz_quad, dz_geom, dz_dcmip
+    real    (r_def) :: domain_top
 
     ! Dummy test variables
     integer(i_def) :: gid, lid, iface, iedge
@@ -81,20 +84,29 @@ contains
     real(r_def), allocatable :: test_real_array2_2d(:,:)
     real(r_def), allocatable :: test_real_array1_3d(:,:,:)
     real(r_def), allocatable :: test_real_array2_3d(:,:,:)
+    real(r_def), allocatable :: dz_test(:)
 
     ! Get unit test data objects
     global_mesh = global_mesh_type()
     partition   = partition_type()
 
-    ! Set the input variables for mesh construction
+    ! Set the input variables for mesh construction and testing
     l_spherical = .true.
     nlayers     = 5_i_def
-    dz          = 2000.0_r_def
-
+    domain_top  = 10000.0_r_def
+    ! Set vertical grid spacings values to test meshes with
+    dz_uni      = 2000.0_r_def
+    dz_quad     = 400.0_r_def
+    dz_geom     = 1883.545714005761_r_def
+    dz_dcmip    = 883.0368802245059_r_def
    
-    ! Instantiate the mesh
-    mesh_1 = mesh_type(partition, global_mesh, nlayers, dz)
-    mesh_2 = mesh_type(partition, global_mesh, nlayers, dz)
+    ! Instantiate the mesh - uniform in vertical
+    mesh_1 = mesh_type(partition, global_mesh, nlayers, domain_top, VGRID_UNIFORM )
+    mesh_2 = mesh_type(partition, global_mesh, nlayers, domain_top, VGRID_UNIFORM )
+    ! Instantiate the mesh - stretched in vertical to test dz
+    mesh_3 = mesh_type(partition, global_mesh, nlayers, domain_top, VGRID_QUADRATIC )
+    mesh_4 = mesh_type(partition, global_mesh, nlayers, domain_top, VGRID_GEOMETRIC )
+    mesh_5 = mesh_type(partition, global_mesh, nlayers, domain_top, VGRID_DCMIP)
 
     !========================================
     ! Test output from mesh object methods
@@ -384,9 +396,38 @@ contains
     @assertEqual ( test_real, 10000.0_r_def )
 
     !-------------------------------------------------------------------
-    ! Test get_dz
-    test_real = mesh_1%get_dz()
-    @assertEqual ( test_real, dz, 1.0e-2_r_def )
+    ! Test get_dz for different meshes
+    allocate( dz_test(nlayers) )
+
+    ! Uniform mesh_1, first layer depth
+    call mesh_1%get_dz(dz_test)
+    test_real = dz_test(1)
+    @assertEqual ( test_real, dz_uni, 1.0e-2_r_def )
+
+    ! Quadratic mesh_3, first layer depth
+    dz_test = 0.0_r_def
+    call mesh_3%get_dz(dz_test)
+    test_real = dz_test(1)
+    @assertEqual ( test_real, dz_quad, 1.0e-2_r_def )
+
+    ! Geometric mesh_4 with stretching_factor = 1.03_r_def, first layer depth
+    dz_test = 0.0_r_def
+    call mesh_4%get_dz(dz_test)
+    test_real = dz_test(1)
+    @assertEqual ( test_real, dz_geom, 1.0e-2_r_def )
+
+    ! DCMIP mesh_5 with phi_flatten = 15.0_r_def, first layer depth
+    dz_test = 0.0_r_def
+    call mesh_5%get_dz(dz_test)
+    test_real = dz_test(1)
+    @assertEqual ( test_real, dz_dcmip, 1.0e-2_r_def )
+
+    deallocate( dz_test )
+
+    !-------------------------------------------------------------------
+    ! Test get_domain_top
+    test_real = mesh_1%get_domain_top()
+    @assertEqual ( test_real, domain_top, 1.0e-2_r_def )
 
     !-------------------------------------------------------------------
     ! Test Mesh_1 and Mesh_2 have different ids

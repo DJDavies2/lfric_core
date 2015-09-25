@@ -25,7 +25,7 @@ module psy
 contains
 
 !-------------------------------------------------------------------------------   
-!> Invoke the solver kernel for a w3 field kernel
+!> invoke_w3_solver_kernel: Invoke the solver kernel for a w3 field kernel
   subroutine invoke_w3_solver_kernel( lhs, rhs, chi, qr )
 
     use w3_solver_kernel_mod, only : solver_w3_code
@@ -104,7 +104,8 @@ contains
     deallocate(w3_basis, w0_diff_basis)
   end subroutine invoke_w3_solver_kernel
 
-!-------------------------------------------------------------------------------  
+!-------------------------------------------------------------------------------   
+!> invoke_matrix_vector_mm: Invoke the solver kernel for w0, w1 and w2 fields
   subroutine invoke_matrix_vector_mm(Ax,x, mm)
     use matrix_vector_mm_mod, only : matrix_vector_mm_code
     use enforce_bc_mod,          only: enforce_bc_w2                            
@@ -156,7 +157,7 @@ contains
   end subroutine invoke_matrix_vector_mm
   
 !-------------------------------------------------------------------------------  
-!> Invoke_initial_theta_kernel: Invoke the theta initialisation
+!> invoke_initial_theta_kernel: Invoke the theta initialisation
   subroutine invoke_initial_theta_kernel( theta, chi )
 
     use initial_theta_kernel_mod, only : initial_theta_code
@@ -191,7 +192,7 @@ contains
   
    
 !-------------------------------------------------------------------------------  
-!> Invoke_rtheta_kernel: Invoke the RHS of the theta equation
+!> invoke_rtheta_kernel: Invoke the RHS of the theta equation
   subroutine invoke_rtheta_kernel( r_theta, theta, f, rho, qr )
 
     use rtheta_kernel_mod, only : rtheta_code
@@ -294,7 +295,7 @@ contains
   end subroutine invoke_rtheta_kernel 
   
 !-------------------------------------------------------------------------------  
-!> Invoke_ru_kernel: Invoke the RHS of the u equation
+!> invoke_ru_kernel: Invoke the RHS of the u equation
   subroutine invoke_ru_kernel( r_u )
 
     use ru_kernel_mod, only : ru_code
@@ -333,7 +334,7 @@ contains
   end subroutine invoke_ru_kernel
   
 !-------------------------------------------------------------------------------  
-!> Invoke_rrho_kernel: Invoke the RHS of the rho equation
+!> invoke_rrho_kernel: Invoke the RHS of the rho equation
   subroutine invoke_rrho_kernel( r_rho, u, qr )
 
     use rrho_kernel_mod, only : rrho_code
@@ -773,7 +774,7 @@ contains
   end subroutine invoke_axmy
   
 !-------------------------------------------------------------------------------   
-!> invoke_copy_field_data: copy the data from one field to another ( a = b )
+!> invoke_copy_field_data: Copy the data from one field to another ( a = b )
   subroutine invoke_copy_field_data(field1,field_res)
     use log_mod, only : log_event, LOG_LEVEL_ERROR
     implicit none
@@ -877,7 +878,7 @@ contains
   end subroutine invoke_plus_field_data
   
 !-------------------------------------------------------------------------------   
-!> invoke_set_field_scalar: set all values in a field to a single value
+!> invoke_set_field_scalar: Set all values in a field to a single value
   subroutine invoke_set_field_scalar(scalar, field_res)
     use log_mod, only : log_event, LOG_LEVEL_ERROR
     implicit none
@@ -896,7 +897,7 @@ contains
   end subroutine invoke_set_field_scalar
 
 !-------------------------------------------------------------------------------   
-!> invoke_divide_field: divide the values of field1 by field2 and put result in
+!> invoke_divide_field: Divide the values of field1 by field2 and put result in
 !>field_res
 !> c = a/b
   subroutine invoke_divide_field(field1,field2,field_res)
@@ -935,7 +936,7 @@ contains
   end subroutine invoke_divide_field
 
 !-------------------------------------------------------------------------------   
-!> Invoke_gp_rhs: Invoke the scalar RHS for a Galerkin projection
+!> invoke_gp_rhs: Invoke the scalar RHS for a Galerkin projection
   subroutine invoke_gp_rhs( rhs, field, chi, qr )
 
     use gp_rhs_kernel_mod, only : gp_rhs_code
@@ -1026,7 +1027,7 @@ contains
   end subroutine invoke_gp_rhs
   
 !-------------------------------------------------------------------------------  
-!> Invoke_gp_vector_rhs: Invoke the vector RHS for a Galerkin projection
+!> invoke_gp_vector_rhs: Invoke the vector RHS for a Galerkin projection
   subroutine invoke_gp_vector_rhs( rhs, field, chi, qr )
 
     use gp_vector_rhs_kernel_mod, only : gp_vector_rhs_code
@@ -1127,7 +1128,7 @@ contains
   end subroutine invoke_gp_vector_rhs
 
 !-------------------------------------------------------------------------------   
-!> invoke_copy_scaled_field_data: copy the scaled data from one field to another ( a = scaler*b )
+!> invoke_copy_scaled_field_data: Copy the scaled data from one field to another ( a = scaler*b )
   subroutine invoke_copy_scaled_field_data(scaler,field1,field_res)
     use log_mod, only : log_event, LOG_LEVEL_ERROR
     implicit none
@@ -1156,7 +1157,7 @@ contains
   end subroutine invoke_copy_scaled_field_data
 
 !-------------------------------------------------------------------------------  
-!> Invoke_flux_rhs_kernel: Invoke the RHS of the flux equation Flux = u*f
+!> invoke_flux_rhs_kernel: Invoke the RHS of the flux equation Flux = u*f
   subroutine invoke_flux_rhs( rhs, u, f, chi, qr )
 
     use flux_rhs_kernel_mod, only : flux_rhs_code
@@ -1264,7 +1265,7 @@ contains
   end subroutine invoke_flux_rhs
  
 !-------------------------------------------------------------------------------  
-!> Invoke_ru_kernel: Invoke the RHS of the u equation
+!> invoke_ru_kernel: Invoke the RHS of the u equation
   subroutine invoke_linear_ru_kernel( r_u, u, rho, theta, phi, chi, qr )
 
     use linear_ru_kernel_mod, only : linear_ru_code
@@ -1382,7 +1383,7 @@ contains
   end subroutine invoke_linear_ru_kernel
  
 !-------------------------------------------------------------------------------   
-!> Invoke_compute_geopotential_kernel: Invoke the computation of the
+!> invoke_compute_geopotential_kernel: Invoke the computation of the
 !! geopotential
   subroutine invoke_compute_geopotential_kernel( phi, chi )
 
@@ -1477,7 +1478,7 @@ contains
   end subroutine invoke_axpby
 
 !-------------------------------------------------------------------------------   
-!> invoke_multiply_field: compute y = a*x for scalar a and fields y and x
+!> invoke_multiply_field: Compute y = a*x for scalar a and fields y and x
   subroutine invoke_multiply_field(a, x, y)
     use log_mod, only : log_event, LOG_LEVEL_ERROR
     implicit none
@@ -1504,7 +1505,8 @@ contains
     end do
   end subroutine invoke_multiply_field
 
-!-------------------------------------------------------------------------------   
+!------------------------------------------------------------------------------- 
+!> invoke_sample_flux_kernel: Retrieve values from flux kernel  
   subroutine invoke_sample_flux_kernel(flux, u, multiplicity, q)
     use sample_flux_kernel_mod, only: sample_flux_code
     implicit none
@@ -1563,7 +1565,7 @@ contains
   end subroutine invoke_sample_flux_kernel
 
 !-------------------------------------------------------------------------------   
-!> invoke_field_delta: compute delta, a small perturbation to a field
+!> invoke_field_delta: Compute delta, a small perturbation to a field
   subroutine invoke_compute_delta(delta, norm, x)
     implicit none
     type( field_type ), intent(in)    :: x

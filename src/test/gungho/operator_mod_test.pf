@@ -15,15 +15,16 @@ module operator_mod_test
 
     @test
     subroutine operator_test()
-      use constants_mod,            only : r_def, PLANE_BI_PERIODIC
+      use constants_mod,            only : r_def
       use operator_mod,             only : operator_type,      &
-           operator_proxy_type
+                                           operator_proxy_type
       use function_space_mod,       only : function_space_type, W1,W2
-      use mesh_mod,                 only : mesh_type
+      use mesh_mod,                 only : mesh_type, PLANE_BI_PERIODIC
       use function_space_build_mod, only : fs_build, fs_destroy
       use pFUnit_Mod
      
       implicit none
+
       type( operator_type )       :: Op
       type( operator_proxy_type ) :: Op_p
       type( function_space_type ) :: fs1, fs2
@@ -31,10 +32,11 @@ module operator_mod_test
 
       integer :: ncell_3d_1, ncell_3d_2, ls_size
 
-      ! Dummy mesh mod has 9 cells, 3 layers
+
+      ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
       mesh = mesh_type(PLANE_BI_PERIODIC)    
 
-      ! build some function spaces
+      ! Build some function spaces
       call fs_build(mesh)
       ! make an operator
 
@@ -44,11 +46,11 @@ module operator_mod_test
       ! get the proxy
       Op_p = Op%get_proxy()
 
-      ! check we get back what we sowed
+      ! Check we get back what we sowed
       @assertEqual( Op%which_fs_from(), W1 )
       @assertEqual( Op%which_fs_to(),   W2 )
 
-      ! only meaningful test without PSy and Kernel layers is to check array 
+      ! Only meaningful test without PSy and Kernel layers is to check array 
       ! sizes on the proxy.
       ncell_3d_1 = Op_p%fs_from%get_ncell() * Op_p%fs_from%get_nlayers() 
       ncell_3d_2 = Op_p%fs_to%get_ncell() * Op_p%fs_to%get_nlayers() 
@@ -57,7 +59,7 @@ module operator_mod_test
       ls_size = ncell_3d_1 * Op_p%fs_from%get_ndf() * Op_p%fs_to%get_ndf() 
       @assertEqual( size( Op_p%local_stencil ), ls_size )
 
-      ! tear down
+      ! Tear down
       call fs_destroy()
 
     end  subroutine operator_test

@@ -16,6 +16,8 @@
 module set_up_mod
 
   use constants_mod,              only : i_def, r_def, str_def, PI, QUAD
+  use mesh_mod,                   only : VGRID_UNIFORM, VGRID_QUADRATIC, &
+                                         VGRID_GEOMETRIC, VGRID_DCMIP
   use function_space_mod,         only : function_space_type
   use reference_element_mod,      only : reference_cube, &
                                          reference_element, nfaces, nedges, nverts
@@ -67,10 +69,13 @@ contains
     ! Number of ranks the mesh is partitioned over in the x- and y-directions
     ! (across a single face for a cubed-sphere mesh)
     integer :: xproc, yproc
-    real(r_def)    :: dz
+    real(r_def)    :: domain_top
     integer(i_def) :: nlayers
-    !Get the processor decomposition
-    !Code is not set up to run in parallel - so hardcode for now
+    integer(i_def) :: vgrid_option !> Choice of uniform or different kinds 
+                                   !> of stretched grids in vertical
+
+    ! Get the processor decomposition
+    ! Code is not set up to run in parallel - so hardcode for now
     xproc = 1
     yproc = 1
 !> @todo Eventually xproc and yproc will be inputted into Dynamo (and not hard-coded).
@@ -81,9 +86,11 @@ contains
     l_fplane      = .true.
     nlayers       = 5
     element_order = 0
-    l_spherical   = .true.
-! Vertical spacing for all grids    
-    dz = 2000.0_r_def
+    l_spherical   = .true.   
+    ! Domain top for all grids - vertical spacing is calculated from 
+    ! domain_top and vgrid_option
+    domain_top = 10000.0_r_def
+    vgrid_option = VGRID_UNIFORM
 
     filename = 'ugrid_quads_2d.nc' 
     call log_event( "set_up: generating/reading the mesh", LOG_LEVEL_INFO )
@@ -95,7 +102,7 @@ contains
 
     ! Generate the global mesh and choose a partitioning strategy by setting
     ! a function pointer to point at the appropriate partitioning routine
-    global_mesh=global_mesh_type( filename )
+    global_mesh = global_mesh_type( filename )
     if ( l_spherical ) then
       partitioner_ptr => partitioner_cubedsphere_serial
     else
@@ -104,15 +111,15 @@ contains
     end if
 
     ! Generate the partition object
-    partition=partition_type( global_mesh, &
-                              partitioner_ptr, &
-                              xproc, &
-                              yproc, &
-                              1, &
-                              local_rank, &
-                              total_ranks)
-
-    mesh = mesh_type(partition, global_mesh, nlayers, dz)
+    partition = partition_type( global_mesh, &
+                               partitioner_ptr, &
+                               xproc, &
+                               yproc, &
+                               1, &
+                               local_rank, &
+                               total_ranks)
+    ! Generate the mesh
+    mesh = mesh_type(partition, global_mesh, nlayers, domain_top, vgrid_option)
     call mesh%set_colours()
 
 ! -----------------------------------------------------------

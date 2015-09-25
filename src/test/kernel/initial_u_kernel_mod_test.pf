@@ -22,10 +22,10 @@ contains
     use function_space_mod,         only : function_space_type, W0, W2
     use initial_u_kernel_mod,  &
                                     only : initial_u_code
-    use constants_mod,              only : r_def, PLANE_BI_PERIODIC
+    use constants_mod,              only : r_def
     use quadrature_mod,             only : quadrature_type, QR3
     use slush_mod,                  only : l_spherical
-    use mesh_mod,                   only : mesh_type
+    use mesh_mod,                   only : mesh_type, PLANE_BI_PERIODIC
 
    implicit none
     type(field_type) :: chi(3)

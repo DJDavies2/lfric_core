@@ -119,10 +119,10 @@ contains
   ! Compute rhs_theta
   call invoke_set_field_scalar( 0.0_r_def, rhs_tmp(2) )
   if ( l_from_solver ) then
-     rho_fs = rho%which_function_space() 
-     ones = field_type( vector_space = fs%get_instance(mesh, rho_fs) )
-     call invoke_set_field_scalar( 1.0_r_def, ones )
-     call invoke( rtheta_kernel_type( rhs_tmp(2), theta, u, ones, qr) )
+    rho_fs = rho%which_function_space() 
+    ones = field_type( vector_space = fs%get_instance(mesh, rho_fs) )
+    call invoke_set_field_scalar( 1.0_r_def, ones )
+    call invoke( rtheta_kernel_type( rhs_tmp(2), theta, u, ones, qr) )
   end if
   call invoke_set_field_scalar( 0.0_r_def, rhs(2) )
   call invoke( matrix_vector_kernel_mm_type( rhs(2), theta, mm_w0) )

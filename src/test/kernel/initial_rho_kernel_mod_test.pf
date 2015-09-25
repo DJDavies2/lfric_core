@@ -24,11 +24,12 @@ contains
     use function_space_mod,         only : function_space_type, W0, W3
     use initial_rho_kernel_mod,     only : initial_rho_code
     use slush_mod,                  only : l_spherical
-    use constants_mod,              only : r_def, PLANE_BI_PERIODIC
+    use constants_mod,              only : r_def
     use quadrature_mod,             only : quadrature_type, QR3
-    use mesh_mod,                   only : mesh_type
+    use mesh_mod,                   only : mesh_type, PLANE_BI_PERIODIC
  
-   implicit none
+    implicit none
+
     type(field_type) :: chi(3)
 
     ! Information for testing initial rho
@@ -61,20 +62,21 @@ contains
     integer :: i, j, k, cell
     real(kind=r_def), parameter :: dx = 6000.0_r_def, &
                                    dy = 2000.0_r_def
-    real(r_def) :: dz
+    real(r_def) :: dz, dz_test(3)
 
     tol = 1.0e-6_r_def
     l_spherical = .false.
     qr => qr%get_instance(QR3, 9, 3)
 
-    ! Dummy mesh mod has 9 cells, 3 layers
+    ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
     mesh = mesh_type(PLANE_BI_PERIODIC)
-    dz   = mesh%get_dz()
+    call mesh%get_dz(dz_test)
+    dz = dz_test(1)
 
-    ! build some function spaces ...
+    ! Build some function spaces ...
     call fs_build(mesh)
 
-    ! make a coordinate field with a function space
+    ! Make a coordinate field with a function space
     do i = 1,3
       chi(i) = field_type( vector_space = fs%get_instance(mesh,  W0 ) )
       chi_p(i) = chi(i)%get_proxy()
@@ -159,7 +161,7 @@ contains
       @assertEqual(answer(i), rho_p%data(i), tol)
     end do
 
-    !tear down ...
+    ! Tear down ...
     call fs_destroy()
   
   end subroutine initial_rho_kernel_test

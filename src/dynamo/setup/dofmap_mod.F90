@@ -165,9 +165,9 @@ contains
 !> @param[in] function_space The function space
 !> @param[in] ndf_entity     The number of dofs on each grid entity
 !> @param[in] w_dof_entity ndofs for vert, edge, face, cell, exterior and
-!!interior collums for W0-W2H
+!> interior columns for W0-W2H
 !> @param[in] w_unique_dofs ndofs for global, local, exterior & interior dofs in
-!!collums for W0-W2H
+!> columns for W0-W2H
 subroutine get_dofmap(mesh, w_dof_entity, w_unique_dofs)
   
   implicit none
@@ -856,7 +856,7 @@ end subroutine get_orientation
 !>                         entity in a single cell
 !> @param[in] is_scalar    Logical: true (scalar-space) or false (vector-space)
 !> @param[in] select_entity  Data type that holds lists of entities to use in
-!! the function space
+!> the function space
 !> @param[out] orientation The output orientation
 subroutine orientation_populate(mesh, ncells, ndf, ndf_entity, is_scalar, select_entity, orientation)
 

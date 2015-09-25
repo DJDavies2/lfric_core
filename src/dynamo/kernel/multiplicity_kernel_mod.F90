@@ -40,7 +40,7 @@ end type
 
 ! overload the default structure constructor for function space
 interface multiplicity_kernel_type
-   module procedure multiplicity_kernel_constructor
+  module procedure multiplicity_kernel_constructor
 end interface
 
 !-------------------------------------------------------------------------------

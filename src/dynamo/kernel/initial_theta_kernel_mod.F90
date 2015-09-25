@@ -93,7 +93,7 @@ subroutine initial_theta_code(nlayers, &
   real(kind=r_def)            :: theta_ref, exner_ref, rho_ref
   real(kind=r_def)            :: lat, lon, r
   real(kind=r_def)            :: theta_pert, nl
-   real(kind=r_def)            :: l, dt
+  real(kind=r_def)            :: l, dt
   real(kind=r_def), parameter :: XR = 4000.0_r_def, &
                                  ZC_cold = 3000.0_r_def, &
                                  ZC_hot = 260.0_r_def, &

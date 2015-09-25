@@ -23,11 +23,12 @@ contains
                                            field_proxy_type
     use function_space_mod,         only : function_space_type, W0, W1, W3
     use compute_total_pv_kernel_mod,only : compute_total_pv_code
-    use constants_mod,              only : r_def, PLANE_BI_PERIODIC
+    use constants_mod,              only : r_def
     use quadrature_mod,             only : quadrature_type, QR3
-    use mesh_mod,                   only : mesh_type
+    use mesh_mod,                   only : mesh_type, PLANE_BI_PERIODIC
 
-   implicit none
+    implicit none
+
     type(field_type) :: chi(3)
     type(field_proxy_type )   :: chi_p(3) 
     type(function_space_type) :: fs
@@ -38,7 +39,7 @@ contains
 
     integer :: i, j, k, cell
 
-! Required for calling vorticity kernel    
+    ! Required for calling vorticity kernel    
     type( field_type )     :: xi, theta, pv
 
     integer          :: ndf_xi, undf_xi, dim_xi, &
@@ -63,16 +64,16 @@ contains
                                   basis_xi, &
                                   diff_basis_theta
  
-    tol = 1.0e-6_r_def  
+    tol = 1.0e-6_r_def 
     qr => qr%get_instance(QR3,9,3)
     
-   ! Dummy mesh mod has 9 cells, 3 layers
+    ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
     mesh = mesh_type(PLANE_BI_PERIODIC)
 
-    ! build some function spaces ...
+    ! Build some function spaces ...
     call fs_build(mesh)
     
-    ! make a coordinate field with a function space
+    ! Make a coordinate field with a function space
     do i = 1,3
       chi(i) = field_type( vector_space = fs%get_instance( mesh, W0 ) )
       chi_p(i) = chi(i)%get_proxy()
@@ -132,37 +133,38 @@ contains
     map_pv    => pv_p%vspace%get_cell_dofmap( cell )
     orientation_xi => xi_p%vspace%get_cell_orientation ( cell )
 
-! Create the data
+    ! Create the data
     xi_p%data(:) = 6.0_r_def
     theta_p%data(:) = 300.0_r_def
     pv_p%data(:) = 0.0_r_def
-       call compute_total_pv_code(                                   &
-                                  xi_p%vspace%get_nlayers(),         &
-                                  pv_p%data,                         &
-                                  xi_p%data,                         &
-                                  theta_p%data,                      &
-                                  chi_p(1)%data,                     &
-                                  chi_p(2)%data,                     &
-                                  chi_p(3)%data,                     &
-                                  ndf_pv, undf_pv,                   &
-                                  map_pv,                            &
-                                  ndf_xi, undf_xi,                   &
-                                  map_xi,                            &
-                                  basis_xi,                          &
-                                  orientation_xi,                    &
-                                  ndf_theta, undf_theta,             &
-                                  map_theta,                         &
-                                  diff_basis_theta,                  &
-                                  nqp_h, nqp_v,                      &
-                                  wh, wv)
+
+    call compute_total_pv_code(                                   &
+                               xi_p%vspace%get_nlayers(),         &
+                               pv_p%data,                         &
+                               xi_p%data,                         &
+                               theta_p%data,                      &
+                               chi_p(1)%data,                     &
+                               chi_p(2)%data,                     &
+                               chi_p(3)%data,                     &
+                               ndf_pv, undf_pv,                   &
+                               map_pv,                            &
+                               ndf_xi, undf_xi,                   &
+                               map_xi,                            &
+                               basis_xi,                          &
+                               orientation_xi,                    &
+                               ndf_theta, undf_theta,             &
+                               map_theta,                         &
+                               diff_basis_theta,                  &
+                               nqp_h, nqp_v,                      &
+                               wh, wv)
 
     deallocate( basis_xi, diff_basis_theta )
 
-! this is only testing the vertical component of vorticity
+    ! This is only testing the vertical component of vorticity
     answer = 0.0_r_def
     @assertEqual(answer, pv_p%data(map_pv(1)), tol)
 
-    !tear down ...
+    ! Tear down ...
     call fs_destroy()
   
   end subroutine compute_total_pv_kernel_test

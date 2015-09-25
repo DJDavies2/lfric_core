@@ -47,7 +47,7 @@ subroutine setUp(this)
                   localPet=local_pet, &
                   petCount=pet_count, &
                   rc=rc)
-  if (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+  if (rc  /=  ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   call reference_cube()
 
@@ -77,7 +77,7 @@ end subroutine tearDown
 @test
 subroutine test_compute_colours_cubedsphere(this)
   use pFUnit_Mod
-  use mesh_mod, only              : mesh_type
+  use mesh_mod, only              : mesh_type, VGRID_UNIFORM
   use partition_mod, only         : partition_type, &
                                     partitioner_interface, &
                                     partitioner_cubedsphere_serial
@@ -112,15 +112,17 @@ subroutine test_compute_colours_cubedsphere(this)
   global_mesh = global_mesh_type(filename)
   partitioner_ptr => partitioner_cubedsphere_serial
 
-  partition=partition_type(global_mesh, &
-                           partitioner_ptr, &
-                           this%xproc, &
-                           this%yproc, &
-                           1, & 
-                           this%local_rank, &
-                           this%total_ranks)
+  partition = partition_type(global_mesh, &
+                            partitioner_ptr, &
+                            this%xproc, &
+                            this%yproc, &
+                            1, & 
+                            this%local_rank, &
+                            this%total_ranks)
 
-  mesh = mesh_type(partition, global_mesh, this%num_layers, 2000.0_r_def)
+  ! Mesh is now constructed with num_layers and domain top instead of dz and
+  ! is uniform in vertical for purpose of the test
+  mesh = mesh_type(partition, global_mesh, this%num_layers, 10000.0_r_def, VGRID_UNIFORM)
   ! Mesh is not yet coloured...
   @assertFalse(mesh%is_coloured(), "Mesh is unexpectedly coloured")
   call mesh%set_colours()
@@ -153,12 +155,13 @@ subroutine test_compute_colours_cubedsphere(this)
   ! Does the total in each colour match the cells in the colour map...
   do colour_idx=1, num_colours
     nc_colour = num_cell_per_colour_w0(colour_idx)
-    cic_colour = count(cells_in_colour_w0(colour_idx,:)/=0)
+    cic_colour = count(cells_in_colour_w0(colour_idx,:) /= 0)
     @assertEqual(nc_colour, cic_colour, "Mismatch between num-per-colour total and cell count.")
   end do
 
 
 end subroutine test_compute_colours_cubedsphere
+
 !-------------------------------------------------------------------------------
 end module mesh_colouring_mod_test
 !-------------------------------------------------------------------------------

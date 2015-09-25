@@ -8,17 +8,21 @@ module evaluate_output_field_mod
 
 use constants_mod,           only: r_def, earth_radius
 use field_mod,               only: field_type, field_proxy_type
-use coordinate_jacobian_mod, only: coordinate_jacobian, coordinate_jacobian_inverse
+use coordinate_jacobian_mod, only: coordinate_jacobian, &
+                                   coordinate_jacobian_inverse
 use mesh_mod,                only: mesh_type
 use slush_mod,               only: l_spherical
 use coord_transform_mod,     only: cartesian_distance, llr2xyz
+use log_mod,                 only: log_event, LOG_LEVEL_ERROR
 
 
 implicit none
 
 contains
-!>@brief evaluates a field at a point (x_in) that horizontally lies within a given cell
-!>@detail Subroutine that evaluates a field at a vertical column of given points.
+!>@brief  Evaluates a field at a point (x_in) that horizontally lies within a 
+!>        given cell
+!>@detail Subroutine that evaluates a field at a vertical column of given
+!>        points.
 !>        The column of points is taken to lie within a given column of grid
 !>        cells. A newton method is used to compute the exact point within each
 !>        cell where a point lies and then the field is evaluated at this point
@@ -47,15 +51,16 @@ subroutine evaluate_output_field( mesh, field, chi, x_in, cell, nz, field_out )
                                    map_f(:) => null()
   integer                       :: iter, ndf, ndf_f, k, df, &
                                    dir, nlayers, dfk
+  integer                       :: kk, alloc_error
   integer, allocatable          :: out_layer(:)
   integer,          parameter   :: NEWTON_ITERS = 4
-  real(kind=r_def)              :: jac(3,3), jac_inv(3,3), dj(1,1), &
-                                   g_func(3), gamma(1), x_loc(3), x_out(3), &
-                                   offset, dz
+  real(kind=r_def)              :: jac(3,3), jac_inv(3,3), dj(1,1), g_func(3), &
+                                   gamma(1), x_loc(3), x_out(3), offset 
+  real(kind=r_def)              :: domain_top, eta_in
+  real(kind=r_def), allocatable :: eta(:)  ! eta(0:nlayers)
   real(kind=r_def), allocatable :: chi_cell(:,:), dgamma(:,:) 
 
   offset = 0.0_r_def
-  dz = mesh%get_dz()
 
   if ( l_spherical ) offset = earth_radius
 
@@ -69,11 +74,26 @@ subroutine evaluate_output_field( mesh, field, chi, x_in, cell, nz, field_out )
   map_f => field_proxy%vspace%get_cell_dofmap(cell)
   ndf_f = field_proxy%vspace%get_ndf() 
   nlayers = field_proxy%vspace%get_nlayers()
+  domain_top = mesh%get_domain_top()
 
   allocate ( chi_cell(3,ndf), dgamma(3,ndf), out_layer(nz) )
-! Compute layer each output point is in (assumes constant dz)
+  allocate ( eta(0:nlayers), STAT = alloc_error )
+  if ( alloc_error /= 0 ) then
+    call log_event( " evaluate_output_field: Unable to allocate "// &
+                    "local array eta(0:nlayers) ", LOG_LEVEL_ERROR )
+  end if
+  call mesh%get_eta(eta)
+
+! Compute layer each output point is in using non-dimensional 
+! eta_in = x_in(3,k)/domain_top (rather than dz like previously used)
   do k = 1,nz
-    out_layer(k) = min(int(mod(x_in(3,k)/dz,dz)),nlayers-1)
+    eta_in = x_in(3,k)/domain_top
+    ! Initialise position layer to next-to-top layer of mesh
+    out_layer(k) = nlayers-1
+    do kk = 0,nlayers-1
+      if ( eta_in >= eta(kk) .and. eta_in < eta(kk+1) ) &
+           out_layer(k) = min(kk,nlayers-1)
+    end do
   end do
 
 ! Find the horizontal coordinates (x_out in [0,1]^2) corresponding to each 
@@ -108,7 +128,7 @@ subroutine evaluate_output_field( mesh, field, chi, x_in, cell, nz, field_out )
                               jac, &
                               dj)
     call coordinate_jacobian_inverse(1, 1, jac, dj, jac_inv)
-! compute g(xi^n) - [x,y,z]
+! Compute g(xi^n) - [x,y,z]
     g_func = - x_loc(:)
     do df = 1, ndf
       gamma(:) = chi_proxy(1)%vspace%evaluate_basis(df, x_out)
@@ -121,8 +141,10 @@ subroutine evaluate_output_field( mesh, field, chi, x_in, cell, nz, field_out )
   end do    
 ! Evaluate field at xi 
   do k = 1,nz
-  ! Find vertical xi point
-    x_out(3) = (x_in(3,k) - real(out_layer(k))*dz)/dz
+  ! Find vertical xi point between 0 and 1 
+    kk = out_layer(k)
+    eta_in = x_in(3,k)/domain_top
+    x_out(3) = (eta_in - eta(kk))/(eta(kk+1) - eta(kk))
     field_out(k) = 0.0_r_def
     do df = 1, ndf_f
       gamma(:) = field_proxy%vspace%evaluate_basis(df,x_out)
@@ -130,6 +152,8 @@ subroutine evaluate_output_field( mesh, field, chi, x_in, cell, nz, field_out )
       field_out(k) = field_out(k) + gamma(1)*field_proxy%data(dfk)
     end do
   end do
+
+  deallocate ( chi_cell, dgamma, out_layer, eta )
 
   end subroutine evaluate_output_field
 

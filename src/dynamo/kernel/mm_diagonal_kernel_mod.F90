@@ -44,7 +44,7 @@ end type
 
 ! overload the default structure constructor for function space
 interface mm_diagonal_kernel_type
-   module procedure mm_diagonal_kernel_constructor
+  module procedure mm_diagonal_kernel_constructor
 end interface
 
 !-------------------------------------------------------------------------------

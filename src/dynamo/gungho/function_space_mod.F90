@@ -272,106 +272,106 @@ function get_instance(mesh, function_space) result(instance)
   case (W0)
     if(.not.allocated(w0_function_space)) then
       allocate(w0_function_space)   
-      call init_function_space(self=w0_function_space, &
+      call init_function_space(self = w0_function_space, &
          order = w0_order, &
-         mesh=mesh,&
+         mesh = mesh,&
          num_dofs = w_unique_dofs(1,2), &
          num_unique_dofs = w_unique_dofs(1,1) ,  &
          dim_space = 1, dim_space_diff = 3,  &
-         dofmap=w0_dofmap, &
-         nodal_coords=w0_nodal_coords, &
-         dof_on_vert_boundary=w0_dof_on_vert_boundary, &
-         orientation=w0_orientation, fs=W0, &
-         basis_order=w0_basis_order, basis_index=w0_basis_index, &
-         basis_vector=w0_basis_vector, basis_x=w0_basis_x, &
-         global_dof_id=w0_global_dof_id, &
-         last_dof_owned=w0_last_dof_owned, &
-         last_dof_annexed=w0_last_dof_annexed, &
-         last_dof_halo=w0_last_dof_halo) 
+         dofmap = w0_dofmap, &
+         nodal_coords = w0_nodal_coords, &
+         dof_on_vert_boundary = w0_dof_on_vert_boundary, &
+         orientation = w0_orientation, fs = W0, &
+         basis_order = w0_basis_order, basis_index = w0_basis_index, &
+         basis_vector = w0_basis_vector, basis_x = w0_basis_x, &
+         global_dof_id = w0_global_dof_id, &
+         last_dof_owned = w0_last_dof_owned, &
+         last_dof_annexed = w0_last_dof_annexed, &
+         last_dof_halo = w0_last_dof_halo) 
     end if
     instance => w0_function_space
   case (W1)
     if(.not.allocated(w1_function_space)) then
       allocate(w1_function_space) 
-      call init_function_space(self=w1_function_space, &
+      call init_function_space(self = w1_function_space, &
          order = w1_order, &
-         mesh=mesh,&
+         mesh = mesh,&
          num_dofs = w_unique_dofs(2,2), &
          num_unique_dofs = w_unique_dofs(2,1) ,  &
          dim_space = 3, dim_space_diff = 3,  &
-         dofmap=w1_dofmap, &
-         nodal_coords=w1_nodal_coords, &
-         dof_on_vert_boundary=w1_dof_on_vert_boundary, &
-         orientation=w1_orientation, fs=W1, &
-         basis_order=w1_basis_order, basis_index=w1_basis_index, &
-         basis_vector=w1_basis_vector, basis_x=w1_basis_x, &
-         global_dof_id=w1_global_dof_id, &
-         last_dof_owned=w1_last_dof_owned, &
-         last_dof_annexed=w1_last_dof_annexed, &
-         last_dof_halo=w1_last_dof_halo) 
+         dofmap = w1_dofmap, &
+         nodal_coords = w1_nodal_coords, &
+         dof_on_vert_boundary = w1_dof_on_vert_boundary, &
+         orientation = w1_orientation, fs = W1, &
+         basis_order = w1_basis_order, basis_index = w1_basis_index, &
+         basis_vector = w1_basis_vector, basis_x = w1_basis_x, &
+         global_dof_id = w1_global_dof_id, &
+         last_dof_owned = w1_last_dof_owned, &
+         last_dof_annexed = w1_last_dof_annexed, &
+         last_dof_halo = w1_last_dof_halo) 
     end if
     instance => w1_function_space
   case (W2)
     if(.not.allocated(w2_function_space)) then 
       allocate(w2_function_space)
-      call init_function_space(self=w2_function_space, &
+      call init_function_space(self = w2_function_space, &
          order = w2_order, &
-         mesh=mesh,&
+         mesh = mesh,&
          num_dofs = w_unique_dofs(3,2), &
          num_unique_dofs = w_unique_dofs(3,1) ,  &
          dim_space = 3, dim_space_diff = 1,  &
-         dofmap=w2_dofmap, &
-         nodal_coords=w2_nodal_coords, &
-         dof_on_vert_boundary=w2_dof_on_vert_boundary, &
-         orientation=w2_orientation, fs=W2, &
-         basis_order=w2_basis_order, basis_index=w2_basis_index, &
-         basis_vector=w2_basis_vector, basis_x=w2_basis_x, &
-         global_dof_id=w2_global_dof_id, &
-         last_dof_owned=w2_last_dof_owned, &
-         last_dof_annexed=w2_last_dof_annexed, &
-         last_dof_halo=w2_last_dof_halo) 
+         dofmap = w2_dofmap, &
+         nodal_coords = w2_nodal_coords, &
+         dof_on_vert_boundary = w2_dof_on_vert_boundary, &
+         orientation = w2_orientation, fs = W2, &
+         basis_order = w2_basis_order, basis_index = w2_basis_index, &
+         basis_vector = w2_basis_vector, basis_x = w2_basis_x, &
+         global_dof_id = w2_global_dof_id, &
+         last_dof_owned = w2_last_dof_owned, &
+         last_dof_annexed = w2_last_dof_annexed, &
+         last_dof_halo = w2_last_dof_halo) 
     end if
     instance => w2_function_space
   case (W3)
     if(.not.allocated(w3_function_space)) then
       allocate(w3_function_space)
-      call init_function_space(self=w3_function_space, &
+      call init_function_space(self = w3_function_space, &
          order = w3_order, &
-         mesh=mesh,&
+         mesh = mesh,&
          num_dofs = w_unique_dofs(4,2), &
          num_unique_dofs = w_unique_dofs(4,1) ,  &
          dim_space = 1, dim_space_diff = 1,  &
-         dofmap=w3_dofmap, &
-         nodal_coords=w3_nodal_coords, &
-         dof_on_vert_boundary=w3_dof_on_vert_boundary, &
-         orientation=w3_orientation, fs=W3, &
-         basis_order=w3_basis_order, basis_index=w3_basis_index, &
-         basis_vector=w3_basis_vector, basis_x=w3_basis_x, &
-         global_dof_id=w3_global_dof_id, &
-         last_dof_owned=w3_last_dof_owned, &
-         last_dof_annexed=w3_last_dof_annexed, &
-         last_dof_halo=w3_last_dof_halo) 
+         dofmap = w3_dofmap, &
+         nodal_coords = w3_nodal_coords, &
+         dof_on_vert_boundary = w3_dof_on_vert_boundary, &
+         orientation = w3_orientation, fs = W3, &
+         basis_order = w3_basis_order, basis_index = w3_basis_index, &
+         basis_vector = w3_basis_vector, basis_x = w3_basis_x, &
+         global_dof_id = w3_global_dof_id, &
+         last_dof_owned = w3_last_dof_owned, &
+         last_dof_annexed = w3_last_dof_annexed, &
+         last_dof_halo = w3_last_dof_halo) 
     end if
     instance => w3_function_space
   case (Wtheta)
     if(.not.allocated(wtheta_function_space)) then
       allocate(wtheta_function_space)
-      call init_function_space(self=wtheta_function_space, &
+      call init_function_space(self = wtheta_function_space, &
          order = wtheta_order, &
-         mesh=mesh,&
+         mesh = mesh,&
          num_dofs = w_unique_dofs(5,2), &
          num_unique_dofs = w_unique_dofs(5,1) ,  &
          dim_space = 1, dim_space_diff = 3,  &
-         dofmap=wtheta_dofmap, &
-         nodal_coords=wtheta_nodal_coords, &
-         dof_on_vert_boundary=wtheta_dof_on_vert_boundary, &
-         orientation=wtheta_orientation, fs=Wtheta, &
-         basis_order=wtheta_basis_order, basis_index=wtheta_basis_index, &
-         basis_vector=wtheta_basis_vector, basis_x=wtheta_basis_x, &
-         global_dof_id=wtheta_global_dof_id, &
-         last_dof_owned=wtheta_last_dof_owned, &
-         last_dof_annexed=wtheta_last_dof_annexed, &
-         last_dof_halo=wtheta_last_dof_halo) 
+         dofmap = wtheta_dofmap, &
+         nodal_coords = wtheta_nodal_coords, &
+         dof_on_vert_boundary = wtheta_dof_on_vert_boundary, &
+         orientation = wtheta_orientation, fs = Wtheta, &
+         basis_order = wtheta_basis_order, basis_index = wtheta_basis_index, &
+         basis_vector = wtheta_basis_vector, basis_x = wtheta_basis_x, &
+         global_dof_id = wtheta_global_dof_id, &
+         last_dof_owned = wtheta_last_dof_owned, &
+         last_dof_annexed = wtheta_last_dof_annexed, &
+         last_dof_halo = wtheta_last_dof_halo) 
     end if
     instance => wtheta_function_space
   case (W2V)
@@ -383,16 +383,16 @@ function get_instance(mesh, function_space) result(instance)
          num_dofs = w_unique_dofs(6,2), &
          num_unique_dofs = w_unique_dofs(6,1) ,  &
          dim_space = 3, dim_space_diff = 1,  &
-         dofmap=w2v_dofmap, &
-         nodal_coords=w2v_nodal_coords, &
-         dof_on_vert_boundary=w2v_dof_on_vert_boundary, &
-         orientation=w2v_orientation, fs=W2V, &
-         basis_order=w2v_basis_order, basis_index=w2v_basis_index, &
-         basis_vector=w2v_basis_vector, basis_x=w2v_basis_x, &
-         global_dof_id=w2v_global_dof_id, &
-         last_dof_owned=w2v_last_dof_owned, &
-         last_dof_annexed=w2v_last_dof_annexed, &
-         last_dof_halo=w2v_last_dof_halo) 
+         dofmap = w2v_dofmap, &
+         nodal_coords = w2v_nodal_coords, &
+         dof_on_vert_boundary = w2v_dof_on_vert_boundary, &
+         orientation = w2v_orientation, fs = W2V, &
+         basis_order = w2v_basis_order, basis_index = w2v_basis_index, &
+         basis_vector = w2v_basis_vector, basis_x = w2v_basis_x, &
+         global_dof_id = w2v_global_dof_id, &
+         last_dof_owned = w2v_last_dof_owned, &
+         last_dof_annexed = w2v_last_dof_annexed, &
+         last_dof_halo = w2v_last_dof_halo) 
     end if
     instance => w2v_function_space
   case (W2H)
@@ -404,16 +404,16 @@ function get_instance(mesh, function_space) result(instance)
          num_dofs = w_unique_dofs(7,2), &
          num_unique_dofs = w_unique_dofs(7,1) ,  &
          dim_space = 3, dim_space_diff = 1,  &
-         dofmap=w2h_dofmap, &
-         nodal_coords=w2h_nodal_coords, &
-         dof_on_vert_boundary=w2h_dof_on_vert_boundary, &
-         orientation=w2h_orientation, fs=W2H, &
-         basis_order=w2h_basis_order, basis_index=w2h_basis_index, &
-         basis_vector=w2h_basis_vector, basis_x=w2h_basis_x, &
-         global_dof_id=w2h_global_dof_id, &
-         last_dof_owned=w2h_last_dof_owned, &
-         last_dof_annexed=w2h_last_dof_annexed, &
-         last_dof_halo=w2h_last_dof_halo) 
+         dofmap = w2h_dofmap, &
+         nodal_coords = w2h_nodal_coords, &
+         dof_on_vert_boundary = w2h_dof_on_vert_boundary, &
+         orientation = w2h_orientation, fs = W2H, &
+         basis_order = w2h_basis_order, basis_index = w2h_basis_index, &
+         basis_vector = w2h_basis_vector, basis_x = w2h_basis_x, &
+         global_dof_id = w2h_global_dof_id, &
+         last_dof_owned = w2h_last_dof_owned, &
+         last_dof_annexed = w2h_last_dof_annexed, &
+         last_dof_halo = w2h_last_dof_halo) 
     end if
     instance => w2h_function_space
   case default

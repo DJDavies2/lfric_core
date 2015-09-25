@@ -8,15 +8,14 @@
 !>@brief A two time-level iterative time-discretisation of the nonlinear 3D equations
 module iter_timestep_alg_mod
 
-  use log_mod,            only: log_event,         &
-                                log_scratch_space, &
-                                LOG_LEVEL_INFO,    &
-                                LOG_LEVEL_TRACE
+  use log_mod,                           only: log_event,         &
+                                               log_scratch_space, &
+                                               LOG_LEVEL_INFO,    &
+                                               LOG_LEVEL_TRACE
   use constants_mod,                     only: r_def, SOLVER_OPTION, DT, NT, &
                                                L_NEWTON_KRYLOV, &
                                                N_OUTER_ITER, N_INNER_ITER, &
                                                ALPHA, BETA
-
   ! PsyKAl-lite kernels
   use psy,                               only: invoke_axpby,                   &
                                                invoke_plus_field_data,         &
@@ -119,14 +118,14 @@ contains
     qr => qr%get_instance(QR3,9,3)
 
     ! Create field bundles
-     state_np1(1) = field_type( vector_space = fs%get_instance(mesh, u_fs) )
-     state_np1(2) = field_type( vector_space = fs%get_instance(mesh, theta_fs) )
-     state_np1(3) = field_type( vector_space = fs%get_instance(mesh, rho_fs) )
-     call clone_bundle(state_np1, state_adv, mesh, 3)
-     call clone_bundle(state_np1, state_n,   mesh, 3)
-     call clone_bundle(state_np1, rhs_n,     mesh, 3)
-     call clone_bundle(state_np1, rhs_np1,   mesh, 3)
-     call clone_bundle(state_np1, rhs_adv,   mesh, 3)
+    state_np1(1) = field_type( vector_space = fs%get_instance(mesh, u_fs) )
+    state_np1(2) = field_type( vector_space = fs%get_instance(mesh, theta_fs) )
+    state_np1(3) = field_type( vector_space = fs%get_instance(mesh, rho_fs) )
+    call clone_bundle(state_np1, state_adv, mesh, 3)
+    call clone_bundle(state_np1, state_n,   mesh, 3)
+    call clone_bundle(state_np1, rhs_n,     mesh, 3)
+    call clone_bundle(state_np1, rhs_np1,   mesh, 3)
+    call clone_bundle(state_np1, rhs_adv,   mesh, 3)
     
     ! Create W2 field needed for u initialisation
     r_u = field_type( vector_space = fs%get_instance(mesh, u_fs) )
@@ -216,9 +215,9 @@ contains
       !=== End of Section 3.4 ================================================!
     end do
     ! Return fields in u, theta, rho arrays
-     call invoke_copy_field_data(state_np1(1), u)
-     call invoke_copy_field_data(state_np1(2), theta)
-     call invoke_copy_field_data(state_np1(3), rho)
+    call invoke_copy_field_data(state_np1(1), u)
+    call invoke_copy_field_data(state_np1(2), theta)
+    call invoke_copy_field_data(state_np1(3), rho)
 
     call log_event( "Dynamo: finished timestep", LOG_LEVEL_INFO )
     !=== End Section 3.0 ======================================================!

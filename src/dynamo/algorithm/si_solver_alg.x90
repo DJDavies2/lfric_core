@@ -201,7 +201,7 @@ subroutine mixed_gmres_alg(x0, rhs0, rhs, x_ref, delta, runtime_constants, mm_di
         end if
       end do
 
-! Solve (7.2bundle_size) of Wesseling (see Saad's book)
+      ! Solve (7.2bundle_size) of Wesseling (see Saad's book)
       do m = 1, GCRK
         nrm    = sqrt( h(m,m)*h(m,m) + h(m+1,m)*h(m+1,m) )
         si     = h(m+1,m)/nrm
@@ -232,7 +232,7 @@ subroutine mixed_gmres_alg(x0, rhs0, rhs, x_ref, delta, runtime_constants, mm_di
         call bundle_axpy( u(i), s, dx, dx, bundle_size )
       end do
 
-! Check for convergence
+      ! Check for convergence
       call apply_lhs(Ax, dx, rhs, x0, x_ref, delta, runtime_constants, TAU_DT, bundle_size)
 
       call minus_bundle( rhs0, Ax, residual, bundle_size )

@@ -15,7 +15,7 @@ module constants_mod_test
 
 contains
 
-  !> test to ensure that real type real32 is 32 bits
+  !> Test to ensure that real type real32 is 32 bits
   !>
   @test
   subroutine test_constants_real32( )
@@ -30,7 +30,7 @@ contains
 
   end subroutine test_constants_real32
 
-  !> test to ensure that real type real64 is 64 bits
+  !> Test to ensure that real type real64 is 64 bits
   !>
   @test
   subroutine test_constants_real64( )
@@ -45,7 +45,7 @@ contains
 
   end subroutine test_constants_real64
 
-  !> test to ensure that real type real128 is 128 bits
+  !> Test to ensure that real type real128 is 128 bits
   !>
   @test
   subroutine test_constants_real128( )
@@ -60,7 +60,7 @@ contains
 
   end subroutine test_constants_real128
 
-  !> test to ensure that real type r_native is the same kind as a default real
+  !> Test to ensure that real type r_native is the same kind as a default real
   !>
   @test
   subroutine test_constants_r_native( )
@@ -74,7 +74,7 @@ contains
 
   end subroutine test_constants_r_native
 
-  !> test to ensure that real type int8 is 8 bits
+  !> Test to ensure that real type int8 is 8 bits
   !>
   @test
   subroutine test_constants_int8( )
@@ -89,7 +89,7 @@ contains
 
   end subroutine test_constants_int8
 
-  !> test to ensure that real type int16 is 16 bits
+  !> Test to ensure that real type int16 is 16 bits
   !>
   @test
   subroutine test_constants_int16( )
@@ -104,7 +104,7 @@ contains
 
   end subroutine test_constants_int16
 
-  !> test to ensure that real type int32 is 32 bits
+  !> Test to ensure that real type int32 is 32 bits
   !>
   @test
   subroutine test_constants_int32( )
@@ -119,7 +119,7 @@ contains
 
   end subroutine test_constants_int32
 
-  !> test to ensure that real type int64 is 64 bits
+  !> Test to ensure that real type int64 is 64 bits
   !>
   @test
   subroutine test_constants_int64( )
@@ -134,7 +134,7 @@ contains
 
   end subroutine test_constants_int64
 
-  !> test to ensure that integer type i_native is the same kind as a default integer
+  !> Test to ensure that integer type i_native is the same kind as a default integer
   !>
   @test
   subroutine test_constants_i_native( )
@@ -148,7 +148,7 @@ contains
 
   end subroutine test_constants_i_native
 
-  !> test to ensure that logical type l_native is the same kind as a default logical
+  !> Test to ensure that logical type l_native is the same kind as a default logical
   !>
   @test
   subroutine test_constants_l_native( )
@@ -162,7 +162,7 @@ contains
 
   end subroutine test_constants_l_native
 
-  !> test to ensure that character type c_native is the same kind as a default character
+  !> Test to ensure that character type c_native is the same kind as a default character
   !>
   @test
   subroutine test_constants_c_native( )
