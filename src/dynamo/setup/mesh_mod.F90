@@ -495,15 +495,13 @@ contains
 
     integer(i_def) :: base_id, k, icell
 
-    if (cell_lid > self%ncells_2d) then
-      base_id = modulo(cell_lid,self%ncells_2d)
-      if (base_id == 0) base_id = self%ncells_2d
-    else
-      base_id = cell_lid
-    end if
+    ! Get the cell id of the cell at the base of the column containing input cell
+    base_id = modulo(cell_lid,self%ncells_2d_with_ghost)
+    if (base_id == 0) base_id = self%ncells_2d_with_ghost
 
+    ! Get the coordinates of each cell in the column
     do k=1, self%nlayers
-      icell = base_id + (k-1)*self%ncells_2d
+      icell = base_id + (k-1)*self%ncells_2d_with_ghost
       call self%get_cell_coords(icell,column_coords(:,:,k))
     end do
 
