@@ -106,18 +106,15 @@ end function linear_ru_kernel_constructor
 !! @param[in] nqp_v Integer, number of quadrature points in the vertical
 !! @param[in] wqp_h Real array. Quadrature weights horizontal
 !! @param[in] wqp_v Real array. Quadrature weights vertical
-subroutine linear_ru_code(nlayers,                                             &
-                          ndf_w2, undf_w2, map_w2, w2_basis, w2_diff_basis,    &
-                          boundary_value, r_u, u,                              &
-                          ndf_w3, undf_w3, map_w3, w3_basis, rho,              &
-                          ndf_w0, undf_w0, map_w0, w0_basis, w0_diff_basis,    &
-                          theta, phi, chi_1, chi_2, chi_3,                     &
-                          nqp_h, nqp_v, wqp_h, wqp_v                           &
+subroutine linear_ru_code(nlayers, r_u, u, rho, theta, phi, chi_1, chi_2, chi_3, &
+                          ndf_w2, undf_w2, map_w2, w2_basis, w2_diff_basis,      &
+                          ndf_w3, undf_w3, map_w3, w3_basis,                     &
+                          ndf_w0, undf_w0, map_w0, w0_basis, w0_diff_basis,      &
+                          nqp_h, nqp_v, wqp_h, wqp_v                             &
                          )
 
   use coordinate_jacobian_mod,  only: coordinate_jacobian
   use reference_profile_mod,    only: reference_profile 
-  use enforce_bc_kernel_mod,    only: enforce_bc_code
   use calc_exner_pointwise_mod, only: linear_calc_exner_pointwise
   use coord_transform_mod,      only: xyz2llr, sphere2cart_vector
   use rotation_vector_mod,      only: rotation_vector_fplane,  &
@@ -132,8 +129,6 @@ subroutine linear_ru_code(nlayers,                                             &
   integer, dimension(ndf_w2), intent(in) :: map_w2
   integer, dimension(ndf_w3), intent(in) :: map_w3
   
-  integer, dimension(ndf_w2,2), intent(in) :: boundary_value
-
   real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v), intent(in) :: w3_basis  
   real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis 
   real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis 
@@ -246,7 +241,6 @@ subroutine linear_ru_code(nlayers,                                             &
     end do 
   end do 
 
-  call enforce_bc_code(nlayers,r_u, ndf_w2,undf_w2,map_w2,boundary_value)
 end subroutine linear_ru_code
 
 end module linear_ru_kernel_mod

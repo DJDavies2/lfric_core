@@ -27,10 +27,11 @@ module lin_rk_alg_timestep_mod
   use timestepping_config_mod,   only : dt
   use runge_kutta_init_mod, only: ak, num_rk_stage
   ! PsyKAl-lite kernels
-  use psykal_lite_mod, only: invoke_axpy,             &
-                             invoke_copy_field_data,  &
-                             invoke_linear_ru_kernel, &
-                             invoke_set_field_scalar
+  use psykal_lite_mod,     only: invoke_copy_field_data,                          &
+                               invoke_set_field_scalar,                         &
+                               invoke_axpy
+
+  ! PsyKAl PSYClone kernels
   use compute_geopotential_kernel_mod,   only: compute_geopotential_kernel_type
   use compute_mass_matrix_kernel_w0_mod, only: compute_mass_matrix_kernel_w0_type
   use compute_mass_matrix_kernel_w2_mod, only: compute_mass_matrix_kernel_w2_type
@@ -38,6 +39,8 @@ module lin_rk_alg_timestep_mod
   use initial_theta_kernel_mod,          only: initial_theta_kernel_type
   use linear_rtheta_kernel_mod,          only: linear_rtheta_kernel_type
   use linear_rrho_kernel_mod,            only: linear_rrho_kernel_type 
+  use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
+  use linear_ru_kernel_mod,              only: linear_ru_kernel_type
 
   use field_mod,           only: field_type 
   use function_space_mod,  only: function_space_type
@@ -219,8 +222,9 @@ contains
         call invoke(linear_rtheta_kernel_type( rt_prediction(stage), u, geopotential, chi, qr) )
         !PSY call invoke ( set_field_scalar(0.0_r_def, ru_prediction(stage)))
         call invoke_set_field_scalar(0.0_r_def, ru_prediction(stage))
-        call invoke_linear_ru_kernel ( ru_prediction(stage), u, rho, theta, &
-                                          geopotential, chi, qr ) 
+        call invoke(linear_ru_kernel_type ( ru_prediction(stage), u, rho, theta, &
+                                          geopotential, chi, qr ) )
+        call invoke( enforce_bc_kernel_type(ru_prediction(stage)) )
         call invoke( linear_rrho_kernel_type ( rr_prediction(stage), u, geopotential, chi, qr ) )
         !PSY call invoke ( set_field_scalar(0.0_r_def, r_theta))
         call invoke_set_field_scalar(0.0_r_def, r_theta)

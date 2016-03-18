@@ -20,12 +20,12 @@ module advection_alg_mod
   use mesh_mod,                       only: mesh_type
   use operator_mod,                   only: operator_type
   use psykal_lite_mod,                only: invoke_set_field_scalar, &
-                                            invoke_flux_rhs, &
                                             invoke_multiply_field
   use quadrature_mod,                 only: quadrature_type, GAUSSIAN
   use rrho_kernel_mod,                only: rrho_kernel_type
   use rtheta_kernel_mod,              only: rtheta_kernel_type
   use rtheta_supg_kernel_mod,         only: rtheta_supg_kernel_type
+  use flux_rhs_kernel_mod,            only: flux_rhs_kernel_type
   use runtime_constants_mod,          only: runtime_constants_type
   use solver_config_mod,              only: method,         &
                                             preconditioner, &
@@ -118,7 +118,8 @@ contains
   ! Compute advection terms
   ! 1) mass flux ( F = rho * u )
   call invoke_set_field_scalar( 0.0_r_def, advection(1) ) 
-  call invoke_flux_rhs( advection(1), u, rho, chi, qr ) 
+  call invoke(flux_rhs_kernel_type( advection(1), u, rho, chi, qr ) )
+  call invoke(enforce_bc_kernel_type( advection(1) ) )
   call invoke_set_field_scalar( 0.0_r_def, mass_flux ) 
   call solver_algorithm( mass_flux, advection(1), mesh, chi, method, &
                          mm=mm_w2, mmd=mmd_w2, &

@@ -18,6 +18,7 @@ module psykal_lite_mod
   use operator_mod,   only : operator_type, operator_proxy_type
   use quadrature_mod, only : quadrature_type
   use constants_mod,  only : r_def, i_def
+  use mesh_mod,       only : mesh_type
 
   implicit none
   public
@@ -67,7 +68,9 @@ contains
     real(kind=r_def),   intent(in )    :: scalar
     type( field_proxy_type)            :: field1_proxy,field2_proxy      &
                                         , field_res_proxy
-    integer                            :: i,undf
+    integer(kind=i_def)                :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -93,6 +96,19 @@ contains
     do i = 1,undf
       field_res_proxy%data(i) = (scalar * field1_proxy%data(i)) + field2_proxy%data(i)
     end do
+
+    mesh = field_res%get_mesh()
+    depth = mesh%get_halo_depth()
+
+    do dplp = 1, depth
+      if( field1_proxy%is_dirty(depth=dplp) .or. &
+          field2_proxy%is_dirty(depth=dplp) ) then
+        call field_res_proxy%set_dirty()
+      else
+        call field_res_proxy%set_clean(dplp)
+      end if
+    end do
+
   end subroutine invoke_axpy
   
 !-------------------------------------------------------------------------------   
@@ -105,7 +121,9 @@ contains
     real(kind=r_def),   intent(in )    :: scalar
     type( field_proxy_type)            :: field1_proxy,field2_proxy      &
                                         , field_res_proxy
-    integer                            :: i,undf
+    integer(kind=i_def)                :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -131,6 +149,19 @@ contains
     do i = 1,undf
       field_res_proxy%data(i) = (scalar * field1_proxy%data(i)) - field2_proxy%data(i)
     end do
+
+    mesh = field_res%get_mesh()
+    depth = mesh%get_halo_depth()
+
+    do dplp = 1, depth
+      if( field1_proxy%is_dirty(depth=dplp) .or. &
+          field2_proxy%is_dirty(depth=dplp) ) then
+        call field_res_proxy%set_dirty()
+      else
+        call field_res_proxy%set_clean(dplp)
+      end if
+    end do
+
   end subroutine invoke_axmy
   
 !-------------------------------------------------------------------------------   
@@ -142,6 +173,8 @@ contains
     type( field_type ), intent(inout ) :: field_res
     type( field_proxy_type)            :: field1_proxy , field_res_proxy
     integer                            :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     field1_proxy = field1%get_proxy()
     field_res_proxy = field_res%get_proxy()
@@ -159,6 +192,18 @@ contains
     do i = 1,undf
       field_res_proxy%data(i) = field1_proxy%data(i)
     end do
+
+    mesh = field_res%get_mesh()
+    depth = mesh%get_halo_depth()
+    
+    do dplp = 1, depth
+      if( field1_proxy%is_dirty(depth=dplp) ) then
+        call field_res_proxy%set_dirty()
+      else
+        call field_res_proxy%set_clean(dplp)
+      end if
+    end do
+
   end subroutine invoke_copy_field_data
   
 !-------------------------------------------------------------------------------   
@@ -171,7 +216,9 @@ contains
     type( field_type ), intent(inout ) :: field_res
     type( field_proxy_type)            :: field1_proxy,field2_proxy      &
                                         , field_res_proxy
-    integer                            :: i,undf
+    integer(kind=i_def)                :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -197,6 +244,18 @@ contains
     do i = 1,undf
       field_res_proxy%data(i) = field1_proxy%data(i) - field2_proxy%data(i)
     end do
+
+    mesh = field_res%get_mesh()
+    depth = mesh%get_halo_depth()
+
+    do dplp = 1, depth
+      if( field1_proxy%is_dirty(depth=dplp) .or. field2_proxy%is_dirty(depth=dplp) ) then
+        call field_res_proxy%set_dirty()
+      else
+        call field_res_proxy%set_clean(dplp)
+      end if
+    end do
+
   end subroutine invoke_minus_field_data
   
 !-------------------------------------------------------------------------------   
@@ -209,7 +268,9 @@ contains
     type( field_type ), intent(inout ) :: field_res
     type( field_proxy_type)            :: field1_proxy,field2_proxy      &
                                         , field_res_proxy
-    integer                            :: i,undf
+    integer(kind=i_def)                :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -235,6 +296,18 @@ contains
     do i = 1,undf
       field_res_proxy%data(i) = field1_proxy%data(i) + field2_proxy%data(i)
     end do
+
+    mesh = field_res%get_mesh()
+    depth = mesh%get_halo_depth()
+
+    do dplp = 1, depth
+      if( field1_proxy%is_dirty(depth=dplp) .or. field2_proxy%is_dirty(depth=dplp) ) then
+        call field_res_proxy%set_dirty()
+      else
+        call field_res_proxy%set_clean(dplp)
+      end if
+    end do
+
   end subroutine invoke_plus_field_data
   
 !-------------------------------------------------------------------------------   
@@ -245,7 +318,9 @@ contains
     type( field_type ), intent(inout ) :: field_res
     real(kind=r_def),   intent(in )    :: scalar
     type( field_proxy_type)            :: field_res_proxy
-    integer                            :: i,undf
+    integer(kind=i_def)                :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     field_res_proxy = field_res%get_proxy()
 
@@ -254,6 +329,14 @@ contains
     do i = 1,undf
       field_res_proxy%data(i) = scalar
     end do
+
+    mesh = field_res%get_mesh()
+    depth = mesh%get_halo_depth()
+
+    do dplp = 1, depth
+      call field_res_proxy%set_clean(dplp)
+    end do
+
   end subroutine invoke_set_field_scalar
 
 !-------------------------------------------------------------------------------   
@@ -267,7 +350,9 @@ contains
     type( field_type ), intent(inout ) :: field_res
     type( field_proxy_type)            :: field1_proxy,field2_proxy      &
                                         , field_res_proxy
-    integer                            :: i,undf
+    integer(kind=i_def)                :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -293,6 +378,19 @@ contains
     do i = 1,undf
       field_res_proxy%data(i) = field1_proxy%data(i)/field2_proxy%data(i)
     end do
+
+    mesh = field_res%get_mesh()
+    depth = mesh%get_halo_depth()
+    
+    do dplp = 1, depth
+      if( field1_proxy%is_dirty(depth=dplp) .or. &
+          field2_proxy%is_dirty(depth=dplp) ) then
+        call field_res_proxy%set_dirty()
+      else
+        call field_res_proxy%set_clean(dplp)
+      end if
+    end do
+
   end subroutine invoke_divide_field
 
 !-------------------------------------------------------------------------------   
@@ -304,7 +402,9 @@ contains
     type( field_type ), intent(in )    :: field1
     type( field_type ), intent(inout ) :: field_res
     type( field_proxy_type)            :: field1_proxy , field_res_proxy
-    integer                            :: i,undf
+    integer(kind=i_def)                :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     field1_proxy = field1%get_proxy()
     field_res_proxy = field_res%get_proxy()
@@ -320,8 +420,20 @@ contains
     endif
 
     do i = 1,undf
-      field_res_proxy%data(i) = scaler*field1_proxy%data(i)
+       field_res_proxy%data(i) = scaler*field1_proxy%data(i)
     end do
+   
+    mesh = field_res%get_mesh()
+    depth = mesh%get_halo_depth()
+        
+    do dplp = 1, depth
+       if( field1_proxy%is_dirty(depth=dplp) ) then
+          call field_res_proxy%set_dirty()
+       else
+          call field_res_proxy%set_clean(dplp)
+       end if
+    end do
+   
   end subroutine invoke_copy_scaled_field_data
 
 
@@ -332,18 +444,23 @@ contains
     implicit none
     type( field_type ),  intent(in ) :: x
     real(kind=r_def),    intent(out) :: field_sum
-
+    real(kind=r_def)                 :: field_sum_local
     type( field_proxy_type)          :: x_p
-    integer                          :: df, undf
+    integer(kind=i_def)              :: df, undf
 
     x_p = x%get_proxy()   
 
-    undf = x_p%vspace%get_undf()
+    undf = x_p%vspace%get_last_dof_owned()
     
-    field_sum = 0.0_r_def
+    ! Calculate the local sum on this partition
+    field_sum_local = 0.0_r_def
     do df = 1,undf
-      field_sum = field_sum + x_p%data(df)
+      field_sum_local = field_sum_local + x_p%data(df)
     end do
+
+    ! Now call the global sum
+    field_sum = 0.0_r_def
+    CALL invoke_global_sum_scalar(field_sum_local, field_sum)
 
   end subroutine invoke_sum_field
 
@@ -357,7 +474,9 @@ contains
     real(kind=r_def),   intent(in )    :: a, b
     type( field_proxy_type)            :: x_proxy,y_proxy      &
                                         , z_proxy
-    integer                            :: i,undf
+    integer(kind=i_def)                :: i,undf
+    integer(kind=i_def)                :: depth, dplp
+    type(mesh_type)                    :: mesh
 
     x_proxy = x%get_proxy()
     y_proxy = y%get_proxy()
@@ -383,6 +502,18 @@ contains
     do i = 1,undf
       z_proxy%data(i) = (a * x_proxy%data(i)) + (b * y_proxy%data(i))
     end do
+
+    mesh = z%get_mesh()
+    depth = mesh%get_halo_depth()
+
+    do dplp = 1, depth
+      if( x_proxy%is_dirty(depth=dplp) .or. y_proxy%is_dirty(depth=dplp) ) then
+        call z_proxy%set_dirty()
+      else
+        call z_proxy%set_clean(dplp)
+      end if
+    end do
+
   end subroutine invoke_axpby
 
 !-------------------------------------------------------------------------------   
@@ -394,7 +525,9 @@ contains
     type( field_type ), intent(inout) :: y
     real(kind=r_def),   intent(in)    :: a
     type( field_proxy_type)           :: x_proxy, y_proxy
-    integer                           :: i,undf
+    integer(kind=i_def)               :: i,undf
+    integer(kind=i_def)               :: depth, dplp
+    type(mesh_type)                   :: mesh
 
     x_proxy = x%get_proxy()
     y_proxy = y%get_proxy()
@@ -411,6 +544,18 @@ contains
     do i = 1,undf
       y_proxy%data(i) = a*x_proxy%data(i)
     end do
+
+    mesh = y%get_mesh()
+    depth = mesh%get_halo_depth()
+    
+    do dplp = 1, depth
+      if( x_proxy%is_dirty(depth=dplp)  ) then
+        call y_proxy%set_dirty()
+      else
+        call y_proxy%set_clean(dplp)
+      end if
+    end do
+
   end subroutine invoke_multiply_field
 
 !-------------------------------------------------------------------------------   
@@ -421,18 +566,29 @@ contains
     real(kind=r_def),   intent(in)    :: norm
     real(kind=r_def),   intent(out)   :: delta
     type( field_proxy_type)           :: x_proxy
-    integer                           :: i,undf
+    integer(kind=i_def)               :: i,undf
+    real(kind=r_def)                  :: r_undf, r_undf_global
     real(kind=r_def), parameter       :: delta0 = 1.0e-6_r_def
+    real(kind=r_def)                  :: delta_l
 
     x_proxy = x%get_proxy()
 
-    undf = x_proxy%vspace%get_undf()
-    
-    delta = 0.0_r_def
+    ! Calculate local delta
+    undf = x_proxy%vspace%get_last_dof_owned()
+
+    delta_l = 0.0_r_def
     do i = 1,undf
-      delta = delta + delta0*abs(x_proxy%data(i)) + delta0
+      delta_l = delta_l + delta0*abs(x_proxy%data(i)) + delta0
     end do
-    delta = delta/(real(undf)*norm)
+
+    ! Get global delta
+    delta   = 0.0_r_def
+    call invoke_global_sum_scalar(delta_l,delta)
+    r_undf=real(undf)
+    r_undf_global = 0.0_r_def
+    call invoke_global_sum_scalar(r_undf,r_undf_global)
+    delta = delta/(r_undf_global*norm)
+
   end subroutine invoke_compute_delta
 
 !-------------------------------------------------------------------------------
@@ -478,6 +634,19 @@ contains
     nodes => flux_p%vspace%get_nodes( )
     call q_p%vspace%compute_nodal_basis_function(basis_q, ndf_q, ndf_f, nodes)    
 
+    if(flux_p%is_dirty(depth=1) ) then
+      call flux_p%halo_exchange(depth=1)
+    end if
+    if(u_p%is_dirty(depth=1) ) then
+      call u_p%halo_exchange(depth=1)
+    end if
+    if(m_p%is_dirty(depth=1) ) then
+      call m_p%halo_exchange(depth=1)
+    end if
+    if(q_p%is_dirty(depth=1) ) then
+      call q_p%halo_exchange(depth=1)
+    end if
+
     do cell = 1, flux_p%vspace%get_ncell()
        map_f => flux_p%vspace%get_cell_dofmap( cell )
        map_q => q_p%vspace%get_cell_dofmap( cell )
@@ -496,228 +665,9 @@ contains
                             )
     end do
 
+    call flux_p%set_dirty()
+
   end subroutine invoke_sample_flux_kernel
-!-------------------------------------------------------------------------------  
-!> invoke_flux_rhs_kernel: Invoke the RHS of the flux equation Flux = u*f
-  subroutine invoke_flux_rhs( rhs, u, f, chi, qr )
-
-    use flux_rhs_kernel_mod, only : flux_rhs_code
-
-    type( field_type ),     intent( in ) :: rhs, f, u
-    type( field_type ),     intent( in ) :: chi(3) 
-    type( quadrature_type), intent( in ) :: qr
-
-    integer          :: cell
-    integer          :: ndf_f, undf_f, dim_f, &
-                        ndf_u, undf_u, dim_u, &
-                        ndf_chi, undf_chi, dim_diff_chi, &
-                        nqp_h, nqp_v
-
-    integer, pointer :: map_f(:) => null(), &
-                        map_u(:) => null(), & 
-                        map_chi(:) => null(), &
-                        boundary_dofs(:,:) => null()
-
-    real(kind=r_def), pointer :: xp(:,:) => null()
-    real(kind=r_def), pointer :: zp(:)   => null()
-    real(kind=r_def), pointer :: wh(:), wv(:) => null()
-
-    type( field_proxy_type )        :: rhs_proxy, f_proxy, u_proxy
-    type( field_proxy_type )        :: chi_proxy(3) 
-    
-    real(kind=r_def), dimension(:,:,:,:), allocatable :: &
-                                  basis_u, &
-                                  basis_f, &
-                                  diff_basis_chi
-
-    rhs_proxy    = rhs%get_proxy()
-    f_proxy      = f%get_proxy()
-    u_proxy      = u%get_proxy()
-    chi_proxy(1) = chi(1)%get_proxy()
-    chi_proxy(2) = chi(2)%get_proxy()
-    chi_proxy(3) = chi(3)%get_proxy()
-    
-    boundary_dofs => rhs_proxy%vspace%get_boundary_dofs()
-
-    ndf_u  = rhs_proxy%vspace%get_ndf( )
-    undf_u = rhs_proxy%vspace%get_undf( )
-    dim_u  = rhs_proxy%vspace%get_dim_space( ) 
-
-    ndf_f  = f_proxy%vspace%get_ndf( )
-    undf_f = f_proxy%vspace%get_undf( )
-    dim_f  = f_proxy%vspace%get_dim_space( ) 
-
-    ndf_chi  = chi_proxy(1)%vspace%get_ndf( )
-    undf_chi = chi_proxy(1)%vspace%get_undf( )
-    dim_diff_chi = chi_proxy(1)%vspace%get_dim_space_diff( ) 
-
-    nqp_h=qr%get_nqp_h()
-    nqp_v=qr%get_nqp_v()
-    zp=>qr%get_xqp_v()
-    xp=>qr%get_xqp_h()
-    wh=>qr%get_wqp_h()
-    wv=>qr%get_wqp_v()
-
-    allocate( basis_u(dim_u, ndf_u, nqp_h, nqp_v),           &
-              basis_f(dim_f, ndf_f, nqp_h, nqp_v),           &
-              diff_basis_chi(dim_diff_chi, ndf_chi, nqp_h, nqp_v) )         
-    
-    call rhs_proxy%vspace%compute_basis_function( &
-         basis_u, ndf_u, nqp_h, nqp_v, xp, zp)  
-    call f_proxy%vspace%compute_basis_function( &
-         basis_f, ndf_f, nqp_h, nqp_v, xp, zp)  
-    call chi_proxy(1)%vspace%compute_diff_basis_function( &
-         diff_basis_chi, ndf_chi, nqp_h, nqp_v, xp, zp)  
-    
-    do cell = 1, rhs_proxy%vspace%get_ncell()
-       map_f   => f_proxy%vspace%get_cell_dofmap( cell )
-       map_u   => rhs_proxy%vspace%get_cell_dofmap( cell )
-       map_chi => chi_proxy(1)%vspace%get_cell_dofmap( cell )
-
-      call flux_rhs_code( rhs_proxy%vspace%get_nlayers(), &
-                           ndf_u, &
-                           undf_u, &
-                           map_u, &
-                           basis_u, &
-                           boundary_dofs, &
-                           rhs_proxy%data, &
-                           u_proxy%data, &
-                           ndf_f, &
-                           undf_f, &
-                           map_f, &
-                           basis_f, &                             
-                           f_proxy%data, &
-                           ndf_chi, &
-                           undf_chi, &
-                           map_chi, &
-                           diff_basis_chi, &   
-                           chi_proxy(1)%data, &
-                           chi_proxy(2)%data, &
-                           chi_proxy(3)%data, &
-                           nqp_h, &
-                           nqp_v, &
-                           wh, &
-                           wv &
-                           )           
-    end do 
-  end subroutine invoke_flux_rhs
- 
-!-------------------------------------------------------------------------------  
-!> invoke_ru_kernel: Invoke the RHS of the u equation
-  subroutine invoke_linear_ru_kernel( r_u, u, rho, theta, phi, chi, qr )
-
-    use linear_ru_kernel_mod, only : linear_ru_code
-
-    type( field_type ), intent( in ) :: r_u, u, rho, theta, phi
-    type( field_type ), intent( in ) :: chi(3)
-    type( quadrature_type), intent( in ) :: qr
-
-    integer                 :: cell, nlayers, nqp_h, nqp_v
-    integer                 :: ndf_w0, ndf_w2, ndf_w3
-    integer                 :: undf_w0, undf_w2, undf_w3
-    integer                 :: dim_w0, diff_dim_w0, dim_w2, diff_dim_w2,dim_w3
-    integer, pointer        :: map_w3(:), map_w2(:), map_w0(:) => null()
-    integer, pointer        :: boundary_dofs(:,:) => null()
-
-    type( field_proxy_type )        :: r_u_proxy, u_proxy, rho_proxy, theta_proxy, phi_proxy
-    type( field_proxy_type )        :: chi_proxy(3)
-    
-    real(kind=r_def), allocatable  :: basis_w3(:,:,:,:), &
-                                      basis_w2(:,:,:,:), &
-                                      basis_w0(:,:,:,:), &
-                                      diff_basis_w0(:,:,:,:), &
-                                      diff_basis_w2(:,:,:,:) 
-
-    real(kind=r_def), pointer :: xp(:,:) => null()
-    real(kind=r_def), pointer :: zp(:) => null()
-    real(kind=r_def), pointer :: wh(:), wv(:) => null()
-
-    r_u_proxy    = r_u%get_proxy()
-    u_proxy      = u%get_proxy()
-    rho_proxy    = rho%get_proxy()
-    theta_proxy  = theta%get_proxy()
-    phi_proxy    = phi%get_proxy()
-    chi_proxy(1) = chi(1)%get_proxy()
-    chi_proxy(2) = chi(2)%get_proxy()
-    chi_proxy(3) = chi(3)%get_proxy()
-
-    boundary_dofs => r_u_proxy%vspace%get_boundary_dofs()
-
-    nlayers = rho_proxy%vspace%get_nlayers()
-    nqp_h=qr%get_nqp_h()
-    nqp_v=qr%get_nqp_v()
-    zp=>qr%get_xqp_v()
-    xp=>qr%get_xqp_h()
-    wh=>qr%get_wqp_h()
-    wv=>qr%get_wqp_v()
-
-    ndf_w3  = rho_proxy%vspace%get_ndf( )
-    dim_w3  = rho_proxy%vspace%get_dim_space( )
-    undf_w3 = rho_proxy%vspace%get_undf()
-    allocate(basis_w3(dim_w3,ndf_w3,nqp_h,nqp_v))
-
-    ndf_w2      = r_u_proxy%vspace%get_ndf( )
-    dim_w2      = r_u_proxy%vspace%get_dim_space( )
-    diff_dim_w2 = r_u_proxy%vspace%get_dim_space_diff( )
-    undf_w2     = r_u_proxy%vspace%get_undf()
-    allocate(basis_w2(dim_w2,ndf_w2,nqp_h,nqp_v))
-    allocate(diff_basis_w2(diff_dim_w2,ndf_w2,nqp_h,nqp_v))
-
-    ndf_w0      = theta_proxy%vspace%get_ndf( )
-    dim_w0      = theta_proxy%vspace%get_dim_space( )
-    diff_dim_w0 = theta_proxy%vspace%get_dim_space_diff( )
-    undf_w0     = theta_proxy%vspace%get_undf()
-    allocate(basis_w0(dim_w0,ndf_w0,nqp_h,nqp_v))
-    allocate(diff_basis_w0(diff_dim_w0,ndf_w0,nqp_h,nqp_v))
-
-    call rho_proxy%vspace%compute_basis_function(basis_w3, ndf_w3,         & 
-                                                   nqp_h, nqp_v, xp, zp)    
-
-    call r_u_proxy%vspace%compute_basis_function(basis_w2, ndf_w2,         & 
-                                                   nqp_h, nqp_v, xp, zp)    
-
-    call r_u_proxy%vspace%compute_diff_basis_function(                     &
-         diff_basis_w2, ndf_w2, nqp_h, nqp_v, xp, zp)
-
-    call theta_proxy%vspace%compute_basis_function(basis_w0, ndf_w0,      & 
-                                                   nqp_h, nqp_v, xp, zp)    
-
-    call theta_proxy%vspace%compute_diff_basis_function(                  &
-         diff_basis_w0, ndf_w0, nqp_h, nqp_v, xp, zp)
-
-
-    
-    do cell = 1, r_u_proxy%vspace%get_ncell()
-
-       map_w3 => rho_proxy%vspace%get_cell_dofmap( cell )
-       map_w2 => r_u_proxy%vspace%get_cell_dofmap( cell )
-       map_w0 => theta_proxy%vspace%get_cell_dofmap( cell )
-
-
-       call linear_ru_code( nlayers,                                      &
-                            ndf_w2, undf_w2,                              &
-                            map_w2, basis_w2, diff_basis_w2,              &
-                            boundary_dofs,                                &
-                            r_u_proxy%data,                               &
-                            u_proxy%data,                                 &
-                            ndf_w3, undf_w3,                              &
-                            map_w3, basis_w3,                             &
-                            rho_proxy%data,                               &
-                            ndf_w0, undf_w0,                              &
-                            map_w0, basis_w0, diff_basis_w0,              &   
-                            theta_proxy%data,                             &
-                            phi_proxy%data,                               &
-                            chi_proxy(1)%data,                            &
-                            chi_proxy(2)%data,                            &
-                            chi_proxy(3)%data,                            &
-                            nqp_h, nqp_v, wh, wv                          &
-                            )           
-    end do
-
-    deallocate(basis_w3, basis_w2, diff_basis_w2, basis_w0, diff_basis_w0)
-    
-  end subroutine invoke_linear_ru_kernel
- 
 
   subroutine invoke_nodal_coordinates_kernel(nodal_coords, chi)
     use nodal_coordinates_kernel_mod, only: nodal_coordinates_code
@@ -757,6 +707,18 @@ contains
     nodes => x_p(1)%vspace%get_nodes( )
     call chi_p(1)%vspace%compute_nodal_basis_function(basis_chi, ndf_chi, ndf_x, nodes)    
 
+    if (chi_p(1)%is_dirty(depth=1)) then
+       call chi_p(1)%halo_exchange(depth=1)
+    end if
+      !
+    if (chi_p(2)%is_dirty(depth=1)) then
+       call chi_p(2)%halo_exchange(depth=1)
+    end if
+      !
+    if (chi_p(3)%is_dirty(depth=1)) then
+       call chi_p(3)%halo_exchange(depth=1)
+    end if
+
     do cell = 1, x_p(1)%vspace%get_ncell()
        map_x   => x_p(1)%vspace%get_cell_dofmap( cell )
        map_chi => chi_p(1)%vspace%get_cell_dofmap( cell )
@@ -772,6 +734,11 @@ contains
                                    basis_chi &
                                   )
     end do
+
+    call x_p(1)%set_dirty()
+    call x_p(2)%set_dirty()
+    call x_p(3)%set_dirty()
+
     deallocate(basis_chi)
   end subroutine invoke_nodal_coordinates_kernel
 
@@ -794,7 +761,7 @@ contains
 
     real(kind=r_def), allocatable  :: diff_basis_chi(:,:,:), basis(:,:,:)
     real(kind=r_def), pointer :: nodes(:,:) => null()
-    integer :: i
+    integer(kind=i_def) :: i
 
     do i = 1,3
       phys_p(i) = phys_field(i)%get_proxy()
@@ -817,6 +784,31 @@ contains
     nodes => comp_p%vspace%get_nodes( )
     call chi_p(1)%vspace%compute_nodal_diff_basis_function(diff_basis_chi, ndf_chi, ndf, nodes)    
     call comp_p%vspace%compute_nodal_basis_function(basis, ndf, ndf, nodes) 
+
+    if (chi_p(1)%is_dirty(depth=1)) then
+      call chi_p(1)%halo_exchange(depth=1)
+    end if
+    if (chi_p(2)%is_dirty(depth=1)) then
+      call chi_p(2)%halo_exchange(depth=1)
+    end if
+    if (chi_p(3)%is_dirty(depth=1)) then
+      call chi_p(3)%halo_exchange(depth=1)
+    end if
+
+    if (phys_p(1)%is_dirty(depth=1)) then
+      call phys_p(1)%halo_exchange(depth=1)
+    end if
+    if (phys_p(2)%is_dirty(depth=1)) then
+      call phys_p(2)%halo_exchange(depth=1)
+    end if
+    if (phys_p(3)%is_dirty(depth=1)) then
+      call phys_p(3)%halo_exchange(depth=1)
+    end if
+
+    if (comp_p%is_dirty(depth=1)) then
+      call comp_p%halo_exchange(depth=1)
+    end if
+
     do cell = 1, comp_p%vspace%get_ncell()
        map     => comp_p%vspace%get_cell_dofmap( cell )
        map_chi => chi_p(1)%vspace%get_cell_dofmap( cell )
@@ -834,6 +826,11 @@ contains
                                      diff_basis_chi &
                                     )
     end do
+
+    call phys_p(1)%set_dirty()
+    call phys_p(2)%set_dirty()
+    call phys_p(3)%set_dirty()
+
     deallocate(diff_basis_chi, basis)
   end subroutine invoke_convert_hcurl_field
 
@@ -879,6 +876,31 @@ contains
     nodes => comp_p%vspace%get_nodes( )
     call chi_p(1)%vspace%compute_nodal_diff_basis_function(diff_basis_chi, ndf_chi, ndf, nodes)    
     call comp_p%vspace%compute_nodal_basis_function(basis, ndf, ndf, nodes) 
+
+    if (chi_p(1)%is_dirty(depth=1)) then
+      call chi_p(1)%halo_exchange(depth=1)
+    end if
+    if (chi_p(2)%is_dirty(depth=1)) then
+      call chi_p(2)%halo_exchange(depth=1)
+    end if
+    if (chi_p(3)%is_dirty(depth=1)) then
+      call chi_p(3)%halo_exchange(depth=1)
+    end if
+
+    if (phys_p(1)%is_dirty(depth=1)) then
+      call phys_p(1)%halo_exchange(depth=1)
+    end if
+    if (phys_p(2)%is_dirty(depth=1)) then
+      call phys_p(2)%halo_exchange(depth=1)
+    end if
+    if (phys_p(3)%is_dirty(depth=1)) then
+      call phys_p(3)%halo_exchange(depth=1)
+    end if
+
+    if (comp_p%is_dirty(depth=1)) then
+      call comp_p%halo_exchange(depth=1)
+    end if
+
     do cell = 1, comp_p%vspace%get_ncell()
        map     => comp_p%vspace%get_cell_dofmap( cell )
        map_chi => chi_p(1)%vspace%get_cell_dofmap( cell )
@@ -896,6 +918,11 @@ contains
                                     diff_basis_chi &
                                    )
     end do
+
+    call phys_p(1)%set_dirty()
+    call phys_p(2)%set_dirty()
+    call phys_p(3)%set_dirty()
+
     deallocate(diff_basis_chi, basis)
   end subroutine invoke_convert_hdiv_field
 !-------------------------------------------------------------------------------   
@@ -924,6 +951,10 @@ contains
       f_p(3)%data(df) = vector_out(3)
     end do
 
+    call f_p(1)%set_dirty()
+    call f_p(2)%set_dirty()
+    call f_p(3)%set_dirty()
+
   end subroutine invoke_convert_cart2sphere_vector
 !-------------------------------------------------------------------------------   
   subroutine invoke_pointwise_convert_xyz2llr( coords)
@@ -947,6 +978,10 @@ contains
       x_p(2)%data(df) = llr(2)
       x_p(3)%data(df) = llr(3)
     end do
+
+    call x_p(1)%set_dirty()
+    call x_p(2)%set_dirty()
+    call x_p(3)%set_dirty()
 
   end subroutine invoke_pointwise_convert_xyz2llr
 
@@ -1002,7 +1037,7 @@ subroutine invoke_write_fields(nodal_coordinates, level, nodal_output, fspace_di
   end do
   l_p = level%get_proxy()
 
-  undf = n_p(1)%vspace%get_undf()
+  undf = n_p(1)%vspace%get_last_dof_owned()
 
   open(OUTPUT_UNIT, file = trim(fname), status = "replace")   
   write(OUTPUT_UNIT,'(A)') 'x = [' 

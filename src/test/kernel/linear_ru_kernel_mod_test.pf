@@ -162,9 +162,10 @@ contains
   @test
   subroutine test_all( this )
 
-    use function_space_mod,   only : function_space_type
-    use fs_continuity_mod,    only : W0, W2, W3
-    use linear_ru_kernel_mod, only : linear_ru_code
+    use function_space_mod,    only : function_space_type
+    use fs_continuity_mod,     only : W0, W2, W3
+    use linear_ru_kernel_mod,  only : linear_ru_code
+    use enforce_bc_kernel_mod, only : enforce_bc_code
 
     implicit none
 
@@ -196,8 +197,7 @@ contains
     integer                 :: undf_w0, undf_w2, undf_w3
     integer, pointer        :: map_w3(:), map_w2(:), map_w0(:) => null()
     integer, pointer        :: boundary_dofs(:,:) => null()
-
-    type(field_proxy_type) :: r_u_proxy, u_proxy, rho_proxy, theta_proxy, phi_proxy
+    type(field_proxy_type)  :: r_u_proxy, u_proxy, rho_proxy, theta_proxy, phi_proxy
 
     real(kind=r_def), pointer :: xp(:,:) => null()
     real(kind=r_def), pointer :: zp(:) => null()
@@ -290,23 +290,34 @@ contains
     theta_proxy%data(:) = 0.0_r_def
     rho_proxy%data(:) = 0.0_r_def
     call linear_ru_code( nlayers,                                   &
-                         ndf_w2, undf_w2,                           &
-                         map_w2, this%basis_w2, this%diff_basis_w2, &
-                         boundary_dofs,                             &
                          r_u_proxy%data,                            &
                          u_proxy%data,                              &
-                         ndf_w3, undf_w3,                           &
-                         map_w3, this%basis_w3,                     &
                          rho_proxy%data,                            &
-                         ndf_w0, undf_w0,                           &
-                         map_w0, this%basis_w0, this%diff_basis_w0, &
                          theta_proxy%data,                          &
                          phi_proxy%data,                            &
                          chi_p(1)%data,                             &
                          chi_p(2)%data,                             &
                          chi_p(3)%data,                             &
+                         ndf_w2, undf_w2,                           &
+                         map_w2, this%basis_w2, this%diff_basis_w2, &
+                         ndf_w3, undf_w3,                           &
+                         map_w3, this%basis_w3,                     &
+                         ndf_w0, undf_w0,                           &
+                         map_w0, this%basis_w0, this%diff_basis_w0, &
                          nqp_h, nqp_v, wh, wv                       &
                          )
+
+    boundary_dofs => r_u_proxy%vspace%get_boundary_dofs()
+
+    ! enforce the bc
+    call enforce_bc_code(nlayers,          &
+                         r_u_proxy%data,   &
+                         ndf_w2,           &
+                         undf_w2,          &
+                         map_w2,           &
+                         boundary_dofs     &
+                         )
+      
 
     ! Simple test, zero in zero out
     this%answer(:) = 0.0_r_def

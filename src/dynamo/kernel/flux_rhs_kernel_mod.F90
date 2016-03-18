@@ -87,23 +87,21 @@ end function flux_rhs_kernel_constructor
 !! @param[in] nqp_v the number of vertical quadrature points
 !! @param[in] wqp_h the weights of the horizontal quadrature points
 !! @param[in] wqp_v the weights of the vertical quadrature points
-subroutine flux_rhs_code(nlayers,ndf_u, undf_u, map_u, basis_u,              &
-                         boundary_value, rhs, u,                             &
-                         ndf_f, undf_f, map_f, basis_f, f,                   &
-                         ndf_chi, undf_chi, map_chi, diff_basis_chi,         &                           
-                         chi_1, chi_2, chi_3,                                &
+subroutine flux_rhs_code(nlayers, rhs, u, f, chi_1, chi_2, chi_3, &
+                         ndf_u, undf_u, map_u, basis_u,              &
+                         ndf_f, undf_f, map_f, basis_f,                      &
+                         ndf_chi, undf_chi, map_chi, diff_basis_chi,         &   
                          nqp_h, nqp_v, wqp_h, wqp_v                          &
                          )
+
                            
   use coordinate_jacobian_mod,  only: coordinate_jacobian
-  use enforce_bc_kernel_mod,    only: enforce_bc_code
   
   !Arguments
   integer, intent(in) :: nlayers
   integer, intent(in) :: ndf_chi, ndf_u, ndf_f, undf_chi, undf_u, undf_f
   integer, intent(in) :: nqp_h, nqp_v
   integer, intent(in) :: map_chi(ndf_chi), map_u(ndf_u), map_f(ndf_f)
-  integer, dimension(ndf_u,2), intent(in) :: boundary_value
   real(kind=r_def), dimension(3,ndf_u,nqp_h,nqp_v) ,  intent(in)    :: basis_u  
   real(kind=r_def), dimension(1,ndf_f,nqp_h,nqp_v),   intent(in)    :: basis_f
   real(kind=r_def), dimension(3,ndf_chi,nqp_h,nqp_v), intent(in)    :: diff_basis_chi
@@ -168,7 +166,6 @@ subroutine flux_rhs_code(nlayers,ndf_u, undf_u, map_u, basis_u,              &
     end do 
   end do 
   
-  call enforce_bc_code(nlayers, rhs, ndf_u, undf_u, map_u, boundary_value)
 end subroutine flux_rhs_code
 
 end module flux_rhs_kernel_mod

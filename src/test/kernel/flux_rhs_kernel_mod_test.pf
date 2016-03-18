@@ -158,8 +158,7 @@ contains
 
     integer, pointer :: map_f(:) => null(), &
                         map_u(:) => null(), & 
-                        map_chi(:) => null(), &
-                        boundary_dofs(:,:) => null()
+                        map_chi(:) => null()
 
     real(kind=r_def), pointer :: xp(:,:) => null()
     real(kind=r_def), pointer :: zp(:)   => null()
@@ -196,8 +195,6 @@ contains
     rhs_p = this%rhs%get_proxy()
     f_p   = this%f%get_proxy()
     u_p   = u%get_proxy()
-
-    boundary_dofs => rhs_p%vspace%get_boundary_dofs()
 
     ndf_u  = rhs_p%vspace%get_ndf( )
     undf_u = rhs_p%vspace%get_undf( )
@@ -239,37 +236,35 @@ contains
 
 
     call flux_rhs_code( rhs_p%vspace%get_nlayers(), &
+                        rhs_p%data, &                     
+                        u_p%data, &
+                        f_p%data, &
+                        chi_p(1)%data, &
+                        chi_p(2)%data, &
+                        chi_p(3)%data, &
                         ndf_u, &
                         undf_u, &
                         map_u, &
                         this%basis_u, &
-                        boundary_dofs, &
-                        rhs_p%data, &
-                        u_p%data, &
                         ndf_f, &
                         undf_f, &
                         map_f, &
                         this%basis_f, &
-                        f_p%data, &
                         ndf_chi, &
                         undf_chi, &
                         map_chi, &
                         this%diff_basis_chi, &
-                        chi_p(1)%data, &
-                        chi_p(2)%data, &
-                        chi_p(3)%data, &
                         nqp_h, &
                         nqp_v, &
                         wh, &
                         wv &
                         )
 
-    answer(1) = 0.0_r_def
+    answer(1) = 5.0_r_def/90.0_r_def
     answer(2) = 5.0_r_def/6.0_r_def * (2.0_r_def/(4.0_r_def*3.0_r_def))*2.0_r_def
     answer(3) = 5.0_r_def/6.0_r_def * (2.0_r_def/(4.0_r_def*3.0_r_def))*2.0_r_def
-    do k = 1,3
-      @assertEqual(answer(k), rhs_p%data(map_u(5) + (k-1) ), tol)
-    end do
+
+    @assertEqual(answer, rhs_p%data(map_u(5):map_u(5)+2) , tol)
 
   end subroutine test_all
 
