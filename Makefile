@@ -61,7 +61,7 @@ test-suite:
 	fi
 	@for target in $(DYNAMO_TEST_SUITE_TARGETS) ; do \
 	    echo Launching test suite against $$target ; \
-	    rose stem --name=$$ROSE_SUITE_NAME_$$target --opt-conf-key=$$target ; \
+	    rose stem --name=$(shell basename `pwd`)-$$target --opt-conf-key=$$target ; \
 	done
 
 # Build the projects documentation. This includes both API and design documents.
