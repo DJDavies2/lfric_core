@@ -186,7 +186,7 @@ contains
        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
     end if
     if(self%checkpoint_frequency <= 0) then
-       write(log_scratch_space, '(A,I6,",",I6)') &
+       write(log_scratch_space, '(A,I6)') &
             "restart_control: checkpoint_frequency cannot be negative or zero:",  &
             self%checkpoint_frequency
        call log_event(log_scratch_space,LOG_LEVEL_ERROR)

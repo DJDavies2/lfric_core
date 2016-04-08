@@ -144,10 +144,12 @@
     [[api_documentation]]
         inherit = TECHNICAL
         script = "make -C $DYNAMO_SOURCE_DIRECTORY/documentation api-documents"
+        pre-script = {{command_list( LOCAL_BASE_SETUP, LOCAL_REVEAL_SETUP) }}
 
     [[design_documentation]]
         inherit = TECHNICAL
         script = "make -C $DYNAMO_SOURCE_DIRECTORY/documentation design-documents"
+        pre-script = {{command_list( LOCAL_BASE_SETUP, LOCAL_REVEAL_SETUP) }}
 
 {#############################################################################}
 {% macro pipeline_tasks( label, compiler, build ) %}

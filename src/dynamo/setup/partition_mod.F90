@@ -656,11 +656,10 @@ end subroutine partition_type_assign
                                              num_halo, &
                                              num_ghost )
 
+  use linked_list_int_mod,   only : linked_list_int_type
   use linked_list_mod,       only : linked_list_type, &
-                                    insert_item, &
-                                    insert_unique_item, &
-                                    clear_list, &
-                                    BEFORE
+                                    linked_list_item_type, &
+                                    before
   use reference_element_mod, only : W, E, N
 
   implicit none
@@ -690,16 +689,19 @@ end subroutine partition_type_assign
   integer(i_def) :: num_x     ! number of cells in the domain on this partition in x-dirn
   integer(i_def) :: start_y   ! global cell id of start of the domain on this partition in y-dirn
   integer(i_def) :: num_y     ! number of cells in the domain on this partition in y-dirn
-  integer(i_def) :: num_in_list !total number of cells known to this partition
-  integer(i_def) :: num_added ! number of cells added to the linked list
   integer(i_def) :: ix, iy    ! loop counters over cells on this partition in x- and y-dirns
 
-  type(linked_list_type), pointer :: curr=>null()  ! the current position at which items will be added
-                                                   ! to the list that holds cells known to this partition
-  type(linked_list_type), pointer :: partition=>null()  ! start of a list of all cells in the partition
-  type(linked_list_type), pointer :: start=>null() ! start of the ordered list that holds cells known to this partition
-  type(linked_list_type), pointer :: last=>null() ! location of the last owned cell in the list of cells
-  type(linked_list_type), pointer :: start_subsect=>null() ! start position when looping over subsections of cells
+  ! Create linked lists
+
+  type(linked_list_type)         :: partition   ! a list of all cells in the partition
+  type(linked_list_type), target :: known_cells ! a list of cells known to this partition
+
+  type(linked_list_item_type), pointer :: last=>null() ! location of the last added cell in the list of cells
+  type(linked_list_item_type), pointer :: start_subsect=>null() ! start position when looping over subsections of cells
+  type(linked_list_item_type), pointer :: insert_point=>null() ! where to insert in a list
+  type(linked_list_item_type), pointer :: loop => null() ! temp ptr to loop through list
+
+
 
   integer :: i, j         ! loop counters
   integer :: cells(4)     ! The cells around the vertex being queried
@@ -789,14 +791,15 @@ end subroutine partition_type_assign
                    real( yproc ) ) + 0.5_r_def ) - start_y + 1
 
   !Create a linked list of all cells that are part of this partition (not halos)
-  num_in_list = 0
+
+  partition = linked_list_type()
+
   do iy = start_y, start_y+num_y - 1
     do ix = start_x, start_x+num_x - 1
-      call insert_item( curr,global_mesh%get_cell_id(start_cell, ix-1, iy-1) )
-      if(.not.associated(partition))partition => curr
+      call partition%insert_item( linked_list_int_type( &
+                               global_mesh%get_cell_id(start_cell, ix-1, iy-1)))
     end do
   end do
-  nullify(curr)
 
   ! Create a linked-list of all cells known to the partition, including halos.
   ! This will be ordered as:
@@ -804,101 +807,148 @@ end subroutine partition_type_assign
   !
   ! Start with the edge cells - those cells owned by the partition - but are on
   ! the edge of the partitioned domain, so may have dofs shared with halo cells
+
+  known_cells = linked_list_type()
+
   ! Those cells along the top/bottom
-  num_in_list=0
+
   do ix = start_x, start_x+num_x-1
-    call insert_item( curr, &
-                      global_mesh%get_cell_id(start_cell, ix-1, start_y-1) )
-    num_in_list = num_in_list+1
-    if(.not.associated(start))start => curr
-    call insert_unique_item( start,curr, &
-                   global_mesh%get_cell_id(start_cell, ix-1, start_y+num_y-2), &
-                             num_added )
-    num_in_list = num_in_list+num_added
+    ! start inserting the edge cells
+    call known_cells%insert_item(linked_list_int_type( &
+                         global_mesh%get_cell_id(start_cell, ix-1, start_y-1)))
+    ! insert but check for duplicates between start and end of known_cells list
+    if(.not. (known_cells%item_exists(global_mesh%get_cell_id( &
+                                   start_cell, ix-1, start_y+num_y-2)) ) ) then
+      call known_cells%insert_item( linked_list_int_type( &
+                   global_mesh%get_cell_id(start_cell, ix-1, start_y+num_y-2)))
+    end if
   end do
   ! Those along the left/right
   do iy = start_y+1, start_y+num_y-2
-    call insert_unique_item( start,curr, &
-                         global_mesh%get_cell_id(start_cell, start_x-1, iy-1), &
-                             num_added )
-    num_in_list = num_in_list+num_added
-    call insert_unique_item( start,curr, &
-                   global_mesh%get_cell_id(start_cell, start_x+num_x-2, iy-1), &
-                             num_added )
-    num_in_list = num_in_list+num_added
+    if(.not. (known_cells%item_exists(global_mesh%get_cell_id( &
+                                      start_cell, start_x-1, iy-1)) )) then
+      call known_cells%insert_item( linked_list_int_type( &
+                         global_mesh%get_cell_id(start_cell, start_x-1, iy-1)))
+    end if
+    if(.not. (known_cells%item_exists(global_mesh%get_cell_id( &
+                                    start_cell, start_x+num_x-2, iy-1)) )) then
+      call known_cells%insert_item( linked_list_int_type( &
+                   global_mesh%get_cell_id(start_cell, start_x+num_x-2, iy-1)))
+    end if
   end do
-  num_edge = num_in_list
+
+  ! get the number of edge cells currently stored in the known_cells list
+  num_edge = known_cells%get_length()
 
   ! Add all cells from the halos (up to max_stencil_depth+1) that are in a
   ! stencil around each of the owned cells, but are not part of the partition.
   ! Also add a "ghost" halo (max_stencil_depth+2) - used later to work out
   ! dof ownerships
-  start_subsect => start
+  start_subsect => known_cells%get_head() ! start at the beginning 
+                                          ! of known_cells list
+  ! num cells to apply stencil to is the number of edge cells
   num_apply=num_edge
-  do depth = 1,max_stencil_depth+2
-    orig_num_in_list = num_in_list
-    last=>curr
+  ! get a pointer to the known_cells list
+  !known_cells_ptr => known_cells                     
+  ! insert point is end of current list
+  insert_point => known_cells%get_tail()
+  do depth = 1,max_stencil_depth +2
+    ! update number of cells currently in known_cells
+    orig_num_in_list = known_cells%get_length()
+    last => known_cells%get_tail() ! point at tail of current known_cells list
     call apply_stencil( global_mesh, &
-                        start_subsect, &
-                        num_apply, &
-                        start, &
-                        curr, &
-                        num_in_list, &
-                        exclude=partition )
+                        known_cells, & ! the current list of known cells
+                        start_subsect, & ! where we want to start applying stencil in known_cells
+                        num_apply, & ! the number of items in known_cells to iterate over
+                        insert_point=insert_point, & ! where to insert in list
+                        exclude=partition ) ! exclude cells in partition
     if(depth <= max_stencil_depth+1)then
-      num_halo(depth) = num_in_list - orig_num_in_list
+      num_halo(depth) = known_cells%get_length() - orig_num_in_list ! num halo cells at this depth 
+                                                                    ! is the number we just added
+      ! reset start point to previous end of known_cells list
       start_subsect => last%next
+      ! and insert point to current end of list
+      insert_point => known_cells%get_tail()
+      ! num cells to apply stencil to next is the number of cells just added to known_cells
       num_apply = num_halo(depth)
     else
-      num_ghost = num_in_list - orig_num_in_list
+      ! num ghost cells is the number we just added to known_cells at max_stencil_depth + 2
+      num_ghost = known_cells%get_length() - orig_num_in_list 
     end if
   end do
+
   
   ! Add all cells from the inner halos (up to max_stencil_depth) that are in a
   ! stencil around each of the owned cells, but are not part of the outer halos
-  curr => start
-  start_subsect => start
+
+  ! Point to start of known_cells list
+  start_subsect => known_cells%get_head()
+  ! insert point is head of known cells list as we want to insert before it
+  insert_point => known_cells%get_head()
+  ! num cells to apply stencil to is the number of edge cells only (not halo cells)
   num_apply=num_edge
   do depth = 1,max_stencil_depth
-    orig_num_in_list = num_in_list
+    ! update number of cells currently in known_cells
+    orig_num_in_list = known_cells%get_length()
     call apply_stencil( global_mesh, &
+                        known_cells, &
                         start_subsect, &
                         num_apply, &
-                        start, &
-                        curr, &
-                        num_in_list, &
-                        placement=BEFORE )
-    num_inner(depth) = num_in_list - orig_num_in_list
+                        insert_point=insert_point, & ! where to insert in list
+                        placement=before )
+    ! num inner halo cells at this depth is the number we just added to known_cells
+    num_inner(depth) = known_cells%get_length()  - orig_num_in_list 
+    ! num cells to apply stencil to next is the number of cells just added to known_cells
     num_apply = num_inner(depth)
+    ! reset start point to current head of known_cells list
+    start_subsect => known_cells%get_head()
+    ! and reset insert point also
+    insert_point => known_cells%get_head()
   end do
-  start => curr
 
-  !Any cells that haven't been assigned a category, yet, must be inner halo
-  !cells of depth max_stencil_depth+1
+  ! Now check partition list for any cells not yet added. These must be inner halo
+  ! cells of depth max_stencil_depth+1
+
   num_inner(max_stencil_depth+1)=0
-  do
-    if ( .not. associated(partition) )exit
-    call insert_unique_item( start, &
-                             curr, &
-                             partition%dat, &
-                             num_added, &
-                             placement=BEFORE )
-    start => curr
-    num_in_list=num_in_list+num_added
-    num_inner(max_stencil_depth+1)=num_inner(max_stencil_depth+1)+num_added
-    partition => partition%next
+  ! update number of cells currently in known_cells
+  orig_num_in_list = known_cells%get_length()  
+  ! point at head of partition list
+  loop => partition%get_head()
+  ! update insert point to head of known_cells list
+  insert_point => known_cells%get_head()
+  if (partition%get_length() > 0) then
+
+    do i = 1,partition%get_length()
+
+      if(.not. (known_cells%item_exists(loop%payload%get_id()))) then
+
+        call known_cells%insert_item( linked_list_int_type(loop%payload%get_id()), &
+                                      insert_point=insert_point, placement=before)
+      end if
+      ! update insert point to head of known_cells list
+      insert_point => known_cells%get_head()
+      loop => loop%next
+    end do
+    ! update num_inner cells added
+    num_inner(max_stencil_depth+1)=known_cells%get_length()  - orig_num_in_list
+  end if
+
+  allocate(partitioned_cells(known_cells%get_length()))
+  ! reset loop to start of known_cells
+  loop => known_cells%get_head()
+
+
+
+  ! Copy cell ids from known_cells list to partitioned_cells array
+  do i = 1,known_cells%get_length()
+    partitioned_cells(i) = loop%payload%get_id()
+    if ( .not. associated(loop%next) ) exit !finished
+    loop => loop%next
   end do
 
 
-  allocate(partitioned_cells(num_in_list))
-  curr => start
-  do i = 1,num_in_list
-    partitioned_cells(i) = curr%dat
-    curr => curr%next
-  end do
-
-  ! Deallocate the list
-  call clear_list( start )
+  ! Deallocate the known_cells list
+  call known_cells%clear()
 
   ! Cell ids within the separate groups have to be in numerical order.
   ! so (bubble) sort the separate groups
@@ -946,59 +996,114 @@ end subroutine partition_type_assign
 !                           list over which the stencil will be applied
 !          number_of_cells  The number of cells in the portion of the linked
 !                           list over which the stencil will be applied
-!          start            Start of the linked-list that holds cells known to 
-!                           this partition
-! In/Out:  curr             Current position at which items will be added to the
-!                           list that holds cells known to this partition
-!          num_in_list      Total number of cells known to this partition
+! In/Out:  known_cells      The current linked list known_cells
+!
+! Optional: insert_point    Where to insert before/after in known_cells
+!                           
+!           placement       Flag to insert before or after insert point
+!      
+!           exclude         An additional list to check for duplicates
 !-------------------------------------------------------------------------------
   subroutine apply_stencil( global_mesh, &
+                            known_cells, &
                             input_cells, &
                             number_of_cells, &
-                            start, &
-                            curr, &
-                            num_in_list, &
+                            insert_point, &
                             placement, &
                             exclude )
-  use linked_list_mod, only : linked_list_type, insert_unique_item, BEFORE
+  use linked_list_int_mod, only : linked_list_int_type
+  use linked_list_mod,     only : linked_list_type, &
+                                  linked_list_item_type, &
+                                  before
   use reference_element_mod, only : nverts_h
+
+  use log_mod,         only : log_event,         &
+                              log_scratch_space, &
+                              LOG_LEVEL_INFO
   implicit none
 
-  type(global_mesh_type),                    intent(in)    :: global_mesh
-  type(linked_list_type),           pointer, intent(inout) :: input_cells
-  integer(i_def),                            intent(in)    :: number_of_cells
-  type(linked_list_type),           pointer, intent(inout) :: curr
-  type(linked_list_type),           pointer, intent(inout) :: start
-  integer(i_def),                            intent(inout) :: num_in_list
-  integer(i_def),         optional,          intent(in)    :: placement
-  type(linked_list_type), optional, pointer, intent(in)    :: exclude
+  type(global_mesh_type),                         intent(in)    :: global_mesh
+  type(linked_list_type),                         intent(inout) :: known_cells
+  type(linked_list_item_type),target,             intent(inout) :: input_cells
+  integer(i_def),                                 intent(in)    :: number_of_cells
+  type(linked_list_item_type), optional,target,   intent(inout) :: insert_point
+  integer(i_def),         optional,               intent(in)    :: placement
+  type(linked_list_type), optional,               intent(in)    :: exclude
 
   integer(i_def) :: i,j,k  ! loop counter
   integer(i_def) :: cell_id ! the current cell id that the stencil is being applied to
-  integer(i_def) :: num_added ! number of cells added to the linked list
+  integer(i_def) :: add_cell ! flag controlling whether to insert after checking duplicates
   integer(i_def), allocatable :: verts(:)
   integer(i_def), allocatable :: cells(:)
+
+  type(linked_list_item_type), pointer :: loop => null() ! temp ptr to loop through list
+  type(linked_list_item_type), pointer :: insert_ptr => null() ! pointer to access insert_point
+
 
   allocate( cells( global_mesh%get_max_cells_per_vertex() ) )
   allocate( verts(nverts_h) )
 
+
+  ! point at where we want to start
+  loop => input_cells
+  insert_ptr => insert_point
+
+  ! iterate through the list for the given number of cells
   do i = 1,number_of_cells
-    cell_id = input_cells%dat
+    ! get cell id for current item
+    cell_id = loop%payload%get_id()
+    ! get list of vertices on this cell 
     call global_mesh%get_vert_on_cell(cell_id, verts)
+    ! iterate through these verts
     do j = 1,nverts_h
+      ! get all the cells sharing this vert
       call global_mesh%get_cell_on_vert( verts(j), cells )
+      ! iterate through these cells 
       do k = 1,global_mesh%get_max_cells_per_vertex()
+        ! Assume we are not adding the cell at first
+        ! then flag for adding depending on checks
+        add_cell = 0
         if(cells(k) > 0)then
-          call insert_unique_item( start, curr, cells(k), num_added, &
-                                   placement=placement, exclude=exclude )
-          num_in_list = num_in_list + num_added
-          if ( present(placement) .and. placement == BEFORE ) then
-            start => curr
+          ! check if cell is already in known_cells list
+          if (.not.(known_cells%item_exists(cells(k)))) then
+            ! Not in known_cells so flag to add initially
+            add_cell = 1
+            ! .... but also check exclude list if it is present
+            if (present(exclude)) then
+              if (exclude%item_exists(cells(k))) then
+                ! It is in the exclude list so don't flag
+                add_cell = 0
+              end if
+            end if
+
           end if
+
+          if (add_cell == 1) then
+             ! add this cell
+             call known_cells%insert_item( linked_list_int_type(cells(k)), &
+                                           insert_point=insert_ptr, &
+                                           placement=placement)
+
+             ! If we added then need to update insert point according to placement
+             if (present(insert_point)) then
+               if (present(placement)) then
+                 if (placement == before) then
+                   insert_ptr => insert_ptr%prev
+                 else
+                   insert_ptr => insert_ptr%next
+                 end if
+               else
+                 ! No placement present so default is to insert after
+                 insert_ptr => insert_ptr%next
+               end if
+             end if
+          end if
+
         end if
       end do
     end do
-    input_cells => input_cells%next
+    ! point at next item 
+    loop=>loop%next
   end do
 
   deallocate(verts)

@@ -6,6 +6,7 @@
 !-------------------------------------------------------------------------------
 !> @brief A type which holds information about the dofmap.
 !> @details Types for storing the general stencil dofmaps of a general size
+!> Inherits from linked_list_data_type so it can be stored in a linked_list
 !> Allowable stencil types ( the size is variable ):
 !> Currently on the point stencil is allowed 
 !> 
@@ -27,18 +28,19 @@ module stencil_dofmap_mod
 
 use constants_mod,     only: i_def
 use master_dofmap_mod, only: master_dofmap_type
+use linked_list_data_mod, only : linked_list_data_type
+
+
 implicit none
 
 private
-type, public :: stencil_dofmap_type
+type, extends(linked_list_data_type), public :: stencil_dofmap_type
   private 
   integer(i_def) :: dofmap_shape
   integer(i_def) :: dofmap_extent
-  integer(i_def) :: dofmap_id
   integer(i_def), allocatable :: dofmap(:,:,:) 
 contains
   procedure :: get_dofmap
-  procedure :: get_id
 end type stencil_dofmap_type
 
 integer(i_def), public, parameter :: STENCIL_POINT = 1100
@@ -82,7 +84,8 @@ function stencil_dofmap_constructor( st_shape, st_extent, ndf, mesh, master_dofm
 
     self%dofmap_shape  = st_shape
     self%dofmap_extent = st_extent
-    self%dofmap_id     = st_shape*100 + st_extent
+    ! call base class set_id()
+    call self%set_id(st_shape*100 + st_extent)
 
     ncells = mesh%get_ncells_2d()
     ! Allocate the dofmap array
@@ -215,19 +218,6 @@ function get_dofmap(self,cell) result(map)
   return
 end function get_dofmap
 
-!-----------------------------------------------------------------------------
-! Get the dofmap id
-!-----------------------------------------------------------------------------
-!> Subroutine Returns the unique id of the dofmap
-!! @param[in] self The calling function_space
-!! @return The dofmap integer id
-integer function get_id(self)
-  implicit none
-  class(stencil_dofmap_type), target, intent(in) :: self
-
-  get_id = self%dofmap_id
-  return
-end function get_id
 
 end module stencil_dofmap_mod
 

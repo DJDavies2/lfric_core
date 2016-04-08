@@ -650,7 +650,7 @@ contains
     do cell = 1, flux_p%vspace%get_ncell()
        map_f => flux_p%vspace%get_cell_dofmap( cell )
        map_q => q_p%vspace%get_cell_dofmap( cell )
-       call sample_flux_code(nlayers, & 
+       call sample_flux_code(nlayers, &
                              flux_p%data, & 
                              m_p%data, &
                              u_p%data, &
@@ -1104,9 +1104,9 @@ subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,direction,rho_stencil_length)
     !                                   |2|
     !                                   |4|
     if (direction .EQ. x_direction) then
-      map => rho_proxy%vspace%ll_get_instance(STENCIL_1DX,rho_stencil_length)
+      map => rho_proxy%vspace%get_stencil_dofmap(STENCIL_1DX,rho_stencil_length)
     elseif (direction .EQ. y_direction) then
-      map => rho_proxy%vspace%ll_get_instance(STENCIL_1DY,rho_stencil_length)
+      map => rho_proxy%vspace%get_stencil_dofmap(STENCIL_1DY,rho_stencil_length)
     end if
 
     do cell = 1, rho_proxy%vspace%get_ncell()
@@ -1194,9 +1194,9 @@ subroutine invoke_conservative_fluxes(    rho,          &
   !                                   |2|
   !                                   |4|
   if (direction .EQ. x_direction) then
-    map => rho_proxy%vspace%ll_get_instance(STENCIL_1DX,stencil_size)
+    map => rho_proxy%vspace%get_stencil_dofmap(STENCIL_1DX,stencil_size)
   elseif (direction .EQ. y_direction) then
-    map => rho_proxy%vspace%ll_get_instance(STENCIL_1DY,stencil_size)
+    map => rho_proxy%vspace%get_stencil_dofmap(STENCIL_1DY,stencil_size)
   end if
 
   do cell = 1, rho_proxy%vspace%get_ncell()
@@ -1323,9 +1323,9 @@ subroutine invoke_calc_deppts(u_n,u_np1,dep_pts,direction,dep_pt_method)
   undf_w2 = u_n_proxy%vspace%get_undf()
 
   if (direction .EQ. x_direction) then
-    map => u_n_proxy%vspace%ll_get_instance(STENCIL_1DX,transport_stencil_length)
+    map => u_n_proxy%vspace%get_stencil_dofmap(STENCIL_1DX,transport_stencil_length)
   elseif (direction .EQ. y_direction) then
-    map => u_n_proxy%vspace%ll_get_instance(STENCIL_1DY,transport_stencil_length)
+    map => u_n_proxy%vspace%get_stencil_dofmap(STENCIL_1DY,transport_stencil_length)
   endif
 
   nlayers = u_n_proxy%vspace%get_nlayers()

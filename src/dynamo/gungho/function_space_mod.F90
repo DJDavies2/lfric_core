@@ -37,6 +37,9 @@ use reference_element_mod, only: tangent_to_edge, normal_to_face               &
 use fs_continuity_mod, only: W0, W1, W2, W3, Wtheta, W2V, W2H
 use fs_setup_mod,   only: ndof_setup, basis_setup, dofmap_setup
 
+use linked_list_mod,       only : linked_list_type, &
+                                  linked_list_item_type
+
 
 implicit none
 
@@ -47,10 +50,6 @@ public :: W0, W1, W2, W3, Wtheta, W2V, W2H
 !-------------------------------------------------------------------------------
 ! Public types
 !-------------------------------------------------------------------------------
-type linked_list_type 
-  type(stencil_dofmap_type)       :: dofmap
-  type(linked_list_type), pointer :: next !The next entry in the linked list
-end type linked_list_type  
 
 type, public :: function_space_type
 
@@ -138,7 +137,7 @@ type, public :: function_space_type
   integer(i_def), allocatable :: last_dof_halo(:)
 
   !> A linked list of stencil dofmaps
-  type(linked_list_type), pointer :: dofmap_list => null()
+  type(linked_list_type)      :: dofmap_list
 
   !> A list of the routing tables needed to perform halo swaps to various depths
   !! of halo
@@ -289,22 +288,8 @@ contains
   !> Gets the index in the dofmap of the last dof in the deepest depth of halo
   procedure get_last_dof_halo
 
-  !> Add a new item to the linked list
-  !> @param curr The current position at which items will be added to the list
-  !> @param[in] stencil_shape The shape identifier for the stencil dofmap to
-  !create
-  !> @param[in] stencil_extent The number of cells in the stencil
-  procedure ll_add_item
-
-  !> Clear the list and return the memory used
-  procedure ll_clear_list
-
-  !> Get the instance of a stencil dofmap with for a given cell and id
-  !> @param[in] stencil_shape The shape identifier for the stencil dofmap to
-  !create
-  !> @param[in] stencil_extent The number of cells in the stencil
-  !> @return map the stencil_dofmap object to return
-  procedure ll_get_instance
+  !> Get the instance of a stencil dofmap with for a given id
+  procedure, public   :: get_stencil_dofmap
 
   ! Mesh colouring wrapper methods
   !> @brief Populates args with colouring info from member mesh.
@@ -466,8 +451,8 @@ subroutine init_function_space( self )
   integer(i_def) :: ncells_2d_with_ghost
 
 
-  integer(i_def) :: st_shape   ! Stencil Size
-  integer(i_def) :: st_size    ! Stencil Shape
+  integer(i_def) :: st_shape   ! Stencil Shape
+  integer(i_def) :: st_size    ! Stencil Extent
 
   integer(i_def) :: rc
   integer(i_def) :: idepth
@@ -536,7 +521,18 @@ subroutine init_function_space( self )
 
 
   self%master_dofmap = master_dofmap_type( dofmap )
-  call self%ll_add_item(self%dofmap_list,STENCIL_POINT,1)
+
+
+  ! create the linked list
+  self%dofmap_list = linked_list_type()
+
+  ! Create the stencil_dofmap object and add to linked list
+
+  call self%dofmap_list%insert_item( stencil_dofmap_type(st_shape,           &
+                                                         st_size,            &
+                                                         self%ndof_cell,     &
+                                                         self%mesh,          &
+                                                         self%master_dofmap) )
 
 
   !Set up routing tables for halo exchanges
@@ -1053,93 +1049,77 @@ function get_last_dof_halo(self) result (last_dof_halo)
   return
 end function get_last_dof_halo
 
-!-----------------------------------------------------------------------------
-! Routines for the linked list of dofmaps
-!-----------------------------------------------------------------------------
-!> Add a new item to the linked list
-!> @param curr The current position at which items will be added to the list
+
+!> Get the instance of a stencil dofmap with for a given shape and size
 !> @param[in] stencil_shape The shape identifier for the stencil dofmap to
 !create
-!> @param[in] stencil_extent The number of cells in the stencil
-subroutine ll_add_item(self, curr, stencil_shape, stencil_extent)
-  implicit none
-
-  class(function_space_type), intent(in) :: self
-  type(linked_list_type), pointer, intent (inout) :: curr
-  integer(i_def), intent(in) :: stencil_shape
-  integer(i_def), intent(in) :: stencil_extent
-
-  type(linked_list_type), pointer :: new ! New list item to be added to the list
-
-  allocate(new)
-  if(associated(curr))curr%next=>new
-  new%next=>null()
-  new%dofmap = stencil_dofmap_type(stencil_shape,  &
-                                   stencil_extent, &
-                                   self%ndof_cell, &
-                                   self%mesh,      &
-                                   self%master_dofmap)
-  curr=>new
-end subroutine ll_add_item
-
-!> Clear the list and return the memory used
-!> @param self The start of the linked list that is to be cleared
-subroutine ll_clear_list(self)
+!> @param[in] stencil_size The number of cells in the stencil
+!> @return map the stencil_dofmap object to return
+function get_stencil_dofmap(self, stencil_shape, stencil_size) result(map)
 
   implicit none
 
   class(function_space_type), intent(inout) :: self
-
-! Temporary space used to clear a list item whilst still allowing access to the
-! next item in the list
-  type(linked_list_type), pointer :: tmp
-
-  do
-    if ( .not. associated(self%dofmap_list) ) exit
-    tmp => self%dofmap_list
-    self%dofmap_list => self%dofmap_list%next
-    deallocate(tmp)
-  end do
-end subroutine ll_clear_list
-
-!> Get the instance of a stencil dofmap with for a given cell and id
-!> @param self The start of the linked list that is to be cleared
-!> @param[in] stencil_shape The shape identifier for the stencil dofmap to
-!create
-!> @param[in] stencil_extent The number of cells in the stencil
-!> @return map the stencil_dofmap object to return
-function ll_get_instance(self, stencil_shape, stencil_extent) result(map)
-
-  implicit none
-
-  class(function_space_type), intent(in) :: self
   integer(i_def),             intent(in) :: stencil_shape
-  integer(i_def),             intent(in) :: stencil_extent
+  integer(i_def),             intent(in) :: stencil_size
 
-  type(stencil_dofmap_type), pointer :: map
-  type(linked_list_type),    pointer :: loop, start
+  type(stencil_dofmap_type), pointer  :: map ! pointer to return instance
+  type(linked_list_item_type),pointer :: loop ! temp pointer for looping
+
 
   integer(i_def) :: id
 
   map => null()
-  start => self%dofmap_list
-  if ( .not. associated(start) ) then
-    call self%ll_add_item(start, stencil_shape, stencil_extent)
+  
+  ! Calculate id of the stencil_dofmap we want
+  id = stencil_shape*100 + stencil_size
+
+
+  ! point at the head of the stencil_dofmap linked list
+  loop => self%dofmap_list%get_head()
+
+  ! if the list is empty then create and add the stencil_dofmap
+
+  if ( .not. associated(loop) ) then
+    ! Empty list or end of list and we didn't find it
+    ! create stencil dofmap and add it 
+
+    call self%dofmap_list%insert_item( stencil_dofmap_type(stencil_shape,    &
+                                                           stencil_size,     &
+                                                           self%ndof_cell,   &
+                                                           self%mesh,        &
+                                                           self%master_dofmap))
   end if
-  id = stencil_shape*100 + stencil_extent
-  loop => start
+
+  ! Point back at the head of the list
+  loop => self%dofmap_list%get_head()
+
+  ! loop through list
   do
     if ( .not. associated(loop) ) then
-    ! Create stencil dofmap
-      call self%ll_add_item(loop, stencil_shape, stencil_extent)
+      ! At the end of list and we didn't find it
+      ! create stencil dofmap and add it 
+
+      call self%dofmap_list%insert_item(stencil_dofmap_type(stencil_shape,    &
+                                                            stencil_size,     &
+                                                            self%ndof_cell,   &
+                                                            self%mesh,        &
+                                                            self%master_dofmap))
+      loop => loop%next
     end if
-    if ( id == loop%dofmap%get_id() ) then
-      map => loop%dofmap
+    ! otherwise check for the id we want
+    if ( id == loop%payload%get_id() ) then
+      ! 'cast' to the stencil_dofmap_type
+      select type(v => loop%payload)
+        type is (stencil_dofmap_type)
+          map => v
+      end select
       exit
     end if
     loop => loop%next
   end do
-end function ll_get_instance
+end function get_stencil_dofmap
+
 
 !============================================================================
 !> @brief  Invoke calculation of colouring for the member mesh.
