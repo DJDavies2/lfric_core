@@ -335,7 +335,7 @@ contains
     integer(i_def) :: rc
     integer(i_def) :: halo_start, halo_finish
 
-    type (mesh_type)   :: mesh
+    type (mesh_type), pointer   :: mesh => null()
 
     dest%vspace => source%vspace
 
@@ -371,7 +371,7 @@ contains
 
     ! Create a flag for holding whether a halo depth is dirty or not
     ! and initialise it with a copy of the source data
-    mesh=source%vspace%get_mesh()
+    mesh=>source%vspace%get_mesh()
     allocate(dest%halo_dirty(mesh%get_halo_depth()))
     dest%halo_dirty(:)=source%halo_dirty(:)
 
@@ -612,9 +612,9 @@ contains
     integer(i_def), intent(in) :: depth
     type(ESMF_RouteHandle) :: haloHandle
     integer(i_def) :: rc
-    type (mesh_type)   :: mesh
+    type (mesh_type), pointer   :: mesh => null()
 
-    mesh=self%vspace%get_mesh()
+    mesh=>self%vspace%get_mesh()
     if( depth > mesh%get_halo_depth() ) &
       call log_event( 'Error in field: '// &
                       'attempt to exchange halos with depth out of range.', &
@@ -648,9 +648,9 @@ contains
     integer(i_def), intent(in) :: depth
     type(ESMF_RouteHandle) :: haloHandle
     integer(i_def) :: rc
-    type (mesh_type)   :: mesh
+    type (mesh_type), pointer   :: mesh => null()
 
-    mesh=self%vspace%get_mesh()
+    mesh=>self%vspace%get_mesh()
     if( depth > mesh%get_halo_depth() ) &
       call log_event( 'Error in field: '// &
                       'attempt to exchange halos with depth out of range.', &
@@ -680,9 +680,9 @@ contains
     integer(i_def), intent(in) :: depth
     type(ESMF_RouteHandle) :: haloHandle
     integer(i_def) :: rc
-    type (mesh_type)   :: mesh
+    type (mesh_type), pointer   :: mesh => null()
 
-    mesh=self%vspace%get_mesh()
+    mesh=>self%vspace%get_mesh()
     if( depth > mesh%get_halo_depth() ) &
       call log_event( 'Error in field: '// &
                       'attempt to exchange halos with depth out of range.', &
@@ -808,9 +808,9 @@ contains
     class(field_proxy_type), intent(in) :: self
     integer(i_def), intent(in) :: depth
     logical(l_def) :: dirtiness
-    type (mesh_type)   :: mesh
+    type (mesh_type), pointer   :: mesh => null()
 
-    mesh=self%vspace%get_mesh()
+    mesh=>self%vspace%get_mesh()
     if( depth > mesh%get_halo_depth() ) &
       call log_event( 'Error in field: '// &
                       'call to is_dirty() with depth out of range.', &
@@ -843,9 +843,9 @@ contains
 
     class(field_proxy_type), intent(inout) :: self
     integer(i_def), intent(in) :: depth
-    type (mesh_type)   :: mesh
+    type (mesh_type), pointer   :: mesh => null()
 
-    mesh=self%vspace%get_mesh()
+    mesh=>self%vspace%get_mesh()
     if( depth > mesh%get_halo_depth() ) &
       call log_event( 'Error in field: '// &
                       'call to set_clean() with depth out of range.', &

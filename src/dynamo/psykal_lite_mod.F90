@@ -183,7 +183,7 @@ contains
                                         , field_res_proxy
     integer(kind=i_def)                :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type),  pointer          :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -213,7 +213,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = field_res%get_mesh()
+    mesh => field_res%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -239,7 +239,7 @@ contains
                                         , field_res_proxy
     integer(kind=i_def)                :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type), pointer           :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -267,7 +267,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = field_res%get_mesh()
+    mesh => field_res%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -291,7 +291,7 @@ contains
     type( field_proxy_type)            :: field1_proxy , field_res_proxy
     integer                            :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type), pointer           :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field_res_proxy = field_res%get_proxy()
@@ -311,7 +311,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = field_res%get_mesh()
+    mesh => field_res%get_mesh()
     depth = mesh%get_halo_depth()
     
     do dplp = 1, depth
@@ -336,7 +336,7 @@ contains
                                         , field_res_proxy
     integer(kind=i_def)                :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type), pointer           :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -364,7 +364,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = field_res%get_mesh()
+    mesh => field_res%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -389,7 +389,7 @@ contains
                                         , field_res_proxy
     integer(kind=i_def)                :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type), pointer           :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -417,7 +417,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = field_res%get_mesh()
+    mesh => field_res%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -440,7 +440,7 @@ contains
     type( field_proxy_type)            :: field_res_proxy
     integer(kind=i_def)                :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type), pointer           :: mesh => null()
 
     field_res_proxy = field_res%get_proxy()
 
@@ -452,7 +452,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = field_res%get_mesh()
+    mesh => field_res%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -474,7 +474,7 @@ contains
                                         , field_res_proxy
     integer(kind=i_def)                :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type), pointer           :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
@@ -502,7 +502,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = field_res%get_mesh()
+    mesh => field_res%get_mesh()
     depth = mesh%get_halo_depth()
     
     do dplp = 1, depth
@@ -527,7 +527,7 @@ contains
     type( field_proxy_type)            :: field1_proxy , field_res_proxy
     integer(kind=i_def)                :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type), pointer           :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field_res_proxy = field_res%get_proxy()
@@ -547,7 +547,7 @@ contains
     end do
     !$omp end parallel do
    
-    mesh = field_res%get_mesh()
+    mesh => field_res%get_mesh()
     depth = mesh%get_halo_depth()
         
     do dplp = 1, depth
@@ -625,7 +625,7 @@ contains
                                         , z_proxy
     integer(kind=i_def)                :: i,undf
     integer(kind=i_def)                :: depth, dplp
-    type(mesh_type)                    :: mesh
+    type(mesh_type), pointer           :: mesh => null()
 
     x_proxy = x%get_proxy()
     y_proxy = y%get_proxy()
@@ -653,7 +653,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = z%get_mesh()
+    mesh => z%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -677,7 +677,7 @@ contains
     type( field_proxy_type)           :: x_proxy, y_proxy
     integer(kind=i_def)               :: i,undf
     integer(kind=i_def)               :: depth, dplp
-    type(mesh_type)                   :: mesh
+    type(mesh_type), pointer          :: mesh => null()
 
     x_proxy = x%get_proxy()
     y_proxy = y%get_proxy()
@@ -696,7 +696,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh = y%get_mesh()
+    mesh => y%get_mesh()
     depth = mesh%get_halo_depth()
     
     do dplp = 1, depth

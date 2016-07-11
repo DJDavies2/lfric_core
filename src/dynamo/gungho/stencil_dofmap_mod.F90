@@ -70,7 +70,7 @@ function stencil_dofmap_constructor( st_shape, st_extent, ndf, mesh, master_dofm
     use mesh_mod, only: mesh_type
 
     integer(i_def),           intent(in) :: st_shape, st_extent, ndf
-    type(mesh_type),          intent(in) :: mesh
+    type(mesh_type), pointer, intent(in) :: mesh
     type(master_dofmap_type), intent(in) :: master_dofmap
     type(stencil_dofmap_type), target    :: self
 
