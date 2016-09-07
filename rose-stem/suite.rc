@@ -357,14 +357,10 @@
         script = rose task-run --app-key=dynamo --command-key={{TARGET_RUN_METHOD}} --opt-conf-key={{configuration}}
         post-script = """
                       cp dynamo-checksums.txt $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.checksums
+                      mkdir -p $DYNAMO_DESTINATION_DIRECTORY/results
+                      cp $CYLC_TASK_WORK_DIR/diagDynamo*.m $DYNAMO_DESTINATION_DIRECTORY/results/
                       # Future publisher stages need this information
                       echo $CYLC_TASK_LOG_ROOT > $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.log.path
-                      mkdir -p ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data
-                      chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output
-                      chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}
-                      chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data
-                      cp $CYLC_TASK_WORK_DIR/diagDynamo*.m ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data
-                      chmod 754 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data/*.m
                       """
         [[[environment]]]
             OMP_NUM_THREADS=2
@@ -377,7 +373,16 @@
 
 {%-       if 'plot_' + configuration_label in scheduledTasks %}
     [[plot_{{configuration_label}}]]
-        inherit = {{family}}, TARGET, PUBLISH
+        inherit = PUBLISH, {{family}}, TARGET
+        pre-script = """
+                     mkdir -p ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data
+                     chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output
+                     chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}
+                     chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data
+                     RELATIVE_DESTINATION_DIRECTORY=`echo $DYNAMO_DESTINATION_DIRECTORY | sed "s|$HOME/||"`
+                     scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/results/* $NODAL_DATA_DIR
+                     chmod 754 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data/*.m
+                     """
         script = rose task-run --app-key=plot
         post-script = """
                       chmod 754 $PLOT_DIR/*.png
@@ -393,7 +398,7 @@
 
 {%-       if 'publish_' + label + '_' +  configuration|lower|replace('-','foo') in scheduledTasks %}
     [[publish_{{label}}_{{configuration|lower|replace('-','foo')}}]]
-        inherit = PUBLISH, {{family}}, TARGET
+        inherit = PUBLISH, {{family}}, LOCAL
         pre-script = """
                      mkdir -p $DYNAMO_DESTINATION_DIRECTORY
                      RELATIVE_DESTINATION_DIRECTORY=`echo $DYNAMO_DESTINATION_DIRECTORY | sed "s|$HOME/||"`
