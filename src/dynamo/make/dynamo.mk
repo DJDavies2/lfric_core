@@ -48,7 +48,7 @@ $(BIN_DIR) $(OBJ_DIR):
 # Build Rules
 
 # Build a set of "-I" arguments to seach the whole object tree:
-INCLUDE_ARGS = -I$(OBJ_DIR) $(patsubst %, -I$(OBJ_DIR)/%, $(SUBDIRS))
+INCLUDE_ARGS = -I$(OBJ_DIR) $(patsubst %, -I$(OBJ_DIR)/%, $(SUBDIRS)) -I$(OBJ_DIR)/psy
 
 # If the compiler produces module files, tell it where to put them
 ifdef F_MOD_DESTINATION_ARG

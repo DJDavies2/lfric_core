@@ -308,3 +308,33 @@ form as that used for test suite targetting.
 If a file ``optimisation/<platform>/<algorithm>.py`` exists it will be used in
 preference to the global script. The algorithm name is taken from
 ``src/dynamo/algorithms/<algorithm>.x90``.
+
+fcm-make
+~~~~~~~~
+
+The Dynamo code, together with PSyclone and pFUnit, can be extracted using 
+fcm-make. This can extract direct to the local machine without the need for a
+mirroring step.
+
+  ``fcm make -f fcm-make/<site-platform-compiler>/<optimisation>.cfg``
+
+This will extract the code to a directory named "extract". Because fcm-make
+extracts code in a different directory structure than the compilation system
+expects, the following environment variables need to be set before invoking
+``make``. Note that the final three environment variables are only required to 
+run the unit tests.
+
+=============================  ===========================================================================================================
+Environment Variable           Setting
+=============================  ===========================================================================================================
+``DYNAMO_BUILD_ROOT``          $PWD/extract/dynamo
+``PSYCLONE``                   python2.7 $PWD/extract/psyclone/src/generator.py
+``PSYCLONE_DIR``               $PWD/extract/psyclone
+``PYTHONPATH``                 $PWD/extract/psyclone/f2py_93:$PWD/extract/psyclone/src:$PYTHONPATH
+``PFUNIT_SOURCE_DIR``          $PWD/extract/pfunit
+``PFUNIT_BUILD_DIR``           $PWD/extract/pfunit
+``INSTALL_DIR``                $PWD/extract/dynamo/pfunit-install
+``F90``                        ifort
+``F90_VENDOR``                 Intel
+=============================  ===========================================================================================================
+

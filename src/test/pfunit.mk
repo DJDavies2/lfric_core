@@ -7,8 +7,8 @@
 
 CMAKE ?= cmake
 
-PFUNIT_SOURCE_DIR = $(abspath ../pfunit)
-PFUNIT_BUILD_DIR = $(DYNAMO_BUILD_ROOT)/pfunit
+PFUNIT_SOURCE_DIR ?= $(abspath ../pfunit)
+PFUNIT_BUILD_DIR ?= $(DYNAMO_BUILD_ROOT)/pfunit
 
 include $(ROOT)/make/include.mk
 include $(MAKE_DIR)/compiler.mk
