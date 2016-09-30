@@ -112,13 +112,17 @@ contains
   use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
   use formulation_config_mod,            only: eliminate_p
   use rtheta_kernel_mod,                 only: rtheta_kernel_type
+  use rtheta_wtheta_kernel_mod,          only: rtheta_wtheta_kernel_type
   use pert_pressure_gradient_kernel_mod, only: pert_pressure_gradient_kernel_type
   use exner_gradient_kernel_mod,         only: exner_gradient_kernel_type
   use psykal_lite_mod,                   only: invoke_axpy,               &
                                                invoke_copy_field_data,    &
                                                invoke_multiply_field,     &
                                                invoke_sample_flux_kernel, &
-                                               invoke_set_field_scalar
+                                               invoke_set_field_scalar,   &
+                                               invoke_rtheta_bd_kernel,   &
+                                               invoke_exner_gradient_bd_kernel, &
+                                               invoke_pert_pressure_gradient_bd_kernel
   use matrix_vector_kernel_mod,          only: matrix_vector_kernel_type
   use operator_mod,                      only: operator_type
   use quadrature_mod,                    only: quadrature_type, GAUSSIAN
@@ -126,7 +130,7 @@ contains
   use w3_solver_kernel_mod,              only: w3_solver_kernel_type
   use derived_config_mod,                only: si_bundle_size, bundle_size
   use lhs_exner_kernel_mod,              only: lhs_exner_kernel_type
-  use finite_element_config_mod,         only: element_order
+  use finite_element_config_mod,         only: element_order, wtheta_on
 
   implicit none
 
@@ -138,13 +142,14 @@ contains
 
   type(quadrature_type)        :: qr
   type(field_type),    pointer :: chi(:)=> null()
-  type(operator_type), pointer :: mm_w2, mm_w0, mm_w3_inv => null()
+  type(operator_type), pointer :: mm_w2, mm_w0, mm_w3_inv, mm_wtheta => null()
   type(operator_type), pointer :: div => null()
   type(field_type),    pointer :: u ,theta, rho, exner, theta_ref, rho_ref => null()
 
   mm_w0        => get_mass_matrix(0)
   mm_w2        => get_mass_matrix(2)
   mm_w3_inv    => get_mass_matrix(4)
+  mm_wtheta    => get_mass_matrix(5)
   chi          => get_coordinates()
   div          => get_div()
 
@@ -161,6 +166,10 @@ contains
   call invoke_set_field_scalar( 0.0_r_def, lhs_tmp(1) )
   call invoke_set_field_scalar( 0.0_r_def, lhs(1) )
   if ( eliminate_p ) then
+    if(wtheta_on) then
+      call invoke_pert_pressure_gradient_bd_kernel( lhs_tmp(1), rho, rho_ref, &
+                                                    theta, theta_ref, qr )
+    end if
     call invoke( pert_pressure_gradient_kernel_type(  &
                    lhs_tmp(1), rho, rho_ref, theta, theta_ref, qr ), &
                  matrix_vector_kernel_type( lhs(1), u, mm_w2) )
@@ -168,10 +177,17 @@ contains
     ! Use r_rho as a zero field so that exner' = 0 in pert_pressure_gradient_kernel
     call invoke_set_field_scalar( 0.0_r_def, r_rho )
     exner => state(4)
+
+    if(wtheta_on) then
+      call invoke_exner_gradient_bd_kernel( lhs_tmp(1), exner, theta_ref, qr )
+      call invoke_pert_pressure_gradient_bd_kernel( lhs_tmp(1), r_rho, rho_ref, &
+                                                     theta, theta_ref, qr )
+    end if
     call invoke( exner_gradient_kernel_type( lhs_tmp(1), exner, theta_ref, qr ), &
                  pert_pressure_gradient_kernel_type( lhs_tmp(1), r_rho, rho_ref, &
                                                      theta, theta_ref, qr ), &
                  matrix_vector_kernel_type( lhs(1), u, mm_w2) )
+
   end if
   call invoke( enforce_bc_kernel_type( lhs_tmp(1) ) )
   call invoke_axpy( -tau_dt, lhs_tmp(1), lhs(1), lhs(1) ) 
@@ -182,8 +198,14 @@ contains
   ! Compute lhs_theta
   call invoke_set_field_scalar( 0.0_r_def, lhs_tmp(2) )
   call invoke_set_field_scalar( 0.0_r_def, lhs(2) )
-  call invoke( rtheta_kernel_type( lhs_tmp(2), theta_ref, u, ones, qr), & 
-               matrix_vector_kernel_type( lhs(2), theta, mm_w0) )
+  if(wtheta_on) then
+    call invoke_rtheta_bd_kernel ( lhs_tmp(2), theta_ref, u, ones, qr )
+    call invoke( rtheta_wtheta_kernel_type( lhs_tmp(2), theta_ref, u, qr), &
+                 matrix_vector_kernel_type( lhs(2), theta, mm_wtheta ) )
+  else
+    call invoke( rtheta_kernel_type( lhs_tmp(2), theta_ref, u, ones, qr), &
+                 matrix_vector_kernel_type( lhs(2), theta, mm_w0) )
+  end if
   call invoke_axpy( -tau_dt, lhs_tmp(2), lhs(2), lhs(2) ) 
 
   ! Compute lhs_rho

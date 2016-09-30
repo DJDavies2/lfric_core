@@ -9,36 +9,37 @@ module si_solver_alg_mod
 
   use, intrinsic :: ieee_arithmetic
 
-  use constants_mod,           only: r_def, str_def, i_def
-  use field_bundle_mod,        only: clone_bundle, &
-                                     set_bundle_scalar, &
-                                     bundle_axpy, &
-                                     copy_bundle, &
-                                     minus_bundle, &
-                                     bundle_ax, &
-                                     bundle_divide, &
-                                     bundle_minmax, &
-                                     bundle_inner_product
-  use runtime_constants_mod,   only: get_mass_matrix_diagonal
-  use field_mod,               only: field_type
-  use formulation_config_mod,  only: eliminate_p
-  use lhs_alg_mod,             only: lhs_alg
-  use log_mod,                 only: log_event,         &
-                                     log_scratch_space, &
-                                     LOG_LEVEL_ERROR,   &
-                                     LOG_LEVEL_DEBUG,   &
-                                     LOG_LEVEL_TRACE,   &
-                                     lOG_LEVEL_INFO
-  use operator_mod,            only: operator_type
-  use solver_config_mod,       only: maximum_iterations, &
-                                     tolerance, &
-                                     preconditioner, &
-                                     solver_preconditioner_none, &
-                                     solver_preconditioner_diagonal, &
-                                     gcrk
+  use constants_mod,             only: r_def, str_def, i_def
+  use field_bundle_mod,          only: clone_bundle, &
+                                       set_bundle_scalar, &
+                                       bundle_axpy, &
+                                       copy_bundle, &
+                                       minus_bundle, &
+                                       bundle_ax, &
+                                       bundle_divide, &
+                                       bundle_minmax, &
+                                       bundle_inner_product
+  use finite_element_config_mod, only: wtheta_on
+  use runtime_constants_mod,     only: get_mass_matrix_diagonal
+  use field_mod,                 only: field_type
+  use formulation_config_mod,    only: eliminate_p
+  use lhs_alg_mod,               only: lhs_alg
+  use log_mod,                   only: log_event,         &
+                                       log_scratch_space, &
+                                       LOG_LEVEL_ERROR,   &
+                                       LOG_LEVEL_DEBUG,   &
+                                       LOG_LEVEL_TRACE,   &
+                                       LOG_LEVEL_INFO
+  use operator_mod,              only: operator_type
+  use solver_config_mod,         only: maximum_iterations, &
+                                       tolerance, &
+                                       preconditioner, &
+                                       solver_preconditioner_none, &
+                                       solver_preconditioner_diagonal, &
+                                       gcrk
 
-  use timestepping_config_mod, only: dt
-  use derived_config_mod,      only: si_bundle_size, bundle_size
+  use timestepping_config_mod,   only: dt
+  use derived_config_mod,        only: si_bundle_size, bundle_size
 
   implicit none
   type(field_type), allocatable, private :: mm_diagonal(:)
@@ -125,7 +126,11 @@ contains
  
 
     mm_diagonal(1) = get_mass_matrix_diagonal(2)
-    mm_diagonal(2) = get_mass_matrix_diagonal(0)
+    if (wtheta_on) then
+      mm_diagonal(2) = get_mass_matrix_diagonal(4)
+    else
+      mm_diagonal(2) = get_mass_matrix_diagonal(0)
+    end if
     mm_diagonal(3) = get_mass_matrix_diagonal(3)
     if ( .not. eliminate_p ) &
       mm_diagonal(4) = get_mass_matrix_diagonal(3)

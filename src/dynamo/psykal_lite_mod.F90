@@ -288,23 +288,23 @@ contains
         end do
       end do
 
-      call rtheta_bd_code( nlayers,                      &
-        ndf_w2, undf_w2,                                 &
-        cross_stencil_w2_map(:,:,cell),                  &
-        cross_stencil_w2_size,                           &
-        ndf_w3, undf_w3,                                 &
-        cross_stencil_w3_map(:,:,cell),                  &
-        cross_stencil_w3_size,                           &
-        ndf_wtheta, undf_wtheta,                         &
-        cross_stencil_wtheta_map(:,:,cell),              &
-        cross_stencil_wtheta_size,                       &
-        r_theta_bd_proxy%data,                           &
-        rho_proxy%data,                                  &
-        theta_proxy%data,                                &
-        f_proxy%data,                                    &
-        nqp_v, nqp_h_1d, wv,                             &
-        basis_w2_face, basis_w3_face, basis_wtheta_face, &
-        adjacent_face )
+      call rtheta_bd_code(nlayers,                                         &
+                          ndf_w2, undf_w2,                                 &
+                          cross_stencil_w2_map(:,:,cell),                  &
+                          cross_stencil_w2_size,                           &
+                          ndf_w3, undf_w3,                                 &
+                          cross_stencil_w3_map(:,:,cell),                  &
+                          cross_stencil_w3_size,                           &
+                          ndf_wtheta, undf_wtheta,                         &
+                          cross_stencil_wtheta_map(:,:,cell),              &
+                          cross_stencil_wtheta_size,                       &
+                          r_theta_bd_proxy%data,                           &
+                          rho_proxy%data,                                  &
+                          theta_proxy%data,                                &
+                          f_proxy%data,                                    &
+                          nqp_v, nqp_h_1d, wv,                             &
+                          basis_w2_face, basis_w3_face, basis_wtheta_face, &
+                          adjacent_face )
 
     end do
 
@@ -448,28 +448,345 @@ contains
         end do
       end do
 
-      call ru_bd_code( nlayers,             &
-        ndf_w2, undf_w2,                    &
-        map_w2,                             &
-        ndf_w3, undf_w3,                    &
-        cross_stencil_w3_map(:,:,cell),     &
-        cross_stencil_w3_size,              &
-        ndf_wtheta, undf_wtheta,            &
-        cross_stencil_wtheta_map(:,:,cell), &
-        cross_stencil_wtheta_size,          &
-        r_u_bd_proxy%data,                  &
-        rho_proxy%data,                     &
-        theta_proxy%data,                   &
-        nqp_v, nqp_h_1d, wv,                &
-        basis_w2_face,                      &
-        basis_w3_face, basis_wtheta_face,   &
-        adjacent_face)
+      call ru_bd_code(nlayers,                            &
+                      ndf_w2, undf_w2,                    &
+                      map_w2,                             &
+                      ndf_w3, undf_w3,                    &
+                      cross_stencil_w3_map(:,:,cell),     &
+                      cross_stencil_w3_size,              &
+                      ndf_wtheta, undf_wtheta,            &
+                      cross_stencil_wtheta_map(:,:,cell), &
+                      cross_stencil_wtheta_size,          &
+                      r_u_bd_proxy%data,                  &
+                      rho_proxy%data,                     &
+                      theta_proxy%data,                   &
+                      nqp_v, nqp_h_1d, wv,                &
+                      basis_w2_face,                      &
+                      basis_w3_face, basis_wtheta_face,   &
+                      adjacent_face)
 
     end do
 
     deallocate(basis_w3_face, basis_w2_face, basis_wtheta_face, adjacent_face)
 
   end subroutine invoke_ru_bd_kernel
+
+  !-------------------------------------------------------------------------------
+  !> Invoke_exner_gradient_bd_kernel: Invoke the boundary integral for the exner_gradient kernel
+  subroutine invoke_exner_gradient_bd_kernel( r_u_bd, exner, theta, qr )
+
+    use exner_gradient_bd_kernel_mod, only : exner_gradient_bd_code
+    use mesh_mod,                     only : mesh_type ! Work around for intel_v15 failues on the Cray
+    use stencil_dofmap_mod,           only : stencil_dofmap_type, STENCIL_CROSS
+    use reference_element_mod,        only : nfaces_h
+
+    implicit none
+
+    type( mesh_type )                    :: mesh
+    type( field_type ), intent( in )     :: exner, theta
+    type( field_type ), intent( inout )  :: r_u_bd
+    type( quadrature_type), intent( in ) :: qr
+
+    type(stencil_dofmap_type), pointer :: cross_stencil_w2 => null()
+    type(stencil_dofmap_type), pointer :: cross_stencil_w3 => null()
+
+    integer                 :: cell, nlayers, nqp_h, nqp_v, nqp_h_1d
+    integer                 :: ndf_w2, ndf_w3, ndf_wtheta
+    integer                 :: undf_w2, undf_w3, undf_wtheta
+    integer                 :: dim_w2, dim_w3, dim_wtheta
+    integer, pointer        :: map_w2(:) => null()
+    integer, pointer        :: map_wtheta(:) => null()
+    integer, allocatable    :: adjacent_face(:)
+
+    integer, pointer        :: cross_stencil_w2_map(:,:,:) => null()
+
+    integer, pointer        :: cross_stencil_w3_map(:,:,:) => null()
+    integer                 :: cross_stencil_w3_size
+
+
+    integer                 :: ii, jj, ff
+
+    type( field_proxy_type )        :: r_u_bd_proxy, exner_proxy, theta_proxy
+
+    real(kind=r_def), allocatable  :: basis_w2_face(:,:,:,:,:)
+    real(kind=r_def), allocatable  :: basis_w3_face(:,:,:,:,:)
+    real(kind=r_def), allocatable  :: basis_wtheta_face(:,:,:,:,:)
+
+    real(kind=r_def), pointer :: xp(:,:), xp_f(:,:,:) => null()
+    real(kind=r_def), pointer :: zp(:) => null()
+    real(kind=r_def), pointer :: wh(:), wv(:) => null()
+
+    mesh = exner%get_mesh()
+
+    r_u_bd_proxy = r_u_bd%get_proxy()
+    exner_proxy  = exner%get_proxy()
+    theta_proxy  = theta%get_proxy()
+
+    cross_stencil_w2 => r_u_bd_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
+    cross_stencil_w2_map => cross_stencil_w2%get_whole_dofmap()
+
+    cross_stencil_w3 => exner_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
+    cross_stencil_w3_map => cross_stencil_w3%get_whole_dofmap()
+    cross_stencil_w3_size = cross_stencil_w3%get_size()
+
+    nlayers = exner_proxy%vspace%get_nlayers()
+    nqp_h=qr%get_nqp_h()
+    nqp_v=qr%get_nqp_v()
+    zp=>qr%get_xqp_v()
+    xp=>qr%get_xqp_h()
+    wh=>qr%get_wqp_h()
+    wv=>qr%get_wqp_v()
+
+    ! Assumes same number of horizontal qp in x and y
+    nqp_h_1d = int(nqp_h**(1./2.))  ! use sqrt
+
+    allocate(xp_f(nfaces_h, nqp_h_1d, 2))
+
+    ndf_w2      = r_u_bd_proxy%vspace%get_ndf( )
+    dim_w2      = r_u_bd_proxy%vspace%get_dim_space( )
+    undf_w2     = r_u_bd_proxy%vspace%get_undf()
+    allocate(basis_w2_face(nfaces_h,dim_w2,ndf_w2,nqp_h_1d,nqp_v))
+
+    ndf_w3  = exner_proxy%vspace%get_ndf( )
+    dim_w3  = exner_proxy%vspace%get_dim_space( )
+    undf_w3 = exner_proxy%vspace%get_undf()
+    allocate(basis_w3_face(nfaces_h,dim_w3,ndf_w3,nqp_h_1d,nqp_v))
+
+    ndf_wtheta      = theta_proxy%vspace%get_ndf( )
+    dim_wtheta      = theta_proxy%vspace%get_dim_space( )
+    undf_wtheta     = theta_proxy%vspace%get_undf()
+    allocate(basis_wtheta_face(nfaces_h,dim_wtheta,ndf_wtheta,nqp_h_1d,nqp_v))
+
+    allocate(adjacent_face(nfaces_h))
+
+    ! Quadrature points on horizontal faces
+
+    xp_f(1, :, :) = xp(1:nqp_h_1d, :)
+    xp_f(1, :, 1) = 0.0_r_def
+
+    xp_f(2, :, :) = xp(1:nqp_h - nqp_h_1d + 1:nqp_h_1d, :)
+    xp_f(2, :, 2) = 0.0_r_def
+
+    xp_f(3, :, :) = xp(nqp_h - nqp_h_1d + 1:nqp_h, :)
+    xp_f(3, :, 1) = 1.0_r_def
+
+    xp_f(4, :, :) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
+    xp_f(4, :, 2) = 1.0_r_def
+
+    ! Filling up the face basis vector with value of the basis functions at the horizontal faces quadrature points
+
+    do ff = 1, nfaces_h
+
+      call r_u_bd_proxy%vspace%compute_basis_function( &
+        basis_w2_face(ff,:,:,:,:), ndf_w2, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+      call exner_proxy%vspace%compute_basis_function( &
+        basis_w3_face(ff,:,:,:,:), ndf_w3, nqp_h_1d, nqp_v, xp_f(ff, :,:), zp)
+
+      call theta_proxy%vspace%compute_basis_function( &
+        basis_wtheta_face(ff,:,:,:,:), ndf_wtheta, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+    end do
+
+
+    do cell = 1, r_u_bd_proxy%vspace%get_ncell()
+
+      map_w2 => r_u_bd_proxy%vspace%get_cell_dofmap( cell )
+      map_wtheta => theta_proxy%vspace%get_cell_dofmap( cell )
+
+      do ii = 1, nfaces_h
+        do jj = 1, nfaces_h
+
+          if(cross_stencil_w2_map(ii, 1, cell) == cross_stencil_w2_map(jj, ii+1, cell)) adjacent_face(ii) = jj
+
+        end do
+      end do
+
+      call exner_gradient_bd_code( nlayers,                            &
+                                   ndf_w2, undf_w2,                    &
+                                   map_w2,                             &
+                                   ndf_w3, undf_w3,                    &
+                                   cross_stencil_w3_map(:,:,cell),     &
+                                   cross_stencil_w3_size,              &
+                                   ndf_wtheta, undf_wtheta,            &
+                                   map_wtheta,                         &
+                                   r_u_bd_proxy%data,                  &
+                                   exner_proxy%data,                   &
+                                   theta_proxy%data,                   &
+                                   nqp_v, nqp_h_1d, wv,                &
+                                   basis_w2_face,                      &
+                                   basis_w3_face, basis_wtheta_face,   &
+                                   adjacent_face)
+
+    end do
+
+    deallocate(basis_w3_face, basis_w2_face, basis_wtheta_face, adjacent_face, xp_f)
+
+  end subroutine invoke_exner_gradient_bd_kernel
+
+  !-------------------------------------------------------------------------------
+  !> Invoke_pert_pressure_gradient_bd_kernel: Invoke the boundary part of pert_pressure_gradient kernel.
+  subroutine invoke_pert_pressure_gradient_bd_kernel( r_u_bd, rho, rho_ref, theta, theta_ref, qr )
+
+    use pert_pressure_gradient_bd_kernel_mod, only : pert_pressure_gradient_bd_code
+    use mesh_mod,                             only : mesh_type ! Work around for intel_v15 failues on the Cray
+    use stencil_dofmap_mod,                   only : stencil_dofmap_type, STENCIL_CROSS
+    use reference_element_mod,                only : nfaces_h
+
+    implicit none
+
+    type( mesh_type )                    :: mesh
+    type( field_type ), intent( in )     :: rho, theta, rho_ref, theta_ref
+    type( field_type ), intent( inout )  :: r_u_bd
+    type( quadrature_type), intent( in ) :: qr
+
+    type(stencil_dofmap_type), pointer :: cross_stencil_w2 => null()
+    type(stencil_dofmap_type), pointer :: cross_stencil_w3 => null()
+    type(stencil_dofmap_type), pointer :: cross_stencil_wtheta => null()
+
+    integer                 :: cell, nlayers, nqp_h, nqp_v, nqp_h_1d
+    integer                 :: ndf_w2, ndf_w3, ndf_wtheta
+    integer                 :: undf_w2, undf_w3, undf_wtheta
+    integer                 :: dim_w2, dim_w3, dim_wtheta
+    integer, pointer        :: map_w2(:) => null()
+    integer, allocatable    :: adjacent_face(:)
+
+    integer, pointer        :: cross_stencil_w2_map(:,:,:) => null()
+
+    integer, pointer        :: cross_stencil_w3_map(:,:,:) => null()
+    integer                 :: cross_stencil_w3_size
+
+    integer, pointer        :: cross_stencil_wtheta_map(:,:,:) => null()
+    integer                 :: cross_stencil_wtheta_size
+
+    integer                 :: ii, jj, ff
+
+    type( field_proxy_type )        :: r_u_bd_proxy, rho_proxy, theta_proxy, rho_ref_proxy, theta_ref_proxy
+
+    real(kind=r_def), allocatable  :: basis_w2_face(:,:,:,:,:),    &
+                                      basis_w3_face(:,:,:,:,:),    &
+                                      basis_wtheta_face(:,:,:,:,:)
+
+    real(kind=r_def), pointer :: xp(:,:), xp_f(:,:,:) => null()
+    real(kind=r_def), pointer :: zp(:) => null()
+    real(kind=r_def), pointer :: wh(:), wv(:) => null()
+
+    mesh = rho%get_mesh()
+
+    r_u_bd_proxy = r_u_bd%get_proxy()
+    rho_proxy    = rho%get_proxy()
+    theta_proxy  = theta%get_proxy()
+    rho_ref_proxy    = rho_ref%get_proxy()
+    theta_ref_proxy  = theta_ref%get_proxy()
+
+    cross_stencil_w2 => r_u_bd_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
+    cross_stencil_w2_map => cross_stencil_w2%get_whole_dofmap()
+
+    cross_stencil_w3 => rho_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
+    cross_stencil_w3_map => cross_stencil_w3%get_whole_dofmap()
+    cross_stencil_w3_size = cross_stencil_w3%get_size()
+
+    cross_stencil_wtheta => theta_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
+    cross_stencil_wtheta_map => cross_stencil_wtheta%get_whole_dofmap()
+    cross_stencil_wtheta_size = cross_stencil_wtheta%get_size()
+
+    nlayers = rho_proxy%vspace%get_nlayers()
+    nqp_h=qr%get_nqp_h()
+    nqp_v=qr%get_nqp_v()
+    zp=>qr%get_xqp_v()
+    xp=>qr%get_xqp_h()
+    wh=>qr%get_wqp_h()
+    wv=>qr%get_wqp_v()
+
+    ! Assumes same number of horizontal qp in x and y
+    nqp_h_1d = int(nqp_h**(1./2.))  ! use sqrt
+
+    allocate(xp_f(nfaces_h, nqp_h_1d, 2))
+
+    ndf_w2      = r_u_bd_proxy%vspace%get_ndf( )
+    dim_w2      = r_u_bd_proxy%vspace%get_dim_space( )
+    undf_w2     = r_u_bd_proxy%vspace%get_undf()
+    allocate(basis_w2_face(nfaces_h,dim_w2,ndf_w2,nqp_h_1d,nqp_v))
+
+    ndf_w3  = rho_proxy%vspace%get_ndf( )
+    dim_w3  = rho_proxy%vspace%get_dim_space( )
+    undf_w3 = rho_proxy%vspace%get_undf()
+    allocate(basis_w3_face(nfaces_h,dim_w3,ndf_w3,nqp_h_1d,nqp_v))
+
+    ndf_wtheta      = theta_proxy%vspace%get_ndf( )
+    dim_wtheta      = theta_proxy%vspace%get_dim_space( )
+    undf_wtheta     = theta_proxy%vspace%get_undf()
+    allocate(basis_wtheta_face(nfaces_h,dim_wtheta,ndf_wtheta,nqp_h_1d,nqp_v))
+
+    allocate(adjacent_face(nfaces_h))
+
+    ! Quadrature points on horizontal faces
+
+    xp_f(1, :, :) = xp(1:nqp_h_1d, :)
+    xp_f(1, :, 1) = 0.0_r_def
+
+    xp_f(2, :, :) = xp(1:nqp_h - nqp_h_1d + 1:nqp_h_1d, :)
+    xp_f(2, :, 2) = 0.0_r_def
+
+    xp_f(3, :, :) = xp(nqp_h - nqp_h_1d + 1:nqp_h, :)
+    xp_f(3, :, 1) = 1.0_r_def
+
+    xp_f(4, :, :) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
+    xp_f(4, :, 2) = 1.0_r_def
+
+    ! Filling up the face basis vector with value of the basis functions at the horizontal faces quadrature points
+
+    do ff = 1, nfaces_h
+
+      call r_u_bd_proxy%vspace%compute_basis_function( &
+        basis_w2_face(ff,:,:,:,:), ndf_w2, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+      call rho_proxy%vspace%compute_basis_function( &
+        basis_w3_face(ff,:,:,:,:), ndf_w3, nqp_h_1d, nqp_v, xp_f(ff, :,:), zp)
+
+      call theta_proxy%vspace%compute_basis_function( &
+        basis_wtheta_face(ff,:,:,:,:), ndf_wtheta, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+    end do
+
+
+    do cell = 1, r_u_bd_proxy%vspace%get_ncell()
+
+      map_w2 => r_u_bd_proxy%vspace%get_cell_dofmap( cell )
+
+      do ii = 1, nfaces_h
+        do jj = 1, nfaces_h
+
+          if(cross_stencil_w2_map(ii, 1, cell) == cross_stencil_w2_map(jj, ii+1, cell)) adjacent_face(ii) = jj
+
+        end do
+      end do
+
+      call pert_pressure_gradient_bd_code( nlayers,                            &
+                                           ndf_w2, undf_w2,                    &
+                                           map_w2,                             &
+                                           ndf_w3, undf_w3,                    &
+                                           cross_stencil_w3_map(:,:,cell),     &
+                                           cross_stencil_w3_size,              &
+                                           ndf_wtheta, undf_wtheta,            &
+                                           cross_stencil_wtheta_map(:,:,cell), &
+                                           cross_stencil_wtheta_size,          &
+                                           r_u_bd_proxy%data,                  &
+                                           rho_proxy%data,                     &
+                                           rho_ref_proxy%data,                 &
+                                           theta_proxy%data,                   &
+                                           theta_ref_proxy%data,               &
+                                           nqp_v, nqp_h_1d, wv,                &
+                                           basis_w2_face,                      &
+                                           basis_w3_face, basis_wtheta_face,   &
+                                           adjacent_face)
+
+    end do
+
+    deallocate(basis_w3_face, basis_w2_face, basis_wtheta_face, adjacent_face, xp_f)
+
+  end subroutine invoke_pert_pressure_gradient_bd_kernel
+
 
 !-------------------------------------------------------------------------------    
   subroutine invoke_inner_prod(x,y,inner_prod)
