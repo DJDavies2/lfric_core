@@ -15,6 +15,7 @@
 \usepackage{cancel}
 \usepackage{graphicx}
 \usepackage{indentfirst}
+\usepackage{stmaryrd}
 
 \makeatletter
 
@@ -43,6 +44,12 @@
   \def\labelitemii{\textcolor{red}{\(\ast\)}}
 }
 
+\newsavebox{\@brx}
+\newcommand{\llangle}[1][]{\savebox{\@brx}{\(\m@th{#1\langle}\)}%
+  \mathopen{\copy\@brx\mkern2mu\kern-0.9\wd\@brx\usebox{\@brx}}}
+\newcommand{\rrangle}[1][]{\savebox{\@brx}{\(\m@th{#1\rangle}\)}%
+  \mathclose{\copy\@brx\mkern2mu\kern-0.9\wd\@brx\usebox{\@brx}}}
+
 \makeatother
 
 \begin{document}
@@ -57,7 +64,7 @@
 \hspace*{7 mm}T. Melvin, Met Office, FitzRoy Road, Exeter EX1 3PB,
 U.K.\protect \\
 \hspace*{7 mm}email: Thomas.Melvin@metoffice.gov.uk%
-}\\
+}, Stephen Pring$^{1}$, Tommaso Benacchio$^{1}$\\
 $^{1}$ Met Office, Exeter, U.K.}
 \maketitle
 \begin{abstract}
@@ -530,7 +537,7 @@ and the right hand sides are given by equations \eqref{eq:linear_mom_vec_invaria
 The same method can be applied to the nonlinear equations \eqref{eq:nonlinear_mom-pullback}-\eqref{eq:vorticity_pullback}.
 
 
-\subsection{Semi-Implicit Timestepping}
+\subsection{\label{sec:SI_timestepping}Semi-Implicit Timestepping}
 
 The governing equations can be compactly written as 
 \begin{equation}
@@ -707,7 +714,7 @@ D^{\theta^{*}} & = & \left<\sigma,\nabla.\left(\theta^{*}\mathbf{v}\right)\right
 P_{2\theta}^{\Pi^{*}} & = & \left<\Pi^{*},\nabla.\left(\gamma\mathbf{v}\right)\right> \equiv \left<\nabla.\mathbf{v},\Pi^{*}\gamma\right> + \left<\mathbf{v},\Pi^{*}\nabla\gamma \right>,\label{eq:Ptheta2_star_operator}\\
 M_{3}^{\rho^{*}} & = & \left<\sigma,\frac{\sigma}{\rho^{*}}\det\left(J\right)\right>,\label{eq:M3_rho_star_operator}\\
 M_{3}^{\Pi^{*}} & = & \left<\sigma,\frac{\sigma}{\Pi^{*}}\det\left(J\right)\right>,\label{eq:M3_p_star_operator}\\
-P_{\theta2}^{\theta^{*}} & = & \left<\gamma,\left(\nabla\theta^{*}\right)\mathbf{v} \right>,\label{eq:P2theta_operator}\\
+P_{\theta2}^{\theta^{*}} & = & \left<\gamma,\left(\nabla\theta^{*}\right)\cdot\mathbf{v} \right>,\label{eq:P2theta_operator}\\
 P_{3\theta}^{*} & = & \left<\sigma,\frac{\gamma}{\theta^{*}}\det\left(J\right)\right>,\label{eq:Ptheta3_operator}
 \end{eqnarray}
 and all integrals and functions are evaluated in the computational domain. Where subscripted an operator $P_{ij}$ maps from $\mathbb{W}_j$ to $\mathbb{W}_i$ and a single subscript denotes a mass matrix $M_{i}$ that maps from $\mathbb{W}_{i}$ to itself, finally the $D$ operators are divergence mappings that map from $\mathbb{W}_{2}$ to $\mathbb{W}_{3}$. Whenever it is needed $\Pi^{*}$ is computed from the equation of state using $\rho^{*}$ and $\theta^{*}$.
@@ -813,6 +820,90 @@ All derivatives are computed in computational space, $\frac{\partial f}{\partial
 \end{equation}
 and only the terms that maps the vertical velocity component to itself of $J^T J$ is kept, (equivalent to $\Delta z^2$ in a uniform domain). To ensure stability this operator is forced to be positive by maxing it with a small positive constant.
 
+\section{\label{sec:Wtheta} Modifications for horizontally discontinuous potential temperature}
+
+As mentioned in Section \ref{sec:FEM-Discretisation}, in order to obtain a grid arrangement equivalent to the Charney-Phillips staggering, the potential temperature $\theta$ has to be
+placed in the same space as the vertical component of the velocity vector. $\mathbb{W}_\theta$ is therefore the space of scalar functions built from the tensor product of one $P^{k+1}$ polynomial (in the vertical
+direction) and two $P^k_{DG}$ polynomials (in the horizontal direction) with continuity in the vertical direction only. This Section explains the modifications in the formulation when considering
+$\theta\in\mathbb{W}_\theta$ instead of $\theta\in\mathbb{W}_0$. With an abuse of notation, we still denote as $\gamma$ the test function in $\mathbb{W}_\theta$. Moreover, we denote the boundary
+integral
+\begin{equation}
+\int_{\partial\Omega}tsdS,\label{eq:face_int_def}
+\end{equation}    
+with 
+\begin{equation}
+\llangle t, s\rrangle\label{eq:dbl_ang_brack_def}.
+\end{equation}    
+Above, $\partial\Omega$ denotes the boundary of the domain $\Omega$. Next, let $\mathcal{E}$ be a tessellation of $\Omega$, restricting our attention to extruded quadrilateral
+elements for simplicity. For a scalar or vector function $\varphi$, we denote by $\varphi^-$ and $\varphi^+$ the inner
+and outer traces on the boundary $\partial\mathcal{C}$ of an element $\mathcal{C}\in\mathcal{E}$ with outward-pointing normal vector $\mathbf{n}^-$ as follows:
+\begin{equation}
+\varphi^{\pm}(\mathbf{x}, t) =\lim_{\varepsilon\rightarrow0}\varphi(\mathbf{x}\pm\varepsilon\mathbf{n}^-, t). \label{eq:outwd_traces_def}
+\end{equation}
+Let $\mathcal{C}'\in\mathcal{E}$ be an element adjacent to element $\mathcal{C}$, with outward-pointing boundary $\mathbf{n}^+$. Let
+$\mathcal{F}$ be the set of all faces of $\mathcal{E}$, so that $\int_{\mathcal{F}}=\sum_{f\in\mathcal{F}}\int_f$.
+On an interior face $\mathcal{F}\backslash\partial\Omega\ni f=\partial\mathcal{C}\cap\partial\mathcal{C}'$ we set:
+\begin{equation}
+\{\varphi\}=\frac12\left(\varphi^++\varphi^-\right),\qquad\llbracket\varphi\rrbracket = \varphi^-\mathbf{n}^-+\varphi^+\mathbf{n}^+,\label{eq:jump_at_bd_face_def}
+\end{equation}
+whilst at boundary cells $\mathcal{C}$, i.e. for faces $f\in\mathcal{F}\cap\partial\Omega$, we set: 
+\begin{equation}
+\{\varphi\}=\varphi,\qquad\llbracket\varphi\rrbracket = \varphi\mathbf{n}^-.\label{eq:jump_at_bd_domain_def}
+\end{equation}
+If $\varphi$ is a vector, then the multiplications in the definition of $\llbracket\varphi\rrbracket$ are dot products.
+Therefore, if $\varphi$ is a scalar (respectively vector) quantity, then $\{\varphi\}$ is a scalar (resp. vector), and $\llbracket\varphi\rrbracket$ is a vector (resp. scalar).
+
+With this notation, and considering $\theta\in\mathbb{W}_\theta$, the weak form \eqref{eq:nonlinear_mom-1-1-1} of the momentum equation is modified as follows:
+\begin{equation}
+\left\langle \mathbf{v},\frac{\partial\mathbf{u}}{\partial t}\right\rangle  = -\left\langle \mathbf{v},\frac{\bm{\xi}}{\rho}\times\mathbf{F}+\nabla\Phi\right\rangle +\left\langle \nabla.\mathbf{v},K\right\rangle -c_{pd}\llangle\llbracket\theta\mathbf{v}, \Pi\rrbracket\rrangle +c_{pd}\left\langle \nabla_h.\left(\theta\mathbf{v}\right),\Pi\right\rangle -\left\langle \mathbf{v},2\bm{\Omega}\times\mathbf{u}\right\rangle ,\label{eq:nonlinear_mom-1-1-1_wth}
+\end{equation}
+where the boundary integral is to be taken on the internal faces $\mathcal{F}\backslash\partial\Omega$ only, and $\nabla_h\cdot(\theta\mathbf{v})$ is a function over $\Omega$
+whose restriction to the cell $\mathcal{C}$ is equal to $\nabla\cdot(\theta\mathbf{v})$. 
+As $\mathbf{v}$ has continuous normal component then for each face $f\in\mathcal{F}\backslash\partial\Omega$
+we have $\llbracket\theta\mathbf{v}\rrbracket = \theta^-\mathbf{v}^-\cdot\mathbf{n}^-+\theta^+\mathbf{v}^+\cdot\mathbf{n}^+=\mathbf{v}\cdot\mathbf{n^-}\left(\theta^--\theta^+\right)$,
+the jump of $\theta$ across the face $f$. In view of the continuity in the vertical direction for $\theta\in\mathbb{W}_\theta$,
+for each cell $\mathcal{C}$ the contribution of the boundary integral is equal to the sum of the
+integrals over the vertical faces ($f_1,f_2,f_3,f_4$) of $\partial\mathcal{C}$:
+\begin{equation}
+-c_{p}\sum_{i=1}^4\int_{f_i}\mathbf{v}\cdot\mathbf{n^{-}}\theta^{-}{\Pi}\ dA.\label{eq:face_integral_vert_faces}
+\end{equation}
+As a value for $\Pi$ on $f$, the average between the values on either side of $f$ is taken, i.e., $\Pi_{|f}=\{\Pi\}$.
+
+Since $\theta\in\mathbb{W}_\theta$ is horizontally discontinuous, the advection term in the thermodynamic equation \eqref{eq:nonlinear_thermo-1-1} has to be integrated by parts. The result is:
+\begin{equation}
+\left\langle \gamma,\frac{\partial\theta}{\partial t}\right\rangle  = -\llangle\widehat{\theta\mathbf{u}}\cdot\mathbf{n}^-, \gamma\rrangle + \left\langle\nabla_h\cdot\left(\gamma\mathbf{u}\right), \theta\right\rangle, \label{eq:nonlinear_thermo-1-1_wth}
+\end{equation}
+where the boundary integral is to be taken on the internal faces $\mathcal{F}\backslash\partial\Omega$ only, and $\nabla_h\cdot(\gamma\mathbf{u})$ is a function over $\Omega$
+whose restriction to $\mathcal{C}$ is equal to $\nabla\cdot(\gamma\mathbf{u})$. Choices for the flux term $\widehat{\theta\mathbf{u}}$ in \eqref{eq:nonlinear_thermo-1-1_wth} include the centered flux:
+\begin{equation}
+\widehat{\theta\mathbf{u}} = \{\theta\mathbf{u}\}\label{eq:centered_flux_tdeq}
+\end{equation}
+and the upwind flux:
+\begin{equation}
+\widehat{\theta\mathbf{u}} = \{\theta\mathbf{u}\}+\frac12|\mathbf{u}\cdot\mathbf{n}^-|\llbracket\theta\rrbracket.\label{eq:upwind_flux_tdeq}
+\end{equation}
+
+With reference to section \ref{sec:Coordinate-Transforms}, the coordinate transform for functions in $\mathbb{W}_\theta$ is the same as for functions in $\mathbb{W}_0$. Hence, the momentum equation
+\eqref{eq:nonlinear_mom-pullback} and thermodynamic equation \eqref{eq:nonlinear_thermo-pullback} pulled back via the coordinate transform are modified for $\theta\in\mathbb{W}_\theta$ as:
+\begin{eqnarray}
+\left\langle J\hat{\mathbf{v}},\frac{J}{\det\left(J\right)}\frac{\partial\hat{\mathbf{u}}}{\partial t}\right\rangle & = & -\left\langle J\hat{\mathbf{v}},\frac{J^{-T}\hat{\bm{\xi}}}{\hat{\rho}\det\left(J\right)}\times J\hat{\mathbf{F}}\right\rangle -\left\langle \hat{\mathbf{v}},\nabla\Phi\right\rangle +\left\langle \nabla.\hat{\mathbf{v}},\frac{1}{2}\left(\frac{J\hat{\mathbf{u}}}{\det\left(J\right)}\right).\left(\frac{J\hat{\mathbf{u}}}{\det\left(J\right)}\right)\right\rangle \label{eq:nonlinear_mom-pullback_wt}\\
+& & -\left\langle \frac{J\hat{\mathbf{v}}}{\det\left(J\right)},2\bm{\Omega}\times\left(J\hat{\mathbf{u}}\right)\right\rangle -c_{pd}\llangle\llbracket\hat{\theta}\hat{\mathbf{v}}, \hat{\Pi}\rrbracket\rrangle +c_{pd}\left\langle \hat{\theta}\nabla.\hat{\mathbf{v}}+\hat{\mathbf{v}}.\nabla\hat{\theta},\Pi\right\rangle ,\nonumber
+\end{eqnarray}
+and 
+\begin{equation}
+\left\langle \hat{\gamma},\frac{\partial\hat{\theta}'}{\partial t}\det\left(J\right)\right\rangle = -\llangle\widehat{\hat{\theta}\hat{\mathbf{u}}}\cdot\mathbf{n}^-, \gamma\rrangle + \left\langle\nabla_h\cdot\left(\hat{\gamma}\hat{\mathbf{u}}\right), \hat{\theta}\right\rangle\label{eq:nonlinear_thermo-pullback_wt}
+\end{equation}
+respectively.
+
+As for time integration, in the case $\theta\in\mathbb{W}_\theta$ the mass matrix $M_\theta$, defined equivalently to $M_0$ in \eqref{eq:M0_mass_matrix}, replaces $M_0$ in \eqref{eq:theta_RK}.
+Moreover, the expression for the residuals in section \ref{sec:SI_timestepping} are modified as follows
+\begin{eqnarray}
+R_{\mathbf{u}}^{n+1} & = & \left\langle \mathbf{v},\mathbf{u}^{n+1}\right\rangle -\alpha\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla.\mathbf{v},K^{n+1}\right\rangle -c_{pd}\llangle\llbracket\theta^{n+1}\mathbf{v}, \Pi^{n+1}\rrbracket\rrangle\right. \label{eq:si_ru_np1_wt}\\
+                     &   & \left.+c_{pd}\left\langle \nabla.\left(\theta^{n+1}\mathbf{v}\right),\Pi^{n+1}\right\rangle -\left\langle \mathbf{v},2\bm{\Omega}\times\mathbf{u}^{n+1}\right\rangle \right],\nonumber\\
+R_{\mathbf{u}}^{n} & = & -\left\langle \mathbf{v},\mathbf{u}^{n}\right\rangle -\left(1-\alpha\right)\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla.\mathbf{v},K^{n}\right\rangle -c_{pd}\llangle\llbracket\theta^n\mathbf{v}, \Pi^n\rrbracket\rrangle\right. \label{eq:si_ru_n_wt}\\
+                   &   & \left.+c_{pd}\left\langle \nabla.\left(\theta^{n}\mathbf{v}\right),\Pi^{n}\right\rangle -\left\langle \mathbf{v},2\mathbf{\Omega}\times\mathbf{u}^{n}\right\rangle \right],  \nonumber\\
+R_{\theta}^{adv} & = & -\Delta t[\llangle\widehat{\theta^n\frac{\widetilde{\mathbf{F}}}{\widetilde{\rho}}}\cdot\mathbf{n}^-, \gamma\rrangle + \left\langle\nabla_h\cdot\left(\gamma\frac{\widetilde{\mathbf{F}}}{\widetilde{\rho}}\right), \theta^n\right\rangle].\label{eq:si_rtheta_adv_wt}
+\end{eqnarray}
 
 \section{\label{sec:Advection}Advection}
 
