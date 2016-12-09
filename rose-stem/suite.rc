@@ -3,7 +3,7 @@
                                  'semi-implicit-360ts', 'si-helmholtz', 
                                  'transport-cosmic', 'transport-rk',
                                  'biperiodic_p0_gw', 'biperiodic_p1_gw',
-                                 'dcmip301' %}
+                                 'dcmip301', 'robert', 'robert-moist' %}
 {%- set groups = {'developer': ['science(semi-implicit)',
                                 'science(si-helmholtz)',
                                 'science(runge-kutta)',
@@ -16,6 +16,8 @@
                                 'canned_test',
                                 'godlines',
                                 'cleanlines'],
+		  'csar':    ['science(robert)',
+                              'science(robert-moist)'],
                   'nightly': ['science(semi-implicit-360ts, True, T000360)',
                               'science(dcmip301, True, T000018)',
                               'miniapp(gravity_wave)',
