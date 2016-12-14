@@ -7,6 +7,7 @@ program donothing
   use columnwise_op_appinv_kernel_mod, only : columnwise_op_appinv_kernel_type
   use columnwise_op_mul_kernel_mod, only : columnwise_op_mul_kernel_type
   use columnwise_op_scaledadd_kernel_mod, only : columnwise_op_scaledadd_kernel_type
+  use field_vector_mod
 
   implicit none
 
