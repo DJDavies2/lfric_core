@@ -455,22 +455,21 @@
         inherit = PUBLISH, {{family}}, TARGET
         pre-script = """
  {{ensureDestination()}}
-                     mkdir -p ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data
-                     chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output
+                     mkdir -p ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}
                      chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}
-                     chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data
-                     rm -rf $NODAL_DATA_DIR/*.m
+                     mkdir -p ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/plots
+                     chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/plots
+                     chmod 755 ~/public_html/dynamo-{{TARGET_OPT}}/model_output
+                     # remove old plots before running new ones
                      rm -rf $PLOT_DIR/*.png
-                     cp $DYNAMO_DESTINATION_DIRECTORY/{{configuration}}/results/* $NODAL_DATA_DIR
-                     chmod 754 $NODAL_DATA_DIR/*.m
                      """
         script = rose task-run --app-key=plot
         post-script = """
                       chmod 754 $PLOT_DIR/*.png
                       """
         [[[environment]]]
-             NODAL_DATA_DIR = ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/nodal_data
-             PLOT_DIR = ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}
+             NODAL_DATA_DIR = $DYNAMO_DESTINATION_DIRECTORY/{{configuration}}/results/
+             PLOT_DIR = ~/public_html/dynamo-{{TARGET_OPT}}/model_output/{{configuration_label}}/plots
              FIELDS = theta,rho
              TS = {{ts_config[ts_label]}}
 
