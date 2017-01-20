@@ -55,7 +55,10 @@ contains
                                  base_mesh_partitioner_planar, &
                                  .false., 0.0_r_def)
     call feign_initial_temperature_config( bvf_square )
-    call feign_planet_config( gravity, radius, omega, rd, cp, p_zero, scaling )
+
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
 
   end subroutine setUp
 

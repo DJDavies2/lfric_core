@@ -50,7 +50,9 @@ contains
 
     class(compute_geopotential_kernel_test_type), intent(inout) :: this
 
-    call feign_planet_config( gravity, radius, omega, rd, cp, p_zero, scaling )
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
 
     allocate( this%map(ndf), &
               this%x(undf),  &

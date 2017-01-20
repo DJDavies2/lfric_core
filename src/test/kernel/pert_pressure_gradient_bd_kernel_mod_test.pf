@@ -102,7 +102,10 @@ contains
                                  base_mesh_partitioner_planar, &
                                  .false., 0.0_r_def)
     call feign_initial_temperature_config( bvf_square )
-    call feign_planet_config( cp, gravity, omega, p_zero, radius, rd, scaling )
+
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
 
     reference_element = finite_element_shape_quadrilateral
     call reference_cube()
@@ -204,7 +207,7 @@ contains
     real(r_def), parameter :: tol_v = 1.0e-8_r_def
     real(r_def), parameter :: tol_h = 1.0e+3_r_def
     real(r_def), parameter :: answer_v = 0.0_r_def
-    real(r_def), parameter :: answer_h = -0.2410484E+10_r_def
+    real(r_def), parameter :: answer_h = -536716.4_r_def
 
     integer :: cell
 

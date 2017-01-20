@@ -102,7 +102,10 @@ contains
                                        tracer_background, tracer_max, &
                                        0.0_r_def, 0.0_r_def, y1, y2 )
     call feign_initial_temperature_config( bvf_square )
-    call feign_planet_config( gravity, radius, omega, rd, cp, p_zero, scaling )
+
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
 
     reference_element = finite_element_shape_quadrilateral
     call reference_cube()

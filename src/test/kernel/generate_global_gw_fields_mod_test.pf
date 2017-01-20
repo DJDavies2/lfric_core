@@ -49,7 +49,11 @@ contains
     class(generate_global_gw_fields_test_type), intent(inout) :: this
 
     call feign_initial_temperature_config( bvf_square )
-    call feign_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
+
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
+
     call feign_initial_wind_config( initial_wind_profile_none, &
                                     0.0_r_def, 0.0_r_def, 0.0_r_def )
   end subroutine setUp

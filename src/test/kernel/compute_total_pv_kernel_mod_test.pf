@@ -57,7 +57,7 @@ contains
   subroutine setUp( this )
 
     use finite_element_config_mod, only : finite_element_shape_quadrilateral
-    use feign_config_mod,           only : feign_planet_config
+    use feign_config_mod,          only : feign_planet_config
     use mesh_mod,                  only : PLANE_BI_PERIODIC
     use reference_element_mod,     only : reference_cube, reference_element
 
@@ -74,7 +74,9 @@ contains
 
     integer(i_def) :: mesh_id
 
-    call feign_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
 
     reference_element = finite_element_shape_quadrilateral
     call reference_cube()

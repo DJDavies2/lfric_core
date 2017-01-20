@@ -90,7 +90,10 @@ contains
                                  base_mesh_geometry_planar,    &
                                  base_mesh_partitioner_planar, &
                                  .false., 0.0_r_def)
-    call feign_planet_config( gravity, radius, omega, rd, cp, p_zero, scaling )
+
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
 
     call feign_timestepping_config(method, dt, alpha, nout, nin, rk_method,&
 				    spinup_period,                         &

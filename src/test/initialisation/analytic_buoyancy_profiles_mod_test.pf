@@ -56,7 +56,10 @@ contains
 
     call feign_initial_temperature_config( bvf_square )
     call feign_idealised_config( idealised_test_gravity_wave )
-    call feign_planet_config( gravity, radius, omega, rd, cp, p_zero, scaling )
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
+
     call feign_base_mesh_config( 'foo',                             &
                                  base_mesh_geometry_spherical,      &
                                  base_mesh_partitioner_cubedsphere, &

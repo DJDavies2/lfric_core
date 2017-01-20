@@ -182,7 +182,10 @@ contains
                                  base_mesh_partitioner_cubedsphere, &
                                  .false., 0.0_r_def )
     call feign_extrusion_config( extrusion_method_uniform, domain_top, nlayers )
-    call feign_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
+
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
 
     reference_element = finite_element_shape_quadrilateral
     call reference_cube()

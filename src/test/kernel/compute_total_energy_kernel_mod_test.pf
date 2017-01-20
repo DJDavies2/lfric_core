@@ -76,7 +76,9 @@ contains
     integer(i_def) :: dim_w0, diff_dim_w0, dim_w2, dim_w3
     integer(i_def) :: mesh_id
 
-    call feign_planet_config( gravity, radius, omega, cp, rd, p_zero, scaling )
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
 
     reference_element = finite_element_shape_quadrilateral
     call reference_cube()
