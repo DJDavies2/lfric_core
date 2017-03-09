@@ -157,7 +157,6 @@ subroutine compute_si_operators(ref_state)
   if (wtheta_on) then
     call invoke_weighted_div_bd_kernel_type(div_star, theta, qr)
   end if
-  call invoke( weighted_div_kernel_type(div_star, theta, qr) )
   call invoke( weighted_proj_theta2_kernel_type(ptheta2, theta, qr) )
   call invoke( weighted_proj_2theta_kernel_type(p2theta, theta, rho, qr) )
   call invoke( weighted_proj_3theta_kernel_type(p3theta, theta, chi, qr) )

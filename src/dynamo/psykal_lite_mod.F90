@@ -929,6 +929,7 @@ contains
       use weighted_div_bd_kernel_mod, only : weighted_div_bd_code
       use mesh_mod,                   only : mesh_type
       use reference_element_mod,      only : nfaces_h
+      use stencil_dofmap_mod,         only : stencil_dofmap_type, STENCIL_CROSS
 
       implicit none
 
@@ -941,9 +942,12 @@ contains
       integer :: ndf_w2, ndf_w3, ndf_wtheta, undf_wtheta
       integer :: dim_w2, dim_w3, dim_wtheta
 
-      integer, pointer        :: map_wtheta(:) => null()
+      integer,                   pointer :: map_wtheta(:,:,:) => null(), &
+                                            map_w2(:,:,:) => null()
+      type(stencil_dofmap_type), pointer :: cross_stencil_wtheta => null(), &
+                                            cross_stencil_w2 => null()
 
-      integer                 :: ff
+      integer                 :: ff, wtheta_map_size, ii, jj
 
       real(kind=r_def), allocatable  :: basis_w2_face(:,:,:,:,:), &
       basis_w3_face(:,:,:,:,:), &
@@ -955,6 +959,8 @@ contains
 
       type(operator_proxy_type) ::div_star_proxy
       type(field_proxy_type)    ::theta_proxy
+
+      integer, allocatable    :: adjacent_face(:)
 
       !
       ! Initialise field proxies
@@ -1012,6 +1018,15 @@ contains
       xp_f(4, :, :) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
       xp_f(4, :, 2) = 1.0_r_def
 
+      ! Stencil maps
+      cross_stencil_wtheta => theta_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
+      map_wtheta => cross_stencil_wtheta%get_whole_dofmap()
+      wtheta_map_size = cross_stencil_wtheta%get_size()
+
+      cross_stencil_w2 => div_star_proxy%fs_from%get_stencil_dofmap(STENCIL_CROSS, 1)
+      map_w2 => cross_stencil_w2%get_whole_dofmap()
+      allocate( adjacent_face(nfaces_h) ) 
+
       ! Filling up the face basis vector with value of the basis functions at the horizontal faces quadrature points
 
       do ff = 1, nfaces_h
@@ -1029,13 +1044,14 @@ contains
       !
       ! Call kernels and communication routines
       !
-      if (theta_proxy%is_dirty(depth=1)) then
-        call theta_proxy%halo_exchange(depth=1)
-      end if
+      if (theta_proxy%is_dirty(depth=2)) call theta_proxy%halo_exchange(depth=2)      
       !
-      do cell=1,mesh%get_last_halo_cell(1)
-
-        map_wtheta => theta_proxy%vspace%get_cell_dofmap( cell )
+      do cell=1,mesh%get_last_halo_cell(1)        
+        do ii = 1, nfaces_h
+          do jj = 1, nfaces_h
+            if(map_w2(ii, 1, cell) == map_w2(jj, ii+1, cell)) adjacent_face(ii) = jj
+          end do
+        end do
 
         call weighted_div_bd_code(cell,                               &
                                   nlayers,                            &
@@ -1044,10 +1060,12 @@ contains
                                   theta_proxy%data,                   &
                                   ndf_w2, ndf_w3,                     &
                                   ndf_wtheta, undf_wtheta,            &
-                                  map_wtheta,                         &
+                                  map_wtheta(:,:,cell),               &
+                                  wtheta_map_size,                    &
                                   nqp_v, nqp_h_1d, wv,                &
                                   basis_w2_face,                      &
-                                  basis_w3_face, basis_wtheta_face)
+                                  basis_w3_face, basis_wtheta_face,   &
+                                  adjacent_face)
       end do
       !
       ! Deallocate basis arrays

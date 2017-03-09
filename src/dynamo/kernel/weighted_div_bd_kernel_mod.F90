@@ -11,14 +11,18 @@
 
 !> @details The kernel computes the boundary part of the weighted divergence operator
 !>         This consists of \f[<\sigma,\theta*\mathbf{v}\cdot\mathbf{n}> \f]
-!>          where sigma is the W3 test function, v is the W2 trial function,
-!>          theta is the potential temperature, and \mathbf{n} is the outward pointing normal.
+!>         where sigma is the W3 test function, v is the W2 trial function,
+!>         theta is the potential temperature, and \mathbf{n} is the outward pointing normal.
+!>         Each face provides two contributions to a pressure point, one from
+!>         the right side, using the potential temperature on the right side of
+!>         the face and one from the left side, using the potential temperature on the left 
+!>         side of the face
 
 module weighted_div_bd_kernel_mod
   use kernel_mod,              only : kernel_type
   use argument_mod,            only : arg_type, func_type,                 &
                                       GH_OPERATOR, GH_FIELD,               &
-                                      GH_READ, GH_WRITE,                   &
+                                      GH_READ, GH_INC,                     &
                                       W2, W3, Wtheta, GH_BASIS,            &
                                       CELLS, QUADRATURE_XYoZ
   use constants_mod,           only : r_def, i_def
@@ -34,7 +38,7 @@ module weighted_div_bd_kernel_mod
   type, public, extends(kernel_type) :: weighted_div_bd_kernel_type
     private
     type(arg_type) :: meta_args(2) = (/                               &
-       arg_type(GH_OPERATOR, GH_WRITE, W3, W2),                       &
+       arg_type(GH_OPERATOR, GH_INC,  W3, W2),                        &
        arg_type(GH_FIELD,    GH_READ, Wtheta)                         &
       /)
     type(func_type) :: meta_funcs(3) = (/                             &
@@ -90,16 +94,18 @@ contains
                                   ndf_w2, ndf_w3,                                             &
                                   ndf_wtheta, undf_wtheta,                                    &
                                   map_wtheta,                                                 &
+                                  map_size,                                                   &
                                   nqp_v, nqp_h_1d, wqp_v, w2_basis_face, w3_basis_face,       &
-                                  wtheta_basis_face)
+                                  wtheta_basis_face, adjacent_face)
 
 
     ! Arguments
     integer(kind=i_def), intent(in) :: cell, nlayers, nqp_v, nqp_h_1d, ncell_3d
     integer(kind=i_def), intent(in) :: ndf_w2, ndf_w3
     integer(kind=i_def), intent(in) :: ndf_wtheta, undf_wtheta
+    integer(kind=i_def), intent(in) :: map_size
 
-    integer(kind=i_def), dimension(ndf_wtheta),  intent(in) :: map_wtheta
+    integer(kind=i_def), dimension(ndf_wtheta,map_size),  intent(in) :: map_wtheta
 
     real(kind=r_def), dimension(4,3,ndf_w2,nqp_h_1d,nqp_v), intent(in)     :: w2_basis_face
     real(kind=r_def), dimension(4,1,ndf_w3,nqp_h_1d,nqp_v), intent(in)     :: w3_basis_face
@@ -110,38 +116,45 @@ contains
 
     real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
 
+    integer(kind=i_def), dimension(nfaces_h), intent(in) :: adjacent_face
+
     !Internal variables
-    integer(kind=i_def)              :: df, df2, df3, k, ik, face
+    integer(kind=i_def)              :: df, df2, df3, k, ik, face, face_next
     integer(kind=i_def)              :: qp1, qp2
 
-    real(kind=r_def), dimension(ndf_wtheta)      :: theta_e
+    real(kind=r_def), dimension(ndf_wtheta) :: theta_e, theta_next_e
 
     real(kind=r_def) :: v(3), integrand
-    real(kind=r_def) :: theta_at_fquad, bd_term
+    real(kind=r_def) :: theta_at_fquad, theta_next_at_fquad
+    real(kind=r_def) :: this_bd_term, next_bd_term
+
 
     do k = 0, nlayers - 1
       ik = k + 1 + (cell-1)*nlayers
       do face = 1, nfaces_h
 
-        bd_term = 0.0_r_def
+        face_next = adjacent_face(face)
 
         do df = 1,ndf_wtheta
-          theta_e(df) = theta(map_wtheta(df) + k)
+          theta_e(df)      = theta(map_wtheta(df, 1)      + k)
+          theta_next_e(df) = theta(map_wtheta(df, face+1) + k)
         end do
         do df2 = 1, ndf_w2
           do df3 = 1, ndf_w3
-            div(df3,df2,ik) = 0.0_r_def
             do qp2 = 1, nqp_v
               do qp1 = 1, nqp_h_1d
-                theta_at_fquad = 0.0_r_def
+                theta_at_fquad      = 0.0_r_def 
+                theta_next_at_fquad = 0.0_r_def               
                 do df = 1, ndf_wtheta
-                  theta_at_fquad   = theta_at_fquad + theta_e(df)*wtheta_basis_face(face,1,df,qp1,qp2)
-                end do
+                  theta_at_fquad       = theta_at_fquad      + theta_e(df)     *wtheta_basis_face(face,1,df,qp1,qp2)
+                  theta_next_at_fquad  = theta_next_at_fquad + theta_next_e(df)*wtheta_basis_face(face_next,1,df,qp1,qp2)
+                end do                
                 v  = w2_basis_face(face,:,df2,qp1,qp2)
-                bd_term = dot_product(v, out_face_normal(:, face))*theta_at_fquad
+                this_bd_term =  dot_product(v, out_face_normal(:,face))*theta_at_fquad
+                next_bd_term = -dot_product(v, out_face_normal(:,face))*theta_next_at_fquad
                 integrand = wqp_v(qp1)*wqp_v(qp2)*w3_basis_face(face,1,df3,qp1,qp2) &
-                             * bd_term
-                div(df3,df2,ik) = div(df3,df2,ik) + integrand
+                             * 0.5_r_def*(this_bd_term + next_bd_term)
+                div(df3,df2,ik) = div(df3,df2,ik) - integrand
               end do ! qp1
             end do ! qp2
           end do ! df3
@@ -151,4 +164,4 @@ contains
 
   end subroutine weighted_div_bd_code
 
-end module weighted_div_bd_kernel_mod
+ end module weighted_div_bd_kernel_mod

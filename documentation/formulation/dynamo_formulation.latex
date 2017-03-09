@@ -845,6 +845,20 @@ R_{\mathbf{u}}^{n} & = & -\left\langle \mathbf{v},\mathbf{u}^{n}\right\rangle -\
                    &   & \left.+c_{pd}\left\langle \nabla.\left(\theta^{n}\mathbf{v}\right),\Pi^{n}\right\rangle -\left\langle \mathbf{v},2\mathbf{\Omega}\times\mathbf{u}^{n}\right\rangle \right],  \nonumber\\
 R_{\theta}^{adv} & = & -\Delta t[\llangle\widehat{\theta^n\frac{\widetilde{\mathbf{F}}}{\widetilde{\rho}}}\cdot\mathbf{n}^-, \gamma\rrangle + \left\langle\nabla_h\cdot\left(\gamma\frac{\widetilde{\mathbf{F}}}{\widetilde{\rho}}\right), \theta^n\right\rangle].\label{eq:si_rtheta_adv_wt}
 \end{eqnarray}
+\subsection{\label{sub:WToperators}Modifications to operators}
+When using the horizontally discontinuous potential temperature space some of the operators \eqref{eq:divergence_operator}-\eqref{eq:Ptheta3_operator} need modifications. Firstly $D^{\theta^{*}}$ picks up a boundary integral term
+\begin{equation}
+D^{\theta^{*}} = \left<\sigma,\theta^{*}\nabla.\mathbf{v} + \nabla\theta^{*}.\mathbf{v} \right> - \llangle \{\sigma\}, \theta^{*}\mathbf{v}.\mathbf{n}\rrangle,\label{eq:div_theta_star_operator_wt}
+\end{equation}
+due to the averaging operator $\{\sigma\}$ each pressure dof will pick up a contribution from the integral on the left and right side of the face using the corresponding value of the discontinuous potential temperature field $\theta^{*}$ and so to keep the operator local to each cell the corresponding increments from both sides of the face to the pressure dof in the cell are computed at the same time. Secondly the projection from the potential temperature space to the velocity space $P_{2\theta}^{\Pi^{*}}$ also picks up a boundary term
+\begin{equation}
+P_{2\theta}^{\Pi^{*}} = \left<\nabla.\mathbf{v},\Pi^{*}\gamma\right> + \left<\mathbf{v},\Pi^{*}\nabla\gamma \right> - \llangle \mathbf{v}.\mathbf{n},\{\Pi^{*}\}\gamma\rrangle.\label{eq:Ptheta2_star_operator_wt}
+\end{equation}
+Finally the corresponding projection from the velocity space to the potential temperature space $P_{\theta2}^{\theta^{*}}$ picks up a corresponding boundary term
+\begin{equation}
+P_{\theta2}^{\theta^{*}} = \llangle\gamma,\widehat{\theta^{*}\mathbf{v}}\cdot\mathbf{n}^-\rrangle - \left\langle\nabla_h\cdot\left(\gamma\mathbf{v}\right), \theta^{*}\right\rangle,\label{eq:P2theta_operator_w2}
+\end{equation}
+or alternatively, for lowest order elements only, if it is left unchanged from \eqref{eq:P2theta_operator} then it only picks up the vertical contribution as in ENDGame since the horizontal component of $\nabla\theta^{*}\equiv 0$.
 
 \section{\label{sec:Advection}Advection}
 
