@@ -115,7 +115,9 @@ subroutine compute_si_operators(ref_state)
                                              invoke_set_field_scalar, &
                                              invoke_compute_tri_precon_kernel, &
                                              invoke_divide_field_data, &
-                                             invoke_weighted_div_bd_kernel_type
+                                             invoke_weighted_div_bd_kernel_type, &
+                                             invoke_weighted_proj_2theta_bd_kernel_type, &
+                                             invoke_weighted_proj_theta2_bd_kernel_type
   use multiplicity_kernel_mod,         only: multiplicity_kernel_type
   use finite_element_config_mod,       only: element_order, wtheta_on
   use function_space_mod,              only: function_space_type
@@ -150,14 +152,25 @@ subroutine compute_si_operators(ref_state)
   call invoke( weighted_m3_rho_kernel_type(m3_rho_star, rho, chi, qr) )
   call invoke( weighted_m3_exner_kernel_type(m3_exner_star, rho, theta, chi, qr) )
 
- ! Split off due to use of any_space for chi
-
+  ! Split off due to use of any_space for chi
+  ! Weighted operator from W2 to W3
   call invoke( weighted_div_kernel_type(div_star, theta, qr) )
+  ! And its boundary part in the case of horizontally discontinuous theta
   if (wtheta_on) then
     call invoke_weighted_div_bd_kernel_type(div_star, theta, qr)
   end if
+  ! Weighted operator from W2 to Wtheta
   call invoke( weighted_proj_theta2_kernel_type(ptheta2, theta, qr) )
+  ! And its boundary part in the case of horizontally discontinuous theta
+  if (wtheta_on) then
+    call invoke_weighted_proj_theta2_bd_kernel_type(ptheta2, theta, qr)
+  end if
+  ! Weighted operator from Wtheta to W2
   call invoke( weighted_proj_2theta_kernel_type(p2theta, theta, rho, qr) )
+  ! And its boundary part in the case of horizontally discontinuous theta
+  if (wtheta_on) then
+    call invoke_weighted_proj_2theta_bd_kernel_type(p2theta, theta, rho, qr)
+  end if
   call invoke( weighted_proj_3theta_kernel_type(p3theta, theta, chi, qr) )
   call invoke( compound_operator_kernel_type(compound_div, m3_rho_star, m3_inv, div) )
 

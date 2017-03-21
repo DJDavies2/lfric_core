@@ -81,7 +81,8 @@ contains
   !! @param[in] ndf_w3 Number of degrees of freedom per cell for w3
   !! @param[in] ndf_wtheta Number of degrees of freedom per cell for wtheta
   !! @param[in] undf_wtheta Number unique of degrees of freedom  for wtheta
-  !! @param[in] map_wtheta Dofmap for wtheta
+  !! @param[in] stencil_wtheta_map W2 dofmaps for the stencil
+  !! @param[in] stencil_wtheta_size Size of the W2 stencil (number of cells)
   !! @param[in] nqp_v Number of quadrature points in the vertical
   !! @param[in] nqp_h_1d Number of quadrature points in a single horizontal direction
   !! @param[in] wqp_v Vertical quadrature weights
@@ -93,8 +94,8 @@ contains
                                   div, theta,                                                 &
                                   ndf_w2, ndf_w3,                                             &
                                   ndf_wtheta, undf_wtheta,                                    &
-                                  map_wtheta,                                                 &
-                                  map_size,                                                   &
+                                  stencil_wtheta_map,                                         &
+                                  stencil_wtheta_size,                                        &
                                   nqp_v, nqp_h_1d, wqp_v, w2_basis_face, w3_basis_face,       &
                                   wtheta_basis_face, adjacent_face)
 
@@ -103,9 +104,9 @@ contains
     integer(kind=i_def), intent(in) :: cell, nlayers, nqp_v, nqp_h_1d, ncell_3d
     integer(kind=i_def), intent(in) :: ndf_w2, ndf_w3
     integer(kind=i_def), intent(in) :: ndf_wtheta, undf_wtheta
-    integer(kind=i_def), intent(in) :: map_size
+    integer(kind=i_def), intent(in) :: stencil_wtheta_size
 
-    integer(kind=i_def), dimension(ndf_wtheta,map_size),  intent(in) :: map_wtheta
+    integer(kind=i_def), dimension(ndf_wtheta,stencil_wtheta_size),  intent(in) :: stencil_wtheta_map
 
     real(kind=r_def), dimension(4,3,ndf_w2,nqp_h_1d,nqp_v), intent(in)     :: w2_basis_face
     real(kind=r_def), dimension(4,1,ndf_w3,nqp_h_1d,nqp_v), intent(in)     :: w3_basis_face
@@ -136,8 +137,8 @@ contains
         face_next = adjacent_face(face)
 
         do df = 1,ndf_wtheta
-          theta_e(df)      = theta(map_wtheta(df, 1)      + k)
-          theta_next_e(df) = theta(map_wtheta(df, face+1) + k)
+          theta_e(df)      = theta(stencil_wtheta_map(df, 1)      + k)
+          theta_next_e(df) = theta(stencil_wtheta_map(df, face+1) + k)
         end do
         do df2 = 1, ndf_w2
           do df3 = 1, ndf_w3

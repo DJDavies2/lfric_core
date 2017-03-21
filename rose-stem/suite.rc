@@ -554,7 +554,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%-     if 'run_canned_test_' + label in allTasks %}
     [[run_canned_test_{{label}}]]
 {%-       set directiveParameters = {'mpiProcesses': 1, 'ompThreads': 1,
-                                     'ramPerNode': 2048, 'wallclock': 120} %}
+                                     'ramPerNode': 2048, 'wallclock': 300} %}
         inherit = {{family}}, TARGET
         pre-script = """
                      {{'\n'|commandList(TARGET_BASE_SETUP, compiler_setup[compiler], TARGET_RUN_SETUP, TARGET_REVEAL_SETUP)}}

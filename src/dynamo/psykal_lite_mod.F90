@@ -344,7 +344,7 @@ contains
     wv=>qr%get_wqp_v()
 
     ! Assumes same number of horizontal quad points in x and y
-    nqp_h_1d = int(nqp_h**(1./2.))
+    nqp_h_1d = int(sqrt(real(nqp_h)))
 
     allocate(xp_f(nfaces_h, nqp_h_1d, 2))
 
@@ -511,7 +511,7 @@ contains
     wv=>qr%get_wqp_v()
 
     ! Assumes same number of horizontal qp in x and y
-    nqp_h_1d = int(nqp_h**(1./2.))  ! use sqrt
+    nqp_h_1d = int(sqrt(real(nqp_h)))  ! use sqrt
 
     allocate(xp_f(nfaces_h, nqp_h_1d, 2))
 
@@ -672,7 +672,7 @@ contains
     wv=>qr%get_wqp_v()
 
     ! Assumes same number of horizontal qp in x and y
-    nqp_h_1d = int(nqp_h**(1./2.))  ! use sqrt
+    nqp_h_1d = int(sqrt(real(nqp_h)))  ! use sqrt
 
     allocate(xp_f(nfaces_h, nqp_h_1d, 2))
 
@@ -842,7 +842,7 @@ contains
     wv=>qr%get_wqp_v()
 
     ! Assumes same number of horizontal qp in x and y
-    nqp_h_1d = int(nqp_h**(1./2.))  ! use sqrt
+    nqp_h_1d = int(sqrt(real(nqp_h)))  ! use sqrt
 
     allocate(xp_f(nfaces_h, nqp_h_1d, 2))
 
@@ -959,12 +959,13 @@ contains
       integer :: ndf_w2, ndf_w3, ndf_wtheta, undf_wtheta
       integer :: dim_w2, dim_w3, dim_wtheta
 
-      integer,                   pointer :: map_wtheta(:,:,:) => null(), &
-                                            map_w2(:,:,:) => null()
+      integer,                   pointer :: cross_stencil_wtheta_map(:,:,:) => null(), &
+                                            cross_stencil_w2_map(:,:,:) => null()
       type(stencil_dofmap_type), pointer :: cross_stencil_wtheta => null(), &
                                             cross_stencil_w2 => null()
+      integer                            :: cross_stencil_wtheta_size
 
-      integer                 :: ff, wtheta_map_size, ii, jj
+      integer                 :: ff, ii, jj
 
       real(kind=r_def), allocatable  :: basis_w2_face(:,:,:,:,:), &
       basis_w3_face(:,:,:,:,:), &
@@ -1006,7 +1007,7 @@ contains
       wv=>qr%get_wqp_v()
 
       ! Assumes same number of horizontal qp in x and y
-      nqp_h_1d = int(nqp_h**(1./2.))  ! use sqrt
+      nqp_h_1d = int(sqrt(real(nqp_h)))  ! use sqrt
 
       allocate(xp_f(nfaces_h, nqp_h_1d, 2))
 
@@ -1039,11 +1040,11 @@ contains
 
       ! Stencil maps
       cross_stencil_wtheta => theta_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
-      map_wtheta => cross_stencil_wtheta%get_whole_dofmap()
-      wtheta_map_size = cross_stencil_wtheta%get_size()
+      cross_stencil_wtheta_map => cross_stencil_wtheta%get_whole_dofmap()
+      cross_stencil_wtheta_size = cross_stencil_wtheta%get_size()
 
       cross_stencil_w2 => div_star_proxy%fs_from%get_stencil_dofmap(STENCIL_CROSS, 1)
-      map_w2 => cross_stencil_w2%get_whole_dofmap()
+      cross_stencil_w2_map => cross_stencil_w2%get_whole_dofmap()
       allocate( adjacent_face(nfaces_h) ) 
 
       ! Filling up the face basis vector with value of the basis functions at the horizontal faces quadrature points
@@ -1068,7 +1069,7 @@ contains
       do cell=1,mesh%get_last_halo_cell(1)        
         do ii = 1, nfaces_h
           do jj = 1, nfaces_h
-            if(map_w2(ii, 1, cell) == map_w2(jj, ii+1, cell)) adjacent_face(ii) = jj
+            if(cross_stencil_w2_map(ii, 1, cell) == cross_stencil_w2_map(jj, ii+1, cell)) adjacent_face(ii) = jj
           end do
         end do
 
@@ -1079,8 +1080,8 @@ contains
                                   theta_proxy%data,                   &
                                   ndf_w2, ndf_w3,                     &
                                   ndf_wtheta, undf_wtheta,            &
-                                  map_wtheta(:,:,cell),               &
-                                  wtheta_map_size,                    &
+                                  cross_stencil_wtheta_map(:,:,cell), &
+                                  cross_stencil_wtheta_size,          &
                                   nqp_v, nqp_h_1d, wv,                &
                                   basis_w2_face,                      &
                                   basis_w3_face, basis_wtheta_face,   &
@@ -1093,6 +1094,319 @@ contains
       !
     end subroutine invoke_weighted_div_bd_kernel_type
 
+  !-------------------------------------------------------------------------------
+  !> Computation of 2d quadrature on faces not currently supported PSyClone,
+  !> will be introduced in #793  by modifying quadrature tools developed in ticket #761.
+  !> Invoke_weighted_proj_2theta_bd_kernel: Invoke the boundary part of the projection from wtheta to w2 operator of the lhs Helmholtz
+  subroutine invoke_weighted_proj_2theta_bd_kernel_type(p2theta, theta, rho, qr)
+
+      use weighted_proj_2theta_bd_kernel_mod, only : weighted_proj_2theta_bd_code
+      use mesh_mod,                           only : mesh_type
+      use reference_element_mod,              only : nfaces_h
+      use stencil_dofmap_mod,                 only : stencil_dofmap_type, STENCIL_CROSS
+
+      implicit none
+
+      type( mesh_type ), pointer           :: mesh => null()
+      type(field_type), intent(in)         :: theta, rho
+      type(operator_type), intent(inout)   :: p2theta
+      type(quadrature_type), intent(in)    :: qr
+
+      integer :: cell, nlayers, nqp_h, nqp_v, nqp_h_1d
+      integer :: ndf_w2, ndf_w3, undf_w3, ndf_wtheta, undf_wtheta
+      integer :: dim_w2, dim_w3, dim_wtheta
+
+      integer,                   pointer :: cross_stencil_wtheta_map(:,:,:) => null(), &
+                                            cross_stencil_w2_map(:,:,:) => null(),     &
+                                            cross_stencil_w3_map(:,:,:) => null()
+      type(stencil_dofmap_type), pointer :: cross_stencil_wtheta => null(), &
+                                            cross_stencil_w2 => null(),     &
+                                            cross_stencil_w3 => null()
+
+      integer                            :: cross_stencil_w3_size, cross_stencil_wtheta_size
+
+
+      integer                 :: ff, ii, jj
+
+      real(kind=r_def), allocatable  :: basis_w2_face(:,:,:,:,:), basis_w3_face(:,:,:,:,:), &
+      basis_wtheta_face(:,:,:,:,:)
+
+      real(kind=r_def), pointer :: xp(:,:), xp_f(:,:,:) => null()
+      real(kind=r_def), pointer :: zp(:) => null()
+      real(kind=r_def), pointer :: wv(:) => null()
+
+      type(operator_proxy_type) ::p2theta_proxy
+      type(field_proxy_type)    ::theta_proxy, rho_proxy
+
+      integer, allocatable    :: adjacent_face(:)
+
+      !
+      ! Initialise field proxies
+      !
+      p2theta_proxy = p2theta%get_proxy()
+      theta_proxy = theta%get_proxy()
+      rho_proxy   = rho%get_proxy()
+      !
+      ! Initialise number of layers
+      !
+      nlayers = p2theta_proxy%fs_from%get_nlayers()
+      !
+      ! Create a mesh object
+      !
+      mesh => p2theta%get_mesh()
+
+      !
+      ! Initialise qr values
+      !
+      nqp_h=qr%get_nqp_h()
+      nqp_v=qr%get_nqp_v()
+      zp=>qr%get_xqp_v()
+      xp=>qr%get_xqp_h()
+      wv=>qr%get_wqp_v()
+
+      ! Assumes same number of horizontal qp in x and y
+      nqp_h_1d = int(sqrt(real(nqp_h)))  ! use sqrt
+
+      allocate(xp_f(nfaces_h, nqp_h_1d, 2))
+
+      ndf_w2      = p2theta_proxy%fs_to%get_ndf( )
+      dim_w2      = p2theta_proxy%fs_to%get_dim_space( )
+      allocate(basis_w2_face(nfaces_h,dim_w2,ndf_w2,nqp_h_1d,nqp_v))
+
+      ndf_w3   = rho_proxy%vspace%get_ndf( )
+      undf_w3  = rho_proxy%vspace%get_undf( )
+      dim_w3   = rho_proxy%vspace%get_dim_space( )
+      allocate(basis_w3_face(nfaces_h,dim_w3,ndf_w3,nqp_h_1d,nqp_v))
+
+      ndf_wtheta      = p2theta_proxy%fs_from%get_ndf( )
+      dim_wtheta      = p2theta_proxy%fs_from%get_dim_space( )
+      undf_wtheta     = p2theta_proxy%fs_from%get_undf()
+      allocate(basis_wtheta_face(nfaces_h,dim_wtheta,ndf_wtheta,nqp_h_1d,nqp_v))
+
+      ! Quadrature points on horizontal faces
+
+      xp_f(1, :, :) = xp(1:nqp_h_1d, :)
+      xp_f(1, :, 1) = 0.0_r_def
+
+      xp_f(2, :, :) = xp(1:nqp_h - nqp_h_1d + 1:nqp_h_1d, :)
+      xp_f(2, :, 2) = 0.0_r_def
+
+      xp_f(3, :, :) = xp(nqp_h - nqp_h_1d + 1:nqp_h, :)
+      xp_f(3, :, 1) = 1.0_r_def
+
+      xp_f(4, :, :) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
+      xp_f(4, :, 2) = 1.0_r_def
+
+      ! Stencil maps
+      cross_stencil_wtheta => p2theta_proxy%fs_from%get_stencil_dofmap(STENCIL_CROSS, 1)
+      cross_stencil_wtheta_map => cross_stencil_wtheta%get_whole_dofmap()
+      cross_stencil_wtheta_size = cross_stencil_wtheta%get_size()
+
+      cross_stencil_w3 => rho_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
+      cross_stencil_w3_map => cross_stencil_w3%get_whole_dofmap()
+      cross_stencil_w3_size = cross_stencil_w3%get_size()
+
+      cross_stencil_w2 => p2theta_proxy%fs_to%get_stencil_dofmap(STENCIL_CROSS, 1)
+      cross_stencil_w2_map => cross_stencil_w2%get_whole_dofmap()
+      allocate( adjacent_face(nfaces_h) )
+
+      ! Filling up the face basis vector with value of the basis functions at the horizontal faces quadrature points
+
+      do ff = 1, nfaces_h
+
+        call p2theta_proxy%fs_to%compute_basis_function( &
+          basis_w2_face(ff,:,:,:,:), ndf_w2, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+        call p2theta_proxy%fs_from%compute_basis_function( &
+          basis_wtheta_face(ff,:,:,:,:), ndf_wtheta, nqp_h_1d, nqp_v, xp_f(ff, :,:), zp)
+
+        call rho_proxy%vspace%compute_basis_function( &
+          basis_w3_face(ff,:,:,:,:), ndf_w3, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+      end do
+      !
+      ! Call kernels and communication routines
+      !
+      if (theta_proxy%is_dirty(depth=2)) call theta_proxy%halo_exchange(depth=2)
+      if (rho_proxy%is_dirty(depth=2))   call rho_proxy%halo_exchange(depth=2)
+      !
+      do cell=1,mesh%get_last_halo_cell(1)
+        do ii = 1, nfaces_h
+          do jj = 1, nfaces_h
+            if(cross_stencil_w2_map(ii, 1, cell) == cross_stencil_w2_map(jj, ii+1, cell)) adjacent_face(ii) = jj
+          end do
+        end do
+
+        call weighted_proj_2theta_bd_code(cell,                       &
+                                  nlayers,                            &
+                                  p2theta_proxy%ncell_3d,             &
+                                  p2theta_proxy%local_stencil,        &
+                                  theta_proxy%data,                   &
+                                  rho_proxy%data,                     &
+                                  ndf_w2,                             &
+                                  ndf_wtheta, undf_wtheta,            &
+                                  cross_stencil_wtheta_map(:,:,cell), &
+                                  cross_stencil_wtheta_size,          &
+                                  ndf_w3, undf_w3,                    &
+                                  cross_stencil_w3_map(:,:,cell),     &
+                                  cross_stencil_w3_size,              &
+                                  nqp_h_1d, nqp_v, wv,                &
+                                  basis_w2_face,                      &
+                                  basis_w3_face, basis_wtheta_face,   &
+                                  adjacent_face)
+      end do
+      !
+      ! Deallocate basis arrays
+      !
+      deallocate (basis_w3_face, basis_wtheta_face, basis_w2_face)
+      !
+    end subroutine invoke_weighted_proj_2theta_bd_kernel_type
+
+
+  !-------------------------------------------------------------------------------
+  !> Computation of 2d quadrature on faces not currently supported PSyClone,
+  !> will be introduced in #793  by modifying quadrature tools developed in ticket #761.
+  !> Invoke_weighted_proj_theta2_bd_kernel: Invoke the boundary part of the projection from w2 to wtheta operator of the lhs Helmholtz
+  subroutine invoke_weighted_proj_theta2_bd_kernel_type(ptheta2, theta, qr)
+
+      use weighted_proj_theta2_bd_kernel_mod, only : weighted_proj_theta2_bd_code
+      use mesh_mod,                           only : mesh_type
+      use reference_element_mod,              only : nfaces_h
+      use stencil_dofmap_mod,                 only : stencil_dofmap_type, STENCIL_CROSS
+
+      implicit none
+
+      type( mesh_type ), pointer           :: mesh => null()
+      type(field_type), intent(in)         :: theta
+      type(operator_type), intent(inout)   :: ptheta2
+      type(quadrature_type), intent(in)    :: qr
+
+      integer :: cell, nlayers, nqp_h, nqp_v, nqp_h_1d
+      integer :: ndf_w2, ndf_wtheta, undf_wtheta
+      integer :: dim_w2, dim_wtheta
+
+      integer,                   pointer :: cross_stencil_wtheta_map(:,:,:) => null(), &
+                                            cross_stencil_w2_map(:,:,:) => null()
+      type(stencil_dofmap_type), pointer :: cross_stencil_wtheta => null(), &
+                                            cross_stencil_w2 => null()
+
+      integer                            :: cross_stencil_wtheta_size
+
+      integer                 :: ff, ii, jj
+
+      real(kind=r_def), allocatable  :: basis_w2_face(:,:,:,:,:), basis_wtheta_face(:,:,:,:,:)
+
+      real(kind=r_def), pointer :: xp(:,:), xp_f(:,:,:) => null()
+      real(kind=r_def), pointer :: zp(:) => null()
+      real(kind=r_def), pointer :: wv(:) => null()
+
+      type(operator_proxy_type) ::ptheta2_proxy
+      type(field_proxy_type)    ::theta_proxy
+
+      integer, allocatable    :: adjacent_face(:)
+
+      !
+      ! Initialise field proxies
+      !
+      ptheta2_proxy = ptheta2%get_proxy()
+      theta_proxy = theta%get_proxy()
+      !
+      ! Initialise number of layers
+      !
+      nlayers = ptheta2_proxy%fs_from%get_nlayers()
+      !
+      ! Create a mesh object
+      !
+      mesh => ptheta2%get_mesh()
+
+      !
+      ! Initialise qr values
+      !
+      nqp_h=qr%get_nqp_h()
+      nqp_v=qr%get_nqp_v()
+      zp=>qr%get_xqp_v()
+      xp=>qr%get_xqp_h()
+      wv=>qr%get_wqp_v()
+
+      ! Assumes same number of horizontal qp in x and y
+      nqp_h_1d = int(sqrt(real(nqp_h)))  ! use sqrt
+
+      allocate(xp_f(nfaces_h, nqp_h_1d, 2))
+
+      ndf_w2      = ptheta2_proxy%fs_from%get_ndf( )
+      dim_w2      = ptheta2_proxy%fs_from%get_dim_space( )
+      allocate(basis_w2_face(nfaces_h,dim_w2,ndf_w2,nqp_h_1d,nqp_v))
+
+      ndf_wtheta      = ptheta2_proxy%fs_to%get_ndf( )
+      dim_wtheta      = ptheta2_proxy%fs_to%get_dim_space( )
+      undf_wtheta     = ptheta2_proxy%fs_to%get_undf()
+      allocate(basis_wtheta_face(nfaces_h,dim_wtheta,ndf_wtheta,nqp_h_1d,nqp_v))
+
+      ! Quadrature points on horizontal faces
+
+      xp_f(1, :, :) = xp(1:nqp_h_1d, :)
+      xp_f(1, :, 1) = 0.0_r_def
+
+      xp_f(2, :, :) = xp(1:nqp_h - nqp_h_1d + 1:nqp_h_1d, :)
+      xp_f(2, :, 2) = 0.0_r_def
+
+      xp_f(3, :, :) = xp(nqp_h - nqp_h_1d + 1:nqp_h, :)
+      xp_f(3, :, 1) = 1.0_r_def
+
+      xp_f(4, :, :) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
+      xp_f(4, :, 2) = 1.0_r_def
+
+      ! Stencil maps
+      cross_stencil_wtheta => ptheta2_proxy%fs_to%get_stencil_dofmap(STENCIL_CROSS, 1)
+      cross_stencil_wtheta_map => cross_stencil_wtheta%get_whole_dofmap()
+      cross_stencil_wtheta_size = cross_stencil_wtheta%get_size()
+
+      cross_stencil_w2 => ptheta2_proxy%fs_from%get_stencil_dofmap(STENCIL_CROSS, 1)
+      cross_stencil_w2_map => cross_stencil_w2%get_whole_dofmap()
+      allocate( adjacent_face(nfaces_h) )
+
+      ! Filling up the face basis vector with value of the basis functions at the horizontal faces quadrature points
+
+      do ff = 1, nfaces_h
+
+        call ptheta2_proxy%fs_from%compute_basis_function( &
+          basis_w2_face(ff,:,:,:,:), ndf_w2, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+        call ptheta2_proxy%fs_to%compute_basis_function( &
+          basis_wtheta_face(ff,:,:,:,:), ndf_wtheta, nqp_h_1d, nqp_v, xp_f(ff, :,:), zp)
+
+      end do
+      !
+      ! Call kernels and communication routines
+      !
+      if (theta_proxy%is_dirty(depth=2)) call theta_proxy%halo_exchange(depth=2)
+      !
+      do cell=1,mesh%get_last_halo_cell(1)
+        do ii = 1, nfaces_h
+          do jj = 1, nfaces_h
+            if(cross_stencil_w2_map(ii, 1, cell) == cross_stencil_w2_map(jj, ii+1, cell)) adjacent_face(ii) = jj
+          end do
+        end do
+
+        call weighted_proj_theta2_bd_code(cell,                       &
+                                  nlayers,                            &
+                                  ptheta2_proxy%ncell_3d,             &
+                                  ptheta2_proxy%local_stencil,        &
+                                  theta_proxy%data,                   &
+                                  ndf_w2,                             &
+                                  ndf_wtheta, undf_wtheta,            &
+                                  cross_stencil_wtheta_map(:,:,cell), &
+                                  cross_stencil_wtheta_size,          &
+                                  nqp_h_1d, nqp_v, wv,                &
+                                  basis_w2_face,                      &
+                                  basis_wtheta_face, adjacent_face)
+      end do
+      !
+      ! Deallocate basis arrays
+      !
+      deallocate (basis_wtheta_face, basis_w2_face)
+      !
+    end subroutine invoke_weighted_proj_theta2_bd_kernel_type
 
 
 !-------------------------------------------------------------------------------    

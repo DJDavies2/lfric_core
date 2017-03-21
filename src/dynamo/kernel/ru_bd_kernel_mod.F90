@@ -41,12 +41,12 @@ module ru_bd_kernel_mod
     type(arg_type) :: meta_args(3) = (/                               &
       arg_type(GH_FIELD,   GH_INC,  W2),                              &
       arg_type(GH_FIELD,   GH_READ, W3),                              &
-      arg_type(GH_FIELD,   GH_READ, Wtheta)                      &
+      arg_type(GH_FIELD,   GH_READ, Wtheta)                           &
       /)
     type(func_type) :: meta_funcs(3) = (/                             &
       func_type(W2, GH_BASIS, GH_DIFF_BASIS),                         &
       func_type(W3, GH_BASIS),                                        &
-      func_type(Wtheta, GH_BASIS)                                &
+      func_type(Wtheta, GH_BASIS)                                     &
       /)
     integer :: iterates_over = CELLS
     integer :: evaluator_shape = QUADRATURE_XYoZ

@@ -67,7 +67,7 @@ type(weighted_proj_2theta_kernel_type) function weighted_proj_2theta_constructor
   return
 end function weighted_proj_2theta_constructor
 
-!> @brief Compute the weigthed projection fro Wtheta to W2
+!> @brief Compute the weigthed projection from Wtheta to W2
 !! @param[in] cell Cell number
 !! @param[in] nlayers Number of layers.
 !! @param[in] ncell_3d ncell*ndf
