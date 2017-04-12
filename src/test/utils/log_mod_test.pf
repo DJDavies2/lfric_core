@@ -12,7 +12,7 @@ module log_mod_test
 
   use pFUnit_Mod
   use log_mod
-  use constants_mod, only: r_def, i_def
+  use constants_mod, only: r_def, i_def, str_long
 
   implicit none
 
@@ -70,7 +70,7 @@ contains
     class( level_parameter_type ), intent( in ) :: this
     character(:), allocatable :: string
 
-    character(len=80) :: buffer
+    character(str_long) :: buffer
     write( buffer, '(I0, A)') &
            this%level, this%expected_tag
     string = trim( buffer )

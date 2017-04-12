@@ -126,7 +126,7 @@ class NamelistDescription():
 
         kindset = set(['i_native'])
         if self._enumerations:
-            kindset.add( 'str_short' )
+            kindset.add( 'str_def' )
         if self._logicals:
             kindset.add( 'l_def' )
 

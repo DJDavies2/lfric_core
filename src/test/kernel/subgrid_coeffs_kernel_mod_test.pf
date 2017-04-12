@@ -9,7 +9,7 @@
 !>
 module subgrid_coeffs_kernel_mod_test
 
-  use constants_mod, only : i_def, i_native, r_def
+  use constants_mod, only : i_def, i_native, r_def, str_long
   use pFUnit_Mod
 
   implicit none
@@ -63,7 +63,7 @@ contains
     class(rho_parameter_type), intent( in ) :: this
     character(:), allocatable :: string
 
-    character(len=80) :: buffer
+    character(str_long) :: buffer
     write( buffer, '(I0, A)') &
                          this%rho_approximation, &
                          key_from_rho_approximation(this%rho_approximation)

@@ -46,8 +46,8 @@ module {{listname}}_config_mod
 {%- if enumerations %}
 {{-'\n'}}
 {%-   for enumeration, pairs in enumerations | dictsort %}
-  character(str_short), parameter :: {{enumeration}}_key({{pairs | length()}}) &
-{%      set indent = '          = [character(len=str_short) :: ' %}
+  character(str_def), parameter :: {{enumeration}}_key({{pairs | length()}}) &
+{%      set indent = '          = [character(len=str_def) :: ' %}
 {%-       for pair in pairs %}
 {%-         if not loop.first %}, &{{'\n'}}{% endif %}
 {{- indent }}'{{ pair.key }}'
@@ -97,7 +97,7 @@ contains
   !>
   !> \param[in] value Enumeration value.
   !>
-  character(str_short) function key_from_{{enumeration}}( value )
+  character(str_def) function key_from_{{enumeration}}( value )
 
     implicit none
 
@@ -159,7 +159,7 @@ contains
     {%-   endfor %}
     {{-'\n'}}
     {%-   for enumeration in enumerations.keys() | sort %}
-    character(str_short) :: {{enumeration}}
+    character(str_def) :: {{enumeration}}
     {%-   endfor %}
     {%- endif %}
 

@@ -8,7 +8,7 @@
 !-------------------------------------------------------------------------------
 module function_space_mod_test
 
-  use constants_mod,         only : i_def, r_def
+  use constants_mod,         only : i_def, r_def, str_long
   use fs_continuity_mod,     only : W0, W1, W2, W3, Wtheta, W2V, W2H
   use fs_test_data_mod  ! Will use everything in here as it's the static data
   use function_space_mod,    only : function_space_type
@@ -83,7 +83,7 @@ contains
     class( function_space_parameter_type ), intent( in ) :: this
     character(:), allocatable :: string
 
-    character(len=80) :: buffer
+    character(str_long) :: buffer
     write( buffer, '(A)') fs_name(this%function_space)
     string = trim( buffer )
 
