@@ -1,6 +1,6 @@
 #!jinja2
 {%- set science_configurations = 'runge-kutta', 'semi-implicit',
-                                 'transport-bip_cosmic', 'transport-rk', 'transport-biperiodic',
+                                 'transport-rk', 'transport-biperiodic',
                                  'biperiodic_p0_gw', 'biperiodic_p1_gw', 'biperiodic_p0_gw_short',
                                  'biperiodic_p0_gw_fem',
                                  'dcmip301', 'robert', 'robert-moist', 'robert_short',
@@ -11,7 +11,6 @@
 {%- set groups = {'developer': ['science(semi-implicit)',
                                 'science(runge-kutta)',
                                 'science(transport-rk)',
-                                'science(transport-bip_cosmic)',
                                 'science(transport-biperiodic)',
                                 'science(biperiodic_p0_gw_short)',
                                 'science(biperiodic_p1_gw)',
