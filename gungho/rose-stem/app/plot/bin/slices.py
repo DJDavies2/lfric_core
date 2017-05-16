@@ -45,7 +45,7 @@ levels = []
 
 def process_file_list(filestem):
 
-  # get the list of files to stitch together
+  # Get the list of files to stitch together
   dirlist = glob.glob(filestem)
 
   # If no files are found then don't try to process them
@@ -62,9 +62,9 @@ def process_file_list(filestem):
       # data to appropriate list 
       for strline in fo:
          strsplit = strline.split()
-         # check we got a valid data line
+         # Check we got a valid data line
          if (len(strsplit) == 5):
-            # get the level
+            # Get the level
             level = float(strsplit[3])
             # Is the level already in the levels list?
             if (level in levels):
@@ -73,7 +73,7 @@ def process_file_list(filestem):
                y[levels.index(level)].append(float(strsplit[1]))
                z[levels.index(level)].append(float(strsplit[4]))
             else:
-               # add the level to the levels list and append
+               # Add the level to the levels list and append
                # corresponding empty lists to x, y and z lists
                levels.append(level)
                x.append([])
@@ -86,7 +86,7 @@ def process_file_list(filestem):
 
       fo.close()
        
-def make_figure(plotpath, field, timestep, plotlevel):
+def make_figure(plotpath, field, timestep, plotlong, plotlat, plotlevel):
   # Sort levels in asscending order, this is needed for high order spaces
   sorted_levels = sorted(levels)
   l2h = np.zeros(len(levels))
@@ -96,7 +96,7 @@ def make_figure(plotpath, field, timestep, plotlevel):
         l2h[i] = j
 
 
-   # get min and max of x,y data for plot axes
+   # Get min and max of x,y data for plot axes
   xmin =  min(x[0])
   xmax = max(x[0])
   ymin =  min(y[0])
@@ -105,9 +105,9 @@ def make_figure(plotpath, field, timestep, plotlevel):
   zmax = max(levels)*1000.0
 
   r2d = 180.0/np.pi;
-  nx,ny,nz = 300,180,len(levels)
+  nx,ny,nz = 360,180,len(levels)
 
-  #create 2D plot
+  # Create 2D plot
   x2d = np.linspace(xmin, xmax, nx)
   z2d = np.linspace(zmin, zmax, nz)
   y2d = np.linspace(ymin, ymax, ny)
@@ -120,17 +120,18 @@ def make_figure(plotpath, field, timestep, plotlevel):
   for p in xrange(len(levels)):
     pp = int(l2h[p])
     zi[:,:,p] = griddata((np.asarray(x[p]), np.asarray(y[p])), np.asarray(z[p]), (xi, yi), method='linear')
+
+  lat = int(plotlat)+90
  
   yi, xi = np.meshgrid(z2d, x2d) 
   dz = np.zeros([nx,len(levels)])
   for i in range(nx):
-    dz[i,:] = zi[90,i,:]
+    dz[i,:] = zi[lat,i,:]
 
   fig = plt.figure(figsize=(10,5))
   cf = plt.contourf(xi *r2d, yi / 1000.0, dz, cc)
   plt.colorbar(cf,  cmap=cm.spectral)
   cl = plt.contour(xi * r2d, yi / 1000.0, dz, cc, linewidths=0.5,colors='k')
-  plt.ylim([0, 10])
   plt.title('max: %e, min: %e'%(np.max(dz),np.min(dz)))
   plt.xlabel('Longitude')
   plt.ylabel('z')
@@ -146,13 +147,12 @@ def make_figure(plotpath, field, timestep, plotlevel):
   yi, xi = np.meshgrid(z2d, y2d) 
   dz = np.zeros([ny,len(levels)])
   for i in range(ny):
-    dz[i,:] = zi[i,150,:]
+    dz[i,:] = zi[i,plotlong,:]
 
   fig = plt.figure(figsize=(10,5))
   cf = plt.contourf(xi *r2d, yi / 1000.0, dz, cc)
   plt.colorbar(cf,  cmap=cm.spectral)
   cl = plt.contour(xi * r2d, yi / 1000.0, dz, cc, linewidths=0.5,colors='k')
-  plt.ylim([0, 10])
   plt.title('max: %e, min: %e'%(np.max(dz),np.min(dz)))
   plt.xlabel('Latitude')
   plt.ylabel('z')
@@ -174,9 +174,9 @@ def make_figure(plotpath, field, timestep, plotlevel):
 if __name__ == "__main__":
 
   try:
-    datapath, fields, timesteps, plotlevel, plotpath = sys.argv[1:6]
+    config, datapath, fields, timesteps, plotlong, plotlat, plotlevel, plotpath = sys.argv[1:9]
   except ValueError:
-    print("Usage: {0} <datapath> <field_names> <timestep_list> <plotlevel> <plotpath>".format(sys.argv[0]))
+    print("Usage: {0} <datapath> <field_names> <timestep_list> <plotlong> <plotlat> <plotlevel> <plotpath>".format(sys.argv[0]))
     exit(1)
 
   # Split out the list of fields
@@ -189,16 +189,16 @@ if __name__ == "__main__":
 
     for ts in ts_list:
 
-      # clear the lists in between plots
+      # Clear the lists in between plots
       del levels[:]
       del x[:]
       del y[:]
       del z[:]
 
-      filestem =  datapath + "/gravity_wave_nodal_" + field + "_" + ts + "*"
+      filestem =  datapath + "/" + config + "_nodal_" + field + "_" + ts + "*"
       
       process_file_list(filestem)
       # Only try to plot if we found some files for this timestep
       if len(levels) > 0:
-        make_figure(plotpath,field, ts, plotlevel)
+        make_figure(plotpath,field, ts, plotlong, plotlat, plotlevel)
 

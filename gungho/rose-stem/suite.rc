@@ -6,7 +6,6 @@
                                  'dcmip301', 'robert', 'robert-moist', 'robert_short',
                                  'sbr', 'sbr_spinupwinds', 'sbr_spinupalpha',
                                  'straka_x', 'straka_y', 'straka_200m',
-                                 'biperiodic-cosmic',
                                  'baroclinic'%}
 {%- set miniapp_configurations = 'gravity_wave', 'boundary_test' %}
 {%- set groups = {'developer': ['science(semi-implicit)',
@@ -17,7 +16,7 @@
                                 'science(biperiodic_p1_gw)',
                                 'science(straka_y, plotstr="straka_plot_y.py $NODAL_DATA_DIR theta T000090 $PLOT_DIR")',
                                 'science(robert_short, crun=3, env={"nrun":5})',	
-                                'science(baroclinic, plotstr="baroclinic.py diagDynamo $NODAL_DATA_DIR theta:exner:1u T000010 $PLOT_DIR")',
+                                'science(baroclinic, plotstr="slices.py diagDynamo $NODAL_DATA_DIR theta:rho:1u:2u:3u T000010 180 50 0 $PLOT_DIR")',
                                 'check_compilers(fast-debug)',
                                 'canned_test',
                                 'godlines',
@@ -39,9 +38,8 @@
                               'science(straka_x, plotstr="straka_plot_x.py $NODAL_DATA_DIR theta T000090 $PLOT_DIR" )',
                               'science(straka_y, plotstr="straka_plot_y.py $NODAL_DATA_DIR theta T000090 $PLOT_DIR" )',
                               'science(dcmip301, plotstr="dcmip301.py $NODAL_DATA_DIR theta T000180:T000252:T000324:T000360 $PLOT_DIR")',
-                              'science(biperiodic-cosmic,plotstr="biperiodic-cosmic_plot.py $NODAL_DATA_DIR rho T000000:T000500 $PLOT_DIR")',
                               'science(sbr)',
-                              'miniapp(gravity_wave,plotstr="slices.py $NODAL_DATA_DIR buoyancy T000036 6 $PLOT_DIR")',
+                              'miniapp(gravity_wave, plotstr="slices.py gravity_wave $NODAL_DATA_DIR buoyancy T000036 150 0 6 $PLOT_DIR")',
                               'miniapp(boundary_test)',
                               'check_compilers(full-debug, True)',
                               'godlines(True)',

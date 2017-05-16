@@ -13,17 +13,17 @@
 
 module compute_geopotential_kernel_mod
 
-use argument_mod,         only : arg_type, func_type,                      &
-                                 GH_FIELD, GH_READ, GH_WRITE,              &
-                                 W0, ANY_SPACE_9, GH_BASIS,                &
-                                 CELLS, EVALUATOR
-use base_mesh_config_mod, only : geometry, &
-                                 base_mesh_geometry_spherical
-use constants_mod,        only : r_def
-use coord_transform_mod,  only : xyz2llr
-use kernel_mod,           only : kernel_type
-use planet_config_mod,    only : gravity
-
+use argument_mod,           only : arg_type, func_type,                      &
+                                   GH_FIELD, GH_READ, GH_WRITE,              &
+                                   W0, ANY_SPACE_9, GH_BASIS,                &
+                                   CELLS, EVALUATOR
+use base_mesh_config_mod,   only : geometry, &
+                                   base_mesh_geometry_spherical
+use constants_mod,          only : r_def
+use coord_transform_mod,    only : xyz2llr
+use kernel_mod,             only : kernel_type
+use planet_config_mod,      only : gravity, scaled_radius
+use formulation_config_mod, only : shallow
 implicit none
 
 !-------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ end type
 ! Constructors
 !-------------------------------------------------------------------------------
 
-! overload the default structure constructor for function space
+! Overload the default structure constructor for function space
 interface compute_geopotential_kernel_type
    module procedure compute_geopotential_kernel_constructor
 end interface
@@ -64,24 +64,24 @@ type(compute_geopotential_kernel_type) function compute_geopotential_kernel_cons
   return
 end function compute_geopotential_kernel_constructor
 
-!! @param[in] nlayers Integer the number of layers
-!! @param[in] ndf_w0 The number of degrees of freedom per cell for w0
-!! @param[in] undf_w0 The number of unique degrees of freedom for w0
-!! @param[in] map_w0 Integer array holding the dofmap for the cell at the base of the column for w0
-!! @param[inout] phi The actual data
-!! @param[in] ndf_chi The number of degrees of freedom per cell for chi
-!! @param[in] undf_chi The number of unique degrees of freedom for chi
-!! @param[in] map_chi The dofmap for the cell at the base of the column for chi
-!! @param[in] chi_basis 3-dim array chi basis functions evaluated at w0 nodes
-!! @param[in] chi_1 Real array, the physical x coordinates
-!! @param[in] chi_2 Real array, the physical y coordinates
-!! @param[in] chi_3 Real array, the physical z coordinates
-subroutine compute_geopotential_code(nlayers,phi, &
-                                     chi_1,chi_2,chi_3, &
-                                     ndf_w0,undf_w0,map_w0, &
+!! @param[in] nlayers Number of layers
+!! @param[inout] phi Geopotential array
+!! @param[in] chi_1 Physical x coordinates
+!! @param[in] chi_2 Physical y coordinates
+!! @param[in] chi_3 Physical z coordinates
+!! @param[in] ndf_w0 Number of degrees of freedom per cell for w0
+!! @param[in] undf_w0 Number of unique degrees of freedom for w0
+!! @param[in] map_w0 Dofmap for the cell at the base of the column for w0
+!! @param[in] ndf_chi Number of degrees of freedom per cell for chi
+!! @param[in] undf_chi Number of unique degrees of freedom for chi
+!! @param[in] map_chi Dofmap for the cell at the base of the column for chi
+!! @param[in] chi_basis Chi basis functions evaluated at w0 nodes
+subroutine compute_geopotential_code(nlayers, phi, &
+                                     chi_1, chi_2, chi_3, &
+                                     ndf_w0, undf_w0, map_w0, &
                                      ndf_chi, undf_chi, map_chi, &
                                      chi_basis)
-  !Arguments
+  ! Arguments
   integer, intent(in)                                       :: nlayers
   integer, intent(in)                                       :: ndf_w0
   integer, intent(in)                                       :: undf_w0
@@ -95,14 +95,20 @@ subroutine compute_geopotential_code(nlayers,phi, &
   real(kind=r_def), dimension(undf_chi), intent(in)         :: chi_3
   real(kind=r_def), dimension(1,ndf_chi,ndf_w0), intent(in) :: chi_basis
 
-  !Internal variables
+  ! Internal variables
   integer          :: df, dfc, k
   real(kind=r_def) :: x(3)
-  real(kind=r_def) :: lat, lon, r
+  real(kind=r_def) :: lat, lon, r, s
 
   real(kind=r_def), dimension(ndf_chi)             :: chi_1_e, chi_2_e, chi_3_e
 
+
   if ( geometry == base_mesh_geometry_spherical ) then
+    if ( shallow ) then
+      s = 1.0_r_def
+    else
+      s = 0.0_r_def
+    end if
     do k = 0, nlayers-1
         do dfc = 1, ndf_chi
             chi_1_e(dfc) = chi_1( map_chi(dfc) + k)
@@ -119,7 +125,7 @@ subroutine compute_geopotential_code(nlayers,phi, &
             end do
             call xyz2llr(x(1), x(2), x(3), lon, lat, r)
 
-            phi(map_w0(df) + k) =  gravity*r
+            phi(map_w0(df) + k) =  gravity*(s*r - (1.0_r_def-s)*scaled_radius**2/r)
 
         end do
     end do
