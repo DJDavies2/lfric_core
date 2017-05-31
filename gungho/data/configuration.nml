@@ -78,7 +78,7 @@
 /
 
 &restart
-  filename = 'dynamo_restart.nml'
+  filename = 'restart.nml'
 /
 
 &solver
