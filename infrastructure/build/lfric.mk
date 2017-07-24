@@ -160,13 +160,15 @@ $(DOCUMENT_DIR)/%.svg: $(SOURCE_DIR)/%.puml \
 #
 .PHONY: run-integration-test-%
 run-integration-test-%: PYTHONPATH := $(PYTHONPATH):$(LFRIC_BUILD)
-run-integration-test-%: $(patsubst %,run-run-integration-test-%,$(PROGRAMS))
+run-integration-test-%: $(addprefix integration-test-run/,$(PROGRAMS))
 	$(Q)echo >/dev/null
 
-.PHONY: run-run-integration-test-%
-run-run-integration-test-%: compile
+.PHONY: integration-test-run/%
+integration-test-run/%: PROGRAMS := $(notdir $(PROGRAMS))
+integration-test-run/%: compile
 	$(call MESSAGE,Running,$*)
-	$(Q)$(patsubst %,$(SOURCE_DIR)/%.py,$*) $(patsubst %,$(BIN_DIR)/%,$*)
+	$(Q)cd $(dir $*); \
+	    $(notdir $(addsuffix .py,$*)) $(addprefix $(BIN_DIR)/,$(notdir $*))
 
 ##############################################################################
 # Run unit tests.

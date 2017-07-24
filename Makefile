@@ -146,18 +146,23 @@ integration-test-infrastructure: export PROJECT      = infrastructure
 integration-test-infrastructure: export SOURCE_DIR   = infrastructure/integration-test
 integration-test-infrastructure: export WORKING_DIR := $(WORKING_DIR)/infrastructure
 integration-test-infrastructure: export BIN_DIR      = $(ROOT)/tests
-integration-test-infrastructure: export PROGRAMS    := $(basename $(notdir $(shell find $(SOURCE_DIR) -maxdepth 1 -name '*.[Ff]90' -print)))
+integration-test-infrastructure: export PROGRAMS    := $(basename $(shell find $(SOURCE_DIR) -name '*.[Ff]90' -exec egrep -l "^\s*program" {} \;))
 integration-test-infrastructure: generate-integration-test-infrastructure
-	$(MAKE) run-integration-test-infrastructure
+	$(MAKE) -f $(LFRIC_BUILD)/lfric.mk run-integration-test-infrastructure
 
 .PHONY: generate-integration-test-infrastructure
 generate-integration-test-infrastructure: extract-integration-test-infrastructure \
-                                         extract-infrastructure
+                                          integration-test-infrastructure-configuration \
+                                          extract-infrastructure
 	$(Q)echo >/dev/null
 
 .PHONY: extract-integration-test-infrastructure
 extract-integration-test-infrastructure:
 	$(MAKE) -f $(LFRIC_BUILD)/extract.mk
+
+.PHONY: integration-test-infrastructure-configuration
+integration-test-infrastructure-configuration:
+	$(MAKE) -f $(LFRIC_BUILD)/lfric.mk configuration
 
 .PHONY: unit-tests-infrastructure
 unit-test-infrastructure: export EXTERNAL_STATIC_LIBRARIES = pfunit
