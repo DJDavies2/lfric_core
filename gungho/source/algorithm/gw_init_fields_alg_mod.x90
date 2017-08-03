@@ -20,8 +20,6 @@ module gw_init_fields_alg_mod
   ! Configuration and restart/checkpoint options
   use finite_element_config_mod,       only: element_order
   use restart_control_mod,             only: restart_type
-  ! I/O tools
-  use field_io_mod,                    only: read_state_netcdf
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod,                 only: invoke_initial_buoyancy_kernel
@@ -40,8 +38,7 @@ module gw_init_fields_alg_mod
   ! Handles
   use fs_continuity_mod,               only: W0, W2, W3, Wtheta
 
-  ! Field index
-  use field_indices_mod,               only: igw_u, igw_p, igw_b
+
   implicit none
 
   private
@@ -50,30 +47,22 @@ module gw_init_fields_alg_mod
 contains
   !> @details An algorithm for initialising prognostic fields for 
   !>          all solvers.
-  !> @param[in] mesh_id Id of Mesh object on which the model runs
   !> @param[inout] wind  The 3D wind field
   !> @param[inout] pressure The pressure
   !> @param[inout] buoyancy The buoyancy
   !> @param[in] restart Checkpoint/restart type with timestepping information
-  subroutine gw_init_fields_alg( mesh_id, wind, pressure, buoyancy, restart)
-    use gw_miniapp_constants_config_mod, only: b_space, &
-                                               gw_miniapp_constants_b_space_w0, &
-                                               gw_miniapp_constants_b_space_w3, &
-                                               gw_miniapp_constants_b_space_wtheta
+  subroutine gw_init_fields_alg( wind, pressure, buoyancy, restart)
+
     implicit none
 
-    ! Mesh id
-    integer(i_def),  intent(in) :: mesh_id
     ! Prognostic fields
     type( field_type ),   intent(inout) :: wind, pressure, buoyancy
     ! Control
     type( restart_type ), intent(in)    :: restart
 
     type( quadrature_type )            :: qr
-    type( field_type ), allocatable    :: state(:)
     type( field_type )                 :: r_u
-    integer :: n_fields
-    integer :: buoyancy_space
+
     ! Coordinate fields
     type( field_type ), pointer :: chi(:) => null()
 
@@ -101,50 +90,25 @@ contains
 
     else                                   ! Recorded check point to start from
 
-      allocate(state(igw_b))
-      n_fields = 1
       write(log_scratch_space,'(A,A)') "Reading file:", &
             trim(restart%startfname("pressure"))
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
-      state(igw_u) = field_type(vector_space =                                     &
-                        function_space_collection%get_fs(mesh_id,element_order, W3))
-
-      call read_state_netcdf(n_fields, state(igw_u), trim(restart%startfname("pressure")))
-      pressure = state(igw_u)
+      call pressure%read_restart(trim(restart%startfname("pressure")))
 
       write(log_scratch_space,'(A,A)') "Reading file:", &
             trim(restart%startfname("wind"))
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
-      state(igw_p) = field_type(vector_space =                                      &
-                       function_space_collection%get_fs(mesh_id, element_order, W2))
-
-      call read_state_netcdf(n_fields, state(igw_p), trim(restart%startfname("wind")))
-      wind = state(igw_p)
+      call wind%read_restart(trim(restart%startfname("wind")))
 
       write(log_scratch_space,'(A,A)') "Reading file:", &
             trim(restart%startfname("buoyancy"))
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
-      select case(b_space)
-        case(gw_miniapp_constants_b_space_w0)  
-          buoyancy_space = W0
-        case(gw_miniapp_constants_b_space_w3)  
-          buoyancy_space = W3
-        case(gw_miniapp_constants_b_space_wtheta)  
-          buoyancy_space = Wtheta
-        case default
-          call log_event( "Gravity waves: unknown buoyancy space", LOG_LEVEL_ERROR )
-      end select 
-      state(igw_b) = field_type(vector_space =                                      &
-                        function_space_collection%get_fs(mesh_id, element_order, buoyancy_space))
 
-      call read_state_netcdf(n_fields, state(igw_b), &
-           trim(restart%startfname("buoyancy")))
-      buoyancy = state(igw_b)
+      call buoyancy%read_restart(trim(restart%startfname("buoyancy")))
 
-      deallocate(state)
-      call log_event( "Gravity waves: Read prognostic fields from files", LOG_LEVEL_INFO )
+      call log_event( "Gravity wave: Read prognostic fields from files", LOG_LEVEL_INFO )
 
     end if
 

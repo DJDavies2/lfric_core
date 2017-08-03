@@ -11,7 +11,7 @@
 !
 module function_space_constructor_helper_functions_mod
 
-use constants_mod,         only: i_def, r_def
+use constants_mod,         only: i_def, r_def, dp_xios, IMDI
 use mesh_mod,              only: mesh_type
 use fs_continuity_mod,     only: W0, W1, W2, W3, Wtheta, W2V, W2H, Wchi
 use reference_element_mod, only: nfaces_h, nedges_h, nverts_h                  &
@@ -21,10 +21,17 @@ use reference_element_mod, only: nfaces_h, nedges_h, nverts_h                  &
                                , select_entity_theta, select_entity_w2h        &
                                , select_entity_w2v
 
+use reference_element_data_mod, only :  select_data_entity_all, &
+                                        select_data_entity_theta, &
+                                        select_data_entity_w2h, &
+                                        select_data_entity_w2v, &
+                                        vert_coords, edge_coords, &
+                                        face_coords, vol_coords
+
 implicit none
 
 private
-public :: ndof_setup, basis_setup, dofmap_setup
+public :: ndof_setup, basis_setup, dofmap_setup, levels_setup
 
 contains
 
@@ -279,19 +286,19 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell,       &
   integer(i_def), intent(in) :: ndof_cell ! ndofs per 3D-cell
 
   ! Output
-  integer,        intent(out) :: basis_index  (:,:)
-  integer,        intent(out) :: basis_order  (:,:)
+  integer(i_def), intent(out) :: basis_index  (:,:)
+  integer(i_def), intent(out) :: basis_order  (:,:)
   real(r_def),    intent(out) :: basis_vector (:,:)
   real(r_def),    intent(out) :: basis_x      (:,:,:)
   real(r_def),    intent(out) :: nodal_coords (:,:)
-  integer,        intent(out) :: dof_on_vert_boundary (:,:)
+  integer(i_def), intent(out) :: dof_on_vert_boundary (:,:)
 
   integer(i_def) :: k
 
 
-  integer :: i, jx, jy, jz, poly_order, idx, j1, j2
-  integer :: j(3), j2l_edge(12,3), j2l_face(6,3), face_idx(6), edge_idx(12,2)
-  integer, allocatable :: lx(:), ly(:), lz(:)
+  integer(i_def) :: i, jx, jy, jz, poly_order, idx, j1, j2
+  integer(i_def) :: j(3), j2l_edge(12,3), j2l_face(6,3), face_idx(6), edge_idx(12,2)
+  integer(i_def), allocatable :: lx(:), ly(:), lz(:)
   real(kind=r_def), allocatable :: unit_vec(:,:)
 
   real(r_def) :: x1(element_order+2)
@@ -1113,10 +1120,10 @@ subroutine dofmap_setup( mesh, dynamo_fs, ncells_2d_with_ghost,                &
   integer(i_def) :: bottom_vert_id, top_vert_id
 
   ! Number of entities for a single layer
-  integer :: nvert_layer, nedge_layer, nface_layer
+  integer(i_def) :: nvert_layer, nedge_layer, nface_layer
 
   ! Start and end points of the cell indices to loop over
-  integer :: start,finish
+  integer(i_def) :: start,finish
 
   ! Entity dofmaps
   integer(i_def), allocatable :: dofmap_d0(:,:), &
@@ -1596,5 +1603,135 @@ subroutine dofmap_setup( mesh, dynamo_fs, ncells_2d_with_ghost,                &
 
   return
 end subroutine dofmap_setup
+
+!-----------------------------------------------------------------------------
+! Setup the fractional levels for data on this function space
+!-----------------------------------------------------------------------------
+!> @brief   Creates an array of unique fractional levels
+!> @details Creates an array of fractional (dof) levels for output.
+!> @param[in] nlayers Number of layers
+!> @param[in] fs Integer enumeration of the function space
+!> @param[out] levels Array of fractional levels
+
+subroutine levels_setup(nlayers, fs, levels)
+
+  integer(i_def),  intent(in)          :: nlayers
+  integer(i_def),  intent(in)          :: fs
+  real(kind=dp_xios), dimension(:),allocatable, intent(out)   :: levels
+
+
+  ! Variable to hold the number of levels we found
+  integer(i_def)   :: idx
+  ! working array to hold fractional levels
+  real(kind=dp_xios),allocatable  :: tmp_levs(:)
+
+  select case (fs)
+
+
+  case (W0)
+    ! W0 locates data on vertices
+
+    call compute_levels(nlayers, vert_coords, select_data_entity_all%verts, tmp_levs, idx)
+
+  case (W1)
+    ! W1 locates data on edges
+
+    call compute_levels(nlayers, edge_coords, select_data_entity_all%edges, tmp_levs, idx)
+
+  case (W2)
+    ! W2 locates data on faces 
+
+    call compute_levels(nlayers, face_coords, select_data_entity_all%faces, tmp_levs, idx)
+
+
+  case (W3)
+    ! W3 locates data on cell volume
+
+    call compute_levels(nlayers, vol_coords, select_data_entity_all%vols, tmp_levs, idx)
+
+
+  case (WTHETA)
+    ! WTheta locates data on selected faces
+    ! (top and bottom)
+
+    call compute_levels(nlayers, face_coords, select_data_entity_theta%faces, tmp_levs, idx)
+
+
+  case (W2H)
+    ! W2H locates data on selected faces
+    ! (top and bottom)
+
+    call compute_levels(nlayers, face_coords, select_data_entity_w2h%faces, tmp_levs, idx)
+
+
+  case (W2V)
+    ! W2V locates data on selected faces
+    ! (W, S, E, N)
+
+    call compute_levels(nlayers, face_coords, select_data_entity_w2v%faces, tmp_levs, idx)
+
+  case default
+    ! For anything else just make a dummy list
+
+    idx = 2
+    allocate(tmp_levs(1))
+    tmp_levs(1) = 0
+
+  end select
+
+  ! Allocate the out array to be the size of the number of levels we found
+  ! and copy in the data from the temp array
+  allocate( levels( size(tmp_levs(1:(idx-1))) ) )
+  levels=tmp_levs(1:(idx-1))
+
+  deallocate(tmp_levs)
+
+
+end subroutine levels_setup 
+
+!-----------------------------------------------------------------------------
+! Compute the fractional levels 
+!-----------------------------------------------------------------------------
+
+! A private routine to Compute fractional (dof) levels for output. Takes information
+! from the data reference element combined with the number of layers to compute a unique,
+! ordered list of fractional levels that fields on this function space are to be output on.
+
+
+subroutine compute_levels(nlayers, coords_array, entity_array, tmp_levs, idx )
+
+  integer(i_def),                             intent(in)    :: nlayers
+  real(kind=r_def), dimension(:,:),           intent(in)    :: coords_array
+  integer(i_def), dimension(:),               intent(in)    :: entity_array
+  real(kind=dp_xios), dimension(:),allocatable, intent(out) :: tmp_levs
+  integer(i_def),                             intent(inout) :: idx
+
+
+  ! Local variables for computation
+  real(kind=r_def) :: l
+  integer(i_def)   :: ilayer, idof
+
+  ! Allocate temp levels array to be the maximum possible size 
+  allocate(tmp_levs(size(entity_array)*nlayers))
+  tmp_levs = 999.0
+  idx=1
+
+  do ilayer=0, (nlayers - 1)
+    do idof = 1, size(entity_array)
+      ! Check this mesh entity is not marked as missing for this function space
+      if (entity_array(idof) /= IMDI) then
+        l = ilayer + coords_array(entity_array(idof),3)
+        if ( .not.(any(tmp_levs == l)) ) then
+          tmp_levs(idx) = l
+          ! keep track of how many items we added
+          idx = idx + 1
+        end if
+      end if
+    end do
+  end do
+
+end subroutine compute_levels
+
+
 
 end module function_space_constructor_helper_functions_mod

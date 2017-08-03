@@ -27,6 +27,10 @@ module constants_mod
 
   integer, parameter :: r_native  = kind(r_val)  !< Native kind for real.
   integer, parameter :: dp_native = kind(dp_val) !< Native kind for double precision.
+
+  ! Define kinds specifically for IO
+  integer, parameter :: dp_xios = kind(dp_val) !< XIOS kind for double precision fields
+
   !> @}
 
   !> @name Complex

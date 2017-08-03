@@ -13,7 +13,7 @@ module init_dynamo_mod
   use base_mesh_config_mod,           only : geometry, &
                                              base_mesh_geometry_spherical
   use constants_mod,                  only : i_def
-  use field_mod,                      only : field_type
+  use field_mod,                      only : field_type, write_interface
   use finite_element_config_mod,      only : element_order, wtheta_on
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : W0, W1, W2, W3, Wtheta
@@ -28,6 +28,9 @@ module init_dynamo_mod
                                              transport_operators_fv
   use mr_indices_mod,                 only : nummr
   use runtime_constants_mod,          only : create_runtime_constants
+  use output_config_mod,              only : write_xios_output
+  use io_mod,                         only : xios_write_field_node, &
+                                             xios_write_field_face
 
   implicit none
 
@@ -44,6 +47,8 @@ module init_dynamo_mod
 
     integer(i_def)                           :: imr
 
+    procedure(write_interface), pointer      :: tmp_ptr
+
     call log_event( 'Dynamo: initialisation...', LOG_LEVEL_INFO )
 
     
@@ -54,25 +59,72 @@ module init_dynamo_mod
          wtheta_on  ) then
       ! Only use Wtheta for fv method of lines transport or if wtheta_on
       theta = field_type( vector_space = &
-                             function_space_collection%get_fs(mesh_id, element_order, Wtheta) )
+                          function_space_collection%get_fs(mesh_id, element_order, Wtheta), &
+                          output_space = W3)
     else
       theta = field_type( vector_space = &
-                         function_space_collection%get_fs(mesh_id, element_order, W0) )
+                          function_space_collection%get_fs(mesh_id, element_order, W0), &
+                          output_space = W3)
     end if
     xi    = field_type( vector_space = &
-                       function_space_collection%get_fs(mesh_id, element_order, W1) )
+                        function_space_collection%get_fs(mesh_id, element_order, W1), &
+                        output_space = W3)
     u     = field_type( vector_space = &
-                       function_space_collection%get_fs(mesh_id, element_order, W2) )
+                        function_space_collection%get_fs(mesh_id, element_order, W2), &
+                        output_space = W3)
     rho   = field_type( vector_space = &
-                       function_space_collection%get_fs(mesh_id, element_order, W3) )
+                        function_space_collection%get_fs(mesh_id, element_order, W3), &
+                        output_space = W3)
 
     rho_in_wth = field_type( vector_space = & 
-       function_space_collection%get_fs(mesh_id, element_order, theta%which_function_space()))
+        function_space_collection%get_fs(mesh_id, element_order, theta%which_function_space()), &
+                                         output_space = W3)
 
     do imr = 1,nummr
       mr(imr) = field_type( vector_space = &
-         function_space_collection%get_fs(mesh_id, element_order, theta%which_function_space()) )
+      function_space_collection%get_fs(mesh_id, element_order, theta%which_function_space()), &
+                                       output_space = W3)
     end do
+
+    if (write_xios_output) then
+
+
+       ! Fields that are output on the XIOS face domain
+
+       tmp_ptr => xios_write_field_face
+
+       call xi%set_write_field_behaviour(tmp_ptr)
+       call u%set_write_field_behaviour(tmp_ptr)
+       call rho%set_write_field_behaviour(tmp_ptr)
+       
+
+       ! Fields that are output on the XIOS node domain
+
+       ! Theta is a special case as it can be on face (if function space is WTheta) 
+       ! or node (if function space is W0)
+
+       if (theta%which_function_space() == Wtheta) then
+
+          call theta%set_write_field_behaviour(tmp_ptr)
+
+       else
+
+          tmp_ptr => xios_write_field_node
+
+          call theta%set_write_field_behaviour(tmp_ptr)
+
+       end if
+
+       ! Moisture diagnostics use the same type of field write as Theta
+
+       call theta%get_write_field_behaviour(tmp_ptr)
+
+       do imr = 1,nummr
+         call mr(imr)%set_write_field_behaviour(tmp_ptr)
+       end do
+
+
+    end if
 
     ! Create runtime_constants object. This in turn creates various things
     ! needed by the timestepping algorithms such as mass matrix operators, mass

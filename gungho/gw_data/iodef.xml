@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simulation> 
+
+  <context id = "gungho_gw"> 
+  
+   <calendar type = "Gregorian" start_date = "2016-01-01 15:00:00" />
+
+   <axis_definition>
+    <axis id="vert_axis_node" name="levels_nodes"/>
+    <axis id="vert_axis_face" name="levels_faces"/>
+   </axis_definition>
+   
+   <domain_definition>
+      <domain id="node" name="Mesh2" nvertex="1"/>
+      <domain id="face" name="Mesh2" nvertex="4"/>
+   </domain_definition>
+   
+   <grid_definition>
+    <grid id="node_grid">
+      <domain domain_ref="node"/>
+      <axis axis_ref="vert_axis_node"/>
+    </grid>
+    <grid id="face_grid">
+      <domain domain_ref="face"/>
+      <axis axis_ref="vert_axis_face"/>
+    </grid>
+   </grid_definition>
+
+   <field_definition prec="8" >
+     <!-- Main diagnostic group -->
+     <field_group freq_op="1s" enabled=".TRUE." operation="instant" >   
+       <field id="wind1" name="wind1" long_name="Wind1" unit="m s-1" grid_ref="face_grid" />
+       <field id="wind2" name="wind2" long_name="Wind2" unit="m s-1" grid_ref="face_grid" />
+       <field id="wind3" name="wind3" long_name="Wind3" unit="m s-1" grid_ref="face_grid" />
+       <field id="pressure" name="pressure" long_name="air_density" standard_name="air_density" unit="kg m-3" grid_ref="face_grid" />
+       <field id="buoyancy" name="buoyancy" long_name="buoyancy" unit="kg m s-2" grid_ref="face_grid" />
+
+     </field_group>
+      <!-- Initial conditions group -->
+     <field_group freq_op="1s" enabled=".TRUE." operation="once" >
+       <field id="init_wind1" name="wind1" long_name="Wind1" unit="m s-1" grid_ref="face_grid" />
+       <field id="init_wind2" name="wind2" long_name="Wind2" unit="m s-1" grid_ref="face_grid" />
+       <field id="init_wind3" name="wind3" long_name="Wind3" unit="m s-1" grid_ref="face_grid" />
+       <field id="init_pressure" name="pressure" long_name="air_density" standard_name="air_density" unit="kg m-3" grid_ref="face_grid" />
+       <field id="init_buoyancy" name="buoyancy" long_name="buoyancy" unit="kg m s-2" grid_ref="face_grid" />
+     </field_group>    
+     
+   </field_definition>
+
+   <file_definition 
+      type="one_file" 
+      par_access="collective"
+      time_counter="none"
+      enabled=".TRUE.">
+      
+      
+      <file id="lfric_gw_diag" name="lfric_gw_diag" output_freq="10s" convention="UGRID">
+        <field field_ref="wind1"/>
+        <field field_ref="wind2"/>
+        <field field_ref="wind3"/>
+        <field field_ref="pressure"/>
+        <field field_ref="buoyancy"/>
+      </file> 
+      
+      <file id="lfric_gw_initial" name="lfric_gw_initial" output_freq="1s" convention="UGRID">
+        <field field_ref="init_wind1"/>
+        <field field_ref="init_wind2"/>
+        <field field_ref="init_wind3"/>
+        <field field_ref="init_pressure"/>
+        <field field_ref="init_buoyancy"/>
+      </file> 
+   
+ 
+    </file_definition>
+    
+  </context>
+  
+  <context id = "xios">
+    <variable_definition>
+      <variable_group id = "buffer">
+        <variable id = "optimal_buffer_size" type = "string" >performance</variable>
+        <variable id = "buffer_factor_size" type = "double" >1.0</variable>
+      </variable_group>
+
+      <variable_group id = "parameters" >
+        <variable id = "using_server" type = "bool" >true</variable>
+        <variable id = "info_level" type = "int" >50</variable>
+        <variable id = "print_file" type="bool">true</variable>
+      </variable_group>
+    </variable_definition>
+  </context>
+
+</simulation>

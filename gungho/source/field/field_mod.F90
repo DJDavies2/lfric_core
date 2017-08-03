@@ -38,6 +38,9 @@ module field_mod
 
     !> Each field has a pointer to the function space on which it lives
     type( function_space_type ), pointer         :: vspace => null( )
+    !> Each field also holds an integer enaumerated value for the
+    !> function space it will be output on
+    integer(kind=i_def)                          :: ospace
     !> Pointer array of type real which holds the values of the field
     real(kind=r_def), pointer             :: data( : ) => null()
     !> The data for each field is held within an ESMF array component
@@ -47,6 +50,10 @@ module field_mod
     !> Flag that determines whether the copy constructor should copy the data.
     !! false to start with, true thereafter.
     logical(kind=l_def) :: extant = .false.
+
+    ! IO interface procedure pointers
+
+    procedure(write_interface), nopass, pointer  :: write_field_method => null()
 
   contains
 
@@ -63,15 +70,26 @@ module field_mod
     !! the field lives
     procedure, public :: which_function_space
 
+    !> function returns the enumerated integer for the output function space
+    procedure, public :: which_output_function_space
+
     !> function returns a pointer to the function space on which
     !! the field lives
     procedure, public :: get_function_space
 
-    !> Routine to read field
-    procedure         :: read_field
+    !> Setter for the field write method 
+    procedure, public :: set_write_field_behaviour
+    !> Getter for the field write method
+    procedure         :: get_write_field_behaviour
 
     !> Routine to write field
     procedure         :: write_field
+
+    !> Routine to read a restart netCDF file
+    procedure         :: read_restart
+
+    !> Routine to write a checkpoint netCDF file
+    procedure         :: write_checkpoint
 
     !> Routine to return the mesh used by this field
     procedure         :: get_mesh
@@ -111,6 +129,9 @@ module field_mod
     integer(kind=i_def), allocatable :: dummy_for_gnu
     !> Each field has a pointer to the function space on which it lives
     type( function_space_type ), pointer, public :: vspace => null()
+    !> Each field also has a pointer to the function space it will be
+    !> output on
+    type( function_space_type ), pointer         :: ospace => null( )
     !> Allocatable array of type real which holds the values of the field
     real(kind=r_def), public, pointer         :: data( : ) => null()
     !> pointer to the ESMF array
@@ -171,6 +192,20 @@ module field_mod
 
   end type field_proxy_type
 
+  ! Define the IO interfaces
+
+  abstract interface
+
+    subroutine write_interface(field_name, field_proxy)
+      import r_def, field_proxy_type
+      character(len=*),        intent(in)  :: field_name              
+      type(field_proxy_type ), intent(in)  :: field_proxy
+    end subroutine write_interface
+
+  end interface
+
+ public :: write_interface
+
 contains
 
   !> Function to create a proxy with access to the data in the field_type.
@@ -192,20 +227,30 @@ contains
   !> Construct a <code>field_type</code> object.
   !>
   !> @param [in] vector_space the function space that the field lives on
+  !> @param [in] output_space the function space used for field output
   !> @return self the field
   !>
-  function field_constructor(vector_space) result(self)
+  function field_constructor(vector_space, output_space) result(self)
 
     use log_mod,         only : log_event, &
                                 LOG_LEVEL_ERROR
     implicit none
 
     type(function_space_type), target, intent(in) :: vector_space
+    integer(i_def), optional, intent(in)               :: output_space
 
     type(field_type), target :: self
     ! only associate the vspace pointer, copy constructor does the rest.
     self%vspace => vector_space
     self%extant = .false.
+
+    ! Set the output function space if given, otherwise default
+    ! to native function space
+    if (present(output_space)) then
+      self%ospace = output_space
+    else
+      self%ospace = self%vspace%which()
+    end if 
     
   end function field_constructor
 
@@ -303,6 +348,8 @@ contains
     type (mesh_type), pointer   :: mesh => null()
 
     dest%vspace => source%vspace
+    dest%ospace = source%ospace
+    dest%write_field_method => source%write_field_method
 
     allocate(global_dof_id(source%vspace%get_last_dof_halo()))
     call source%vspace%get_global_dof_id(global_dof_id)
@@ -347,6 +394,30 @@ contains
     dest%extant = .true. 
 
   end subroutine field_type_assign
+
+  !> Setter for field write behaviour
+  !>
+  !> @param [in] pointer to procedure implementing write method 
+  subroutine set_write_field_behaviour(self, write_field_behaviour)
+    class(field_type), intent(inout)                  :: self
+    procedure(write_interface), pointer, intent(in)   :: write_field_behaviour
+    self%write_field_method => write_field_behaviour
+  end subroutine set_write_field_behaviour
+
+  !> Getter to get pointer to field write behaviour
+  !>
+  !> @return pointer to procedure for field write
+  subroutine get_write_field_behaviour(self, write_field_behaviour)
+
+    implicit none
+
+    class (field_type) :: self
+    procedure(write_interface), pointer, intent(inout)   :: write_field_behaviour
+
+    write_field_behaviour => self%write_field_method
+
+    return
+  end subroutine get_write_field_behaviour
 
   !---------------------------------------------------------------------------
   ! Contained functions/subroutines
@@ -529,6 +600,15 @@ contains
     return
   end function which_function_space
 
+  function which_output_function_space(self) result(fs)
+    implicit none
+    class(field_type), intent(in) :: self
+    integer(i_def) :: fs
+
+    fs = self%ospace
+    return
+  end function which_output_function_space
+
   !> Function to get pointer to function space from the field.
   !>
   !> @return vspace
@@ -543,35 +623,79 @@ contains
     return
   end function get_function_space
 
-  !> Reads the field
-  !! @param[in] io_strategy An IO strategy method to use for this read.
-  !>
-  subroutine read_field( self, io_strategy )
-    use field_io_strategy_mod,    only : field_io_strategy_type
+  !> Calls the underlying IO implementation for writing a field
+  !> throws an error if this has not been set
+  subroutine write_field(this, field_name)
 
-    implicit none
+    use log_mod,           only : log_event, &
+                                  LOG_LEVEL_ERROR
 
-    class( field_type ),             target, intent( inout ) :: self
-    class( field_io_strategy_type ),         intent( in   ) :: io_strategy
+    implicit none 
 
-    call io_strategy % read_field_data ( self % data(:) )
+    class(field_type),   intent(in)     :: this
+    character(len=*),    intent(in)     :: field_name
 
-  end subroutine read_field
+    if (associated(this%write_field_method)) then
 
-  !> Writes the field
-  !! @param[in] io_strategy An IO strategy method to use for this write.
-  !>
-  subroutine write_field( self, io_strategy )
-    use field_io_strategy_mod,    only : field_io_strategy_type
+      call this%write_field_method(trim(field_name), this%get_proxy())
 
-    implicit none
+    else
 
-    class( field_type ),             target, intent( inout ) :: self
-    class( field_io_strategy_type ),         intent( inout ) :: io_strategy
-
-    call io_strategy % write_field_data ( self % data(:) )
+      call log_event( 'Error trying to write field '// trim(field_name) // &
+                      ', write_field_method not set up', LOG_LEVEL_ERROR )
+    end if
 
   end subroutine write_field
+
+  !> Reads a restart file into the field
+  !>
+  subroutine read_restart( self, file_name)
+    use field_io_ncdf_mod,    only : field_io_ncdf_type
+
+    implicit none
+
+    class( field_type ),  target, intent( inout ) :: self
+    character(len=*),     intent(IN)              :: file_name
+
+    type(field_io_ncdf_type), allocatable :: ncdf_file
+
+    allocate(ncdf_file)
+
+    call ncdf_file%file_open( file_name )
+
+    call ncdf_file%read_field_data ( self % data(:) )
+
+    call ncdf_file%file_close()
+
+    deallocate(ncdf_file)
+
+  end subroutine read_restart
+
+  !> Writes a checkpoint netCDF file
+  !>
+  subroutine write_checkpoint( self, file_name )
+    use field_io_ncdf_mod,    only : field_io_ncdf_type
+
+    implicit none
+
+    class( field_type ),  target, intent( inout ) :: self
+    character(len=*),     intent(IN)              :: file_name
+
+    type(field_io_ncdf_type), allocatable :: ncdf_file
+
+    allocate(ncdf_file)
+
+    call ncdf_file%file_new( file_name )
+
+    call ncdf_file%write_field_data ( self % data(:) )
+
+    call ncdf_file%file_close()
+
+    deallocate(ncdf_file)
+
+  end subroutine write_checkpoint
+
+
 
   !! Perform a blocking halo exchange operation on the field
   !!

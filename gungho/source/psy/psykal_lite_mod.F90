@@ -2514,44 +2514,6 @@ contains
 
   end subroutine invoke_compute_dof_level_kernel
 
-!------------------------------------------------------------------------------- 
-subroutine invoke_write_fields(nodal_coordinates, level, nodal_output, fspace_dimension, output_unit, fname)
-  use constants_mod,      only: str_max_filename
-
-  implicit none
-  type(field_type), intent(in) :: nodal_coordinates(3), level, nodal_output(3)
-  integer,          intent(in) :: fspace_dimension, output_unit
-  character(str_max_filename), intent(in) :: fname
-  type(field_proxy_type) :: x_p(3), l_p, n_p(3)
-
-  integer :: df, undf, i
-
-
-  do i = 1,3
-    x_p(i) = nodal_coordinates(i)%get_proxy()
-    n_p(i) = nodal_output(i)%get_proxy()
-  end do
-  l_p = level%get_proxy()
-
-  undf = n_p(1)%vspace%get_last_dof_owned()
-
-  open(OUTPUT_UNIT, file = trim(fname), status = "replace")   
-  write(OUTPUT_UNIT,'(A)') 'x = [' 
-  if ( fspace_dimension  == 1 ) then
-    do df = 1,undf
-      write(OUTPUT_UNIT,'(5e16.8)') x_p(1)%data(df), x_p(2)%data(df), x_p(3)%data(df), l_p%data(df), n_p(1)%data(df)
-    end do
-  else
-    do df = 1,undf
-      write(OUTPUT_UNIT,'(7e16.8)') x_p(1)%data(df), x_p(2)%data(df), x_p(3)%data(df), l_p%data(df), &
-                                    n_p(1)%data(df), n_p(2)%data(df), n_p(3)%data(df)
-    end do
-  end if
-  write(OUTPUT_UNIT,'(A)') '];'
-  close(OUTPUT_UNIT)
-  
-end subroutine invoke_write_fields
-
 !-------------------------------------------------------------------------------  
 !> invoke_subgrid_coeffs: Invoke the calculation of subgrid rho coefficients
 subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,cell_orientation,direction,rho_approximation_stencil_extent,halo_depth_to_compute)

@@ -8,6 +8,11 @@ module diagnostic_alg_mod
    use constants_mod,                 only: i_def, r_def
    use finite_element_config_mod,     only: element_order
    use function_space_collection_mod, only: function_space_collection
+   use output_config_mod,             only : write_nodal_output, &
+                                             write_xios_output
+   use io_mod,                        only : output_nodal, &
+                                             output_xios_nodal, &
+                                             xios_write_field_face
    implicit none
 
    private
@@ -19,12 +24,11 @@ contains
 
   subroutine divergence_diagnostic_alg(u, t, mesh_id)
     use dg_matrix_vector_kernel_mod, only: dg_matrix_vector_kernel_type
-    use output_alg_mod,              only: output_alg
     use runtime_constants_mod,       only: get_mass_matrix, &
                                            get_div, &
                                            w3inv_id
     use operator_mod,                only: operator_type
-    use field_mod,                   only: field_type
+    use field_mod,                   only: field_type, write_interface
     use fs_continuity_mod,           only: W3
     use psykal_lite_mod,             only: invoke_X_innerproduct_X
     use log_mod,                     only: log_event,         &
@@ -38,6 +42,8 @@ contains
     type(field_type)             :: divergence, div_u
     type(operator_type), pointer :: div => null(), m3_inv => null()
     real(r_def)                  :: l2
+
+    procedure(write_interface), pointer  :: tmp_ptr
 
     divergence =  field_type( vector_space = function_space_collection%get_fs(mesh_id,element_order, W3) )
     div_u      =  field_type( vector_space = function_space_collection%get_fs(mesh_id,element_order, W3) )
@@ -54,19 +60,34 @@ contains
 
     ! Convert to pointwise W3 field for output
     call invoke( dg_matrix_vector_kernel_type( divergence, div_u , m3_inv) )
-    call output_alg('divergence',   t, divergence,   mesh_id)
+
+    ! Check what output options have been requested and call them
+ 
+    if (write_nodal_output) then
+      call output_nodal('divergence',   t, divergence,   mesh_id)
+    end if 
+
+    if (write_xios_output) then
+      !If using XIOS, we need to set the field IO method appropriately
+      tmp_ptr => xios_write_field_face
+      call divergence%set_write_field_behaviour(tmp_ptr)
+      if (t == 0) then
+        call divergence%write_field('init_divergence')
+      else
+        call divergence%write_field('divergence')
+      end if
+    end if 
 
   end subroutine divergence_diagnostic_alg
 
 !=============================================================================!
   subroutine pressure_diagnostic_alg(rho, theta, t, mesh_id)
-    use output_alg_mod,              only: output_alg
     use runtime_constants_mod,       only: get_mass_matrix, &
                                            get_qr, &
                                            get_coordinates, &
                                            w3inv_id
     use operator_mod,                only: operator_type
-    use field_mod,                   only: field_type
+    use field_mod,                   only: field_type, write_interface
     use project_pressure_kernel_mod, only: project_pressure_kernel_type
     use quadrature_mod,              only: quadrature_type
     implicit none 
@@ -79,13 +100,32 @@ contains
     type(quadrature_type)        :: qr
     type(field_type), pointer    :: chi(:) => null()
 
+    procedure(write_interface), pointer  :: tmp_ptr
+
     m3_inv => get_mass_matrix(w3inv_id)
     qr = get_qr()
     chi => get_coordinates()
     exner = field_type( vector_space = rho%get_function_space() )
     call invoke( project_pressure_kernel_type( exner, rho, theta, &
                                                chi, m3_inv, qr ) )
-    call output_alg('exner', t, exner, mesh_id)
+
+    ! Check what output options have been requested and call them
+ 
+    if (write_nodal_output) then
+      call output_nodal('exner',   t, exner,   mesh_id)
+    end if 
+
+    if (write_xios_output) then
+      ! If using XIOS, we need to set the field IO method appropriately
+      tmp_ptr => xios_write_field_face
+      call exner%set_write_field_behaviour(tmp_ptr)
+      if (t == 0) then
+        call exner%write_field('init_exner')
+      else
+        call exner%write_field('exner')
+      end if
+    end if 
+
 
   end subroutine pressure_diagnostic_alg
 

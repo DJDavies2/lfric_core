@@ -14,16 +14,16 @@
 
 module reference_element_mod
 
- use constants_mod, only : r_def, IMDI
+ use constants_mod, only : i_def, r_def, IMDI
 
 implicit none
 
 ! Incidence relationships
-integer,          allocatable :: vert_on_face( :,: )
-integer,          allocatable :: vert_on_edge( :,: )
-integer,          allocatable :: edge_on_face( :,: )
-integer,          allocatable :: edge_on_vert( :,: )
-integer,          allocatable :: face_on_edge( :,: )
+integer(i_def),   allocatable :: vert_on_face( :,: )
+integer(i_def),   allocatable :: vert_on_edge( :,: )
+integer(i_def),   allocatable :: edge_on_face( :,: )
+integer(i_def),   allocatable :: edge_on_vert( :,: )
+integer(i_def),   allocatable :: face_on_edge( :,: )
 ! Vertex coodinates
 real(kind=r_def), allocatable :: x_vert( :,: )
 ! Vector directions
@@ -31,17 +31,17 @@ real(kind=r_def), allocatable :: normal_to_face( :,: )
 real(kind=r_def), allocatable :: tangent_to_edge( :,: )
 real(kind=r_def), allocatable :: out_face_normal( :,: )
 ! Geometric information about the reference element
-integer :: nverts, nfaces, nedges
-integer :: nverts_h, nfaces_h, nedges_h
+integer(i_def) :: nverts, nfaces, nedges
+integer(i_def) :: nverts_h, nfaces_h, nedges_h
 
 ! Variable specifying reference element type
-integer :: reference_element
+integer(i_def) :: reference_element
 
 ! Select entities in the function space
 type select_entity_type
-  integer, allocatable :: faces(:)
-  integer, allocatable :: edges(:)
-  integer, allocatable :: verts(:)
+  integer(i_def), allocatable :: faces(:)
+  integer(i_def), allocatable :: edges(:)
+  integer(i_def), allocatable :: verts(:)
 end type select_entity_type
 
 type(select_entity_type), target ::       &
@@ -65,59 +65,59 @@ type(select_entity_type), target ::       &
 !
 ! Parameters to describe the ordering of entities around the reference cube
 !> Describes the face on the "west" side of the cell
-integer, parameter :: W=1     
+integer(i_def), parameter :: W=1     
 !> Describes the face on the "south" side of the cell
-integer, parameter :: S=2
+integer(i_def), parameter :: S=2
 !> Describes the face on the "east" side of the cell
-integer, parameter :: E=3
+integer(i_def), parameter :: E=3
 !> Describes the face on the "north" side of the cell
-integer, parameter :: N=4
+integer(i_def), parameter :: N=4
 !> Describes the face on the "bottom" of the cell
-integer, parameter :: B=5
+integer(i_def), parameter :: B=5
 !> Describes the face on the "top" of the cell
-integer, parameter :: T=6
+integer(i_def), parameter :: T=6
 
 !> Describes the vertex at the "south west bottom" corner of the cell
-integer, parameter :: SWB=1
+integer(i_def), parameter :: SWB=1
 !> Describes the vertex at the "south east bottom" corner of the cell
-integer, parameter :: SEB=2
+integer(i_def), parameter :: SEB=2
 !> Describes the vertex at the "north east bottom" corner of the cell
-integer, parameter :: NEB=3
+integer(i_def), parameter :: NEB=3
 !> Describes the vertex at the "north west bottom" corner of the cell
-integer, parameter :: NWB=4
+integer(i_def), parameter :: NWB=4
 !> Describes the vertex at the "south west top" corner of the cell
-integer, parameter :: SWT=5
+integer(i_def), parameter :: SWT=5
 !> Describes the vertex at the "south east top" corner of the cell
-integer, parameter :: SET=6
+integer(i_def), parameter :: SET=6
 !> Describes the vertex at the "north east top" corner of the cell
-integer, parameter :: NET=7
+integer(i_def), parameter :: NET=7
 !> Describes the vertex at the "north west top" corner of the cell
-integer, parameter :: NWT=8
+integer(i_def), parameter :: NWT=8
 
 !> Describes the "west bottom" edge of the cell 
-integer, parameter :: WB=1
+integer(i_def), parameter :: WB=1
 !> Describes the "south bottom" edge of the cell 
-integer, parameter :: SB=2
+integer(i_def), parameter :: SB=2
 !> Describes the "east bottom" edge of the cell 
-integer, parameter :: EB=3
+integer(i_def), parameter :: EB=3
 !> Describes the "north bottom" edge of the cell 
-integer, parameter :: NB=4
+integer(i_def), parameter :: NB=4
 !> Describes the "south west" edge of the cell 
-integer, parameter :: SW=5
+integer(i_def), parameter :: SW=5
 !> Describes the "south east" edge of the cell 
-integer, parameter :: SE=6
+integer(i_def), parameter :: SE=6
 !> Describes the "north east" edge of the cell 
-integer, parameter :: NE=7
+integer(i_def), parameter :: NE=7
 !> Describes the "north west" edge of the cell 
-integer, parameter :: NW=8
+integer(i_def), parameter :: NW=8
 !> Describes the "west top" edge of the cell 
-integer, parameter :: WT=9
+integer(i_def), parameter :: WT=9
 !> Describes the "south top" edge of the cell 
-integer, parameter :: ST=10
+integer(i_def), parameter :: ST=10
 !> Describes the "east top" edge of the cell 
-integer, parameter :: ET=11
+integer(i_def), parameter :: ET=11
 !> Describes the "north top" edge of the cell 
-integer, parameter :: NT=12
+integer(i_def), parameter :: NT=12
 
 !Entity naming convention for reference trianglular prism:
 !
@@ -140,48 +140,48 @@ integer, parameter :: NT=12
 !
 ! Parameters to describe the ordering of entities around the triangular prism
 !> Describes the vertical face that when prism is viewed from above, appears as a line (0,0)->(1,0)
-integer, parameter :: P=1     
+integer(i_def), parameter :: P=1     
 !> Describes the vertical face that when prism is viewed from above, appears as a line (1,0)->(0.5,srqt(3)/2)
-integer, parameter :: Q=2
+integer(i_def), parameter :: Q=2
 !> Describes the vertical face that when prism is viewed from above, appears as a line (0.5,srqt(3)/2)->(0,0)
-integer, parameter :: R=3
+integer(i_def), parameter :: R=3
 !> Describes the face on the "lower" side of the prism
-integer, parameter :: L=4
+integer(i_def), parameter :: L=4
 !> Describes the face on the "upper" of the prism
-integer, parameter :: U=5
+integer(i_def), parameter :: U=5
 
 
 !> Describes the vertex at the "lower" corner between faces P and R
-integer, parameter :: PRL=1
+integer(i_def), parameter :: PRL=1
 !> Describes the vertex at the "lower" corner between faces P and Q
-integer, parameter :: PQL=2
+integer(i_def), parameter :: PQL=2
 !> Describes the vertex at the "lower" corner between faces Q and R
-integer, parameter :: QRL=3
+integer(i_def), parameter :: QRL=3
 !> Describes the vertex at the "upper" corner between faces P and R
-integer, parameter :: PRU=4
+integer(i_def), parameter :: PRU=4
 !> Describes the vertex at the "upper" corner between faces P and Q
-integer, parameter :: PQU=5
+integer(i_def), parameter :: PQU=5
 !> Describes the vertex at the "upper" corner between faces Q and R
-integer, parameter :: QRU=6
+integer(i_def), parameter :: QRU=6
 
 !> Describes the lower edge of the P face 
-integer, parameter :: PL=1
+integer(i_def), parameter :: PL=1
 !> Describes the lower edge of the Q face 
-integer, parameter :: QL=2
+integer(i_def), parameter :: QL=2
 !> Describes the lower edge of the R face 
-integer, parameter :: RL=3
+integer(i_def), parameter :: RL=3
 !> Describes the edge between the P and R faces
-integer, parameter :: PR=4
+integer(i_def), parameter :: PR=4
 !> Describes the edge between the P and Q faces
-integer, parameter :: PQ=5
+integer(i_def), parameter :: PQ=5
 !> Describes the edge between the Q and R faces
-integer, parameter :: QR=6
+integer(i_def), parameter :: QR=6
 !> Describes the upper edge of the P face 
-integer, parameter :: PU=7
+integer(i_def), parameter :: PU=7
 !> Describes the upper edge of the Q face 
-integer, parameter :: QU=8
+integer(i_def), parameter :: QU=8
 !> Describes the upper edge of the R face 
-integer, parameter :: RU=9
+integer(i_def), parameter :: RU=9
 
 ! Define some vectors for describing normal and tangential vectors below
 !

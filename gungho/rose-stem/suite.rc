@@ -5,17 +5,18 @@
                                  'biperiodic_p0_gw_fem',
                                  'dcmip301', 'robert', 'robert-moist', 'robert_short',
                                  'sbr', 'sbr_spinupwinds', 'sbr_spinupalpha',
-                                 'straka_x', 'straka_y', 'straka_200m',
+                                 'straka_x', 'straka_y', 'straka_y_ugrid', 'straka_200m',
                                  'biperiodic-cosmic',
                                  'baroclinic'%}
-{%- set miniapp_configurations = ['gravity_wave', 'umphysics_testbuild', 'miniapp_skeleton'] %}
+{%- set miniapp_configurations = ['gravity_wave', 'umphysics_testbuild', 'miniapp_skeleton', 'io_miniapp'] %}
 {%- set groups = {'developer': ['science(semi-implicit, env={"nrun":3})',
                                 'science(runge-kutta, env={"nrun":30})',
                                 'science(transport-rk)',
                                 'science(transport-biperiodic)',
                                 'science(biperiodic_p0_gw_short)',
                                 'science(biperiodic_p1_gw)',
-                                'science(straka_y, plotstr="straka_plot_y.py $NODAL_DATA_DIR theta T000090 $PLOT_DIR")',
+                                'science(straka_y, plotstr="straka_plot_y.py $NODAL_DATA_DIR w3projection_theta T000090 $PLOT_DIR")',
+                                'science(straka_y_ugrid, checkkgo=False, plotstr="straka_plot_y_ugrid.py $NODAL_DATA_DIR/lfric_diag.nc air_potential_temperature faces_levels T90 $PLOT_DIR")',
                                 'science(robert_short, env={"crun":3, "nrun":5})',	
                                 'science(baroclinic, plotstr="slices.py diagDynamo $NODAL_DATA_DIR theta:rho:1u:2u:3u T000010 180 50 0 $PLOT_DIR")',
                                 'miniapp(miniapp_skeleton)',
@@ -34,6 +35,7 @@
                               'science(biperiodic-cosmic,plotstr="biperiodic-cosmic_plot.py $NODAL_DATA_DIR rho T000000:T000500 $PLOT_DIR")',
                               'science(sbr, env={"nrun":60})',
                               'miniapp(gravity_wave, plotstr="slices.py gravity_wave $NODAL_DATA_DIR buoyancy T000036 150 0 6 $PLOT_DIR")',
+                              'miniapp(io_miniapp, checkkgo=False)',
                               'check_compilers(full-debug, True)',
                               'godlines(True)',
                               'publish_commit']} %}
@@ -387,6 +389,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
     [[PUBLISH]]
         [[[environment]]]
             DESTINATION = {{publish_destination}}
+            TARGET_PLOT_PYTHON = {{TARGET_PLOT_PYTHON}}
 
 ##############################################################################
     [[purge_local]]
@@ -706,7 +709,12 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
                       mkdir -p $DESTINATION_DIRECTORY/{{configuration}}
                       cp dynamo-checksums.txt $DESTINATION_DIRECTORY/{{configuration}}/{{compiler}}.checksums
                       mkdir -p $DESTINATION_DIRECTORY/{{configuration}}/results
-                      cp $CYLC_TASK_WORK_DIR/diagDynamo*.m $DESTINATION_DIRECTORY/{{configuration}}/results/
+                      # Copy nodal .m output
+                      touch $CYLC_TASK_WORK_DIR/tmp.m
+                      cp $CYLC_TASK_WORK_DIR/*.m $DESTINATION_DIRECTORY/{{configuration}}/results/
+                      # Copy XIOS netCDF (if it exists)
+                      test -f $CYLC_TASK_WORK_DIR/lfric_diag.nc && cp $CYLC_TASK_WORK_DIR/lfric_diag.nc $DESTINATION_DIRECTORY/{{configuration}}/results/
+                      test -f $CYLC_TASK_WORK_DIR/lfric_initial.nc && cp $CYLC_TASK_WORK_DIR/lfric_initial.nc $DESTINATION_DIRECTORY/{{configuration}}/results/
                       # Future publisher stages need this information
                       RELATIVE_LOG_ROOT=$(echo $CYLC_TASK_LOG_ROOT | sed "s|$HOME/||")
                       echo $RELATIVE_LOG_ROOT > $DESTINATION_DIRECTORY/{{configuration}}.log.path
@@ -841,7 +849,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
                      """
         script = rose task-run --app-key={{configuration}} --command-key={{TARGET_RUN_METHOD}}
         post-script = """
-                      cp {{configuration}}-checksums.txt $DESTINATION_DIRECTORY/{{configuration}}.{{compiler}}.checksums
+                      test -f {{configuration}}-checksums.txt && cp {{configuration}}-checksums.txt $DESTINATION_DIRECTORY/{{configuration}}.{{compiler}}.checksums
                       mkdir -p $DESTINATION_DIRECTORY/{{configuration}}/results
                       touch $CYLC_TASK_WORK_DIR/tmp.m
                       cp $CYLC_TASK_WORK_DIR/*.m $DESTINATION_DIRECTORY/{{configuration}}/results/

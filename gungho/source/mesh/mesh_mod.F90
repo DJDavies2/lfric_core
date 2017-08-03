@@ -95,6 +95,8 @@ module mesh_mod
     integer(i_def) :: ncells_2d_with_ghost !< Number of cells in partition
                                            !< @b including ghost cells
 
+    integer(i_def) :: nverts_per_2d_cell   ! Number of vertices per face
+
     ! Local partition 3d-mesh
     integer(i_def) :: nverts               !< Total number of verts in mesh
     integer(i_def) :: nedges               !< Total number of edges in mesh
@@ -191,6 +193,7 @@ module mesh_mod
     procedure, public :: get_cell_coords
     procedure, public :: get_column_coords
     procedure, public :: get_nverts_per_cell
+    procedure, public :: get_nverts_per_cell_2d
     procedure, public :: get_nedges_per_cell
     procedure, public :: get_nfaces_per_cell
     procedure, public :: get_cell_gid
@@ -303,7 +306,6 @@ contains
 
     integer(i_def) :: i, j, counter        ! loop counters
 
-    integer(i_def) :: nverts_per_2d_cell
     integer(i_def) :: nedges_per_2d_cell
 
     ! Arrays used in entity ownership calculation - see their names
@@ -356,7 +358,7 @@ contains
     ! Surface Coordinates in [long, lat, radius] (Units: Radians/metres)
     real(r_def), allocatable :: vertex_coords_2d(:,:)
 
-    nverts_per_2d_cell = global_mesh%get_nverts_per_cell()
+    self%nverts_per_2d_cell = global_mesh%get_nverts_per_cell()
     nedges_per_2d_cell = global_mesh%get_nedges_per_cell()
 
     global_mesh_id  = global_mesh%get_id()
@@ -392,20 +394,20 @@ contains
     allocate ( self%vert_on_cell ( nverts, self%ncells_with_ghost ) )
 
     ! Get global mesh statistics to size connectivity arrays
-    nverts_per_2d_cell   = global_mesh%get_nverts_per_cell()
+    self%nverts_per_2d_cell   = global_mesh%get_nverts_per_cell()
     nedges_per_2d_cell   = global_mesh%get_nedges_per_cell()
 
     self%nverts_per_cell = 2*nedges_per_2d_cell
-    self%nedges_per_cell = 2*nedges_per_2d_cell + nverts_per_2d_cell
+    self%nedges_per_cell = 2*nedges_per_2d_cell + self%nverts_per_2d_cell
     self%nfaces_per_cell = nedges_per_2d_cell + 2
 
     ! Get partition statistics
-    max_num_vertices_2d  = self%ncells_2d_with_ghost*nverts_per_2d_cell
+    max_num_vertices_2d  = self%ncells_2d_with_ghost*self%nverts_per_2d_cell
     max_num_edges_2d     = self%ncells_2d_with_ghost*nedges_per_2d_cell
 
 
     ! Allocate arrays to hold partition connectivities, as global ids
-    allocate( vert_on_cell_2d_gid (nverts_per_2d_cell, &
+    allocate( vert_on_cell_2d_gid (self%nverts_per_2d_cell, &
                                    self%ncells_2d_with_ghost) )
     allocate( edge_on_cell_2d_gid (nedges_per_2d_cell, &
                                    self%ncells_2d_with_ghost) )
@@ -469,12 +471,12 @@ contains
     ! Get global ids of all vertices on partition, by looping over the
     ! cell-vertex connectivity on the partition.
     allocate( tmp_list(max_num_vertices_2d) )
-    allocate( vert_on_cell_2d (nverts_per_2d_cell, self%ncells_2d_with_ghost) )
+    allocate( vert_on_cell_2d (self%nverts_per_2d_cell, self%ncells_2d_with_ghost) )
 
     n_uniq_verts = 0
 
     do i=1, self%ncells_2d_with_ghost
-      do j=1, nverts_per_2d_cell
+      do j=1, self%nverts_per_2d_cell
 
         vert_gid = vert_on_cell_2d_gid(j,i)
         vert_gid_present = .false.
@@ -589,7 +591,7 @@ contains
                         cell_next_2d,              &
                         vert_on_cell_2d,           &
                         vertex_coords_2d,          &
-                        nverts_per_2d_cell,        &
+                        self%nverts_per_2d_cell,   &
                         nedges_per_2d_cell,        &
                         self%nverts_2d,            &
                         self%nverts,               &
@@ -622,21 +624,21 @@ contains
 
     ! Assign ownership of cell vertices and cell edges
     allocate( &
-      self%vertex_ownership (nverts_per_2d_cell, self%ncells_2d_with_ghost) )
+      self%vertex_ownership (self%nverts_per_2d_cell, self%ncells_2d_with_ghost) )
     allocate( &
       self%edge_ownership   (nedges_per_2d_cell, self%ncells_2d_with_ghost) )
     allocate( &
-      self%vert_cell_owner  (nverts_per_2d_cell, self%ncells_2d_with_ghost) )
+      self%vert_cell_owner  (self%nverts_per_2d_cell, self%ncells_2d_with_ghost) )
     allocate( &
       self%edge_cell_owner  (nedges_per_2d_cell, self%ncells_2d_with_ghost) )
 
-    allocate( verts (nverts_per_2d_cell) )
+    allocate( verts (self%nverts_per_2d_cell) )
     allocate( edges (nedges_per_2d_cell) )
 
     do i=1, self%ncells_2d_with_ghost
       ! Vertex ownership
       call global_mesh%get_vert_on_cell(partition%get_gid_from_lid(i), verts)
-      do j=1, nverts_per_2d_cell
+      do j=1, self%nverts_per_2d_cell
         self%vert_cell_owner(j,i) = partition%get_lid_from_gid( &
                                    global_mesh%get_vert_cell_owner( verts(j) ) )
 
@@ -865,6 +867,22 @@ contains
     nverts_per_cell = self%nverts_per_cell
 
   end function get_nverts_per_cell
+
+  !> @details This function returns the number of
+  !>          vertices per 2d-cell/face on this mesh
+  !> @return  Number of vertices per 2d-cell/face on mesh
+  !============================================================================
+  function get_nverts_per_cell_2d(self) result (nverts_per_cell_2d)
+
+    ! Returns number of vertices per 3d-cell on this mesh
+
+    implicit none
+    class (mesh_type), intent(in) :: self
+    integer(i_def)                :: nverts_per_cell_2d
+
+    nverts_per_cell_2d = self%nverts_per_2d_cell
+
+  end function get_nverts_per_cell_2d
 
 
   !> @details This function returns the number of

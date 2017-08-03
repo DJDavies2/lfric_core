@@ -17,7 +17,7 @@ module init_prognostic_fields_alg_mod
   use runtime_constants_mod,           only: get_coordinates
 
   ! Configuration and restart/checkpoint options
-  use finite_element_config_mod,       only: element_order, wtheta_on
+  use finite_element_config_mod,       only: element_order
   use formulation_config_mod,          only: use_moisture
   use transport_config_mod,            only: scheme, &
                                              operators, &
@@ -26,8 +26,7 @@ module init_prognostic_fields_alg_mod
   use initial_density_config_mod,      only: sample_init_rho
   use restart_control_mod,             only: restart_type
   use timestepping_config_mod,         only: dt
-  ! I/O tools
-  use field_io_mod,                    only: read_state_netcdf
+
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod,                 only: invoke_initial_mr_kernel, &
@@ -75,15 +74,12 @@ contains
     type( restart_type ), intent(in)    :: restart
 
     type( quadrature_type )             :: qr
-    type( field_type ), allocatable     :: state(:)
     type( field_type )                  :: r_u
     ! Coordinate fields
     type( field_type ), pointer         :: chi(:) => null()
 
-    integer                             :: n_fields
 
     integer :: i
-    integer :: n_checkpoint  ! number of fields to checkpoint
     character(5) :: name
 
     real(kind=r_def) :: initial_time
@@ -126,67 +122,37 @@ contains
 
     else                                   ! Recorded check point to start from
 
-      n_checkpoint = 4
-      if (use_moisture)n_checkpoint=n_checkpoint+nummr
-      allocate(state(n_checkpoint))
-      n_fields = 1
       write(log_scratch_space,'(A,A)') "Reading file:", &
             trim(restart%startfname("rho"))
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
-      state(1) = field_type(vector_space =                                     &
-                        function_space_collection%get_fs(mesh_id,element_order, W3))
-
-      call read_state_netcdf(n_fields, state(1), trim(restart%startfname("rho")))
-      rho = state(1)
+      call rho%read_restart(trim(restart%startfname("rho")))
 
       write(log_scratch_space,'(A,A)') "Reading file:", &
             trim(restart%startfname("u"))
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
-      state(2) = field_type(vector_space =                                      &
-                       function_space_collection%get_fs(mesh_id, element_order, W2))
-
-      call read_state_netcdf(n_fields, state(2), trim(restart%startfname("u")))
-      u = state(2)
+      call u%read_restart(trim(restart%startfname("u")))
 
       write(log_scratch_space,'(A,A)') "Reading file:", &
             trim(restart%startfname("theta"))
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
-      if (wtheta_on) then
-        state(3) = field_type(vector_space =                                      &
-                          function_space_collection%get_fs(mesh_id, element_order, Wtheta))
-      else
-        state(3) = field_type(vector_space =                                      &
-                          function_space_collection%get_fs(mesh_id, element_order, W0))
-      end if
-
-      call read_state_netcdf(n_fields, state(3), &
-           trim(restart%startfname("theta")))
-      theta = state(3)
+      call theta%read_restart(trim(restart%startfname("theta")))
 
       write(log_scratch_space,'(A,A)') "Reading file:", &
             trim(restart%startfname("xi"))
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
-      state(4) = field_type(vector_space =                                      &
-                       function_space_collection%get_fs(mesh_id, element_order, W1))
-
-      call read_state_netcdf(n_fields, state(4), trim(restart%startfname("xi")))
-      xi = state(4)
+      call xi%read_restart(trim(restart%startfname("xi")))
 
       if (use_moisture)then
         do i=1,nummr
-          state(4+i) = field_type(vector_space =                                      &
-             function_space_collection%get_fs(mesh_id, element_order, Wtheta))
           write(name, '(A,I2.2)') 'mr_', i
-          call read_state_netcdf(n_fields, state(4+i), trim(restart%startfname(name)))
-          mr(i) = state(4+i)
+          call mr(i)%read_restart(trim(restart%startfname(name)))
         end do
       end if
 
-      deallocate(state)
 
       call log_event( "Gungho: Mapping rho->rho_in_wth in same space as theta..", LOG_LEVEL_INFO )
       call map_rho_to_theta(rho, theta, rho_in_wth)

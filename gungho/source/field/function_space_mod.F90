@@ -15,7 +15,7 @@
 module function_space_mod
 
 
-use constants_mod,         only: r_def, i_def
+use constants_mod,         only: r_def, i_def, dp_xios
 use mesh_mod,              only: mesh_type
 use master_dofmap_mod,     only: master_dofmap_type
 use stencil_dofmap_mod,    only: stencil_dofmap_type, STENCIL_POINT
@@ -35,7 +35,8 @@ use reference_element_mod, only: tangent_to_edge, normal_to_face               &
 
 use fs_continuity_mod,     only: W0, W1, W2, W3, Wtheta, W2V, W2H, Wchi
 use function_space_constructor_helper_functions_mod, &
-                           only: ndof_setup, basis_setup, dofmap_setup
+                           only: ndof_setup, basis_setup, &
+                                 dofmap_setup, levels_setup
 
 use linked_list_data_mod,  only : linked_list_data_type
 use linked_list_mod,       only : linked_list_type, &
@@ -119,6 +120,10 @@ type, extends(linked_list_data_type), public :: function_space_type
   !> dofs are on vertex boundarys
   integer(i_def), allocatable :: dof_on_vert_boundary(:,:)
 
+  !> An array to hold an ordered, unique list of levels for output
+  !> of fields on this function space
+  real(dp_xios), allocatable  :: fractional_levels(:)
+
   !> @}
   !> @name Arrays needed for on the fly basis evaluations
   integer(i_def), allocatable :: basis_order(:,:)
@@ -175,6 +180,11 @@ contains
   !> @brief Returns a pointer to the dofmap for all cells 
   !> @return The pointer which points to the cell-ordered dofmap
   procedure, public :: get_whole_dofmap
+
+  !> @brief Returns a pointer to the fractional levels in a column
+  !>        for the function space
+  !> @return The pointer which points to the fractional levels array
+  procedure, public :: get_levels
 
   !> @brief Obtains the number of dofs per cell
   !> @return Integer, the number of dofs per cell
@@ -283,6 +293,9 @@ contains
 
   !> Gets the index within the dofmap of the last "owned" dof
   procedure get_last_dof_owned
+
+  !> Gets the index within the dofmap of the last "annexed" dof
+  procedure get_last_dof_annexed
 
   !> Gets the index in the dofmap of the last dof in any depth of halo
   procedure get_last_dof_halo_any
@@ -518,6 +531,10 @@ subroutine init_function_space( self )
     'ESMF failed to generate the halo routing table', &
     LOG_LEVEL_ERROR )
 
+  ! Set up the fractional levels (for diagnostic output) for this fs
+
+  call levels_setup ( self%get_nlayers(), self%fs, self%fractional_levels)
+
   deallocate (dofmap)
 
   return
@@ -631,6 +648,19 @@ function get_whole_dofmap(self) result(map)
   map => self%master_dofmap%get_whole_master_dofmap()
   return
 end function get_whole_dofmap
+
+!-----------------------------------------------------------------------------
+! Gets the fractional levels for a column in this function space
+!-----------------------------------------------------------------------------
+function get_levels(self) result(levels)
+
+  implicit none
+  class(function_space_type), target, intent(in) :: self
+  double precision, pointer                      :: levels(:)
+
+  levels => self%fractional_levels
+  return
+end function get_levels
 
 !-----------------------------------------------------------------------------
 ! Gets the nodal coordinates of the function_space
@@ -1019,6 +1049,21 @@ function get_last_dof_owned(self) result (last_dof_owned)
 
   return
 end function get_last_dof_owned
+
+!-----------------------------------------------------------------------------
+! Gets the index within the dofmap of the last "annexed" dof
+!-----------------------------------------------------------------------------
+function get_last_dof_annexed(self) result (last_dof_annexed)
+
+  implicit none
+  class(function_space_type) :: self
+
+  integer(i_def) :: last_dof_annexed
+
+  last_dof_annexed = self%last_dof_annexed
+
+  return
+end function get_last_dof_annexed
 
 !-----------------------------------------------------------------------------
 ! Gets the index within the dofmap of the last dof in the specified halo

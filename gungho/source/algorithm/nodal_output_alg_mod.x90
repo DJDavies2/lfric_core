@@ -15,29 +15,26 @@ use psykal_lite_mod,               only: invoke_nodal_coordinates_kernel,   &
                                          invoke_inc_X_times_Y,              &
                                          invoke_convert_cart2sphere_vector, &
                                          invoke_pointwise_convert_xyz2llr,  &
-                                         invoke_compute_dof_level_kernel,   &
-                                         invoke_write_fields
+                                         invoke_compute_dof_level_kernel
+
 use function_space_mod,            only: function_space_type
 use runtime_constants_mod,         only: get_coordinates, get_rmultiplicity
 implicit none
 
 contains
 
-subroutine nodal_output_alg(field, fname ) 
+subroutine nodal_output_alg(field, chi, nodal_output, nodal_coordinates, level)
 
-    type(field_type),            intent(in) :: field   
-    character(str_max_filename), intent(in) :: fname
+    type(field_type),            intent(in) :: field, chi(3)
+    type(field_type), intent(inout)         :: nodal_output(3)
+    type(field_type), intent(inout)         :: nodal_coordinates(3)
+    type(field_type), intent(inout)         :: level
 
     ! Local variables
-    type(field_type), pointer          :: chi(:) => null()
-    type(field_type)                   :: nodal_output(3), nodal_coordinates(3)
     type(field_type), pointer          :: nodal_rmultiplicity
-    type(field_type)                   :: level
-    integer, parameter                 :: nodal_output_unit = 21
     integer                            :: i, output_fs, output_dim
     type(function_space_type), pointer :: output_field_fs   => null()
 
-    chi => get_coordinates()
 
     !(1) Create output fields
     output_fs = field%which_function_space()
@@ -94,10 +91,6 @@ subroutine nodal_output_alg(field, fname )
     level = field_type( vector_space = output_field_fs )
     call invoke_compute_dof_level_kernel(level)
   
-    !(5) Write info to file    
-    write( log_scratch_space, '(A,A)' ) 'Writing nodal output: ',trim(fname)
-    call log_event( log_scratch_space, LOG_LEVEL_INFO )
-    call invoke_write_fields(nodal_coordinates, level, nodal_output, output_dim ,nodal_output_unit, fname)
 end subroutine nodal_output_alg
 
 end module nodal_output_alg_mod

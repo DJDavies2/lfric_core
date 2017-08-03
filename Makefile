@@ -31,7 +31,7 @@
 #
 ##############################################################################
 
-export IGNORE_DEPENDENCIES = netcdf MPI ESMF pfunit_mod planet_constants_mod
+export IGNORE_DEPENDENCIES = netcdf MPI ESMF pfunit_mod planet_constants_mod xios mod_wait
 export EXTERNAL_DYNAMIC_LIBRARIES = esmf netcdff netcdf hdf5
 export IGNORE_PROGRAMS = umphysics_testbuild
 
@@ -165,7 +165,7 @@ integration-test-infrastructure-configuration:
 	$(MAKE) -f $(LFRIC_BUILD)/lfric.mk configuration
 
 .PHONY: unit-tests-infrastructure
-unit-test-infrastructure: export EXTERNAL_STATIC_LIBRARIES = pfunit
+unit-test-infrastructure: export EXTERNAL_STATIC_LIBRARIES += pfunit
 unit-test-infrastructure: export PROJECT      = infrastructure
 unit-test-infrastructure: export WORKING_DIR := $(WORKING_DIR)/infrastructure
 unit-test-infrastructure: export BIN_DIR      = $(ROOT)/tests
@@ -205,6 +205,7 @@ else
 endif
 build-gungho: export PROJECT      = gungho
 build-gungho: export SOURCE_DIR   = gungho/source
+build-gungho: export EXTERNAL_STATIC_LIBRARIES += xios
 build-gungho: export WORKING_DIR := $(WORKING_DIR)/gungho
 build-gungho: export DATABASE     = $(abspath $(WORKING_DIR)/dependencies.db)
 build-gungho: export BIN_DIR      = $(ROOT)/bin
@@ -301,7 +302,7 @@ unit-test-gungho: export PROJECT      = gungho
 unit-test-gungho: export WORKING_DIR := $(WORKING_DIR)/gungho
 unit-test-gungho: export BIN_DIR      = $(ROOT)/tests
 unit-test-gungho: export PROGRAMS     = gungho_unit_test
-unit-test-gungho: export EXTERNAL_STATIC_LIBRARIES = pfunit
+unit-test-gungho: export EXTERNAL_STATIC_LIBRARIES += xios pfunit
 unit-test-gungho: export FFLAGS      += $(FFLAGS_DEBUG) $(FFLAGS_NO_OPTIMISATION) $(FFLAGS_INIT)
 unit-test-gungho: export PRE_PROCESS_MACROS = \
                                  PFUNIT_EXTRA_USAGE=gungho_suite_fixture_mod \
@@ -365,7 +366,7 @@ test-mesh_tools: export PROJECT=mesh_tools
 test-mesh_tools: unit-test-mesh_tools
 
 .PHONY: unit-tests-mesh_tools
-unit-test-mesh_tools: export EXTERNAL_STATIC_LIBRARIES = pfunit
+unit-test-mesh_tools: export EXTERNAL_STATIC_LIBRARIES += pfunit
 unit-test-mesh_tools: export WORKING_DIR := $(WORKING_DIR)/mesh_tools
 unit-test-mesh_tools: export BIN_DIR      = $(ROOT)/tests
 unit-test-mesh_tools: export PROGRAMS     = mesh_tools_unit_test

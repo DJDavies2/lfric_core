@@ -18,7 +18,6 @@ program gravity_wave
   use init_gungho_mod,                only : init_gungho
   use init_gravity_wave_mod,          only : init_gravity_wave
   use ESMF
-  use field_io_mod,                   only : write_state_netcdf
   use field_mod,                      only : field_type
   use finite_element_config_mod,      only : element_order
   use operator_mod,                   only : operator_type
@@ -35,34 +34,62 @@ program gravity_wave
   use restart_config_mod,             only : restart_filename => filename
   use restart_control_mod,            only : restart_type
   use derived_config_mod,             only : set_derived_config
-  use output_config_mod,              only : diagnostic_frequency, subroutine_timers
-  use output_alg_mod,                 only : output_alg
+  use output_config_mod,              only : diagnostic_frequency, &
+                                             subroutine_timers, &
+                                             write_nodal_output, &
+                                             write_xios_output
   use checksum_alg_mod,               only : checksum_alg
   use timer_mod,                      only : timer, output_timer
+
+  use io_mod,                         only : output_nodal, &
+                                             output_xios_nodal, &
+                                             xios_domain_init
+
+  use xios
+  use mpi
+  use mod_wait
+
   implicit none
 
   character(:), allocatable :: filename
 
   type(ESMF_VM)      :: vm
-  integer            :: rc
-  integer            :: total_ranks, local_rank
-  integer            :: petCount, localPET
+  integer(i_def)     :: rc
+  integer(i_def)     :: total_ranks, local_rank
+  integer(i_def)     :: petCount, localPET, ierr
+  integer(i_def)     :: comm = -999
+
+  character(len=*), parameter   :: xios_id   = "lfric_client"
+  character(len=*), parameter   :: xios_ctx  = "gungho_gw"
 
   type(restart_type) :: restart
 
-  integer            :: mesh_id
+  integer(i_def)     :: mesh_id
 
   ! prognostic fields
   type( field_type ) :: wind, buoyancy, pressure
 
-  integer            :: timestep, ts_init
+  integer(i_def)     :: timestep, ts_init, dtime
   !-----------------------------------------------------------------------------
   ! Driver layer init
   !-----------------------------------------------------------------------------
 
-  ! Initialise ESMF and get the rank information from the virtual machine
-  CALL ESMF_Initialize(vm=vm, defaultlogfilename="gravity_wave.Log", &
-                  logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
+  ! Initialise MPI
+ 
+  call mpi_init(ierr)
+
+  ! initialise XIOS and get back the split mpi communicator
+  call init_wait()
+  call xios_initialize(xios_id, return_comm = comm)
+
+  ! Initialise ESMF using mpi communicator initialised by XIOS
+  ! and get the rank information from the virtual machine
+  call ESMF_Initialize(vm=vm, &
+                       defaultlogfilename="gravity_wave.Log", &
+                       logkindflag=ESMF_LOGKIND_MULTI, &
+                       mpiCommunicator=comm, &
+                       rc=rc)
+
   if (rc /= ESMF_SUCCESS) call log_event( 'Failed to initialise ESMF.', LOG_LEVEL_ERROR )
 
   call ESMF_VMGet(vm, localPet=localPET, petCount=petCount, rc=rc)
@@ -92,9 +119,57 @@ program gravity_wave
   call init_gravity_wave(mesh_id, wind, pressure, buoyancy, restart)
 
   !-----------------------------------------------------------------------------
+  ! IO init
+  !-----------------------------------------------------------------------------
+
+  ! If xios output then set up XIOS domain and context
+  if (write_xios_output) then
+
+    dtime = 1
+
+    call xios_domain_init(xios_ctx, comm, dtime, mesh_id, vm, local_rank, total_ranks)
+
+  end if
+
+  ! output initial conditions
+  ! We only want these once at the beginning of a run 
+  ts_init = max( (restart%ts_start() - 1), 0 ) ! 0 or t previous.
+
+  if (ts_init == 0) then 
+
+      if (write_nodal_output) then
+        call output_nodal('wind',     ts_init, wind,     mesh_id)
+        call output_nodal('pressure', ts_init, pressure, mesh_id)
+        call output_nodal('buoyancy', ts_init, buoyancy, mesh_id)
+      end if
+
+    ! XIOS output
+    if (write_xios_output) then
+
+      ! Make sure XIOS calendar is set to timestep 1 as it starts there
+      ! not timestep 0.
+      call xios_update_calendar(1)
+ 
+      ! Output scalar fields
+      call output_xios_nodal("init_wind", wind, mesh_id)
+      call output_xios_nodal("init_pressure", pressure, mesh_id)
+      call output_xios_nodal("init_buoyancy", buoyancy, mesh_id)
+
+    end if
+
+  end if
+
+  !-----------------------------------------------------------------------------
   ! model step 
   !-----------------------------------------------------------------------------
   do timestep = restart%ts_start(),restart%ts_end()
+
+    ! Update XIOS calendar
+    if (write_xios_output) then
+      call log_event( "Gravity Wave: Updating XIOS timestep", LOG_LEVEL_INFO )
+      call xios_update_calendar(timestep)
+    end if
+
     call log_event( &
     "/****************************************************************************\ ", &
      LOG_LEVEL_TRACE )
@@ -102,10 +177,6 @@ program gravity_wave
      call log_event( log_scratch_space, LOG_LEVEL_INFO )
      if (timestep == restart%ts_start()) then
        call gravity_wave_alg_init(mesh_id, wind, pressure, buoyancy)
-       ts_init = max( (restart%ts_start() - 1), 0 ) ! 0 or t previous.
-       call output_alg('wind',     ts_init, wind,     mesh_id)
-       call output_alg('pressure', ts_init, pressure, mesh_id)
-       call output_alg('buoyancy', ts_init, buoyancy, mesh_id)
      end if
 
     call gravity_wave_alg_step(wind, pressure, buoyancy)
@@ -115,11 +186,24 @@ program gravity_wave
     '\****************************************************************************/ ', &
      LOG_LEVEL_INFO)
     if ( mod(timestep, diagnostic_frequency) == 0 ) then
-      call log_event("Gravity Wave: writing diagnostic output", LOG_LEVEL_INFO)
-      call output_alg('wind',     timestep, wind,     mesh_id)
-      call output_alg('pressure', timestep, pressure, mesh_id)
-      call output_alg('buoyancy', timestep, buoyancy, mesh_id)
+
+      if (write_nodal_output) then
+        call log_event("Gravity Wave: writing nodal diag output", LOG_LEVEL_INFO)
+        call output_nodal('wind',     timestep, wind,     mesh_id)
+        call output_nodal('pressure', timestep, pressure, mesh_id)
+        call output_nodal('buoyancy', timestep, buoyancy, mesh_id)
+      end if
+      ! XIOS output
+      if (write_xios_output) then
+ 
+        call log_event("Gravity Wave: writing xios output", LOG_LEVEL_INFO)
+        call output_xios_nodal('wind',     wind,     mesh_id)
+        call output_xios_nodal('pressure', pressure, mesh_id)
+        call output_xios_nodal('buoyancy', buoyancy, mesh_id)
+     end if
+
     end if
+
   end do
   !-----------------------------------------------------------------------------
   ! model finalise
@@ -138,7 +222,18 @@ program gravity_wave
   ! Driver layer finalise
   !-----------------------------------------------------------------------------
 
-  ! Close down ESMF
-  call ESMF_Finalize(rc=rc)
+  ! Finalise XIOS context if we used it for IO
+  if (write_xios_output) then
+    call xios_context_finalize()
+  end if
+
+  ! Finalise XIOS
+  call xios_finalize()
+
+  ! Finalise ESMF
+  call ESMF_Finalize(endflag=ESMF_END_KEEPMPI,rc=rc)
+
+  ! Finalise mpi
+  call mpi_finalize(ierr)
 
 end program gravity_wave

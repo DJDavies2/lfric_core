@@ -21,19 +21,33 @@ program miniapp_skeleton
                                              log_set_level,     &
                                              LOG_LEVEL_ERROR,   &
                                              LOG_LEVEL_INFO
-  use output_alg_mod,                 only : output_alg
+  use output_config_mod,              only : write_nodal_output, &
+                                             write_xios_output
+  use io_mod,                         only : output_nodal, &
+                                             output_xios_nodal, &
+                                             xios_domain_init
   use checksum_alg_mod,               only : checksum_alg
+
+  use xios
+  use mpi
+  use mod_wait
 
   implicit none
 
   character(:), allocatable :: filename
 
   type(ESMF_VM)      :: vm
-  integer            :: rc
-  integer            :: total_ranks, local_rank
-  integer            :: petCount, localPET
+  integer(i_def)     :: rc
+  integer(i_def)     :: total_ranks, local_rank
+  integer(i_def)     :: petCount, localPET, ierr
+  integer(i_def)     :: comm = -999
 
-  integer            :: mesh_id
+  character(len=*), parameter   :: xios_id   = "lfric_client"
+  character(len=*), parameter   :: xios_ctx  = "skeleton_mini"
+
+  integer(i_def)     :: mesh_id
+
+  integer(i_def)     :: dtime
 
   ! prognostic fields
   type( field_type ) :: field_1
@@ -41,9 +55,24 @@ program miniapp_skeleton
   ! Driver layer init
   !-----------------------------------------------------------------------------
 
-  ! Initialise ESMF and get the rank information from the virtual machine
-  CALL ESMF_Initialize(vm=vm, defaultlogfilename="miniapp_skeleton.Log", &
-                  logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
+  ! Initialise MPI
+ 
+  call mpi_init(ierr)
+
+  ! initialise XIOS and get back the split mpi communicator
+  call init_wait()
+  call xios_initialize(xios_id, return_comm = comm)
+
+  ! Initialise ESMF using mpi communicator initialised by XIOS
+  ! and get the rank information from the virtual machine
+  call ESMF_Initialize(vm=vm, &
+                       defaultlogfilename="miniapp_skeleton.Log", &
+                       logkindflag=ESMF_LOGKIND_MULTI, &
+                       mpiCommunicator=comm, &
+                       rc=rc)
+
+
+
   if (rc /= ESMF_SUCCESS) call log_event( 'Failed to initialise ESMF.', LOG_LEVEL_ERROR )
 
   call ESMF_VMGet(vm, localPet=localPET, petCount=petCount, rc=rc)
@@ -67,13 +96,35 @@ program miniapp_skeleton
   ! Create and initialise prognostic fields
   call init_miniapp_skeleton(mesh_id, field_1)
 
+  ! If xios output then set up XIOS domain and context
+  if (write_xios_output) then
+
+    dtime = 1
+
+    call xios_domain_init(xios_ctx, comm, dtime, mesh_id, vm, local_rank, total_ranks)
+
+    ! Make sure XIOS calendar is set to timestep 1 as it starts there
+    ! not timestep 0.
+    call xios_update_calendar(1)
+
+  end if
+
   ! Call an algorithm
   call miniapp_skeleton_alg(field_1)
   
 
   ! Write out output file
   call log_event("skeleton miniapp: writing diagnostic output", LOG_LEVEL_INFO)
-  call output_alg('skeleton_field', 0, field_1, mesh_id)
+
+  ! Original nodal output
+  if ( write_nodal_output)  then
+    call output_nodal('skeleton_field', 0, field_1, mesh_id)
+  end if
+
+  ! XIOS output
+  if (write_xios_output) then
+    call output_xios_nodal("skeleton_field", field_1, mesh_id)
+  end if
   
   !-----------------------------------------------------------------------------
   ! model finalise
@@ -88,7 +139,18 @@ program miniapp_skeleton
   ! Driver layer finalise
   !-----------------------------------------------------------------------------
 
-  ! Close down ESMF
-  call ESMF_Finalize(rc=rc)
+  ! Finalise XIOS context if we used it for IO
+  if (write_xios_output) then
+    call xios_context_finalize()
+  end if
+
+  ! Finalise XIOS
+  call xios_finalize()
+
+  ! Finalise ESMF
+  call ESMF_Finalize(endflag=ESMF_END_KEEPMPI,rc=rc)
+
+  ! Finalise mpi
+  call mpi_finalize(ierr)
 
 end program miniapp_skeleton

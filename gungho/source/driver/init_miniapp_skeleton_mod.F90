@@ -12,7 +12,7 @@
 module init_miniapp_skeleton_mod
 
   use constants_mod,                  only : i_def
-  use field_mod,                      only : field_type
+  use field_mod,                      only : field_type, write_interface
   use finite_element_config_mod,      only : element_order
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : W3
@@ -20,7 +20,8 @@ module init_miniapp_skeleton_mod
                                              LOG_LEVEL_INFO, &
                                              LOG_LEVEL_ERROR
   use runtime_constants_mod,          only : create_runtime_constants
-
+  use output_config_mod,              only : write_xios_output
+  use io_mod,                         only : xios_write_field_face
   implicit none
 
 
@@ -32,6 +33,8 @@ module init_miniapp_skeleton_mod
     ! prognostic fields
     type( field_type ), intent(inout)        :: field_1
 
+    procedure(write_interface), pointer      :: tmp_ptr
+
     call log_event( 'miniapp skeleton: initialisation...', LOG_LEVEL_INFO )
 
     
@@ -39,6 +42,16 @@ module init_miniapp_skeleton_mod
     ! Creates a field in the W3 function space (fully discontinuous field)
     field_1 = field_type( vector_space = &
                       function_space_collection%get_fs(mesh_id, element_order, W3) )
+
+    ! Set up field with an IO behaviour (XIOS only at present)
+
+    if (write_xios_output) then
+
+       tmp_ptr => xios_write_field_face
+
+       call field_1%set_write_field_behaviour(tmp_ptr)
+       
+    end if
 
     ! Create runtime_constants object. This in turn creates various things
     ! needed by the fem algorithms such as mass matrix operators, mass

@@ -9,7 +9,6 @@
 !-------------------------------------------------------------------------------
 module field_io_ncdf_mod
 use constants_mod,         only: r_def
-use field_io_strategy_mod, only: field_io_strategy_type
 use netcdf, only: nf90_max_name, nf90_open, nf90_write, nf90_noerr,       &
                  nf90_strerror, nf90_put_var, nf90_get_var, nf90_put_att, &      
                  nf90_def_var, nf90_inq_varid, nf90_int, nf90_double,     &
@@ -29,7 +28,7 @@ private
 !! @details  Implements the ugrid file type for NetCDF files storing 2D quads.  
 !-------------------------------------------------------------------------------
 
-type, public, extends(field_io_strategy_type) :: field_io_ncdf_type
+type, public :: field_io_ncdf_type
   private
 
   !Dimension lengths

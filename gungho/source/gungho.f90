@@ -26,7 +26,6 @@ program gungho
   use constants_mod,                  only : i_def
   use gungho_mod,                     only : load_configuration
   use ESMF
-  use field_io_mod,                   only : write_state_netcdf
   use field_mod,                      only : field_type
   use finite_element_config_mod,      only : element_order
   use formulation_config_mod,         only : transport_only, use_moisture, use_physics
@@ -59,8 +58,13 @@ program gungho
                                              LOG_LEVEL_TRACE
   use restart_config_mod,             only : restart_filename => filename
   use restart_control_mod,            only : restart_type
-  use output_config_mod,              only : diagnostic_frequency, subroutine_timers
-  use output_alg_mod,                 only : output_alg
+  use output_config_mod,              only : diagnostic_frequency, &
+                                             subroutine_timers, &
+                                             write_nodal_output, &
+                                             write_xios_output
+  use io_mod,                         only : output_nodal, &
+                                             output_xios_nodal, &
+                                             xios_domain_init
   use timestepping_config_mod,        only : method, &
                                            timestepping_method_semi_implicit, &
                                            timestepping_method_rk
@@ -73,14 +77,25 @@ program gungho
                                              imr_nr, nummr
   use runtime_constants_mod,          only : get_cell_orientation, get_detj_at_w2
   use timer_mod,                      only : timer, output_timer
+
+  use xios
+  use mpi
+  use mod_wait
+
   implicit none
 
   character(:), allocatable :: filename
 
   type(ESMF_VM)      :: vm
-  integer            :: rc
-  integer            :: total_ranks, local_rank
-  integer            :: petCount, localPET
+  integer(i_def)     :: rc
+  integer(i_def)     :: total_ranks, local_rank
+  integer(i_def)     :: petCount, localPET, ierr
+
+  integer(i_def)     :: comm = -999
+
+
+  character(len=*), parameter   :: xios_id   = "lfric_client"
+  character(len=*), parameter   :: xios_ctx  = "gungho_atm"
 
   type(restart_type) :: restart
 
@@ -92,26 +107,39 @@ program gungho
   ! prognostic fields in non-native spaces (e.g. for physics)
   type( field_type ) :: u1_in_w3, u2_in_w3, u3_in_w3, theta_in_w3, p_in_w3, p_in_wth
 
-  ! Array to hold fields for checkpoint output
-  type( field_type ), allocatable   :: checkpoint_output(:)
 
   ! Array to hold cell orientation values in W3 field
   type( field_type )               :: cell_orientation
   ! Array to hold detj values at W2 dof locations
   type( field_type )               :: detj_at_w2
 
-  integer                          :: timestep, ts_init
+  integer(i_def)                   :: timestep, ts_init, dtime
 
-  integer :: i
+  integer(i_def) :: i
+
   character(5) :: name
 
   !-----------------------------------------------------------------------------
   ! Driver layer init
   !-----------------------------------------------------------------------------
 
-  ! Initialise ESMF and get the rank information from the virtual machine
-  CALL ESMF_Initialize(vm=vm, defaultlogfilename="dynamo.Log", &
-                  logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
+  ! Initialise MPI
+ 
+  call mpi_init(ierr)
+
+  ! initialise XIOS and get back the split mpi communicator
+  call init_wait()
+  call xios_initialize(xios_id, return_comm = comm)
+
+
+  ! Initialise ESMF using mpi communicator initialised by XIOS
+  ! and get the rank information from the virtual machine
+  call ESMF_Initialize(vm=vm, &
+                       defaultlogfilename="gungho.Log", &
+                       logkindflag=ESMF_LOGKIND_MULTI, &
+                       mpiCommunicator=comm, &
+                       rc=rc)
+
   if (rc /= ESMF_SUCCESS) call log_event( 'Failed to initialise ESMF.', &
                                           LOG_LEVEL_ERROR )
 
@@ -158,27 +186,84 @@ program gungho
   ! Create detj values at W2 dof locations
   detj_at_w2 = get_detj_at_w2()
 
-  ! Initial output
-  ts_init = max( (restart%ts_start() - 1), 0 ) ! 0 or t previous.
-  call output_alg('theta', ts_init, theta, mesh_id)
-  call output_alg('xi',    ts_init, xi,    mesh_id)
-  call output_alg('u',     ts_init, u,     mesh_id)
-  call output_alg('rho',   ts_init, rho,   mesh_id)
-  call pressure_diagnostic_alg(rho, theta, ts_init, mesh_id)
-  call divergence_diagnostic_alg(u, ts_init, mesh_id)
+  !-----------------------------------------------------------------------------
+  ! IO init
+  !-----------------------------------------------------------------------------
 
-  if (use_moisture)then
-    call output_alg('m_v',   ts_init, mr(imr_v),   mesh_id)
-    call output_alg('m_c',   ts_init, mr(imr_c),   mesh_id)
-    call output_alg('m_r',   ts_init, mr(imr_r),   mesh_id)
-    call output_alg('m_nc',   ts_init, mr(imr_nc),   mesh_id)
-    call output_alg('m_nr',   ts_init, mr(imr_nr),   mesh_id)
+  ! If xios output then set up XIOS domain and context
+  if (write_xios_output) then
+
+    dtime = 1
+
+    call xios_domain_init(xios_ctx, comm, dtime, mesh_id, vm, local_rank, total_ranks)
+
+  end if
+
+  ! Initial output
+  ! We only want these once at the beginning of a run 
+  ts_init = max( (restart%ts_start() - 1), 0 ) ! 0 or t previous.
+
+  if (ts_init == 0) then 
+
+    ! Original nodal output
+    if ( write_nodal_output)  then
+
+      call output_nodal('theta', ts_init, theta, mesh_id)
+      call output_nodal('xi',    ts_init, xi,    mesh_id)
+      call output_nodal('u',     ts_init, u,     mesh_id)
+      call output_nodal('rho',   ts_init, rho,   mesh_id)
+
+      if (use_moisture)then
+       call output_nodal('m_v',   ts_init, mr(imr_v),   mesh_id)
+       call output_nodal('m_c',   ts_init, mr(imr_c),   mesh_id)
+       call output_nodal('m_r',   ts_init, mr(imr_r),   mesh_id)
+       call output_nodal('m_nc',   ts_init, mr(imr_nc),   mesh_id)
+       call output_nodal('m_nr',   ts_init, mr(imr_nr),   mesh_id)
+      end if
+
+    end if
+
+    ! XIOS output
+    if (write_xios_output) then
+
+      ! Make sure XIOS calendar is set to timestep 1 as it starts there
+      ! not timestep 0.
+      call xios_update_calendar(1)
+ 
+      ! Output scalar fields
+      call output_xios_nodal("init_theta", theta, mesh_id)
+      call output_xios_nodal("init_rho", rho, mesh_id)
+
+      ! Output vector fields
+      call output_xios_nodal("init_u", u, mesh_id)
+      call output_xios_nodal("init_xi", xi, mesh_id)
+
+      if (use_moisture)then
+       call output_xios_nodal('init_m_v',  mr(imr_v),   mesh_id)
+       call output_xios_nodal('init_m_c',  mr(imr_c),   mesh_id)
+       call output_xios_nodal('init_m_r',  mr(imr_r),   mesh_id)
+       call output_xios_nodal('init_m_nc', mr(imr_nc),   mesh_id)
+       call output_xios_nodal('init_m_nr', mr(imr_nr),   mesh_id)
+      end if
+
+    end if
+
+    call pressure_diagnostic_alg(rho, theta, ts_init, mesh_id)
+    call divergence_diagnostic_alg(u, ts_init, mesh_id)
+
   end if
   
   !-----------------------------------------------------------------------------
   ! model step 
   !-----------------------------------------------------------------------------
   do timestep = restart%ts_start(),restart%ts_end()
+
+    ! Update XIOS calendar
+    if (write_xios_output) then
+      call log_event( "Gungho: Updating XIOS timestep", LOG_LEVEL_INFO )
+      call xios_update_calendar(timestep)
+    end if
+
     call log_event( &
     "/****************************************************************************\ ", &
      LOG_LEVEL_TRACE )
@@ -193,21 +278,18 @@ program gungho
             ! Initialise and output initial conditions on first timestep
             call runge_kutta_init()
             call rk_transport_init( mesh_id, u, rho, theta)
-            call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO )
           end if
           call rk_transport_step( u, rho, theta)
         case ( transport_scheme_bip_cosmic)
           if (timestep == restart%ts_start()) then 
             ! Initialise and output initial conditions on first timestep
             call cosmic_transport_init(mesh_id, u)
-            call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO )
           end if
           call cosmic_transport_step(rho,detj_at_w2)
         case ( transport_scheme_cusph_cosmic)
           if (timestep == restart%ts_start()) then 
             ! Initialise and output initial conditions on first timestep
             call cusph_cosmic_transport_init(mesh_id, u)
-            call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO )
           end if
           call cusph_cosmic_transport_step(mesh_id, rho, cell_orientation, detj_at_w2)
           call density_diagnostic_alg(rho, timestep)
@@ -262,20 +344,52 @@ program gungho
     ! on this timestep
 
     if ( mod(timestep, diagnostic_frequency) == 0 ) then
-      call log_event("Dynamo: writing diagnostic output", LOG_LEVEL_INFO)
-      call output_alg('theta', timestep, theta, mesh_id)
-      call output_alg('xi',    timestep, xi,    mesh_id)
-      call output_alg('u',     timestep, u,     mesh_id)
-      call output_alg('rho',   timestep, rho,   mesh_id)
+
+      ! Original nodal output
+      if ( write_nodal_output)  then
+
+         call log_event("Gungho: writing nodal output", LOG_LEVEL_INFO)
+         call output_nodal("theta", timestep, theta, mesh_id)
+         call output_nodal("rho", timestep, rho, mesh_id)
+         call output_nodal("u", timestep, u, mesh_id)
+         call output_nodal("xi", timestep, xi, mesh_id)
+
+         if (use_moisture)then
+           call output_nodal('m_v',    timestep, mr(imr_v),   mesh_id)
+           call output_nodal('m_c',    timestep, mr(imr_c),   mesh_id)
+           call output_nodal('m_r',    timestep, mr(imr_r),   mesh_id)
+           call output_nodal('m_nc',    timestep, mr(imr_nc),   mesh_id)
+           call output_nodal('m_nr',    timestep, mr(imr_nr),   mesh_id)
+         end if
+
+      end if
+
+      ! XIOS output
+      if (write_xios_output) then
+ 
+         ! Output scalar fields
+         call log_event("Gungho: writing xios output", LOG_LEVEL_INFO)
+         call output_xios_nodal("theta", theta, mesh_id)
+         call output_xios_nodal("rho", rho, mesh_id)
+
+         if (use_moisture)then
+           call output_xios_nodal('m_v', mr(imr_v),   mesh_id)
+           call output_xios_nodal('m_c', mr(imr_c),   mesh_id)
+           call output_xios_nodal('m_r', mr(imr_r),   mesh_id)
+           call output_xios_nodal('m_nc', mr(imr_nc),   mesh_id)
+           call output_xios_nodal('m_nr', mr(imr_nr),   mesh_id)
+         end if
+
+ 
+         ! Output vector fields
+         call output_xios_nodal("u", u, mesh_id)
+         call output_xios_nodal("xi", xi, mesh_id)
+
+
+      end if
+
       call pressure_diagnostic_alg(rho, theta, timestep, mesh_id)
       call divergence_diagnostic_alg(u, timestep, mesh_id)
-      if (use_moisture)then
-        call output_alg('m_v',    timestep, mr(imr_v),   mesh_id)
-        call output_alg('m_c',    timestep, mr(imr_c),   mesh_id)
-        call output_alg('m_r',    timestep, mr(imr_r),   mesh_id)
-        call output_alg('m_nc',    timestep, mr(imr_nc),   mesh_id)
-        call output_alg('m_nr',    timestep, mr(imr_nr),   mesh_id)
-      end if
     end if
 
 
@@ -296,30 +410,25 @@ program gungho
   ! Write checkpoint/restart files if required
   if( restart%write_file() ) then 
 
-    allocate(checkpoint_output(4))
     write(log_scratch_space,'(A,A)') "writing file:",  &
                             trim(restart%endfname("rho"))
      call log_event(log_scratch_space,LOG_LEVEL_INFO)
-     checkpoint_output(1) = rho
-     call write_state_netcdf( 1, checkpoint_output(1), trim(restart%endfname("rho")) )
+     call rho%write_checkpoint(trim(restart%endfname("rho")))
 
      write(log_scratch_space,'(A,A)') "writing file:",  &
                              trim(restart%endfname("u"))
      call log_event(log_scratch_space,LOG_LEVEL_INFO)
-     checkpoint_output(2) = u
-     call write_state_netcdf( 1, checkpoint_output(2), trim(restart%endfname("u")) )
+     call u%write_checkpoint(trim(restart%endfname("u")))
 
      write(log_scratch_space,'(A,A)') "writing file:",  &
                              trim(restart%endfname("theta"))
      call log_event(log_scratch_space,LOG_LEVEL_INFO)
-     checkpoint_output(3) = theta
-     call write_state_netcdf( 1, checkpoint_output(3), trim(restart%endfname("theta")) )
+     call theta%write_checkpoint(trim(restart%endfname("theta")))
   
      write(log_scratch_space,'(A,A)') "writing file:",  &
                              trim(restart%endfname("xi"))
      call log_event(log_scratch_space,LOG_LEVEL_INFO)
-     checkpoint_output(4) = xi
-     call write_state_netcdf( 1, checkpoint_output(4), trim(restart%endfname("xi")) )
+     call xi%write_checkpoint(trim(restart%endfname("xi")))
 
      if (use_moisture)then
        do i=1,nummr
@@ -327,8 +436,7 @@ program gungho
          write(log_scratch_space,'(A,A)') "writing file:",  &
             trim(restart%endfname(name))
          call log_event(log_scratch_space,LOG_LEVEL_INFO)
-         checkpoint_output(1) = mr(i)
-         call write_state_netcdf( 1, checkpoint_output(1), trim(restart%endfname(name)) )
+         call mr(i)%write_checkpoint(trim(restart%endfname(name)))
        end do
      end if
   end if
@@ -349,7 +457,18 @@ program gungho
   ! Driver layer finalise
   !-----------------------------------------------------------------------------
 
-  ! Close down ESMF
-  call ESMF_Finalize(rc=rc)
+  ! Finalise XIOS context if we used it for IO
+  if (write_xios_output) then
+    call xios_context_finalize()
+  end if
+
+  ! Finalise XIOS
+  call xios_finalize()
+
+  ! Finalise ESMF
+  call ESMF_Finalize(endflag=ESMF_END_KEEPMPI,rc=rc)
+
+  ! Finalise mpi
+  call mpi_finalize(ierr)
 
 end program gungho

@@ -35,6 +35,7 @@ module set_up_mod
   use mesh_collection_mod,        only : mesh_collection
   use reference_element_mod,      only : reference_cube, reference_element, &
                                          nfaces, nedges, nverts
+  use reference_element_data_mod, only : reference_cube_data
   use mesh_mod,                   only : mesh_type
   use log_mod,                    only : log_event,      &
                                          log_scratch_space, &
@@ -123,8 +124,9 @@ contains
       call log_event( "set_up: Reference_element must be QUAD for now...", &
                       LOG_LEVEL_ERROR )
     end if
-    ! Setup reference cube
+    ! Setup reference cube(s)
     call reference_cube()
+    call reference_cube_data()
 
 
     ! Setup the partitioning strategy

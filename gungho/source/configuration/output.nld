@@ -1,7 +1,7 @@
 namelist output
 
     diag_stem_name            : string( filename ) ! filename stem for diagnostic files
-    write_interpolated_output : logical ! write interpolated output
+    write_xios_output         : logical ! write xios output
     write_nodal_output        : logical ! write nodal output
     diagnostic_frequency      : integer ! frequency of diagnostic output
     output_projections_on_w3  : logical ! write nodal projection to w3 of fields
