@@ -4,13 +4,37 @@
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
 
+! A very simply program which just logs an error.
+!
 program log_mod_error_test
 
-  use ESMF,    only : ESMF_Initialize, ESMF_Finalize
-  use log_mod, only : log_event, LOG_LEVEL_ERROR
+  use ESMF,            only : ESMF_Initialize, ESMF_Finalize
+  use iso_fortran_env, only : error_unit
+  use log_mod,         only : log_event, LOG_LEVEL_ERROR
 
-  call ESMF_Initialize()
+  integer :: condition
+
+  ! ESMF is needed even for a serial run as it is used to determine that it
+  ! *is* a serial run.
+  !
+  ! Since the logging module is being tested it is important not to use it to
+  ! handle a failure in ESMF. Instead we do it the old fashioned way.
+  call ESMF_Initialize( rc=condition )
+  if (condition /=0 )then
+    write( error_unit, '("Failed to initialise ESMF: ", I0)') condition
+    stop 1
+  end if
+
+  ! Everything else is here purely to support the testing of this line:
+  !
   call log_event( 'An error was logged.', LOG_LEVEL_ERROR )
-  call ESMF_Finalize()
+
+  ! Since the logging module is being tested it is important not to use it to
+  ! handle a failure in ESMF. Instead we do it the old fashioned way.
+  call ESMF_Finalize( rc=condition )
+  if (condition /=0 )then
+    write( error_unit, '("Failed to finalise ESMF: ", I0)') condition
+    stop 2
+  end if
 
 end program log_mod_error_test

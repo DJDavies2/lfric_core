@@ -11,21 +11,22 @@ from __future__ import print_function
 import re
 import sys
 
-from testframework import Test, TestEngine, TestFailed
+from testframework import MpiTest, TestEngine, TestFailed
 
 ##############################################################################
-class one_of_each_test(Test):
+class one_of_each_test(MpiTest):
   def __init__( self ):
     self._INJECT = 'one_of_each.nml'
     super(one_of_each_test, self).__init__( [sys.argv[1], self._INJECT] )
 
     self._precision = 0.0005
 
-  def test( self, process ):
-    out, err = process.communicate( )
-    if process.returncode != 0:
+  def test( self, return_code, out, err ):
+    if return_code != 0:
+      print( 'Standard out: {out}'.format( out=out ), file=sys.stderr )
+      print( 'Standard error: {err}'.format( err=err ), file=sys.stderr )
       raise TestFailed( 'Unexpected failure of test executable: {code}' \
-                        .format( code=process.returncode ) )
+                        .format( code=return_code ) )
 
     expected = { 'angle_deg'   : 7.998,
                  'angle_rad'   : 0.1396,

@@ -23,7 +23,7 @@ OPENMP_ARG            = -qopenmp
 
 FFLAGS_COMPILER           =
 FFLAGS_NO_OPTIMISATION    = -O0
-FFLAGS_SAFE_OPTIMISATION  = -O2 -fp-model precise
+FFLAGS_SAFE_OPTIMISATION  = -O2 -fp-model strict
 FFLAGS_RISKY_OPTIMISATION = -O3 -xhost
 FFLAGS_DEBUG              = -g -traceback
 FFLAGS_WARNINGS           = -warn all -warn errors

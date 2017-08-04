@@ -168,7 +168,7 @@ integration-test-run/%: PROGRAMS := $(notdir $(PROGRAMS))
 integration-test-run/%: compile
 	$(call MESSAGE,Running,$*)
 	$(Q)cd $(dir $*); \
-	    $(notdir $(addsuffix .py,$*)) $(addprefix $(BIN_DIR)/,$(notdir $*))
+	    ./$(notdir $(addsuffix .py,$*)) $(addprefix $(BIN_DIR)/,$(notdir $*))
 
 ##############################################################################
 # Run unit tests.
