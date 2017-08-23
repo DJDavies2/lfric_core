@@ -739,11 +739,11 @@ subroutine nodal_write_field(nodal_coordinates, level, nodal_output, fspace_dime
   write(OUTPUT_UNIT,'(A)') 'x = [' 
   if ( fspace_dimension  == 1 ) then
     do df = 1,undf
-      write(OUTPUT_UNIT,'(5e16.8)') x_p(1)%data(df), x_p(2)%data(df), x_p(3)%data(df), l_p%data(df), n_p(1)%data(df)
+      write(OUTPUT_UNIT,'(5e18.8e3)') x_p(1)%data(df), x_p(2)%data(df), x_p(3)%data(df), l_p%data(df), n_p(1)%data(df)
     end do
   else
     do df = 1,undf
-      write(OUTPUT_UNIT,'(7e16.8)') x_p(1)%data(df), x_p(2)%data(df), x_p(3)%data(df), l_p%data(df), &
+      write(OUTPUT_UNIT,'(7e18.8e3)') x_p(1)%data(df), x_p(2)%data(df), x_p(3)%data(df), l_p%data(df), &
                                     n_p(1)%data(df), n_p(2)%data(df), n_p(3)%data(df)
     end do
   end if
