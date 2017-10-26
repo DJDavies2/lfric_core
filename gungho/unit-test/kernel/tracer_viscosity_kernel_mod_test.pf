@@ -4,7 +4,7 @@
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
 
-module viscosity_kernel_mod_test
+module tracer_viscosity_kernel_mod_test
 
   use constants_mod,                 only : i_def, r_def
   use function_space_collection_mod, only : function_space_collection_type, &
@@ -14,7 +14,7 @@ module viscosity_kernel_mod_test
 
   use field_mod,                     only : field_type,      &
                                             field_proxy_type
-  use fs_continuity_mod,             only : W2, W0
+  use fs_continuity_mod,             only : W0, Wtheta
   use function_space_mod,            only : function_space_type
   use pFUnit_Mod
   use stencil_dofmap_mod,            only : stencil_dofmap_type, STENCIL_CROSS
@@ -25,21 +25,20 @@ module viscosity_kernel_mod_test
   public :: test_all
 
   @TestCase
-  type, extends(TestCase), public :: viscosity_test_type
+  type, extends(TestCase), public :: tracer_viscosity_test_type
     private
-    type(function_space_type), pointer :: w2_fs => null()
     type(function_space_type), pointer :: wt_fs => null()
     type(function_space_type), pointer :: w0_fs => null()
-    type(field_type)                   :: theta, u, theta_inc, u_inc
+    type(field_type)                   :: theta, theta_inc
     type(field_type)                   :: chi(3)
-    type(stencil_dofmap_type), pointer :: stencil_u, stencil_t => null()
+    type(stencil_dofmap_type), pointer :: stencil_t => null()
     integer(i_def)                     :: mesh_id 
 
   contains
     procedure setUp
     procedure tearDown
     procedure test_all
-  end type viscosity_test_type
+  end type tracer_viscosity_test_type
 
   integer(i_def), parameter :: element_order = 0
 
@@ -54,9 +53,9 @@ contains
     use gungho_feign_config_mod,   only : feign_mixing_config
     implicit none
 
-    class(viscosity_test_type), intent(inout) :: this
+    class(tracer_viscosity_test_type), intent(inout) :: this
 
-    type(field_proxy_type)    :: u_p, theta_p
+    type(field_proxy_type)    :: theta_p
 
     integer(i_def) :: mesh_id
 
@@ -71,13 +70,8 @@ contains
     ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
     this%mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
 
-    this%w2_fs => function_space_collection%get_fs(this%mesh_id, element_order, W2)
-    this%wt_fs => function_space_collection%get_fs(this%mesh_id, element_order, W0)
+    this%wt_fs => function_space_collection%get_fs(this%mesh_id, element_order, Wtheta)
     this%w0_fs => function_space_collection%get_fs(this%mesh_id, element_order, W0)
-
-    this%u     = field_type( vector_space = this%w2_fs )
-    this%u_inc = field_type( vector_space = this%w2_fs )
-    u_p        = this%u%get_proxy()
 
     this%theta     = field_type( vector_space = this%wt_fs )
     this%theta_inc = field_type( vector_space = this%wt_fs )
@@ -87,7 +81,6 @@ contains
     this%chi(2) = field_type( vector_space = this%w0_fs ) 
     this%chi(3) = field_type( vector_space = this%w0_fs ) 
 
-    this%stencil_u => u_p%vspace%get_stencil_dofmap(STENCIL_CROSS,1)
     this%stencil_t => theta_p%vspace%get_stencil_dofmap(STENCIL_CROSS,1)
 
     call feign_mixing_config(.false., 10.0_r_def)
@@ -101,7 +94,7 @@ contains
 
     implicit none
 
-    class(viscosity_test_type), intent(inout) :: this
+    class(tracer_viscosity_test_type), intent(inout) :: this
 
     call function_space_collection%clear()
     call deallocate_reference()
@@ -113,12 +106,12 @@ contains
   @test
   subroutine test_all( this )
 
-    use viscosity_kernel_mod,     only : viscosity_code
-    use mesh_mod,                 only : mesh_type
+    use tracer_viscosity_kernel_mod, only : tracer_viscosity_code
+    use mesh_mod,                    only : mesh_type
 
     implicit none
 
-    class(viscosity_test_type), intent(inout) :: this
+    class(tracer_viscosity_test_type), intent(inout) :: this
 
     real(r_def), parameter :: tol = 1.0e-12_r_def
     real(r_def), parameter :: dx = 6000.0_r_def, &
@@ -127,15 +120,13 @@ contains
 
     integer(i_def) :: cell, i, j, k
 
-    ! Variables for testing viscosity
+    ! Variables for testing tracer_viscosity
 
-    integer          :: ndf_u, undf_u, &
-                        ndf_t, undf_t, df
+    integer          :: ndf_t, undf_t, df
 
-    integer, pointer :: stencil_map_t(:,:,:) => null(), &
-                        stencil_map_u(:,:,:) => null()
+    integer, pointer :: stencil_map_t(:,:,:) => null()
 
-    type(field_proxy_type)   :: u_p, u_inc_p, t_p, t_inc_p, chi_p(3)
+    type(field_proxy_type)   :: t_p, t_inc_p, chi_p(3)
 
     real(r_def) :: dz, dz_test(3)
 
@@ -164,13 +155,8 @@ contains
       end do
     end do
 
-    u_p     = this%u%get_proxy()
-    u_inc_p = this%u_inc%get_proxy()
     t_p     = this%theta%get_proxy()
     t_inc_p = this%theta_inc%get_proxy()
-
-    ndf_u  = u_p%vspace%get_ndf( )
-    undf_u = u_p%vspace%get_undf( )
 
     ndf_t  = t_p%vspace%get_ndf( )
     undf_t = t_p%vspace%get_undf( )
@@ -179,40 +165,31 @@ contains
     undf_chi = chi_p(1)%vspace%get_undf( )
 
 
-    stencil_map_u => this%stencil_u%get_whole_dofmap()
     stencil_map_t => this%stencil_t%get_whole_dofmap()
     map_chi => chi_p(1)%vspace%get_whole_dofmap()
 
     ! Create the data
     cell = 5
-    u_p%data(:) = 12.0_r_def
     t_p%data(:) = 300.0_r_def
-    u_inc_p%data(:) = 0.0_r_def
     t_inc_p%data(:) = 0.0_r_def
 
-    call viscosity_code( &
-                       t_p%vspace%get_nlayers(), &
-                       t_inc_p%data, &
-                       t_p%data, &
-                       u_inc_p%data, &
-                       u_p%data, &
-                       chi_p(1)%data, &
-                       chi_p(2)%data, & 
-                       chi_p(3)%data, &
-                       ndf_t, undf_t, &
-                       stencil_map_t(:,:,cell), 5, &
-                       ndf_u, undf_u, &
-                       stencil_map_u(:,:,cell), 5, &
-                       ndf_chi, undf_chi, map_chi(:,cell) &
-                      )
+    call tracer_viscosity_code( &
+                               t_p%vspace%get_nlayers(), &
+                               t_inc_p%data, &
+                               t_p%data, &
+                               5, stencil_map_t(:,:,cell), &
+                               chi_p(1)%data, &
+                               chi_p(2)%data, & 
+                               chi_p(3)%data, &
+                               ndf_t, undf_t, &
+                               stencil_map_t(:,1,cell), &
+                               ndf_chi, undf_chi, map_chi(:,cell) &
+                              )
 
      answer = 0.0_r_def 
      @assertEqual(answer, t_inc_p%data(stencil_map_t(1,1,cell) ), tol)
-     do df = 1, ndf_u
-       @assertEqual(answer, u_inc_p%data(stencil_map_u(df,1,cell) ), tol)
-     end do
 
 
   end subroutine test_all
 
-end module viscosity_kernel_mod_test
+end module tracer_viscosity_kernel_mod_test

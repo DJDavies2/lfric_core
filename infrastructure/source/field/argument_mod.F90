@@ -85,17 +85,27 @@ module argument_mod
   integer, public, parameter :: GH_QUADRATURE_XYoZ  = 505
   integer, public, parameter :: GH_QUADRATURE_XoYoZ = 506
 
+! Stencil metadata
+  integer, public, parameter               :: XORY1D = 1
+  integer, public, parameter               :: X1D    = 2
+  integer, public, parameter               :: Y1D    = 3
+  integer, public, parameter               :: CROSS  = 4
+  integer, public, parameter, dimension(4) :: STENCIL = -1
 ! Evaluator metadata
   integer, public, parameter :: EVALUATOR           = 507
   integer, public, parameter :: GH_EVALUATOR        = 508
+
+! Metadata argument type 
   type, public :: arg_type
      integer :: arg_type         ! {GH_FIELD, GH_OPERATOR, GH_COLUMNWISE_OPERATOR,&
                                  !  GH_REAL, GH_INTEGER}
      integer :: arg_intent       ! {GH_READ, GH_WRITE, GH_RW, GH_INC, GH_SUM, GH_MIN, GH_MAX}
      integer :: wspace      = -1 ! {W0, W1, W2, W3, ANY_SPACE_[0-9]+, ANY_W2}
      integer :: from_wspace = -1 ! { " } only required for gh_operator
+     integer :: stencil_map = -1 !{XORY1D,X1D,Y1D,CROSS} optional, type of stencil map to use
   end type arg_type
 
+! Metadata argument function space type 
   type, public :: func_type
      integer :: wspace            ! {W0, W1, W2, W3, ANY_SPACE_[0-9]+, ANY_W2}
      integer :: wproperties1      ! {GH_BASIS, GH_DIFF_BASIS, GH_OPERATOR, &

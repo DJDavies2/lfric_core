@@ -38,7 +38,8 @@ module rk_alg_timestep_mod
   ! PsyKAl-lite kernels
   use psykal_lite_mod,                   only: invoke_ru_bd_kernel, &
                                                invoke_multiply_field_data, &
-                                               invoke_viscosity
+                                               invoke_tracer_viscosity, &
+                                               invoke_momentum_viscosity
 
   use field_bundle_mod,                  only: clone_bundle, &
                                                bundle_axpy,  & 
@@ -236,9 +237,10 @@ contains
 
     ! Apply viscosity
     if ( viscosity ) then
-      call log_event( 'Applying Viscosity', LOG_LEVEL_INFO )      
-      call invoke_viscosity(inc(igh_t), theta, inc(igh_u), u, chi)
-      call invoke( set_field_scalar(0.0_r_def, inc(igh_d)) )
+      call log_event( 'Applying Viscosity', LOG_LEVEL_INFO ) 
+      call invoke_tracer_viscosity(   inc(igh_t), state(igh_t), 1, chi)
+      call invoke_momentum_viscosity( inc(igh_u), state(igh_u), 1, chi)
+      call invoke( set_field_scalar(0.0_r_def, inc(igh_d)) )     
       call bundle_axpy(dt, inc, state, state, bundle_size)
     end if
 
