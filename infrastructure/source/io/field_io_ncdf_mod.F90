@@ -8,13 +8,14 @@
 !!  @details Implementation of the field_io_strategy class for NetCDF format.
 !-------------------------------------------------------------------------------
 module field_io_ncdf_mod
-use constants_mod,         only: r_def
-use netcdf, only: nf90_max_name, nf90_open, nf90_write, nf90_noerr,       &
-                 nf90_strerror, nf90_put_var, nf90_get_var, nf90_put_att, &      
-                 nf90_def_var, nf90_inq_varid, nf90_int, nf90_double,     &
-                 nf90_clobber, nf90_enddef, nf90_inquire_dimension,       &
-                 nf90_inq_dimid, nf90_def_dim, nf90_create, nf90_close,   &
-                 nf90_64bit_offset
+
+use constants_mod, only: r_def, str_max_filename
+use netcdf, only: nf90_max_name, nf90_open, nf90_write, nf90_noerr,        &
+                  nf90_strerror, nf90_put_var, nf90_get_var, nf90_put_att, &      
+                  nf90_def_var, nf90_inq_varid, nf90_int, nf90_double,     &
+                  nf90_clobber, nf90_enddef, nf90_inquire_dimension,       &
+                  nf90_inq_dimid, nf90_def_dim, nf90_create, nf90_close,   &
+                  nf90_64bit_offset
 implicit none
 private
 
@@ -32,10 +33,10 @@ type, public :: field_io_ncdf_type
   private
 
   !Dimension lengths
-  integer :: field_size                     !< Length of field array
+  integer :: field_size                    !< Length of field array
 
-  integer                      :: ncid      !< NetCDF file ID
-  character(len=nf90_max_name) :: file_name !< Filename
+  integer                     :: ncid      !< NetCDF file ID
+  character(str_max_filename) :: file_name !< Filename
 
   !Variable ids
   integer :: field_dim_id    !< NetCDF-assigned ID for the field dimensions.

@@ -8,7 +8,8 @@
 !-------------------------------------------------------------------------------
 module ncdf_quad_mod
 
-use constants_mod,  only : r_def, i_def, l_def, str_def, str_long
+use constants_mod,  only : r_def, i_def, l_def, str_def, str_long,             &
+                           str_max_filename
 use ugrid_file_mod, only : ugrid_file_type
 use netcdf,         only : nf90_max_name, nf90_open, nf90_write, nf90_noerr,   &
                            nf90_strerror, nf90_put_var, nf90_get_var,          &
@@ -51,11 +52,11 @@ type, public, extends(ugrid_file_type) :: ncdf_quad_type
 
   private
 
-  integer(i_def)           :: ncid        !< NetCDF file ID
-  character(nf90_max_name) :: file_name   !< Filename
-  character(nf90_max_name) :: mesh_name
-  character(str_def)       :: mesh_class  !< Primitive class of mesh,
-                                          !< i.e. sphere, plane
+  integer(i_def)              :: ncid       !< NetCDF file ID
+  character(str_max_filename) :: file_name  !< Filename
+  character(nf90_max_name)    :: mesh_name
+  character(str_def)          :: mesh_class !< Primitive class of mesh,
+                                            !< i.e. sphere, plane
 
   character(str_long) :: generator_inputs !< Inputs to generator for this mesh
 
