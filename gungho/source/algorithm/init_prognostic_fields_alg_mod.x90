@@ -36,6 +36,7 @@ module init_prognostic_fields_alg_mod
   ! PsyKAl PSYClone kernels
   use set_rho_kernel_mod,              only: set_rho_kernel_type
   use initial_u_kernel_mod,            only: initial_u_kernel_type
+  use enforce_bc_kernel_mod,           only: enforce_bc_kernel_type
 
   ! Derived Types
   use function_space_collection_mod,   only: function_space_collection
@@ -106,7 +107,8 @@ contains
       call invoke( name = "Initialise U and Rho",   &
                    setval_c( u,   0.0_r_def ),      &
                    setval_c( r_u, 0.0_r_def ),      &
-                   initial_u_kernel_type( r_u, chi, initial_time, qr ) )
+                   initial_u_kernel_type( r_u, chi, initial_time, qr ), &
+                   enforce_bc_kernel_type( r_u ) )
       call solver_algorithm(u, r_u)
 
       if(sample_init_rho) then
