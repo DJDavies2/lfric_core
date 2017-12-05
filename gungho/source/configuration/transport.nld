@@ -3,4 +3,5 @@ namelist transport
   operators          : enumeration[ fv, fem ]
   fv_flux_order      : integer
   fv_advective_order : integer
+  consistent_metric  : logical ! Compute metric terms with the advection scheme
 end namelist transport

@@ -3175,7 +3175,7 @@ end subroutine invoke_sample_poly_flux
 !> had a dependency on support for evaluators in PSyClone have been removed (they
 !> use PSyClone auto-generated code instead). However, this call requires more
 !> information than a standard call and this will be fixed in #919
-subroutine invoke_sample_poly_adv( adv, tracer, wind, stencil_extent )
+subroutine invoke_sample_poly_adv( adv, tracer, wind, chi, stencil_extent )
 
   use sample_poly_adv_kernel_mod, only: sample_poly_adv_code
   use stencil_dofmap_mod,          only: stencil_dofmap_type, STENCIL_CROSS
@@ -3186,33 +3186,43 @@ subroutine invoke_sample_poly_adv( adv, tracer, wind, stencil_extent )
   type(field_type), intent(inout)      :: adv
   type(field_type), intent(in)         :: wind
   type(field_type), intent(in)         :: tracer
+  type(field_type), intent(in)         :: chi(3)
   integer, intent(in)                  :: stencil_extent
 
-  type( field_proxy_type )  :: adv_proxy, wind_proxy, tracer_proxy
+  type( field_proxy_type )  :: adv_proxy, wind_proxy, tracer_proxy, chi_proxy(3)
 
   type(stencil_dofmap_type), pointer :: stencil => null()
+  type(stencil_dofmap_type), pointer :: stencil_wx => null()
 
   integer, pointer :: map_w2(:,:)        => null()
   integer, pointer :: stencil_map(:,:,:) => null()
+  integer, pointer :: stencil_map_wx(:,:,:) => null()
 
   integer :: undf_wt, ndf_wt
   integer :: undf_w2, ndf_w2
+  integer :: undf_wx, ndf_wx
   integer :: ndf_adv
-  integer :: df_adv, df_w2
+  integer :: df_adv, df_w2, df_wx
   integer :: cell
   integer :: nlayers
-  integer :: stencil_size
+  integer :: stencil_size, stencil_size_wx
   integer :: d
   logical :: swap
   type(mesh_type), pointer :: mesh => null()
   real(kind=r_def), pointer :: nodes_adv(:,:) => null()
 
   real(kind=r_def), allocatable :: basis_w2(:,:,:)
+  real(kind=r_def), allocatable :: basis_wx(:,:,:)
+  real(kind=r_def), allocatable :: diff_basis_wx(:,:,:)
   integer :: dim_w2
+  integer :: dim_wx, diff_dim_wx
 
   adv_proxy    = adv%get_proxy()
   wind_proxy   = wind%get_proxy()
   tracer_proxy = tracer%get_proxy()
+  chi_proxy(1) = chi(1)%get_proxy()
+  chi_proxy(2) = chi(2)%get_proxy()
+  chi_proxy(3) = chi(3)%get_proxy()
 
   ndf_adv = adv_proxy%vspace%get_ndf()
   nodes_adv => adv_proxy%vspace%get_nodes()
@@ -3224,11 +3234,22 @@ subroutine invoke_sample_poly_adv( adv, tracer, wind, stencil_extent )
   undf_w2 = wind_proxy%vspace%get_undf()
   dim_w2  = wind_proxy%vspace%get_dim_space()
 
+  ndf_wx  = chi_proxy(1)%vspace%get_ndf()
+  undf_wx = chi_proxy(1)%vspace%get_undf()
+  dim_wx  = chi_proxy(1)%vspace%get_dim_space()
+  diff_dim_wx = chi_proxy(1)%vspace%get_dim_space_diff()
+
   ! Evaluate the basis function
   allocate (basis_w2(dim_w2, ndf_w2, ndf_adv))
+  allocate (basis_wx(dim_wx, ndf_wx, ndf_adv))
+  allocate (diff_basis_wx(diff_dim_wx, ndf_wx, ndf_adv))
   do df_adv = 1, ndf_adv
     do df_w2 = 1, ndf_w2
       basis_w2(:,df_w2,df_adv) = wind_proxy%vspace%call_function(BASIS,df_w2,nodes_adv(:,df_adv))
+    end do
+    do df_wx = 1, ndf_wx
+      basis_wx(:,df_wx,df_adv) = chi_proxy(1)%vspace%call_function(BASIS,df_wx,nodes_adv(:,df_adv))
+      diff_basis_wx(:,df_wx,df_adv) = chi_proxy(1)%vspace%call_function(DIFF_BASIS,df_wx,nodes_adv(:,df_adv))
     end do
   end do
 
@@ -3238,7 +3259,11 @@ subroutine invoke_sample_poly_adv( adv, tracer, wind, stencil_extent )
                                                     stencil_extent)
   stencil_size = stencil%get_size()
   stencil_map => stencil%get_whole_dofmap()
-  map_w2 => wind_proxy%vspace%get_whole_dofmap()
+
+  stencil_wx => chi_proxy(1)%vspace%get_stencil_dofmap(STENCIL_CROSS, &
+                                                       stencil_extent)
+  stencil_size_wx = stencil_wx%get_size()
+  stencil_map_wx => stencil_wx%get_whole_dofmap()
 
   if(wind_proxy%is_dirty(depth=1) ) then
     call wind_proxy%halo_exchange(depth=1)
@@ -3248,6 +3273,17 @@ subroutine invoke_sample_poly_adv( adv, tracer, wind, stencil_extent )
     if(tracer_proxy%is_dirty(depth=d) ) swap = .true.
   end do
   if ( swap ) call tracer_proxy%halo_exchange(depth=stencil_extent+1)
+  swap = .false.
+  do d = 1,stencil_extent+1
+    if(chi_proxy(1)%is_dirty(depth=d) ) swap = .true.
+  end do
+  if ( swap ) then
+    call chi_proxy(1)%halo_exchange(depth=stencil_extent+1)
+    call chi_proxy(2)%halo_exchange(depth=stencil_extent+1)
+    call chi_proxy(3)%halo_exchange(depth=stencil_extent+1)
+  end if
+
+  map_w2 => wind_proxy%vspace%get_whole_dofmap()
 
   mesh => adv%get_mesh()
   do cell = 1,mesh%get_last_edge_cell()
@@ -3256,14 +3292,23 @@ subroutine invoke_sample_poly_adv( adv, tracer, wind, stencil_extent )
                                  adv_proxy%data,              &
                                  tracer_proxy%data,           &
                                  wind_proxy%data,             &
+                                 chi_proxy(1)%data,           &
+                                 chi_proxy(2)%data,           &
+                                 chi_proxy(3)%data,           &
+                                 stencil_size,                &
+                                 stencil_map(:,:,cell),       &
                                  ndf_wt,                      &
                                  undf_wt,                     &
                                  ndf_w2,                      &
                                  undf_w2,                     &
                                  map_w2(:,cell),              &
                                  basis_w2,                    &
-                                 stencil_size,                &
-                                 stencil_map(:,:,cell)        &
+                                 ndf_wx,                      &
+                                 undf_wx,                     &
+                                 basis_wx,                    &
+                                 diff_basis_wx,               &
+                                 stencil_size_wx,             &
+                                 stencil_map_wx(:,:,cell)     &
                                  )
 
   end do

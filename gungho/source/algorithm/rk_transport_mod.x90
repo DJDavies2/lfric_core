@@ -213,7 +213,7 @@ contains
           ! Use polynomial reconstruction
           call invoke_sample_poly_flux( mass_flux, u, rho, &
                                         flux_stencil_extent )
-          call invoke_sample_poly_adv( rt_prediction(stage), theta, u, &
+          call invoke_sample_poly_adv( rt_prediction(stage), theta, u, chi, &
                                        advective_stencil_extent )
         case(transport_operators_fem)      
           ! Use FEM projection

@@ -20,12 +20,14 @@ module sample_poly_adv_kernel_mod
 
 use argument_mod,  only : arg_type, func_type,                  &
                           GH_FIELD, GH_WRITE, GH_READ,          &
-                          W2, Wtheta, GH_BASIS, CELLS,          &
+                          W2, Wtheta, ANY_SPACE_1,              &
+                          GH_BASIS, GH_DIFF_BASIS, CELLS,       &
                           GH_EVALUATOR, EVALUATOR
-use constants_mod, only : r_def, i_def
-use kernel_mod,    only : kernel_type
-use reference_element_mod, only: W, E, N, S
 
+use constants_mod,         only: r_def, i_def
+use kernel_mod,            only: kernel_type
+use reference_element_mod, only: W, E, N, S
+use transport_config_mod,  only: consistent_metric
 
 implicit none
 
@@ -45,13 +47,15 @@ real(kind=r_def), allocatable,    private :: coeff_matrix_v(:,:,:)
 !> The type declaration for the kernel. Contains the metadata needed by the Psy layer
 type, public, extends(kernel_type) :: sample_poly_adv_kernel_type
   private
-  type(arg_type) :: meta_args(3) = (/                                  &
+  type(arg_type) :: meta_args(4) = (/                                  &
        arg_type(GH_FIELD,   GH_WRITE, Wtheta),                         &
        arg_type(GH_FIELD,   GH_READ,  Wtheta),                         &
-       arg_type(GH_FIELD,   GH_READ,  W2)                              &
+       arg_type(GH_FIELD,   GH_READ,  W2),                             &
+       arg_type(GH_FIELD*3, GH_READ,  ANY_SPACE_1)                     &
        /)
-  type(func_type) :: meta_funcs(1) = (/                                &
-       func_type(W2, GH_BASIS)                                         &
+  type(func_type) :: meta_funcs(2) = (/                                &
+       func_type(W2,          GH_BASIS),                               &
+       func_type(ANY_SPACE_1, GH_BASIS, GH_DIFF_BASIS)                 &
        /)
   integer :: iterates_over = CELLS
   integer :: gh_shape = GH_EVALUATOR
@@ -98,14 +102,21 @@ subroutine sample_poly_adv_code( nlayers,              &
                                  advection,            &
                                  tracer,               &
                                  wind,                 &
+                                 chi1, chi2, chi3,     &
+                                 stencil_size,         &
+                                 stencil_map,          &
                                  ndf_wt,               &
                                  undf_wt,              &
                                  ndf_w2,               &
                                  undf_w2,              &
                                  map_w2,               &
                                  basis_w2,             &
-                                 stencil_size,         &
-                                 stencil_map           &
+                                 ndf_wx,               &
+                                 undf_wx,              &
+                                 basis_wx,             &
+                                 diff_basis_wx,        &
+                                 stencil_size_wx,      &
+                                 stencil_map_wx        &
                                  )
 
   implicit none
@@ -117,20 +128,29 @@ subroutine sample_poly_adv_code( nlayers,              &
   integer(kind=i_def), intent(in)                    :: ndf_w2
   integer(kind=i_def), intent(in)                    :: undf_w2
   integer(kind=i_def), dimension(ndf_w2), intent(in) :: map_w2
+  integer(kind=i_def), intent(in)                    :: ndf_wx
+  integer(kind=i_def), intent(in)                    :: undf_wx
 
   real(kind=r_def), dimension(undf_wt), intent(out)  :: advection
   real(kind=r_def), dimension(undf_w2), intent(in)   :: wind
   real(kind=r_def), dimension(undf_wt), intent(in)   :: tracer
+  real(kind=r_def), dimension(undf_wx), intent(in)   :: chi1, chi2, chi3
 
   real(kind=r_def), dimension(3,ndf_w2,ndf_wt), intent(in) :: basis_w2
+  real(kind=r_def), dimension(1,ndf_wx,ndf_wt), intent(in) :: basis_wx
+  real(kind=r_def), dimension(3,ndf_wx,ndf_wt), intent(in) :: diff_basis_wx
 
   integer(kind=i_def),                                 intent(in) :: stencil_size
   integer(kind=i_def), dimension(ndf_wt,stencil_size), intent(in) :: stencil_map
+  integer(kind=i_def),                                 intent(in) :: stencil_size_wx
+  integer(kind=i_def), dimension(ndf_wx,stencil_size_wx), intent(in) :: stencil_map_wx
 
   ! Internal variables
   integer(kind=i_def) :: k, df, dft, p, dir, id, idx
   real(kind=r_def)    :: u(3,nlayers+1)
   real(kind=r_def)    :: polynomial_tracer, advection_update, z0 
+  real(kind=r_def), allocatable :: x(:,:,:)
+  real(kind=r_def)    :: etadot, dzdx_l, dzdx_c, dzdy_l, dzdy_c, dx, dy, dz
 
   ! Compute wind at tracer points
   u(:,:) = 0.0_r_def
@@ -149,6 +169,28 @@ subroutine sample_poly_adv_code( nlayers,              &
   do k = 1,nlayers+1
     u(:,k) = u(:,k)*0.5_r_def   
   end do
+
+  ! Compute coordinates at all tracer points in stencil
+  if ( consistent_metric ) then
+    allocate( x(3,nlayers+1,stencil_size) )
+    x(:,:,:) = 0.0_r_def
+    do p = 1,stencil_size
+      do df = 1,ndf_wx
+        do dft = 1,ndf_wt
+          do k = 0, nlayers - 1
+            x(1,k + dft,p) = x(1,k + dft,p) + chi1(stencil_map_wx(df,p) + k)*basis_wx(1,df,dft)
+            x(2,k + dft,p) = x(2,k + dft,p) + chi2(stencil_map_wx(df,p) + k)*basis_wx(1,df,dft)
+            x(3,k + dft,p) = x(3,k + dft,p) + chi3(stencil_map_wx(df,p) + k)*basis_wx(1,df,dft)
+          end do
+        end do   
+      end do
+      ! Average coordinates across cell boundaries due to double counting from
+      ! the vertical continuity of Wtheta
+      do k = 2,nlayers
+        x(:,k,p) = 0.5_r_def*x(:,k,p)
+      end do
+    end do
+  end if
 
   ! tracer data is stored contiguously and so can just use dft = 1
   ! and increment by 1 to get each subsequent level up to dft + nlayers 
@@ -175,6 +217,17 @@ subroutine sample_poly_adv_code( nlayers,              &
     ! out sign of wind - hence presense of abs(u)
     advection_update = abs(u(1,k+dft))*polynomial_tracer
 
+    ! Compute metric term using advection scheme
+    if ( consistent_metric ) then
+      do p = 1,np
+        tracer_stencil(p) = x(3,k+dft,stencil(p,dir))
+      end do
+      coeff(:) = matmul(coeff_matrix,tracer_stencil)
+      dzdx_c = 0.0_r_def
+      do p = 1,np-1
+        dzdx_c = dzdx_c + coeff(p+1)*dx0(p)
+      end do    
+    end if
     ! Compute y stencil
     ! stencil_dir is north if v < 0 otherwise it is south
     if (  u(2,k+dft) >= 0.0_r_def ) then
@@ -194,9 +247,47 @@ subroutine sample_poly_adv_code( nlayers,              &
     ! ( dP/dy for v > 0, -dP/dy for v < 0) so need to cancel
     ! out sign of wind - hence presense of abs(v)
     advection_update = advection_update + abs(u(2,k+dft))*polynomial_tracer
-   
+
+    ! Compute metric term using advection scheme
+    if ( consistent_metric ) then
+      do p = 1,np
+        tracer_stencil(p) = x(3,k+dft,stencil(p,dir))
+      end do
+      coeff(:) = matmul(coeff_matrix,tracer_stencil)
+      dzdy_c = 0.0_r_def
+      do p = 1,np-1
+        dzdy_c = dzdy_c + coeff(p+1)*dx0(p)
+      end do    
+    
+      ! Modify vertical velocity to take account of inconsistent metric terms
+      ! w => w + u*(dzdx_l - dzdx_c) + v*(dzdy_l - dzdy_c)
+      ! with _l indicating centred linear approximation
+      ! and _c indicating upwind cubic (or whatever form the horizontal advection
+      ! uses)
+      dzdx_l = 0.0_r_def
+      dzdy_l = 0.0_r_def
+      dx = 0.0_r_def
+      dy = 0.0_r_def
+      dz = 0.0_r_def
+      do df = 1,ndf_wx
+        dx = dx + chi1(stencil_map_wx(df,1)+k)*diff_basis_wx(1,df,dft)
+        dy = dy + chi2(stencil_map_wx(df,1)+k)*diff_basis_wx(2,df,dft)
+        dz = dz + chi3(stencil_map_wx(df,1)+k)*diff_basis_wx(3,df,dft)
+        dzdx_l = dzdx_l + chi3(stencil_map_wx(df,1)+k)*diff_basis_wx(1,df,dft)
+        dzdy_l = dzdy_l + chi3(stencil_map_wx(df,1)+k)*diff_basis_wx(2,df,dft)
+      end do
+      dzdx_l = dzdx_l / dx
+      dzdy_l = dzdy_l / dy 
+      dzdx_c = dzdx_c / dx
+      dzdy_c = dzdy_c / dy
+
+      etadot = u(3,k+dft) + u(1,k+dft)*dx/dz*(dzdx_l-dzdx_c) + u(2,k+dft)*dy/dz*(dzdy_l-dzdy_c) 
+      if ( k == 0 .or. k == nlayers ) etadot = 0.0_r_def
+    else
+      etadot = u(3,k+dft)
+    end if
     ! Compute z stencil, dir < 0 if w > 0
-    if (  u(3,k+dft) >= 0.0_r_def ) then
+    if (  etadot >= 0.0_r_def ) then
       dir = -1
       idx = 1
     else
@@ -219,7 +310,8 @@ subroutine sample_poly_adv_code( nlayers,              &
     ! Polynomial tracer contains the directional derivative
     ! ( dP/dz for w > 0, -dP/dz for w < 0) so need to cancel
     ! out sign of wind - hence presense of abs(w)
-    advection_update = advection_update + abs(u(3,k+dft))*polynomial_tracer
+
+    advection_update = advection_update + abs(etadot)*polynomial_tracer
     
     advection(stencil_map(dft,1)+k) = advection_update
   end do
