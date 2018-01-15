@@ -291,23 +291,31 @@ end function yz_NL_wind_case_1
 !> @param[in] chi Position in physical coordinates
 !> @param[in] time Time (timestep multiplied by dt)
 !> @param[in] choice Integer defining which specified formula to use
-!> @param[in] num_options Number of sclaer options to supply
+!> @param[in] num_options Number of scalar options to supply
 !> @param[in] option Array of real values used to generate the initial profile
 !> @result u Result wind field vector (u,v,w)
-function analytic_wind(chi, time, choice, num_options, option) result(u)
+function analytic_wind(chi, time, choice, num_options, option_arg) result(u)
 
   implicit none
 
-  real(kind=r_def), intent(in) :: chi(3)
-  real(kind=r_def), intent(in) :: time
-  integer,          intent(in) :: choice, num_options
-  real(kind=r_def), optional   :: option(num_options)
+  real(kind=r_def),           intent(in) :: chi(3)
+  real(kind=r_def),           intent(in) :: time
+  integer,                    intent(in) :: choice
+  integer,                    intent(in) :: num_options
+  real(kind=r_def), optional, intent(in) :: option_arg(num_options)
+
+  ! Local variables
+  real(kind=r_def)             :: option(num_options)
   real(kind=r_def)             :: u(3)
   real(kind=r_def)             :: s
   real(kind=r_def)             :: pressure, temperature, density
   real(kind=r_def)             :: lat_pole, lon_pole
 
-  if ( .not. present(option) ) option(:) = 0.0_r_def
+  if ( .not. present(option_arg) ) then
+    option(:) = 0.0_r_def
+  else
+    option(:) = option_arg(:)
+  end if
 
   select case ( choice )
 

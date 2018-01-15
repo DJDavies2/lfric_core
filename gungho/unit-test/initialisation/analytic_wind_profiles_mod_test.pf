@@ -108,7 +108,7 @@ contains
     a = 1.0_r_def/8.0_r_def
     initial_time = 0.0_r_def
 
-    u = analytic_wind(llr, initial_time, initial_wind_profile_solid_body_rotation, 2, (/ u0, a /))
+    u = analytic_wind(llr, initial_time, initial_wind_profile_solid_body_rotation, 3, (/ u0, a, 0.0_r_def /))
     s = 0.5_r_def*(llr(3)/radius + 1.0_r_def)
 
     lat_pole = pi/2.0_r_def - a*pi
