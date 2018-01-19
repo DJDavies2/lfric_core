@@ -27,6 +27,7 @@ module cusph_cosmic_transport_alg_mod
   use cusph_fv_density_update_alg_mod,   only: cusph_fv_density_update_alg
   use flux_direction_mod,                only: x_direction, y_direction
   use initial_u_kernel_mod,              only: initial_u_kernel_type
+  use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
   use quadrature_xyoz_mod,               only: quadrature_xyoz_type
   use quadrature_rule_gaussian_mod,      only: quadrature_rule_gaussian_type
   use timestepping_config_mod,           only: dt
@@ -90,7 +91,8 @@ contains
     call invoke( name = "Initialise U",    &
                  setval_c(u,   0.0_r_def), &
                  setval_c(r_u, 0.0_r_def), &
-                 initial_u_kernel_type(r_u, chi, time, qr) )
+                 initial_u_kernel_type(r_u, chi, time, qr), &
+                 enforce_bc_kernel_type( r_u ) )
     call solver_algorithm(u, r_u)
 
     call invoke( setval_X(u_n, u), &
