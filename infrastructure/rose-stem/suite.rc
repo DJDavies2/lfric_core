@@ -1,5 +1,7 @@
 #!jinja2
 
+{%- set projectName = 'infrastructure' %}
+
 {# Include suite control #}
 %include suite_control.rc
 
@@ -7,6 +9,7 @@
 %include inc/suite_macros.rc
 
 {# SETUP SOME JINJA2 VARIABLES #}
+{%- set rose_suite_gui_headers = [] -%}
 {%- set compiler_setup = {} -%}
 {%- for compiler, setup in TARGET_COMPILER_SETUP|batch(2) -%}
 {%-     do compiler_setup.update({compiler : [setup]}) -%}
@@ -84,9 +87,13 @@
       DESTINATION = {{publish_destination}}
 
 ##############################################################################
+{%- if 'housekeeping' not in rose_suite_gui_headers %}
+{%-   do rose_suite_gui_headers.append('housekeeping') %}
+    [[HOUSEKEEPING]]
+{%- endif %}
 
   [[purge_local]]
-    inherit = None, LOCAL
+    inherit = HOUSEKEEPING, LOCAL
     script = '''
              {{deleteDirectory( "$OUTPUT_ROOT" )}}
              {{deleteDirectory( "$SOURCE_ROOT" )}}
@@ -95,7 +102,7 @@
   # The build directives are used to ensure that any temporary space which
   # might be used for building is available to be cleaned.
   [[purge_target]]
-    inherit = None, TARGET
+    inherit = HOUSEKEEPING, TARGET
     script = '''
              {{deleteDirectory( TARGET_BUILD_ROOT )}}
              {{deleteDirectory( "$OUTPUT_ROOT" )}}
@@ -105,6 +112,39 @@
 {%- for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
       {{DIRECTIVE}}
 {%- endfor %}
+
+
+{%- if 'export_source' in scheduledTasks %}
+  [[export_source]]
+    inherit = HOUSEKEEPING, LOCAL
+    script = """
+             TMP_SOURCE_DIR={{SOURCE_LFRIC}}/{{projectName}}
+             TMP_TARGET_DIR=$SOURCE_ROOT/{{projectName}}
+
+             mkdir -p `dirname $TMP_TARGET_DIR/source`
+             mkdir -p `dirname $TMP_TARGET_DIR/unit-test`
+             mkdir -p `dirname $TMP_TARGET_DIR/integration-test`
+             mkdir -p `dirname $TMP_TARGET_DIR/documentation`
+             mkdir -p `dirname $TMP_TARGET_DIR/build`
+
+	     svn export --force $TMP_SOURCE_DIR/source           $TMP_TARGET_DIR/source
+             svn export --force $TMP_SOURCE_DIR/unit-test        $TMP_TARGET_DIR/unit-test
+             svn export --force $TMP_SOURCE_DIR/integration-test $TMP_TARGET_DIR/integration-test
+             svn export --force $TMP_SOURCE_DIR/documentation    $TMP_TARGET_DIR/documentation
+             svn export --force $TMP_SOURCE_DIR/build            $TMP_TARGET_DIR/build
+             svn export --force $TMP_SOURCE_DIR/Makefile         $TMP_TARGET_DIR
+
+             HOST={{TARGET_HOST}}
+             RELATIVE_SOURCE_DIRECTORY=`echo $SOURCE_DIRECTORY | sed "s|$HOME/||"`
+             ssh $HOST mkdir -p $RELATIVE_SOURCE_DIRECTORY
+             rsync -avz $SOURCE_DIRECTORY/ $HOST:$RELATIVE_SOURCE_DIRECTORY/
+
+             unset TMP_SOURCE_DIR
+	     unset TMP_TARGET_DIR
+             """
+    [[[environment]]]
+      SOURCE_DIRECTORY = $SOURCE_ROOT
+{%- endif %}
 
 {%- if 'publish_nothing' in scheduledTasks %}
   # This task exists purely to ensure that the PUBLISH family has something in it.
@@ -156,7 +196,7 @@
 
     [[TECHNICAL]]
         [[[environment]]]
-            SOURCE_DIRECTORY      = $SOURCE_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fast-debug/infrastructure
+            SOURCE_DIRECTORY      = $SOURCE_ROOT/{{projectName}}
             DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
             WORKING_DIR           = {{LOCAL_BUILD_ROOT}}/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
 
@@ -263,32 +303,17 @@
 {%-     set label = compiler | lower + '_' + build | lower %}
 {%-     set family = label | upper %}
 
-
-
-{%-     if 'export_for_' + label in scheduledTasks %}
-
+{%-     if 'export_source' in scheduledTasks %}
+{%-       if family not in rose_suite_gui_headers %}
+{%-         do rose_suite_gui_headers.append(family) %}
   [[{{family}}]]
     [[[environment]]]
-      SOURCE_DIRECTORY      = $SOURCE_ROOT/{{label}}/infrastructure
+      SOURCE_DIRECTORY      = $SOURCE_ROOT/{{projectName}}
       DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{label}}
       COMPILER              = {{compiler}}
       {#- We can't define WORKING_DIR here as it may contain    #}
       {#- target specific variables not existing on the local machine #}
-
-  # Export must be performed locally as it needs access to any working copy
-  # involved. Such a working copy may well be on a local disc.
-  [[export_for_{{label}}]]
-    inherit = {{family}}, LOCAL
-    script = """
-             mkdir -p `dirname $SOURCE_DIRECTORY`
-             svn export {{ SOURCE_LFRIC }} $SOURCE_DIRECTORY
-             HOST={{TARGET_HOST}}
-             RELATIVE_SOURCE_DIRECTORY=`echo $SOURCE_DIRECTORY | sed "s|$HOME/||"`
-             ssh $HOST mkdir -p $RELATIVE_SOURCE_DIRECTORY
-             rsync -avz $SOURCE_DIRECTORY/ $HOST:$RELATIVE_SOURCE_DIRECTORY/
-             """
-    [[[environment]]]
-      SOURCE_DIRECTORY = $SOURCE_ROOT/{{label}}
+{%-       endif %}
 {%-     endif %}
 
 {%-     if 'unit_test_with_' + label in scheduledTasks %}
