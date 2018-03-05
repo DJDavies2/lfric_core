@@ -384,10 +384,8 @@ contains
 
         err = bundle_inner_product( residual, residual, bundle_size )
         err = sqrt( err )/sc_err
-        if ( err <  si_tolerance ) then 
-          m_final = m
-          exit
-        end if
+        m_final = m
+        if ( err <  si_tolerance ) exit
       end do
       write( log_scratch_space, '(A,I3,A,I3,A,E12.4,A,E15.8)' )      &
            "Mixed solver: [", iter,',',m_final,    &
