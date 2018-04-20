@@ -240,6 +240,7 @@ contains
                  setval_c(mm0_diag,     0.0_r_def),                &
                  setval_c(mm1_diag,     0.0_r_def),                &
                  setval_c(mm2_diag,     0.0_r_def),                &
+                 setval_c(mm3_diag,     0.0_r_def),                &
                  setval_c(mmtheta_diag, 0.0_r_def),                &
     ! Compute mass matrices
                  mm_diagonal_kernel_type(mm0_diag, mm_w0),         &
