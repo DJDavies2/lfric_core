@@ -14,7 +14,7 @@ module mesh_collection_mod
 
   use constants_mod,      only: r_def, i_def, l_def
   use mesh_mod,           only: mesh_type
-  use log_mod,            only: log_event, log_scratch_space, &
+  use log_mod,            only: log_event, log_scratch_space,     &
                                 LOG_LEVEL_ERROR, LOG_LEVEL_TRACE
   use linked_list_mod,    only: linked_list_type, &
                                 linked_list_item_type

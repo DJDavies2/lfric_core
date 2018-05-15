@@ -7,6 +7,8 @@ class ugrid_2d_mod::ugrid_2d_type {
   -mesh_name: string
   -mesh_class: string
   -constructor_inputs: string
+  -coord_units_x: string
+  -coord_units_y: string
   -edge_cells_x: integer
   -edge_cells_y: integer
   -num_cells: integer
@@ -44,6 +46,7 @@ class ugrid_2d_mod::ugrid_2d_type {
   +write_to_file( <<in>> filename: string )
   +append_to_file( <<in>> filename: string )
   +get_metadata( <<out>> mesh_name: string, <<out>> mesh_class: string, <<out>> constructor_inputs: string )
+  +get_coord_units( <<out>> coords_units_x: string, <<out>> coord_units_y: string )
   +get_node_coords( <<out>> node_coords: real[::] )
   +get_node_coords_transpose( <<out>> node_coords: real[::] )
   +get_face_node_connectivity( <<out>> face_node_connectivity: integer[::] )

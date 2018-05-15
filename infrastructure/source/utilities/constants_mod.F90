@@ -87,7 +87,12 @@ module constants_mod
   real(kind=r_def), parameter :: PI  = 4.0_r_def*atan(1.0_r_def) !< Value of pi.
   !> @}
 
+  !> @name Conversion factors
   !> @{
+  real(r_def), parameter :: degrees_to_radians = PI / 180.0_r_def
+  real(r_def), parameter :: radians_to_degrees = 180.0_r_def / PI
+
+  !> @}
   ! Missing data indicators
   real    (r_def), parameter :: RMDI = -huge(0.0_r_def)        !< Missing data indicator value for real numbers
   integer (i_def), parameter :: IMDI = -huge(0_i_def)          !< Missing data indicator value for integer numbers

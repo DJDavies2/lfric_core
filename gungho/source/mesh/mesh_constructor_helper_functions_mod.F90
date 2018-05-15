@@ -195,8 +195,10 @@ contains
       end do
     end do
 
-    if( geometry == base_mesh_geometry_spherical )then
+    if ( geometry == base_mesh_geometry_spherical ) then
+
       ! Convert (long,lat,r) -> (x,y,z)
+      ! long,lat in radians
       do j=1, nverts_2d
         do k=0, nlayers
           long = vertex_coords(1,j+k*nverts_2d)

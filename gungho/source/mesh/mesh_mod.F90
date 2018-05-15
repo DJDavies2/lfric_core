@@ -448,7 +448,6 @@ contains
          self%cell_lid_gid_map(i) = partition%get_gid_from_lid(i)
       end do
 
-
     else
       ! Note: Multiple partition, the global ids lid-gid map is required
       !       and cell_next_2d arrays need to be constructed with local
@@ -541,7 +540,6 @@ contains
 
     self%nverts_2d = n_uniq_verts
     deallocate(tmp_list)
-
 
     !-------------------------------------------------------------------------
     ! C. Get global ids of edges in partition

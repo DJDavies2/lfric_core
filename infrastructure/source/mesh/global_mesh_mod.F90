@@ -12,7 +12,7 @@
 module global_mesh_mod
 
   use constants_mod,                  only: r_def, i_def, str_max_filename, &
-                                            str_def
+                                            str_def, degrees_to_radians
   use global_mesh_map_mod,            only: global_mesh_map_type
   use global_mesh_map_collection_mod, only: global_mesh_map_collection_type
   use linked_list_data_mod,           only: linked_list_data_type
@@ -122,8 +122,8 @@ contains
 
     implicit none
 
-    character(len=*),              intent(in) :: filename
-    character(len=*),              intent(in) :: global_mesh_name
+    character(*), intent(in) :: filename
+    character(*), intent(in) :: global_mesh_name
 
     type(global_mesh_type) :: self
 
@@ -146,7 +146,7 @@ contains
     allocate( ncdf_quad_type :: file_handler )
     call ugrid_2d%set_file_handler( file_handler )
     call ugrid_2d%set_from_file_read( trim(global_mesh_name), trim(filename) )
-    call ugrid_2d%get_dimensions                            &
+    call ugrid_2d%get_dimensions                           &
             ( num_nodes              = nvert_in,           &
               num_edges              = nedge_in,           &
               num_faces              = nface_in,           &
@@ -155,6 +155,7 @@ contains
               num_nodes_per_edge     = num_nodes_per_edge, &
               max_num_faces_per_node = max_num_faces_per_node )
     call ugrid_2d%get_metadata(mesh_class=self%mesh_class)
+
 
     global_mesh_id_counter = global_mesh_id_counter + 1
 
@@ -168,6 +169,13 @@ contains
 
     allocate( self%vert_coords(2, nvert_in) )
     call ugrid_2d%get_node_coords(self%vert_coords)
+
+    ! CF Standard for longitude/latitude is in degrees
+    ! though many functions assume radians. Convert
+    ! coords to radians before going any further into
+    ! code
+    if (trim(self%mesh_class) == 'sphere') &
+        self%vert_coords(:,:) = self%vert_coords(:,:) * degrees_to_radians
 
     allocate( self%cell_next_2d( num_edges_per_face, nface_in ) )
     call ugrid_2d%get_face_face_connectivity( self%cell_next_2d )
@@ -235,6 +243,8 @@ contains
     global_mesh_id_counter = global_mesh_id_counter + 1
 
     call self%set_id(global_mesh_id_counter)
+
+    self%mesh_class = 'plane'
 
     ! Returns global_mesh_object of size 3x3 quad reference cell.
     ! As per reference cell, direction of numbering is anti-clockwise
@@ -472,10 +482,13 @@ contains
 
   end subroutine calc_cell_on_edge
 
-  !----------------------------------------------------------------------------
-  !> @brief  Returns geometry that this mesh describes
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief  Returns string identifying the class of mesh.
   !>
-  !> @return mesh_class String keyword for the geometry.
+  !> @details Currently only 'sphere', 'planar' mesh classes recognised.
+  !>
+  !> @return mesh_class Type of mesh_class this global_mesh describes.
   !>
   function get_mesh_class( self ) result ( mesh_class )
 

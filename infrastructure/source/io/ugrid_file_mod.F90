@@ -134,6 +134,7 @@ abstract interface
 
   subroutine read_mesh_interface( self, mesh_name, mesh_class,          &
                                   constructor_inputs, node_coordinates, &
+                                  coord_units_x, coord_units_y,         &
                                   face_node_connectivity,               &
                                   edge_node_connectivity,               &
                                   face_edge_connectivity,               &
@@ -150,6 +151,8 @@ abstract interface
     character(str_long), intent(out) :: constructor_inputs
 
     real(r_def),        intent(out) :: node_coordinates(:,:)
+    character(str_def), intent(out) :: coord_units_x
+    character(str_def), intent(out) :: coord_units_y
     integer(i_def),     intent(out) :: face_node_connectivity(:,:)
     integer(i_def),     intent(out) :: edge_node_connectivity(:,:)
     integer(i_def),     intent(out) :: face_edge_connectivity(:,:)
@@ -183,6 +186,8 @@ abstract interface
                                    constructor_inputs,              &
                                    num_nodes, num_edges, num_faces, &
                                    node_coordinates,                &
+                                   coord_units_x,                   &
+                                   coord_units_y,                   &
                                    face_node_connectivity,          &
                                    edge_node_connectivity,          &
                                    face_edge_connectivity,          &
@@ -204,6 +209,8 @@ abstract interface
     integer(i_def),      intent(in) :: num_edges
     integer(i_def),      intent(in) :: num_faces
     real(r_def),         intent(in) :: node_coordinates(:,:)
+    character(str_def),  intent(in) :: coord_units_x
+    character(str_def),  intent(in) :: coord_units_y
     integer(i_def),      intent(in) :: face_node_connectivity(:,:)
     integer(i_def),      intent(in) :: edge_node_connectivity(:,:)
     integer(i_def),      intent(in) :: face_edge_connectivity(:,:)

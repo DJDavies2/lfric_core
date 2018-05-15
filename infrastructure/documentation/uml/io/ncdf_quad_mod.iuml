@@ -9,6 +9,8 @@ class ncdf_quad_mod::ncdf_quad_type {
   -mesh_name: string
   -mesh_class: string
   -constructor_inputs: string
+  -coord_units_x: string
+  -coord_units_y: string
 
   -nmesh_nodes: integer
   -nmesh_edges: integer

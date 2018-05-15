@@ -89,6 +89,9 @@ contains
 
     character(str_def)  :: test_mesh_name
     character(str_def)  :: test_mesh_class
+    character(str_def)  :: test_coord_units_x
+    character(str_def)  :: test_coord_units_y
+
     character(str_long) :: test_constructor_inputs
     integer(i_def)      :: test_npanels
     integer(i_def)      :: test_edge_cells_x
@@ -103,7 +106,6 @@ contains
     type(global_mesh_map_type),            pointer :: global_mesh_map  => null()
 
     real(r_def), parameter :: eps = 1E-09_r_def
-
    
     csgen = gencube_ps_type( mesh_name, edge_cells, nsmooth,      &
                              target_mesh_names=target_mesh_names, &
@@ -181,13 +183,16 @@ contains
     @assertEqual(this%nodes_on_edge(:,40), (/ 43,42 /), "Incorrect nodes_on_edge connectivity.")
 
     ! Retrieve mesh coordinates
-    call csgen%get_coordinates(this%coords)
+    call csgen%get_coordinates(this%coords,test_coord_units_x,test_coord_units_y)
 
     ! Mesh coordinates have expected values at specified points
-    @assertTrue(abs(this%coords(1,1) - 5.49778714378214_r_def) < eps, "Incorrect mesh coordinates.")
-    @assertTrue(abs(this%coords(2,1) - 0.615479708670387_r_def) < eps, "Incorrect mesh coordinates.")
-    @assertTrue(abs(this%coords(1,20) - 2.80515847360063_r_def) < eps, "Incorrect mesh coordinates.")
-    @assertTrue(abs(this%coords(2,20) - 0.756566664736064_r_def) < eps, "Incorrect mesh coordinates.")
+    @assertTrue(abs(this%coords(1,1)  - 315.0000000000001137_r_def) < eps)
+    @assertTrue(abs(this%coords(2,1)  -  35.2643896827546399_r_def) < eps)
+    @assertTrue(abs(this%coords(1,20) - 160.7237414026762394_r_def) < eps)
+    @assertTrue(abs(this%coords(2,20) -  43.3480768096655993_r_def) < eps)
+
+    @assertTrue( trim(test_coord_units_x) == 'degrees_east')
+    @assertTrue( trim(test_coord_units_y) == 'degrees_north')
 
     ! Retrieve global mesh maps
     nullify(global_mesh_maps)

@@ -11,7 +11,7 @@
 module io_mod
   use constants_mod,                 only: i_def, i_native, r_def, dp_xios, &
                                            str_short, str_max_filename,     &
-                                           PI
+                                           PI, radians_to_degrees
   use field_mod,                     only: field_type, field_proxy_type
   use finite_element_config_mod,     only: element_order
   use base_mesh_config_mod,          only: geometry, &
@@ -459,7 +459,7 @@ subroutine xios_diagnostic_domain_init(mesh_id, chi, vm, local_rank, total_ranks
 
 
   if ( geometry == base_mesh_geometry_spherical ) then
-   r2d = 180.0_r_def/PI
+   r2d = radians_to_degrees
   else
    r2d = 1.0_r_def
   endif
@@ -817,11 +817,11 @@ subroutine xios_restart_domain_init(mesh_id, chi, vm, local_rank, total_ranks)
 
   ! Factor to convert coords from radians to degrees if needed
   ! set as 1.0 for biperiodic
-  real(r_def)                :: r2d
+  real(r_def) :: r2d
 
 
   if ( geometry == base_mesh_geometry_spherical ) then
-   r2d = 180.0/PI
+   r2d = radians_to_degrees
   else
    r2d = 1.0
   endif
@@ -990,7 +990,7 @@ subroutine calc_xios_domain_coords(nodal_coords, chi, &
 
   ! Factor to convert coords from radians to degrees if needed
   ! set as 1.0 for biperiodic
-  real(r_def)                 :: r2d
+  real(r_def) :: r2d
 
   do i = 1,3
     x_p(i)   = nodal_coords(i)%get_proxy()
@@ -1041,7 +1041,7 @@ subroutine calc_xios_domain_coords(nodal_coords, chi, &
       ! Convert to lat-lon in degrees if required
       if ( geometry == base_mesh_geometry_spherical ) then
 
-        r2d = 180.0_r_def/PI
+        r2d = radians_to_degrees
 
         call xyz2llr(xyz(1), xyz(2), xyz(3), llr(1), llr(2), llr(3))
 

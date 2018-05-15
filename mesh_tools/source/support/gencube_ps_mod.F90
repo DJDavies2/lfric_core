@@ -23,8 +23,9 @@ module gencube_ps_mod
 !-------------------------------------------------------------------------------
 
   use calc_global_cell_map_mod,       only: calc_global_cell_map
-  use constants_mod,                  only: r_def, i_def, str_def, l_def, &
-                                            str_long
+  use constants_mod,                  only: r_def, i_def, str_def, l_def,     &
+                                            str_long, PI, radians_to_degrees, &
+                                            degrees_to_radians
   use global_mesh_map_collection_mod, only: global_mesh_map_collection_type
   use global_mesh_map_mod,            only: generate_global_mesh_map_id
   use log_mod,                        only: log_event, log_scratch_space, &
@@ -59,6 +60,8 @@ module gencube_ps_mod
 
     character(str_def)          :: mesh_name
     character(str_def)          :: mesh_class
+    character(str_def)          :: coord_units_x
+    character(str_def)          :: coord_units_y
     character(str_long)         :: constructor_inputs
     integer(i_def)              :: edge_cells
     integer(i_def)              :: nsmooth
@@ -75,7 +78,6 @@ module gencube_ps_mod
     integer(i_def),     allocatable :: verts_on_edge(:,:)
     real(r_def),        allocatable :: vert_coords(:,:)
 
-
   contains
     procedure :: calc_adjacency
     procedure :: calc_face_to_vert
@@ -90,6 +92,7 @@ module gencube_ps_mod
     procedure :: write_mesh
     procedure :: orient_lfric
     procedure :: smooth
+
   end type gencube_ps_type
 
 !-------------------------------------------------------------------------------
@@ -740,24 +743,29 @@ end subroutine calc_edges
 !>
 !> @param[in]   self         The gencube_ps_type instance reference.
 !> @param[out]  vert_coords  A rank 2 (2,ncells)-sized real array of long and
-!>                           lat coordinates respectively for each vertex.
+!>                           lat coordinates (degrees) respectively for
+!>                           each vertex.
 !-------------------------------------------------------------------------------
-subroutine calc_coords(self, vert_coords)
+subroutine calc_coords(self, vert_coords, coord_units_x, coord_units_y)
 
   use coord_transform_mod, only: xyz2ll
-  use constants_mod,       only: PI
 
   implicit none
 
   class(gencube_ps_type),   intent(in)  :: self
   real(r_def), allocatable, intent(out) :: vert_coords(:,:)
+  character(str_def), intent(out) :: coord_units_x
+  character(str_def), intent(out) :: coord_units_y
 
   integer(i_def) :: ncells, edge_cells, nverts
   integer(i_def) :: cell, x, y, astat, cpp, vert, vert0
   real(r_def)    :: lat, long
   real(r_def)    :: x0, y0, z0
   real(r_def)    :: xs, ys, zs
-  real(r_def)    :: dlambda, lambda1, lambda2, t1, t2
+
+  real(r_def)    :: dlambda 
+  real(r_def)    :: lambda1, lambda2
+  real(r_def)    :: t1, t2
 
   real(r_def), parameter :: pio4 = PI/4.0_r_def
 
@@ -773,7 +781,7 @@ subroutine calc_coords(self, vert_coords)
                       LOG_LEVEL_ERROR )
 
   vert_coords = 0.0_r_def
-  dlambda = 0.5_r_def*PI/edge_cells
+  dlambda = 0.5_r_def*PI/edge_cells  ! dlamba in radians
   vert = 1
 
 ! Panels I-IV
@@ -952,10 +960,16 @@ subroutine calc_coords(self, vert_coords)
   y0 = -zs
   z0 =  xs
 
-  vert0 = 6*cpp+2
+
   call xyz2ll(x0, y0, z0, long, lat)
+
+  vert0 = 6*cpp+2
   vert_coords(1, vert0) = long
   vert_coords(2, vert0) = -lat
+
+  ! Convert units from radians to degrees
+  coord_units_x = 'radians'
+  coord_units_y = 'radians'
 
   return
 end subroutine calc_coords
@@ -1012,14 +1026,18 @@ end subroutine get_dimensions
 !> @param[in]   self              The gencube_ps_type instance reference.
 !> @param[out]  node_coordinates  The argument to receive the vert_coords data.
 !-------------------------------------------------------------------------------
-subroutine get_coordinates(self, node_coordinates)
+subroutine get_coordinates(self, node_coordinates, coord_units_x, coord_units_y)
 
   implicit none
 
   class(gencube_ps_type), intent(in)  :: self
   real(r_def),            intent(out) :: node_coordinates(:,:)
+  character(str_def),     intent(out) :: coord_units_x
+  character(str_def),     intent(out) :: coord_units_y
 
   node_coordinates = self%vert_coords
+  coord_units_x    = self%coord_units_x
+  coord_units_y    = self%coord_units_y
 
   return
 end subroutine get_coordinates
@@ -1094,9 +1112,23 @@ subroutine generate(self)
   call calc_face_to_vert(self, self%verts_on_cell)
   call calc_edges(self, self%edges_on_cell, self%verts_on_edge)
   if (self%nmaps > 0) call calc_global_mesh_maps(self)
-  call calc_coords(self, self%vert_coords)
+  call calc_coords(self, self%vert_coords, self%coord_units_x, self%coord_units_y)
   call orient_lfric(self)
   if (self%nsmooth > 0_i_def) call smooth(self)
+
+
+  ! Convert coordinate units to degrees to be CF compliant
+  if (trim(self%coord_units_x) == 'radians') then
+    self%vert_coords(1,:) = self%vert_coords(1,:) * radians_to_degrees
+    self%coord_units_x = 'degrees_east'
+  end if
+
+  if (trim(self%coord_units_y) == 'radians') then
+    self%vert_coords(2,:) = self%vert_coords(2,:) * radians_to_degrees
+    self%coord_units_y = 'degrees_north'
+  end if
+
+
   if (DEBUG) call write_mesh(self)
 
   return

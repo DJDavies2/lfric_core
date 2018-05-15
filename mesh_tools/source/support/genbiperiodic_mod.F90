@@ -45,6 +45,8 @@ module genbiperiodic_mod
 
     character(str_def)          :: mesh_name
     character(str_def)          :: mesh_class
+    character(str_def)          :: coord_units_x
+    character(str_def)          :: coord_units_y
     character(str_long)         :: constructor_inputs
     real(r_def)                 :: dx, dy
     integer(i_def)              :: edge_cells_x, edge_cells_y
@@ -577,12 +579,14 @@ end subroutine calc_edges
 !> @param[out]  vert_coords  A rank 2 (2,ncells)-sized real array of x and y
 !>                           coordinates for each vertex.
 !-------------------------------------------------------------------------------
-subroutine calc_coords(self, vert_coords)
+subroutine calc_coords(self, vert_coords, coord_units_x, coord_units_y)
 
   implicit none
 
   class(genbiperiodic_type), intent(in)  :: self
   real(r_def), allocatable,  intent(out) :: vert_coords(:,:)
+  character(str_def), intent(out) :: coord_units_x
+  character(str_def), intent(out) :: coord_units_y
 
   integer(i_def) :: ncells, edge_cells_x, edge_cells_y
   integer(i_def) :: cell, x, y, astat
@@ -605,6 +609,9 @@ subroutine calc_coords(self, vert_coords)
     ! y  N/S
     vert_coords(2, self%verts_on_cell(SW, cell)) = real(edge_cells_y/2 - (y-1))*self%dy
   end do
+
+  coord_units_x = 'm'
+  coord_units_y = 'm'
 
   return
 end subroutine calc_coords
@@ -655,14 +662,18 @@ end subroutine get_dimensions
 !> @param[in]   self              The genbiperiodic_type instance reference.
 !> @param[out]  node_coordinates  The argument to receive the vert_coords data.
 !-------------------------------------------------------------------------------
-subroutine get_coordinates(self, node_coordinates)
+subroutine get_coordinates(self, node_coordinates, coord_units_x, coord_units_y)
 
   implicit none
 
   class(genbiperiodic_type), intent(in)  :: self
   real(r_def),               intent(out) :: node_coordinates(:,:)
+  character(str_def),        intent(out) :: coord_units_x
+  character(str_def),        intent(out) :: coord_units_y
 
   node_coordinates = self%vert_coords
+  coord_units_x    = self%coord_units_x
+  coord_units_y    = self%coord_units_y
 
   return
 end subroutine get_coordinates
@@ -718,7 +729,7 @@ subroutine generate(self)
   call calc_face_to_vert(self, self%verts_on_cell)
   call calc_edges(self, self%edges_on_cell, self%verts_on_edge)
   if (self%nmaps > 0) call calc_global_mesh_maps(self)
-  call calc_coords(self, self%vert_coords)
+  call calc_coords(self, self%vert_coords, self%coord_units_x, self%coord_units_y)
 
   return
 end subroutine generate

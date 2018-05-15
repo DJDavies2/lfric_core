@@ -36,6 +36,9 @@ type, public :: ugrid_2d_type
                                              !< i.e. sphere, plane
   character(str_long) :: constructor_inputs  !< Inputs used to generate mesh
 
+  character(str_def)  :: coord_units_x
+  character(str_def)  :: coord_units_y
+
   integer(i_def) :: edge_cells_x !< Number of cells on panel edge x-axis
   integer(i_def) :: edge_cells_y !< Number of cells on panel edge y-axis
 
@@ -83,6 +86,7 @@ contains
   procedure :: write_to_file
   procedure :: append_to_file
   procedure :: get_metadata
+  procedure :: get_coord_units
   procedure :: get_node_coords
   procedure :: get_node_coords_transpose
   procedure :: get_face_node_connectivity
@@ -327,8 +331,10 @@ subroutine set_by_generator(self, generator_strategy)
           maps_edge_cells_y = self%target_edge_cells_y )
   end if
 
-  call generator_strategy%get_coordinates &
-      ( node_coordinates = self%node_coordinates )
+  call generator_strategy%get_coordinates         &
+      ( node_coordinates = self%node_coordinates, &
+        coord_units_x    = self%coord_units_x,    &
+        coord_units_y    = self%coord_units_y     )
 
   call generator_strategy%get_connectivity                    &
       ( face_node_connectivity = self%face_node_connectivity, &
@@ -405,6 +411,8 @@ subroutine set_from_file_read(self, mesh_name, filename)
       mesh_class             = self%mesh_class,             &
       constructor_inputs     = self%constructor_inputs,     &
       node_coordinates       = self%node_coordinates,       &
+      coord_units_x          = self%coord_units_x,          &
+      coord_units_y          = self%coord_units_y,          &
       face_node_connectivity = self%face_node_connectivity, &
       edge_node_connectivity = self%edge_node_connectivity, &
       face_edge_connectivity = self%face_edge_connectivity, &
@@ -446,6 +454,8 @@ subroutine write_to_file(self, filename)
        num_edges              = self%num_edges,              &
        num_faces              = self%num_faces,              &
        node_coordinates       = self%node_coordinates,       &
+       coord_units_x          = self%coord_units_x,          &
+       coord_units_y          = self%coord_units_y,          &
        face_node_connectivity = self%face_node_connectivity, &
        edge_node_connectivity = self%edge_node_connectivity, &
        face_edge_connectivity = self%face_edge_connectivity, &
@@ -481,6 +491,8 @@ subroutine append_to_file(self, filename)
        num_edges              = self%num_edges,              &
        num_faces              = self%num_faces,              &
        node_coordinates       = self%node_coordinates,       &
+       coord_units_x          = self%coord_units_x,          &
+       coord_units_y          = self%coord_units_y,          &
        face_node_connectivity = self%face_node_connectivity, &
        edge_node_connectivity = self%edge_node_connectivity, &
        face_edge_connectivity = self%face_edge_connectivity, &
@@ -531,6 +543,26 @@ subroutine get_metadata( self, mesh_name, mesh_class, &
 end subroutine get_metadata
 
 !-------------------------------------------------------------------------------
+!> @brief   Gets node coordinate units in [x,y] or [longitude, latitude] directions
+!>
+!> @param[in]   self          The calling ugrid object.
+!> @param[out]  coord_units_x String for coordinate units in x-direction
+!> @param[out]  coord_units_y String for coordinate units in y-direction
+!-------------------------------------------------------------------------------
+subroutine get_coord_units(self, coord_units_x, coord_units_y)
+  implicit none
+
+  class(ugrid_2d_type), intent(in)  :: self
+  character(str_def),   intent(out) :: coord_units_x
+  character(str_def),   intent(out) :: coord_units_y
+
+  coord_units_x = self%coord_units_x
+  coord_units_y = self%coord_units_y
+
+  return
+end subroutine get_coord_units
+
+!-------------------------------------------------------------------------------
 !> @brief   Gets node coordinates with ugrid array index ordering.
 !> @details Returns a rank-two array of node coordinates, with the
 !>          coordinate dimension index innermost, and the node number
@@ -544,6 +576,7 @@ subroutine get_node_coords(self, node_coords)
   implicit none
 
   class(ugrid_2d_type), intent(in)  :: self
+
   real(r_def),          intent(out) :: node_coords(:,:)
 
   integer(i_def) :: i

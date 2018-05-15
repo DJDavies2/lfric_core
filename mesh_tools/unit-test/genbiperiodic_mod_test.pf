@@ -101,6 +101,9 @@ contains
 
     character(str_def)  :: test_mesh_name
     character(str_def)  :: test_mesh_class
+    character(str_def)  :: test_coord_units_x
+    character(str_def)  :: test_coord_units_y
+
     character(str_long) :: test_constructor_inputs
     integer(i_def)      :: test_npanels
     integer(i_def)      :: test_edge_cells_x
@@ -188,12 +191,14 @@ contains
     @assertEqual(this%nodes_on_edge(:,40), (/ 17,4 /), "Incorrect nodes_on_edge connectivity.")
 
     ! Retrieve mesh coordinates
-    call bpgen%get_coordinates(this%coords)
+    call bpgen%get_coordinates(this%coords, test_coord_units_x, test_coord_units_y)
 
     ! Mesh coordinates have expected values at certain points
     @assertTrue(this%coords(:,1) == (/ -12000.0_r_def, 4000.0_r_def /), "Incorrect mesh coordinates.")
     @assertTrue(this%coords(:,20) == (/ 12000.0_r_def, 0.0_r_def /), "Incorrect mesh coordinates.")
 
+    @assertTrue( trim(test_coord_units_x) == 'm')
+    @assertTrue( trim(test_coord_units_y) == 'm')
 
     ! Retrieve global mesh maps
     nullify(global_mesh_maps)
@@ -212,9 +217,6 @@ contains
     @assertEqual( 6,  global_mesh_map%get_ntarget_cells_per_source_cell() )
     @assertEqual( 1,  global_mesh_map%get_source_id() )
     @assertEqual( 2,  global_mesh_map%get_target_id() )
-
-
-
 
   end subroutine test_all
 

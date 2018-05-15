@@ -95,7 +95,7 @@
             limit   = {{ TARGET_THROTTLE }}
             members = root
     [[dependencies]]
-{%- set scheduledTasks = schedule() | deduplicateSchedule()%}
+{%- set scheduledTasks = schedule() | deduplicateSchedule() %}
 {{scheduledTasks}}
 
 [runtime]

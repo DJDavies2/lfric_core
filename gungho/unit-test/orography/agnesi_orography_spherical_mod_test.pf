@@ -173,7 +173,7 @@ contains
     type(uniform_extrusion_type)              :: extrusion
     ! Test parameters
     real(r_def), parameter :: tol = 1.0e-3_r_def
-    real(r_def)            :: vertex_coords_2d(3,1), chi_surf, chi_test
+    real(r_def)            :: vertex_coords_2d(3), chi_surf, chi_test
     integer(i_def)         :: itest
 
     ! Add global mesh
@@ -201,16 +201,16 @@ contains
 
     ! Calculate surface height for selected number of points
     itest = 905
-    call global_mesh%get_vert_coords(itest,vertex_coords_2d(:,1))
-    chi_surf = orography_profile%analytic_orography(vertex_coords_2d(1,1), &
-                                                    vertex_coords_2d(2,1))
+    call global_mesh%get_vert_coords(itest,vertex_coords_2d)
+    chi_surf = orography_profile%analytic_orography(vertex_coords_2d(1), &
+                                                    vertex_coords_2d(2))
     chi_test = this%mountain_height
     @assertEqual( chi_surf, chi_test, tol )
 
     itest = 1514
-    call global_mesh%get_vert_coords(itest,vertex_coords_2d(:,1))
-    chi_surf = orography_profile%analytic_orography(vertex_coords_2d(1,1), &
-                                                    vertex_coords_2d(2,1))
+    call global_mesh%get_vert_coords(itest,vertex_coords_2d)
+    chi_surf = orography_profile%analytic_orography(vertex_coords_2d(1), &
+                                                    vertex_coords_2d(2))
     chi_test = 49.90231_r_def
     @assertEqual( chi_surf, chi_test, tol )
 

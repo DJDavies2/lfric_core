@@ -141,13 +141,15 @@ abstract interface
   !> @param[out]    node_coordinates       Node coordinates
   !-----------------------------------------------------------------------------
 
-  subroutine get_coordinates_interface (self, node_coordinates)
+  subroutine get_coordinates_interface (self, node_coordinates, coord_units_x, coord_units_y)
 
-    import :: ugrid_generator_type, r_def
+    import :: ugrid_generator_type, r_def, str_def
 
     class(ugrid_generator_type), intent(in) :: self
 
     real(r_def), intent(out) :: node_coordinates(:,:)
+    character(str_def), intent(out) :: coord_units_x
+    character(str_def), intent(out) :: coord_units_y
 
   end subroutine get_coordinates_interface
 

@@ -64,6 +64,9 @@ type, public, extends(ugrid_file_type) :: ncdf_quad_type
 
   character(str_long) :: constructor_inputs !< Inputs to ugrid_generator for this mesh
 
+  character(str_def)  :: coord_units_x
+  character(str_def)  :: coord_units_y
+
   character(nf90_max_name), allocatable :: target_mesh_names(:)
 
   type(global_mesh_map_collection_type), allocatable :: target_mesh_maps
@@ -429,7 +432,8 @@ subroutine assign_attributes(self)
   character(str_def)  :: std_y_name
   character(str_def)  :: long_x_name
   character(str_def)  :: long_y_name
-  character(str_def)  :: coord_units
+  character(str_def)  :: coord_units_x
+  character(str_def)  :: coord_units_y
 
   character(*), parameter :: routine = 'assign_attributes'
   character(str_long) :: cmess
@@ -681,14 +685,16 @@ subroutine assign_attributes(self)
     std_y_name  = 'latitude'
     long_x_name = 'longitude of 2D mesh nodes.'
     long_y_name = 'latitude of 2D mesh nodes.'
-    coord_units = 'radians'
+
   case ('plane')
     std_x_name  = 'projection_x_coordinate'
     std_y_name  = 'projection_y_coordinate'
     long_x_name = 'x coordinate of 2D mesh nodes.'
     long_y_name = 'y coordinate of 2D mesh nodes.'
-    coord_units = 'm'
   end select
+
+  coord_units_x = self%coord_units_x
+  coord_units_y = self%coord_units_y
 
   id   = self%mesh_node_x_id
   ierr = nf90_inquire_variable( ncid=self%ncid, varid=id, name=var_name )
@@ -710,7 +716,7 @@ subroutine assign_attributes(self)
   attname = 'units'
   cmess   = 'Adding attribute "'//trim(attname)// &
             '" to variable "'//trim(var_name)//'"'
-  ierr = nf90_put_att( self%ncid, id, trim(attname), coord_units )
+  ierr = nf90_put_att( self%ncid, id, trim(attname), coord_units_x )
   call check_err(ierr, routine, cmess)
 
 
@@ -735,7 +741,7 @@ subroutine assign_attributes(self)
   attname = 'units'
   cmess   = 'Adding attribute "'//trim(attname)// &
             '" to variable "'//trim(var_name)//'"'
-  ierr = nf90_put_att( self%ncid, id, trim(attname), coord_units )
+  ierr = nf90_put_att( self%ncid, id, trim(attname), coord_units_y )
   call check_err(ierr, routine, cmess)
 
   !===================================================================
@@ -1072,7 +1078,7 @@ end subroutine get_dimensions
 !-------------------------------------------------------------------------------
 
 subroutine read_mesh( self, mesh_name, mesh_class, constructor_inputs,&
-                      node_coordinates,                               &
+                      node_coordinates, coord_units_x, coord_units_y, &
                       face_node_connectivity, edge_node_connectivity, &
                       face_edge_connectivity, face_face_connectivity, &
                       num_targets, target_mesh_names )
@@ -1085,6 +1091,8 @@ subroutine read_mesh( self, mesh_name, mesh_class, constructor_inputs,&
   character(str_def),  intent(out) :: mesh_class
   character(str_long), intent(out) :: constructor_inputs
   real(r_def),         intent(out) :: node_coordinates(:,:)
+  character(str_def),  intent(out) :: coord_units_x
+  character(str_def),  intent(out) :: coord_units_y
   integer(i_def),      intent(out) :: face_node_connectivity(:,:)
   integer(i_def),      intent(out) :: edge_node_connectivity(:,:)
   integer(i_def),      intent(out) :: face_edge_connectivity(:,:)
@@ -1142,12 +1150,18 @@ subroutine read_mesh( self, mesh_name, mesh_class, constructor_inputs,&
                        node_coordinates(1,:))
   call check_err(ierr, routine, cmess)
 
+  cmess = 'Getting node x coords units for mesh "'//trim(mesh_name)//'"'
+  ierr = nf90_get_att( self%ncid, self%mesh_node_x_id, "units", coord_units_x )
+  call check_err(ierr, routine, cmess)
+
   cmess = 'Getting node y coords for mesh "'//trim(mesh_name)//'"'
   ierr = nf90_get_var( self%ncid, self%mesh_node_y_id, &
                        node_coordinates(2,:))
   call check_err(ierr, routine, cmess)
 
-
+  cmess = 'Getting node y coords units for mesh "'//trim(mesh_name)//'"'
+  ierr = nf90_get_att( self%ncid, self%mesh_node_y_id, "units", coord_units_y )
+  call check_err(ierr, routine, cmess)
 
   ! Face node connectivity
   cmess = 'Getting face-node connectivity for mesh "'//trim(mesh_name)//'"'
@@ -1206,7 +1220,8 @@ end subroutine read_mesh
 !-------------------------------------------------------------------------------
 
 subroutine write_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
-                       num_nodes, num_edges, num_faces, node_coordinates, &
+                       num_nodes, num_edges, num_faces,                   &
+                       node_coordinates, coord_units_x, coord_units_y,    &
                        face_node_connectivity, edge_node_connectivity,    &
                        face_edge_connectivity, face_face_connectivity,    &
                        num_targets, target_mesh_names, target_mesh_maps )
@@ -1222,6 +1237,8 @@ subroutine write_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
   integer(i_def),      intent(in) :: num_edges
   integer(i_def),      intent(in) :: num_faces
   real(r_def),         intent(in) :: node_coordinates(:,:)
+  character(str_def),  intent(in) :: coord_units_x
+  character(str_def),  intent(in) :: coord_units_y
   integer(i_def),      intent(in) :: face_node_connectivity(:,:)
   integer(i_def),      intent(in) :: edge_node_connectivity(:,:)
   integer(i_def),      intent(in) :: face_edge_connectivity(:,:)
@@ -1252,6 +1269,9 @@ subroutine write_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
   self%nmesh_faces   = num_faces
 
   self%nmesh_targets = num_targets
+
+  self%coord_units_x = coord_units_x
+  self%coord_units_y = coord_units_y
 
   if ( self%nmesh_targets >0 ) then
 
@@ -1398,6 +1418,7 @@ end function is_mesh_present
 !-------------------------------------------------------------------------------
 subroutine append_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
                         num_nodes, num_edges, num_faces, node_coordinates, &
+                        coord_units_x, coord_units_y,                      &
                         face_node_connectivity, edge_node_connectivity,    &
                         face_edge_connectivity, face_face_connectivity,    &
                         num_targets, target_mesh_names, target_mesh_maps )
@@ -1412,6 +1433,8 @@ subroutine append_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
   integer(i_def),        intent(in)    :: num_edges
   integer(i_def),        intent(in)    :: num_faces
   real(r_def),           intent(in)    :: node_coordinates(:,:)
+  character(str_def),    intent(in)    :: coord_units_x
+  character(str_def),    intent(in)    :: coord_units_y
   integer(i_def),        intent(in)    :: face_node_connectivity(:,:)
   integer(i_def),        intent(in)    :: edge_node_connectivity(:,:)
   integer(i_def),        intent(in)    :: face_edge_connectivity(:,:)
@@ -1448,7 +1471,9 @@ subroutine append_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
       num_nodes  = num_nodes,                          &
       num_edges  = num_edges,                          &
       num_faces  = num_faces,                          &
-      node_coordinates       = node_coordinates,       &
+      node_coordinates = node_coordinates,             &
+      coord_units_x    = coord_units_x,                &
+      coord_units_y    = coord_units_y,                &
       face_node_connectivity = face_node_connectivity, &
       edge_node_connectivity = edge_node_connectivity, &
       face_edge_connectivity = face_edge_connectivity, &

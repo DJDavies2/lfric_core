@@ -97,7 +97,7 @@ extract: ALWAYS
 .PHONY: unit-tests
 unit-tests: export PROJECT      = mesh_tools
 unit-tests: export SOURCE_DIR   = unit-test
-unit-tests: export WORKING_DIR := $(WORKING_DIR)/unit-tests
+unit-tests: export WORKING_DIR := $(WORKING_DIR)
 unit-tests: export BIN_DIR     ?= $(PROJECT_DIR)/test
 unit-tests: export PROGRAMS     = mesh_tools_unit_tests
 unit-tests: export EXTERNAL_STATIC_LIBRARIES += pfunit
