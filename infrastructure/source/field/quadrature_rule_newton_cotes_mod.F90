@@ -40,6 +40,7 @@ function quadrature_rule(self, nqp_1d)
 
   integer :: i, j
   real(kind=r_def), allocatable :: A(:,:), Ainv(:,:), b(:)
+  real(kind=r_def), parameter   :: DOMAIN_CHANGE_FACTOR = 0.5_r_def
 
   ! quadrature_rule(:,1) => points
   ! quadrature_rule(:,2) => weights
@@ -68,6 +69,8 @@ function quadrature_rule(self, nqp_1d)
   end do
   call matrix_invert(A,Ainv,nqp_1d)
   quadrature_rule(:,2) = matmul(Ainv,b)
+
+  quadrature_rule(:,2) = DOMAIN_CHANGE_FACTOR*quadrature_rule(:,2) 
 
   return
 end function quadrature_rule

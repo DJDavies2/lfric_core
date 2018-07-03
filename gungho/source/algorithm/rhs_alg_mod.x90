@@ -26,6 +26,7 @@ module rhs_alg_mod
   use hydrostatic_kernel_mod,              only: hydrostatic_kernel_type
   use psykal_lite_mod,                     only: invoke_ru_bd_kernel
   use quadrature_xyoz_mod,                 only: quadrature_xyoz_type
+  use quadrature_face_mod,                 only: quadrature_face_type
   use quadrature_rule_gaussian_mod,        only: quadrature_rule_gaussian_type
   use derived_config_mod,                  only: bundle_size
   use field_indices_mod,                   only: igh_u, igh_t, igh_d, igh_p
@@ -33,7 +34,8 @@ module rhs_alg_mod
   use timer_mod,                           only: timer
   use rhs_eos_kernel_mod,                  only: rhs_eos_kernel_type
   use dg_matrix_vector_kernel_mod,         only: dg_matrix_vector_kernel_type
-
+  use reference_element_mod,               only: reference_element_type
+  use mesh_mod,                            only: mesh_type
   implicit none
 
   private
@@ -83,9 +85,12 @@ contains
                                  theta        => null(), &
                                  rho          => null(), &
                                  exner        => null()
-    type(field_type)          :: rhs_tmp, rhs_eos
-    type(quadrature_xyoz_type)          :: qr
-    type(quadrature_rule_gaussian_type) :: quadrature_rule
+    type(field_type)                       :: rhs_tmp, rhs_eos
+    type(quadrature_xyoz_type)             :: qr
+    type(quadrature_face_type)             :: qrf
+    type(quadrature_rule_gaussian_type)    :: gaussian_quadrature
+    class(reference_element_type), pointer :: reference_element => null()
+    type (mesh_type),              pointer :: mesh => null()
 
     if ( subroutine_timers ) call timer('rhs_alg')
 
@@ -109,7 +114,11 @@ contains
  
     rhs_tmp = field_type( vector_space=rhs(igh_u)%get_function_space() )
     rhs_eos = field_type( vector_space=rhs(igh_p)%get_function_space() )
-    qr = quadrature_xyoz_type(element_order+2, quadrature_rule)
+    qr  = quadrature_xyoz_type(element_order+2, gaussian_quadrature)
+    mesh              => theta%get_mesh()
+    reference_element => mesh%get_reference_element()
+    qrf = quadrature_face_type(element_order+2, .true., .false., &
+                               reference_element, gaussian_quadrature)
 
     ! Initialise RHS u and theta fields
     call invoke( name = "Initialise RHS u and theta fields", &
@@ -118,7 +127,7 @@ contains
                  setval_c( rhs(igh_t), 0.0_r_def ) )
 
     ! Compute rhs_u
-    call invoke_ru_bd_kernel (rhs_tmp, exner, theta, qr)
+    call invoke_ru_bd_kernel (rhs_tmp, exner, theta, qrf)
     call invoke( name = "Compute rhs_u setup",                               &
                  hydrostatic_kernel_type( rhs_tmp, exner, theta, geopotential,qr ),   &
                  kinetic_energy_gradient_kernel_type( rhs_tmp, u, chi, qr ), &
@@ -138,7 +147,7 @@ contains
     ! Compute rhs_rho
                  setval_X( rhs(igh_d), rho ) )
     if ( compute_eos ) then
-      qr = quadrature_xyoz_type(1, quadrature_rule)
+      qr = quadrature_xyoz_type(1, gaussian_quadrature)
       call invoke( name = "Compute rhs_eos",               &
                    rhs_eos_kernel_type(rhs_eos, exner, rho, theta, chi, qr), & 
                    dg_matrix_vector_kernel_type( rhs(igh_p), rhs_eos, mm_w3_inv ))
@@ -147,7 +156,8 @@ contains
     end if
 
     nullify( mm_vel, mm_wtheta, mm_w3_inv, chi, &
-             geopotential, u, theta, rho, exner )
+             geopotential, u, theta, rho, exner, &
+             mesh, reference_element )
 
     if ( subroutine_timers ) call timer('rhs_alg')
 

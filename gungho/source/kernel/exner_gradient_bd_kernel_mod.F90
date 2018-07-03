@@ -20,7 +20,7 @@ module exner_gradient_bd_kernel_mod
                                       GH_FIELD, GH_READ, GH_INC,           &
                                       GH_BASIS,                            &
                                       GH_DIFF_BASIS, CELLS,                &
-                                      GH_QUADRATURE_XYoZ,                  &
+                                      GH_QUADRATURE_face,                  &
                                       adjacent_face,                       &
                                       reference_element_out_face_normal
   use constants_mod,           only : r_def, i_def
@@ -48,7 +48,7 @@ module exner_gradient_bd_kernel_mod
       func_type(Wtheta, GH_BASIS)                                     &
       /)
     integer :: iterates_over = CELLS
-    integer :: gh_shape = GH_QUADRATURE_XYoZ
+    integer :: gh_shape = GH_QUADRATURE_face
         type(mesh_data_type) :: meta_init(2) = (/                         &
             mesh_data_type( adjacent_face ),                              &
             mesh_data_type( reference_element_out_face_normal )           &
@@ -92,9 +92,8 @@ contains
   !! @param[inout] r_u_bd Right hand side of the momentum equation
   !! @param[in] exner The Exner pressure
   !! @param[in] theta Potential temperature
-  !! @param[in] nqp_v Number of quadrature points in the vertical
-  !! @param[in] nqp_h_1d Number of quadrature points in a single horizontal direction
-  !! @param[in] wqp_v Vertical quadrature weights
+  !! @param[in] nqp Number of quadrature points
+  !! @param[in] wqp Quadrature weights
   !! @param[in] w2_basis_face Basis functions evaluated at gaussian quadrature points on horizontal faces
   !! @param[in] w3_basis_face Basis functions evaluated at gaussian quadrature points on horizontal faces
   !! @param[in] wtheta_basis_face Basis functions evaluated at gaussian quadrature points on horizontal faces
@@ -112,7 +111,7 @@ contains
                                      map_wtheta,                   &
                                      r_u_bd,                       &
                                      exner, theta,                 &
-                                     nqp_v, nqp_h_1d, wqp_v,       &
+                                     nqp, wqp,                     &
                                      w2_basis_face, w3_basis_face, &
                                      wtheta_basis_face,            &
                                      adjacent_face, out_face_normal )
@@ -138,23 +137,18 @@ contains
     real(r_def),    intent(inout) :: r_u_bd(undf_w2)
     real(r_def),    intent(in)    :: exner(undf_w3)
     real(r_def),    intent(in)    :: theta(undf_wtheta)
-    integer(i_def), intent(in)    :: nqp_v
-    integer(i_def), intent(in)    :: nqp_h_1d
-    real(r_def),    intent(in)    :: wqp_v(nqp_v)
-    real(r_def),    intent(in)    :: w2_basis_face(4, 3, &
-                                                   ndf_w2, nqp_h_1d, nqp_v)
-    real(r_def),    intent(in)    :: w3_basis_face(4, 1, &
-                                                   ndf_w3, nqp_h_1d, nqp_v)
-    real(r_def),    intent(in)    :: wtheta_basis_face(4, 1, &
-                                                       ndf_wtheta, &
-                                                       nqp_h_1d, nqp_v)
+    integer(i_def), intent(in)    :: nqp
+    real(r_def),    intent(in)    :: wqp(nqp,4)
+    real(r_def),    intent(in)    :: w2_basis_face(3, ndf_w2, nqp, 4)
+    real(r_def),    intent(in)    :: w3_basis_face(1, ndf_w3, nqp, 4)
+    real(r_def),    intent(in)    :: wtheta_basis_face(1, ndf_wtheta, nqp, 4)
     integer(i_def), intent(in)    :: adjacent_face(:)
     real(r_def),    intent(in)    :: out_face_normal(:,:)
 
 
     !Internal variables
     integer(kind=i_def)              :: df, k, face, face_next
-    integer(kind=i_def)              :: qp1, qp2
+    integer(kind=i_def)              :: qp
 
     real(kind=r_def), dimension(ndf_w3)          :: exner_e, exner_next_e
     real(kind=r_def), dimension(ndf_wtheta)      :: theta_e
@@ -190,33 +184,31 @@ contains
         end do
 
         ! Compute the boundary RHS integrated over one horizontal face
-        do qp2 = 1, nqp_v
-          do qp1 = 1, nqp_h_1d
-            exner_at_fquad = 0.0_r_def
-            exner_next_at_fquad = 0.0_r_def
+        do qp = 1, nqp
+          exner_at_fquad = 0.0_r_def
+          exner_next_at_fquad = 0.0_r_def
 
-            do df = 1, ndf_w3
-              exner_at_fquad  = exner_at_fquad + exner_e(df)*w3_basis_face(face,1,df,qp1,qp2)
-              exner_next_at_fquad  = exner_next_at_fquad + exner_next_e(df)*w3_basis_face(face_next,1,df,qp1,qp2)
-            end do
+          do df = 1, ndf_w3
+            exner_at_fquad  = exner_at_fquad + exner_e(df)*w3_basis_face(1,df,qp,face)
+            exner_next_at_fquad  = exner_next_at_fquad + exner_next_e(df)*w3_basis_face(1,df,qp,face_next)
+          end do
 
-            theta_at_fquad = 0.0_r_def
+          theta_at_fquad = 0.0_r_def
 
-            do df = 1, ndf_wtheta
-              theta_at_fquad   = theta_at_fquad + theta_e(df)*wtheta_basis_face(face,1,df,qp1,qp2)
-            end do
+          do df = 1, ndf_wtheta
+            theta_at_fquad   = theta_at_fquad + theta_e(df)*wtheta_basis_face(1,df,qp,face)
+          end do
 
-            av_pi_at_fquad = .5 * (exner_at_fquad + exner_next_at_fquad)
+          av_pi_at_fquad = .5 * (exner_at_fquad + exner_next_at_fquad)
 
-            do df = 1, ndf_w2
-              v  = w2_basis_face(face,:,df,qp1,qp2)
+          do df = 1, ndf_w2
+            v  = w2_basis_face(:,df,qp,face)
 
-              bdary_term = - cp * dot_product(v, out_face_normal(:, face)) *  theta_at_fquad * av_pi_at_fquad
-              ru_bd_e(df) = ru_bd_e(df) + wqp_v(qp1)*wqp_v(qp2) * bdary_term
-            end do
+            bdary_term = - cp * dot_product(v, out_face_normal(:, face)) *  theta_at_fquad * av_pi_at_fquad
+            ru_bd_e(df) = ru_bd_e(df) + wqp(qp,face) * bdary_term
+          end do
 
-          end do ! qp1
-        end do ! qp2
+        end do ! qp
       end do ! faces
 
       do df = 1, ndf_w2

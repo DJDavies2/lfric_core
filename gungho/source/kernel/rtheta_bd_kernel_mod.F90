@@ -18,7 +18,7 @@ module rtheta_bd_kernel_mod
   use argument_mod,          only : arg_type, func_type, mesh_data_type, &
                                     GH_FIELD, GH_READ, GH_READWRITE,     &
                                     GH_BASIS, GH_DIFF_BASIS,             &
-                                    CELLS, GH_QUADRATURE_XYoZ,           &
+                                    CELLS, GH_QUADRATURE_face,           &
                                     adjacent_face,                       &
                                     reference_element_normal_to_face,    &
                                     reference_element_out_face_normal
@@ -49,7 +49,7 @@ module rtheta_bd_kernel_mod
           func_type(Wtheta, GH_BASIS)                                   &
           /)
       integer :: iterates_over = CELLS
-      integer :: gh_shape = GH_QUADRATURE_XYoZ
+      integer :: gh_shape = GH_QUADRATURE_face
       type(mesh_data_type) :: meta_init(3) = (/                         &
           mesh_data_type( adjacent_face ),                              &
           mesh_data_type( reference_element_normal_to_face ),           &
@@ -96,14 +96,12 @@ contains
     !! @param[inout] r_theta_bd Real array the data
     !! @param[in] theta Potential temperature.
     !! @param[in] u Wind field.
-    !! @param[in] nqp_v Integer, number of quadrature points in the vertical
-    !! @param[in] nqp_h_1d Integer, number of quadrature points in a single
-    !!                     horizontal direction.
-    !! @param[in] wqp_v Real array. Quadrature weights vertical
-    !! @param[in] w2_basis_face Real 5-dim array holding w2 basis functions
+    !! @param[in] nqp Integer, number of quadrature points
+    !! @param[in] wqp Real array. Quadrature weights
+    !! @param[in] w2_basis_face Real 4-dim array holding w2 basis functions
     !!                          evaluated at gaussian quadrature points on
     !!                          horizontal faces.
-    !! @param[in] wtheta_basis_face Real 5-dim array holding wtheta basis
+    !! @param[in] wtheta_basis_face Real 4-dim array holding wtheta basis
     !!                              functions evaluated at gaussian quadrature
     !!                              points on horizontal faces.
     !! @param[in] adjacent_face Vector containing information on neighbouring
@@ -122,7 +120,7 @@ contains
                                stencil_wtheta_size,                   &
                                r_theta_bd,                            &
                                theta, u,                              &
-                               nqp_v, nqp_h_1d, wqp_v, w2_basis_face, &
+                               nqp, wqp, w2_basis_face,               &
                                wtheta_basis_face,                     &
                                adjacent_face,                         &
                                normal_to_face, out_face_normal )
@@ -130,7 +128,7 @@ contains
         implicit none
 
         ! Arguments
-        integer(kind=i_def), intent(in) :: nlayers, nqp_h_1d, nqp_v
+        integer(kind=i_def), intent(in) :: nlayers, nqp
         integer(kind=i_def), intent(in) :: ndf_w2
         integer(kind=i_def), intent(in) :: undf_w2
         integer(kind=i_def), intent(in) :: ndf_wtheta, undf_wtheta
@@ -141,8 +139,8 @@ contains
         integer(kind=i_def), dimension(ndf_w2, stencil_w2_size), intent(in)          :: stencil_w2_map
         integer(kind=i_def), dimension(ndf_wtheta, stencil_wtheta_size), intent(in)  :: stencil_wtheta_map
 
-        real(kind=r_def), dimension(3,ndf_w2,nqp_h_1d,nqp_v,4), intent(in)     :: w2_basis_face
-        real(kind=r_def), dimension(1,ndf_wtheta,nqp_h_1d,nqp_v,4), intent(in) :: wtheta_basis_face
+        real(kind=r_def), dimension(3,ndf_w2,nqp,4),     intent(in) :: w2_basis_face
+        real(kind=r_def), dimension(1,ndf_wtheta,nqp,4), intent(in) :: wtheta_basis_face
 
         integer(kind=i_def), intent(in) :: adjacent_face(:)
 
@@ -153,11 +151,11 @@ contains
         real(kind=r_def), dimension(undf_wtheta), intent(in)    :: theta
         real(kind=r_def), dimension(undf_w2), intent(in)        :: u
 
-        real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
+        real(kind=r_def), dimension(nqp,4), intent(in) ::  wqp
 
         ! Internal variables
         integer(kind=i_def)               :: df, k, face, face_next
-        integer(kind=i_def)               :: qp1, qp2
+        integer(kind=i_def)               :: qp
         integer(kind=i_def)               :: i_face
 
         real(kind=r_def), dimension(ndf_wtheta)      :: theta_e, theta_next_e
@@ -199,42 +197,40 @@ contains
               end do
 
               ! compute the boundary RHS integrated over one cell
-              do qp2 = 1, nqp_v
-                do qp1 = 1, nqp_h_1d
-                  theta_at_uquad = 0.0_r_def
-                  theta_next_at_uquad = 0.0_r_def
+              do qp = 1, nqp
+                theta_at_uquad = 0.0_r_def
+                theta_next_at_uquad = 0.0_r_def
 
-                  do df = 1, ndf_wtheta
-                    theta_at_uquad       = theta_at_uquad + theta_e(df)*wtheta_basis_face(1,df,qp1,qp2,face)
-                    theta_next_at_uquad  = theta_next_at_uquad + theta_next_e(df)*wtheta_basis_face(1,df,qp1,qp2,face_next)
-                  end do
+                do df = 1, ndf_wtheta
+                  theta_at_uquad       = theta_at_uquad + theta_e(df)*wtheta_basis_face(1,df,qp,face)
+                  theta_next_at_uquad  = theta_next_at_uquad + theta_next_e(df)*wtheta_basis_face(1,df,qp,face_next)
+                end do
 
-                  u_at_uquad(:) = 0.0_r_def
-                  u_next_at_uquad(:) = 0.0_r_def
+                u_at_uquad(:) = 0.0_r_def
+                u_next_at_uquad(:) = 0.0_r_def
 
-                  do df = 1, ndf_w2
-                    u_at_uquad(:)       = u_at_uquad(:)      + u_e(df)     *w2_basis_face(:,df,qp1,qp2,face)
-                    u_next_at_uquad(:)  = u_next_at_uquad(:) + u_next_e(df)*w2_basis_face(:,df,qp1,qp2,face_next)
-                  end do
+                do df = 1, ndf_w2
+                  u_at_uquad(:)       = u_at_uquad(:)      + u_e(df)     *w2_basis_face(:,df,qp,face)
+                  u_next_at_uquad(:)  = u_next_at_uquad(:) + u_next_e(df)*w2_basis_face(:,df,qp,face_next)
+                end do
 
-                  flux_term = 0.5_r_def * (theta_next_at_uquad * dot_product(u_next_at_uquad, face_next_inward_normal) + &
-                                           theta_at_uquad      * dot_product(u_at_uquad,      out_face_normal(:, face)))
+                flux_term = 0.5_r_def * (theta_next_at_uquad * dot_product(u_next_at_uquad, face_next_inward_normal) + &
+                                         theta_at_uquad      * dot_product(u_at_uquad,      out_face_normal(:, face)))
 
-                  if (upwind) then
-                    flux_term = flux_term + 0.5_r_def * abs(dot_product(u_at_uquad, out_face_normal(:, face))) * &
-                                  (dot_product(theta_at_uquad      * out_face_normal(:, face), out_face_normal(:, face)) - &
-                                   dot_product(theta_next_at_uquad * face_next_inward_normal , face_next_inward_normal))
-                  end if
+                if (upwind) then
+                  flux_term = flux_term + 0.5_r_def * abs(dot_product(u_at_uquad, out_face_normal(:, face))) * &
+                                (dot_product(theta_at_uquad      * out_face_normal(:, face), out_face_normal(:, face)) - &
+                                 dot_product(theta_next_at_uquad * face_next_inward_normal , face_next_inward_normal))
+                end if
 
-                  do df = 1, ndf_wtheta
-                    gamma_wtheta  = wtheta_basis_face(1,df,qp1,qp2,face)
+                do df = 1, ndf_wtheta
+                  gamma_wtheta  = wtheta_basis_face(1,df,qp,face)
 
-                    bdary_term = gamma_wtheta * flux_term
-                    rtheta_bd_e(df) = rtheta_bd_e(df) +  wqp_v(qp1)*wqp_v(qp2) * bdary_term
-                  end do
+                  bdary_term = gamma_wtheta * flux_term
+                  rtheta_bd_e(df) = rtheta_bd_e(df) +  wqp(qp,face) * bdary_term
+                end do
 
-                end do ! qp1
-              end do ! qp2
+              end do ! qp
 
           end do ! faces
 

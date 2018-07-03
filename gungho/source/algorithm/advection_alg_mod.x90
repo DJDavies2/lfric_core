@@ -30,7 +30,7 @@ module advection_alg_mod
                                             invoke_rtheta_bd_kernel
   use quadrature_xyoz_mod,            only: quadrature_xyoz_type
   use quadrature_rule_gaussian_mod,   only: quadrature_rule_gaussian_type
-
+  use quadrature_face_mod,            only: quadrature_face_type
   use rtheta_kernel_mod,              only: rtheta_kernel_type
   use rtheta_supg_kernel_mod,         only: rtheta_supg_kernel_type
   use flux_rhs_kernel_mod,            only: flux_rhs_kernel_type
@@ -506,13 +506,18 @@ contains
   !>@param[in]    wind Advecting wind field
   subroutine advective_inc_alg(rtheta, theta, wind)
   use sample_poly_adv_kernel_mod, only: sample_poly_adv_kernel_type
+  use reference_element_mod,      only: reference_element_type
+  use mesh_mod,                   only: mesh_type
   implicit none
-  type(field_type), intent(in)        :: theta, wind
-  type(field_type), intent(inout)     :: rtheta
-  type(quadrature_xyoz_type)          :: qr
-  type(quadrature_rule_gaussian_type) :: quadrature_rule
-  type(field_type), pointer           :: chi(:) => null()
-  type(field_type), pointer           :: mt_lumped_inv => null()
+  type(field_type), intent(in)           :: theta, wind
+  type(field_type), intent(inout)        :: rtheta
+  type(quadrature_xyoz_type)             :: qr
+  type(quadrature_face_type)             :: qrf
+  type(quadrature_rule_gaussian_type)    :: quadrature_rule
+  type(field_type), pointer              :: chi(:) => null()
+  type(field_type), pointer              :: mt_lumped_inv => null()
+  class(reference_element_type), pointer :: reference_element =>null()
+  type(mesh_type),               pointer :: mesh => null()
 
   mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
 
@@ -533,9 +538,14 @@ contains
     case(transport_operators_fem)
      ! Use project u.grad(theta) into the theta function space
       qr = quadrature_xyoz_type(element_order+3, quadrature_rule)
+      mesh              => rtheta%get_mesh()
+      reference_element => mesh%get_reference_element()
+      qrf = quadrature_face_type(element_order+3, .true., .false., &
+                                 reference_element, quadrature_rule)
       call invoke( setval_c(rtheta, 0.0_r_def) )
       call invoke( rtheta_kernel_type (rtheta, theta, wind, qr) )
-      call invoke_rtheta_bd_kernel ( rtheta, theta, wind, qr )
+      call invoke_rtheta_bd_kernel ( rtheta, theta, wind, qrf )
+      nullify( mesh, reference_element )
    end select
 
   nullify( chi, mt_lumped_inv )

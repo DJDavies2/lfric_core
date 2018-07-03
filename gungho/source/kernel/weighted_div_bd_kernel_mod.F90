@@ -21,7 +21,7 @@ module weighted_div_bd_kernel_mod
                                 GH_OPERATOR, GH_FIELD, GH_REAL,             &
                                 GH_READ, GH_READWRITE,                      &
                                 GH_BASIS,                                   &
-                                CELLS, GH_QUADRATURE_XYoZ,                  &
+                                CELLS, GH_QUADRATURE_face,                  &
                                 adjacent_face,                              &
                                 reference_element_number_horizontal_faces,  &
                                 reference_element_out_face_normal
@@ -52,7 +52,7 @@ module weighted_div_bd_kernel_mod
        func_type(Wtheta, GH_BASIS)                                    &
       /)
     integer :: iterates_over = CELLS
-    integer :: gh_shape = GH_QUADRATURE_XYoZ
+    integer :: gh_shape = GH_QUADRATURE_face
     type(mesh_data_type) :: meta_init(3) = (/                        &
         mesh_data_type( adjacent_face ),                             &
         mesh_data_type( reference_element_number_horizontal_faces ), &
@@ -99,10 +99,8 @@ contains
   !! @param[in] undf_wtheta Number unique of degrees of freedom  for wtheta
   !! @param[in] stencil_wtheta_map W2 dofmaps for the stencil
   !! @param[in] stencil_wtheta_size Size of the W2 stencil (number of cells)
-  !! @param[in] nqp_v Number of quadrature points in the vertical
-  !! @param[in] nqp_h_1d  Number of quadrature points in a single horizontal
-  !!                      direction.
-  !! @param[in] wqp_v Vertical quadrature weights
+  !! @param[in] nqp Number of quadrature points
+  !! @param[in] wqp Quadrature weights
   !! @param[in] w2_basis_face  Basis functions evaluated at gaussian &
   !!                           quadrature points on horizontal faces.
   !! @param[in] w3_basis_face  Basis functions evaluated at gaussian &
@@ -122,7 +120,7 @@ contains
                                    ndf_wtheta, undf_wtheta, &
                                    stencil_wtheta_map,      &
                                    stencil_wtheta_size,     &
-                                   nqp_v, nqp_h_1d, wqp_v,  &
+                                   nqp, wqp,                &
                                    w2_basis_face,           &
                                    w3_basis_face,           &
                                    wtheta_basis_face,       &
@@ -133,22 +131,22 @@ contains
     implicit none
 
     ! Arguments
-    integer(kind=i_def), intent(in) :: cell, nlayers, nqp_v, nqp_h_1d, ncell_3d
+    integer(kind=i_def), intent(in) :: cell, nlayers, nqp, ncell_3d
     integer(kind=i_def), intent(in) :: ndf_w2, ndf_w3
     integer(kind=i_def), intent(in) :: ndf_wtheta, undf_wtheta
     integer(kind=i_def), intent(in) :: stencil_wtheta_size
 
     integer(kind=i_def), dimension(ndf_wtheta,stencil_wtheta_size),  intent(in) :: stencil_wtheta_map
 
-    real(kind=r_def), dimension(3,ndf_w2,nqp_h_1d,nqp_v,4), intent(in)     :: w2_basis_face
-    real(kind=r_def), dimension(1,ndf_w3,nqp_h_1d,nqp_v,4), intent(in)     :: w3_basis_face
-    real(kind=r_def), dimension(1,ndf_wtheta,nqp_h_1d,nqp_v,4), intent(in) :: wtheta_basis_face
+    real(kind=r_def), dimension(3,ndf_w2,    nqp,4), intent(in) :: w2_basis_face
+    real(kind=r_def), dimension(1,ndf_w3,    nqp,4), intent(in) :: w3_basis_face
+    real(kind=r_def), dimension(1,ndf_wtheta,nqp,4), intent(in) :: wtheta_basis_face
 
     real(kind=r_def), dimension(ndf_w2,ndf_w3,ncell_3d), intent(inout) :: div
     real(kind=r_def), dimension(undf_wtheta), intent(in)    :: theta
     real(kind=r_def),                         intent(in)    :: scalar
 
-    real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
+    real(kind=r_def), dimension(nqp,4), intent(in) ::  wqp
 
     integer(kind=i_def), intent(in) :: number_horizontal_faces
     integer(kind=i_def), intent(in) :: adjacent_face(number_horizontal_faces)
@@ -156,7 +154,7 @@ contains
 
     ! Internal variables
     integer(kind=i_def)              :: df, df2, df3, k, ik, face, face_next
-    integer(kind=i_def)              :: qp1, qp2
+    integer(kind=i_def)              :: qp
 
     real(kind=r_def), dimension(ndf_wtheta) :: theta_e, theta_next_e
 
@@ -175,26 +173,24 @@ contains
           theta_e(df)      = theta(stencil_wtheta_map(df, 1)      + k)
           theta_next_e(df) = theta(stencil_wtheta_map(df, face+1) + k)
         end do
-        do qp2 = 1, nqp_v
-          do qp1 = 1, nqp_h_1d
-            theta_at_fquad      = 0.0_r_def 
-            theta_next_at_fquad = 0.0_r_def               
-            do df = 1, ndf_wtheta
-              theta_at_fquad       = theta_at_fquad      + theta_e(df)     *wtheta_basis_face(1,df,qp1,qp2,face)
-              theta_next_at_fquad  = theta_next_at_fquad + theta_next_e(df)*wtheta_basis_face(1,df,qp1,qp2,face_next)
-            end do                
-            do df3 = 1, ndf_w3
-              do df2 = 1, ndf_w2
-                v_dot_n  = dot_product(w2_basis_face(:,df2,qp1,qp2,face),out_face_normal(:,face))
-                this_bd_term =  v_dot_n*theta_at_fquad
-                next_bd_term = -v_dot_n*theta_next_at_fquad
-                integrand = wqp_v(qp1)*wqp_v(qp2)*w3_basis_face(1,df3,qp1,qp2,face) &
-                             * 0.5_r_def*(this_bd_term + next_bd_term)
-                div(df2,df3,ik) = div(df2,df3,ik) - scalar*integrand
-              end do ! df2
-            end do ! df3
-          end do ! qp1
-        end do ! qp2
+        do qp = 1, nqp
+          theta_at_fquad      = 0.0_r_def 
+          theta_next_at_fquad = 0.0_r_def               
+          do df = 1, ndf_wtheta
+            theta_at_fquad       = theta_at_fquad      + theta_e(df)     *wtheta_basis_face(1,df,qp,face)
+            theta_next_at_fquad  = theta_next_at_fquad + theta_next_e(df)*wtheta_basis_face(1,df,qp,face_next)
+          end do                
+          do df3 = 1, ndf_w3
+            do df2 = 1, ndf_w2
+              v_dot_n  = dot_product(w2_basis_face(:,df2,qp,face),out_face_normal(:,face))
+              this_bd_term =  v_dot_n*theta_at_fquad
+              next_bd_term = -v_dot_n*theta_next_at_fquad
+              integrand = wqp(qp,face)*w3_basis_face(1,df3,qp,face) &
+                           * 0.5_r_def*(this_bd_term + next_bd_term)
+              div(df2,df3,ik) = div(df2,df3,ik) - scalar*integrand
+            end do ! df2
+          end do ! df3
+        end do ! qp
       end do ! faces
     end do ! layers
 

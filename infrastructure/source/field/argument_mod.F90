@@ -81,6 +81,7 @@ module argument_mod
   integer, public, parameter :: GH_QUADRATURE_XYZ   = 912
   integer, public, parameter :: GH_QUADRATURE_XYoZ  = 849
   integer, public, parameter :: GH_QUADRATURE_XoYoZ = 701
+  integer, public, parameter :: GH_QUADRATURE_face  = 539
 
 ! Evaluator metadata
   integer, public, parameter :: GH_EVALUATOR        = 959

@@ -8,5 +8,6 @@
 !include field/quadrature_rule_mod.iuml
 !include field/quadrature_rule_gaussian_mod.iuml
 !include field/quadrature_rule_newton_cotes_mod.iuml
+!include field/quadrature_rule_gauss_lobatto_mod.iuml
 
 @enduml

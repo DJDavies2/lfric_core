@@ -142,9 +142,11 @@ contains
   use derived_config_mod,                only: bundle_size
   use quadrature_xyoz_mod,               only: quadrature_xyoz_type
   use quadrature_rule_gaussian_mod,      only: quadrature_rule_gaussian_type
+  use quadrature_face_mod,               only: quadrature_face_type
   use lhs_exner_kernel_mod,              only: lhs_exner_kernel_type
   use sample_flux_kernel_mod,            only: sample_flux_kernel_type
-
+  use reference_element_mod,             only: reference_element_type
+  use mesh_mod,                          only: mesh_type
   implicit none
 
   real(kind=r_def),             intent(in)    :: tau_u_dt, tau_t_dt, tau_r_dt
@@ -154,6 +156,7 @@ contains
   type(field_type),             intent(inout) :: lhs(bundle_size)
 
   type( quadrature_xyoz_type )          :: qr
+  type( quadrature_face_type )          :: qrf
   type( quadrature_rule_gaussian_type ) :: quadrature_rule
 
   type(field_type),    pointer :: chi(:) => null()
@@ -173,10 +176,12 @@ contains
                                   mt_lumped_inv => null(), &
                                   m2_diag => null()
 
+  class(reference_element_type), pointer :: reference_element =>null()
+  type(mesh_type),               pointer :: mesh => null()
+
   ! Auxiliary constants to group invokes
   real(kind=r_def), parameter  :: minus_one = -1.0_r_def
   real(r_def)                  :: const
-
   ! Get operators from runtime constants
   mm_w3_inv => get_mass_matrix(w3inv_id)
   mm_wtheta => get_mass_matrix(theta_space_id)
@@ -201,8 +206,11 @@ contains
   rho_ref   => ref_state(igh_d)
   exner_ref => ref_state(igh_p)
 
-  qr = quadrature_xyoz_type(element_order+2, quadrature_rule)
-
+  qr  = quadrature_xyoz_type(element_order+2, quadrature_rule)
+  mesh              => theta%get_mesh()
+  reference_element => mesh%get_reference_element()
+  qrf = quadrature_face_type(element_order+2, .true., .false., &
+                             reference_element, quadrature_rule)
   ! Compute lhs_u
   call invoke( setval_c( lhs_tmp(igh_u), 0.0_r_def ), &
                setval_c( lhs(igh_u),     0.0_r_def ) )
@@ -212,8 +220,8 @@ contains
     call invoke( matrix_vector_kernel_type( lhs(igh_u), u, coriolis ), &
                  inc_a_times_X(const, lhs(igh_u) ) )
   end if
-  call invoke_exner_gradient_bd_kernel( lhs_tmp(igh_u), exner, theta_ref, qr )
-  call invoke_exner_gradient_bd_kernel( lhs_tmp(igh_u), exner_ref, theta, qr )
+  call invoke_exner_gradient_bd_kernel( lhs_tmp(igh_u), exner, theta_ref, qrf )
+  call invoke_exner_gradient_bd_kernel( lhs_tmp(igh_u), exner_ref, theta, qrf )
   call invoke( exner_gradient_kernel_type( lhs_tmp(igh_u), exner, theta_ref, qr ), &
                exner_gradient_kernel_type( lhs_tmp(igh_u), exner_ref, theta, qr ), &
                matrix_vector_kernel_type( lhs(igh_u), u, mm_vel ) )
@@ -221,11 +229,13 @@ contains
   call invoke( inc_X_minus_bY( lhs(igh_u), tau_u_dt, lhs_tmp(igh_u) ), &
                enforce_bc_kernel_type( lhs(igh_u) ) )
  
-  qr = quadrature_xyoz_type(element_order+1, quadrature_rule)
+  qr  = quadrature_xyoz_type(element_order+1, quadrature_rule)
+  qrf = quadrature_face_type(element_order+1, .true., .false., &
+                             reference_element, quadrature_rule)
   ! Compute lhs_theta
   call invoke( setval_c( lhs_tmp(igh_t), 0.0_r_def ), &
                setval_c( lhs(igh_t),     0.0_r_def ) )
-  call invoke_rtheta_bd_kernel ( lhs_tmp(igh_t), theta_ref, u, qr )
+  call invoke_rtheta_bd_kernel ( lhs_tmp(igh_t), theta_ref, u, qrf )
   call invoke( rtheta_kernel_type( lhs_tmp(igh_t), theta_ref, u, qr ),         &
                matrix_vector_kernel_type( lhs(igh_t), theta, mm_wtheta ),      &
                inc_X_plus_bY( lhs(igh_t), tau_t_dt, lhs_tmp(igh_t) ) )
@@ -260,7 +270,8 @@ contains
 
   nullify( chi, mm_vel, mm_w3_inv, mm_wtheta, div, u, theta, &
            rho, exner, theta_ref, rho_ref, exner_ref,        &
-           w2_rmultiplicity, mt_lumped_inv, m2_diag )
+           w2_rmultiplicity, mt_lumped_inv, m2_diag,         &
+           reference_element, mesh )
 
   end subroutine on_the_fly_lhs_alg
 

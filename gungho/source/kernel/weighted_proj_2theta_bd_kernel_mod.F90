@@ -17,7 +17,7 @@ module weighted_proj_2theta_bd_kernel_mod
                                GH_OPERATOR, GH_FIELD, GH_REAL,      &
                                GH_READ, GH_READWRITE,               &
                                GH_BASIS, GH_DIFF_BASIS,             &
-                               CELLS, GH_QUADRATURE_XYoZ,           &
+                               CELLS, GH_QUADRATURE_face,           &
                                adjacent_face,                       &
                                reference_element_out_face_normal
   use constants_mod,     only: r_def, i_def
@@ -43,7 +43,7 @@ module weighted_proj_2theta_bd_kernel_mod
         func_type(W3,     GH_BASIS)       &
         /)
     integer :: iterates_over = CELLS
-    integer :: gh_shape = GH_QUADRATURE_XYoZ
+    integer :: gh_shape = GH_QUADRATURE_face
       type(mesh_data_type) :: meta_init(2) = (/               &
           mesh_data_type( adjacent_face ),                    &
           mesh_data_type( reference_element_out_face_normal ) &
@@ -89,10 +89,8 @@ contains
   !! @param[in] undf_w3 Total number of degrees.
   !! @param[in] stencil_w3_map W3 dofmaps for the stencil
   !! @param[in] stencil_w3_size Size of the W3 stencil (number of cells)
-  !! @param[in] nqp_h_1d  Number of quadrature points in a single horizontal &
-  !!                      direction.
-  !! @param[in] nqp_v Number of vertical quadrature points
-  !! @param[in] wqp_v Vertical quadrature weights
+  !! @param[in] nqp Number of quadrature points
+  !! @param[in] wqp Quadrature weights
   !! @param[in] w2_basis_face  Basis functions evaluated at gaussian &
   !!                           quadrature points on horizontal faces.
   !! @param[in] w3_basis_face  Basis functions evaluated at gaussian &
@@ -112,7 +110,7 @@ contains
                                            ndf_w3, undf_w3,         &
                                            stencil_w3_map,          &
                                            stencil_w3_size,         &
-                                           nqp_h_1d, nqp_v, wqp_v,  &
+                                           nqp, wqp,                &
                                            w2_basis_face,           &
                                            w3_basis_face,           &
                                            wtheta_basis_face,       &
@@ -123,7 +121,7 @@ contains
     implicit none
 
     ! Arguments
-    integer(kind=i_def),                     intent(in) :: cell, nqp_h_1d, nqp_v
+    integer(kind=i_def),                     intent(in) :: cell, nqp
     integer(kind=i_def),                     intent(in) :: nlayers
     integer(kind=i_def),                     intent(in) :: ncell_3d
     integer(kind=i_def),                     intent(in) :: undf_w3, ndf_w3, ndf_w2, ndf_wtheta
@@ -131,21 +129,21 @@ contains
     integer(kind=i_def), intent(in) :: stencil_w3_size
     integer(kind=i_def), dimension(ndf_w3, stencil_w3_size), intent(in)  :: stencil_w3_map
 
-    real(kind=r_def), dimension(3,ndf_w2,nqp_h_1d,nqp_v,4), intent(in)     :: w2_basis_face
-    real(kind=r_def), dimension(1,ndf_w3,nqp_h_1d,nqp_v,4), intent(in)     :: w3_basis_face
-    real(kind=r_def), dimension(1,ndf_wtheta,nqp_h_1d,nqp_v,4), intent(in) :: wtheta_basis_face
+    real(kind=r_def), dimension(3,ndf_w2,nqp,4),     intent(in) :: w2_basis_face
+    real(kind=r_def), dimension(1,ndf_w3,nqp,4),     intent(in) :: w3_basis_face
+    real(kind=r_def), dimension(1,ndf_wtheta,nqp,4), intent(in) :: wtheta_basis_face
 
     real(kind=r_def), dimension(ndf_w2,ndf_wtheta,ncell_3d), intent(inout) :: projection
     real(kind=r_def), dimension(undf_w3),                    intent(in)    :: exner
     real(kind=r_def),                                        intent(in)    :: scalar
-    real(kind=r_def), dimension(nqp_v),                      intent(in)    :: wqp_v
+    real(kind=r_def), dimension(nqp,4),                      intent(in)    :: wqp
 
     integer(kind=i_def), intent(in) :: adjacent_face(:)
     real(kind=r_def),    intent(in) :: out_face_normal(:,:)
 
     ! Internal variables
     integer(kind=i_def)                      :: df, df0, df2, k, ik, face, face_next
-    integer(kind=i_def)                      :: qp1, qp2
+    integer(kind=i_def)                      :: qp
     real(kind=r_def), dimension(ndf_w3)      :: exner_e, exner_next_e
 
     real(kind=r_def)                         :: v(3), normal(3), integrand
@@ -164,24 +162,22 @@ contains
           exner_next_e(df) = exner(stencil_w3_map(df, face+1) + k)
         end do
 
-        do qp2 = 1, nqp_v
-          do qp1 = 1, nqp_h_1d
-            exner_at_fquad      = 0.0_r_def
-            exner_next_at_fquad = 0.0_r_def
-            do df = 1, ndf_w3
-              exner_at_fquad      = exner_at_fquad + exner_e(df)*w3_basis_face(1,df,qp1,qp2,face)
-              exner_next_at_fquad = exner_next_at_fquad + exner_next_e(df)*w3_basis_face(1,df,qp1,qp2,face_next)
-            end do
-            exner_av = 0.5_r_def*(exner_at_fquad + exner_next_at_fquad)
+        do qp = 1, nqp
+          exner_at_fquad      = 0.0_r_def
+          exner_next_at_fquad = 0.0_r_def
+          do df = 1, ndf_w3
+            exner_at_fquad      = exner_at_fquad + exner_e(df)*w3_basis_face(1,df,qp,face)
+            exner_next_at_fquad = exner_next_at_fquad + exner_next_e(df)*w3_basis_face(1,df,qp,face_next)
+          end do
+          exner_av = 0.5_r_def*(exner_at_fquad + exner_next_at_fquad)
 
-            do df0 = 1, ndf_wtheta
-              normal =  out_face_normal(:,face)*wtheta_basis_face(1,df0,qp1,qp2,face)
-              do df2 = 1, ndf_w2
-                v  = w2_basis_face(:,df2,qp1,qp2,face)
+          do df0 = 1, ndf_wtheta
+            normal =  out_face_normal(:,face)*wtheta_basis_face(1,df0,qp,face)
+            do df2 = 1, ndf_w2
+              v  = w2_basis_face(:,df2,qp,face)
 
-                integrand = wqp_v(qp1)*wqp_v(qp2)*exner_av*dot_product(v, normal)
-                projection(df2,df0,ik) = projection(df2,df0,ik) - scalar*integrand
-              end do
+              integrand = wqp(qp,face)*exner_av*dot_product(v, normal)
+              projection(df2,df0,ik) = projection(df2,df0,ik) - scalar*integrand
             end do
           end do
         end do

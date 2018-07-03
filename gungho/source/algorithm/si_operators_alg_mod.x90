@@ -18,7 +18,6 @@ module si_operators_alg_mod
                                          normalise
   use output_config_mod,         only: subroutine_timers 
   use timer_mod,                 only: timer
-
   implicit none
   private
 
@@ -135,6 +134,7 @@ contains
   !>@param[in] ref_state Bundle of reference states used to create linear operators
   subroutine compute_si_operators(ref_state)
     use quadrature_xyoz_mod,             only: quadrature_xyoz_type
+    use quadrature_face_mod,             only: quadrature_face_type
     use quadrature_rule_gaussian_mod,    only: quadrature_rule_gaussian_type
     use eos_operators_kernel_mod,        only: eos_operators_kernel_type
     use weighted_div_kernel_mod,         only: weighted_div_kernel_type
@@ -161,22 +161,27 @@ contains
     use field_indices_mod,               only: igh_u, igh_t, igh_d, igh_p
     use planet_config_mod,               only: kappa, cp
     use timestepping_config_mod,         only: tau_r, tau_t, tau_u, dt
+    use reference_element_mod,           only: reference_element_type
+    use mesh_mod,                        only: mesh_type
 
     implicit none
 
-    type(field_type), target, intent(in) :: ref_state(bundle_size) ! (u, theta, rho, exner)
-    type(field_type),            pointer :: theta => null(), &
-                                            rho => null(), &
-                                            exner => null()
-    type(quadrature_xyoz_type)           :: qr
-    type(quadrature_rule_gaussian_type)  :: quadrature_rule
-    type(field_type),            pointer :: chi(:) => null()
-    type(operator_type),         pointer :: m3_inv => null(), div => null()
-    type(field_type)                     :: ones
-    type(field_type), pointer            :: w2_rmultiplicity => null()
-    type(function_space_type),   pointer :: u_fs => null()
-    real(r_def)                          :: const1, const2
-    integer(i_def), parameter            :: imone = -1_i_def
+    type(field_type), target, intent(in)   :: ref_state(bundle_size) ! (u, theta, rho, exner)
+    type(field_type),            pointer   :: theta => null(), &
+                                              rho => null(), &
+                                              exner => null()
+    type(quadrature_xyoz_type)             :: qr
+    type(quadrature_face_type)             :: qrf
+    type(quadrature_rule_gaussian_type)    :: quadrature_rule
+    type(field_type),            pointer   :: chi(:) => null()
+    type(operator_type),         pointer   :: m3_inv => null(), div => null()
+    type(field_type)                       :: ones
+    type(field_type), pointer              :: w2_rmultiplicity => null()
+    type(function_space_type),   pointer   :: u_fs => null()
+    real(r_def)                            :: const1, const2
+    integer(i_def), parameter              :: imone = -1_i_def
+    class(reference_element_type), pointer :: reference_element =>null()
+    type(mesh_type),               pointer :: mesh => null()
 
     if ( subroutine_timers ) call timer('si_operators_alg:compute')
     call log_event( "Gungho: computing si_operators", LOG_LEVEL_INFO )
@@ -195,7 +200,10 @@ contains
     ! The rest of the operators are topological and so do not need as high
     ! quadrature order
     qr = quadrature_xyoz_type(element_order+2, quadrature_rule)
-
+    mesh => theta%get_mesh()
+    reference_element => mesh%get_reference_element()
+    qrf = quadrature_face_type(element_order+2, .true., .false., &
+                               reference_element, quadrature_rule)
     ! Cell kernels
     const1 = tau_u*dt*cp
     const2 = tau_t*dt
@@ -206,9 +214,9 @@ contains
                  weighted_proj_theta2_kernel_type(ptheta2, theta, const2, qr) )
 
     ! Boundary kernels
-    call invoke_weighted_div_bd_kernel_type(div_star, theta, const1, qr)
-    call invoke_weighted_proj_theta2_bd_kernel_type(ptheta2, theta, const2, qr)
-    call invoke_weighted_proj_2theta_bd_kernel_type(p2theta, exner, const1, qr)
+    call invoke_weighted_div_bd_kernel_type(div_star, theta, const1, qrf)
+    call invoke_weighted_proj_theta2_bd_kernel_type(ptheta2, theta, const2, qrf)
+    call invoke_weighted_proj_2theta_bd_kernel_type(p2theta, exner, const1, qrf)
 
     ! Compute rho^ref at u nodal points
     u_fs => ref_state(igh_u)%get_function_space()
@@ -248,7 +256,8 @@ contains
       call invoke( setval_c(Helm_diag, 1.0_r_def) )
     end if
 
-    nullify( theta, rho, exner, chi, m3_inv, div, w2_rmultiplicity )
+    nullify( theta, rho, exner, chi, m3_inv, div, w2_rmultiplicity, &
+             mesh, reference_element )
 
     if ( subroutine_timers ) call timer('si_operators_alg:compute')
 

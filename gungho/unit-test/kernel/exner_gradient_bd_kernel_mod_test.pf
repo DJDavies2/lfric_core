@@ -20,12 +20,13 @@ module exner_gradient_bd_kernel_mod_test
   use function_space_mod,            only : function_space_type
   use fs_continuity_mod,             only : W0, W2, W3, Wtheta
   use pFUnit_Mod
-  use quadrature_xyoz_mod,           only: quadrature_xyoz_type, &
-                                           quadrature_xyoz_proxy_type
-  use quadrature_rule_gaussian_mod,  only: quadrature_rule_gaussian_type
+  use quadrature_face_mod,           only : quadrature_face_type, &
+                                            quadrature_face_proxy_type
+  use quadrature_rule_gaussian_mod,  only : quadrature_rule_gaussian_type
   use stencil_dofmap_mod,            only : stencil_dofmap_type, STENCIL_CROSS
   use yaxt,                          only : xt_initialize, xt_finalize
   use mpi_mod,                       only : store_comm, clear_comm
+  use function_space_mod,            only : BASIS
 
   implicit none
 
@@ -35,16 +36,16 @@ module exner_gradient_bd_kernel_mod_test
   @TestCase
   type, extends(MPITestCase) :: exner_gradient_bd_test_type
     private
-    type( quadrature_xyoz_type )          :: qr
-    type(quadrature_xyoz_proxy_type) :: qr_proxy
+    type(quadrature_face_type)         :: qr
+    type(quadrature_face_proxy_type)   :: qr_proxy
     type(function_space_type), pointer :: wtheta_fs => null()
     type(function_space_type), pointer :: w0_fs => null()
     type(function_space_type), pointer :: w2_fs => null()
     type(function_space_type), pointer :: w3_fs => null()
     type(field_type)                   :: r_u_bd, exner, theta
-    real(r_def), allocatable           :: basis_w3_face(:,:,:,:,:), &
-                                          basis_w2_face(:,:,:,:,:), &
-                                          basis_wtheta_face(:,:,:,:,:)
+    real(r_def), allocatable           :: basis_w3_face(:,:,:,:), &
+                                          basis_w2_face(:,:,:,:), &
+                                          basis_wtheta_face(:,:,:,:)
 
     type(stencil_dofmap_type), pointer :: cross_stencil_w2 => null()
     type(stencil_dofmap_type), pointer :: cross_stencil_w3 => null()
@@ -98,7 +99,7 @@ contains
     type(field_proxy_type)    :: r_u_bd_proxy, exner_proxy, theta_proxy
     type( quadrature_rule_gaussian_type ) :: quadrature_rule
 
-    integer(i_def) :: nqp_h, nqp_v, nqp_h_1d
+    integer(i_def) :: nqp
     integer(i_def) :: ndf_wtheta, ndf_w2, ndf_w3
     integer(i_def) :: undf_wtheta, undf_w2, undf_w3
     integer(i_def) :: dim_wtheta, dim_w2, dim_w3
@@ -126,14 +127,6 @@ contains
     ! Create top level function space collection
     function_space_collection = function_space_collection_type()
 
-    this%qr = quadrature_xyoz_type(3, quadrature_rule)
-
-    this%qr_proxy = this%qr%get_quadrature_proxy()
-    nqp_h=this%qr_proxy%np_xy
-    nqp_v=this%qr_proxy%np_z
-
-    ! Assumes same number of horizontal quad points in x and y
-    nqp_h_1d = int(nqp_h**(1./2.))
 
     ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
     mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
@@ -148,11 +141,17 @@ contains
 
     mesh              => exner_proxy%vspace%get_mesh()
     reference_element => mesh%get_reference_element()
+
+    this%qr = quadrature_face_type(3, .true., .false., reference_element, &
+                                   quadrature_rule)
+    this%qr_proxy = this%qr%get_quadrature_proxy()
+
+    nqp=this%qr_proxy%np_xyz
     nfaces_h = reference_element%get_number_horizontal_faces()
     ndf_w3  = exner_proxy%vspace%get_ndf( )
     dim_w3  = exner_proxy%vspace%get_dim_space( )
     undf_w3 = exner_proxy%vspace%get_undf()
-    allocate( this%basis_w3_face(nfaces_h,dim_w3,ndf_w3,nqp_h_1d,nqp_v) )
+    allocate( this%basis_w3_face(dim_w3,ndf_w3,nqp,nfaces_h) )
 
     this%r_u_bd   = field_type( vector_space = this%w2_fs )
     r_u_bd_proxy = this%r_u_bd%get_proxy()
@@ -160,7 +159,7 @@ contains
     ndf_w2      = r_u_bd_proxy%vspace%get_ndf( )
     dim_w2      = r_u_bd_proxy%vspace%get_dim_space( )
     undf_w2     = r_u_bd_proxy%vspace%get_undf()
-    allocate( this%basis_w2_face(nfaces_h,dim_w2,ndf_w2,nqp_h_1d,nqp_v) )
+    allocate( this%basis_w2_face(dim_w2,ndf_w2,nqp,nfaces_h) )
 
     this%theta = field_type( vector_space = this%wtheta_fs )
     theta_proxy = this%theta%get_proxy()
@@ -168,7 +167,7 @@ contains
     ndf_wtheta      = theta_proxy%vspace%get_ndf( )
     dim_wtheta      = theta_proxy%vspace%get_dim_space( )
     undf_wtheta     = theta_proxy%vspace%get_undf()
-    allocate( this%basis_wtheta_face(nfaces_h,dim_wtheta,ndf_wtheta,nqp_h_1d,nqp_v) )
+    allocate( this%basis_wtheta_face(dim_wtheta,ndf_wtheta,nqp,nfaces_h) )
 
     this%cross_stencil_w2 => r_u_bd_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
     this%cross_stencil_w2_map => this%cross_stencil_w2%get_whole_dofmap()
@@ -222,16 +221,12 @@ contains
     real(r_def), parameter :: answer_v = 0.0_r_def
     real(r_def), parameter :: answer_h = 300000.0_r_def
 
-    real(kind=r_def), pointer :: xp(:,:)     => null()
-    real(kind=r_def), pointer :: xp_f(:,:,:) => null()
-    real(kind=r_def), pointer :: zp(:)       => null()
-    real(kind=r_def), pointer :: wh(:)       => null()
-    real(kind=r_def), pointer :: wv(:)       => null()
+    real(kind=r_def), pointer :: wqp(:,:) => null()
 
     integer :: cell
 
     integer(i_def)           :: nfaces_h
-    integer(i_def)           :: nlayers, nqp_h, nqp_v, nqp_h_1d
+    integer(i_def)           :: nlayers, nqp
     integer(i_def)           :: ndf_wtheta, ndf_w2, ndf_w3
     integer(i_def)           :: undf_wtheta, undf_w2, undf_w3
     integer(i_def), pointer  :: map_w2(:)     => null()
@@ -244,7 +239,7 @@ contains
 
     real(r_def), allocatable :: out_face_normal(:,:)
 
-    integer                 :: ff, ii, jj, k, i, j
+    integer                 :: ii, jj, k, i, j
 
     type(field_proxy_type) :: r_u_bd_proxy, exner_proxy, theta_proxy
 
@@ -274,21 +269,12 @@ contains
     theta_proxy = this%theta%get_proxy()
 
     nlayers = r_u_bd_proxy%vspace%get_nlayers()
-    nqp_h=this%qr_proxy%np_xy
-    nqp_v=this%qr_proxy%np_z
-    xp=>this%qr_proxy%points_xy
-    zp=>this%qr_proxy%points_z
-    wh=>this%qr_proxy%weights_xy
-    wv=>this%qr_proxy%weights_z
+    nqp =  this%qr_proxy%np_xyz
+    wqp => this%qr_proxy%weights_xyz
 
     mesh              => theta_proxy%vspace%get_mesh()
     reference_element => mesh%get_reference_element()
     nfaces_h = reference_element%get_number_horizontal_faces()
-
-    ! Assumes same number of horizontal quad points in x and y
-    nqp_h_1d = int(nqp_h**(1./2.))
-
-    allocate(xp_f(nfaces_h, nqp_h_1d, 2))
 
     ndf_w3  = exner_proxy%vspace%get_ndf( )
     undf_w3 = exner_proxy%vspace%get_undf()
@@ -299,32 +285,9 @@ contains
     ndf_wtheta  = theta_proxy%vspace%get_ndf( )
     undf_wtheta = theta_proxy%vspace%get_undf()
 
-    ! Quadrature points on horizontal faces
-
-    xp_f(1, :, :) = xp(1:nqp_h_1d, :)
-    xp_f(1, :, 1) = 0.0_r_def
-
-    xp_f(2, :, :) = xp(1:nqp_h - nqp_h_1d + 1:nqp_h_1d, :)
-    xp_f(2, :, 2) = 0.0_r_def
-
-    xp_f(3, :, :) = xp(nqp_h - nqp_h_1d + 1:nqp_h, :)
-    xp_f(3, :, 1) = 1.0_r_def
-
-    xp_f(4, :, :) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
-    xp_f(4, :, 2) = 1.0_r_def
-
-    do ff = 1, nfaces_h
-
-      call r_u_bd_proxy%vspace%compute_basis_function( &
-        this%basis_w2_face(ff,:,:,:,:), ndf_w2, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
-
-      call exner_proxy%vspace%compute_basis_function( &
-        this%basis_w3_face(ff,:,:,:,:), ndf_w3, nqp_h_1d, nqp_v, xp_f(ff, :,:), zp)
-
-      call theta_proxy%vspace%compute_basis_function( &
-        this%basis_wtheta_face(ff,:,:,:,:), ndf_wtheta, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
-
-    end do
+    call this%qr%compute_function(BASIS, r_u_bd_proxy%vspace, 3,     ndf_w2, this%basis_w2_face)
+    call this%qr%compute_function(BASIS, exner_proxy%vspace,  1,     ndf_w3, this%basis_w3_face)
+    call this%qr%compute_function(BASIS, theta_proxy%vspace,  1, ndf_wtheta, this%basis_wtheta_face)
 
     cell = 5
 
@@ -350,7 +313,7 @@ contains
                                  r_u_bd_proxy%data,                   &
                                  exner_proxy%data,                    &
                                  theta_proxy%data,                    &
-                                 nqp_v, nqp_h_1d, wv,                 &
+                                 nqp, wqp,                            &
                                  this%basis_w2_face,                  &
                                  this%basis_w3_face,                  &
                                  this%basis_wtheta_face,              &
@@ -364,8 +327,6 @@ contains
 
     ! Test the contribution on a vertical face
     @assertEqual(answer_h, r_u_bd_proxy%data(map_w2(4)+k), tol_h)
-
-    deallocate(xp_f)
 
   end subroutine test_all
 
