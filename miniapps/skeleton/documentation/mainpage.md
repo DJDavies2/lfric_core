@@ -1,6 +1,6 @@
 @mainpage Overview
 
-@section skel_miniapp Skeleton Miniapp
+@section skeleton_miniapp Skeleton Miniapp
 
 This miniapp forms part of the LFRic and Gungho project. It provides an example of how to write a fully working application that uses the LFRic infrastructure,
 but is scientifically straightforward so is easier to understand than a full model.
