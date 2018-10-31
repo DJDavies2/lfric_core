@@ -181,6 +181,7 @@
   viscosity = .false.
   viscosity_mu = 0.0
   smagorinsky = .false.
+  mix_factor = 0.0
 /
 
 &orography

@@ -1,0 +1,138 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2018 Met Office. All rights reserved.
+! For further details please refer to the file COPYRIGHT.txt
+! which you should have received as part of this distribution.
+!-----------------------------------------------------------------------------
+
+module smagorinsky_shear_kernel_mod_test
+
+  use constants_mod,                 only : i_def, r_def
+  use pFUnit_Mod
+
+  implicit none
+
+  private
+  public :: test_all
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @Test
+  subroutine test_all( )
+
+    use smagorinsky_shear_kernel_mod, only : smagorinsky_shear_code
+
+    implicit none
+
+    integer(i_def), parameter :: nlayers = 3
+    integer(i_def), parameter :: ncells = 9
+    integer(i_def), parameter :: ndf_w0 = 8      ! chi
+    integer(i_def), parameter :: undf_w0 = 36
+    integer(i_def), parameter :: ndf_w2 = 6      ! u
+    integer(i_def), parameter :: undf_w2 = 90
+    integer(i_def), parameter :: ndf_w3 = 1      ! height_w3
+    integer(i_def), parameter :: undf_w3 = 27
+    integer(i_def), parameter :: ndf_wt = 2      ! shear, height_wt
+    integer(i_def), parameter :: undf_wt = 36
+
+    integer(i_def) :: map_w0(ndf_w0, ncells)
+    integer(i_def) :: map_w2(ndf_w2, ncells)
+    integer(i_def) :: map_w3(ndf_w3, ncells)
+    integer(i_def) :: map_wt(ndf_wt, ncells)
+
+    integer(i_def) :: stencil_map_w2(ndf_w2, 5, ncells)
+    integer(i_def) :: stencil_map_w3(ndf_w3, 5, ncells)
+    integer(i_def) :: stencil_map_wt(ndf_wt, 5, ncells)
+
+
+    real(r_def) :: u(undf_w2)
+    real(r_def) :: shear(undf_wt)
+    real(r_def) :: height_wth(undf_wt)
+    real(r_def) :: height_w3(undf_w3)
+    real(r_def) :: chi1(undf_w0), chi2(undf_w0), chi3(undf_w0)
+
+    real(r_def), parameter :: tol = 1.0e-10_r_def
+    real(r_def), parameter :: dx = 1000.0_r_def, &
+                              dy = 1000.0_r_def, &
+                              dz = 2000.0_r_def
+    real(r_def) :: answer
+
+    integer(i_def) :: icell, i, j, k
+
+    integer(i_def) :: cell
+    cell = 5
+
+    ! Variables for testing smagorinsky_shear
+
+    ! Setup maps
+
+    map_w0(:,cell) = (/9,21,33,25,10,22,34,26/)
+    map_w2(:,cell) = (/43,23,53,56,59,60/)
+    map_w3(:,cell) = (/13/)
+    map_wt(:,cell) = (/17,18/)
+
+    stencil_map_w2(:,1,cell) = (/ 43,23,53,56,59,60 /)
+    stencil_map_w2(:,2,cell) = (/ 40,10,43,46,49,50 /)
+    stencil_map_w2(:,3,cell) = (/  7,17,20,23,26,27 /)
+    stencil_map_w2(:,4,cell) = (/ 53,33,40,63,66,67 /)
+    stencil_map_w2(:,5,cell) = (/ 73,56,80,17,83,84 /)
+
+    stencil_map_w3(1,:,cell) = (/ 13,10,4,16,22 /)
+
+    stencil_map_wt(:,1,cell) = (/ 17,18 /)
+    stencil_map_wt(:,2,cell) = (/ 13,14 /)
+    stencil_map_wt(:,3,cell) = (/  5, 6 /)
+    stencil_map_wt(:,4,cell) = (/ 21,22 /)
+    stencil_map_wt(:,5,cell) = (/ 29,30 /)
+
+    ! Compute coordinates
+    icell = 1
+    do j = 1,3
+      do i = 1,3
+        do k = 0,3
+          chi1((icell-1)*4+k+1) = real(i-1)*dx
+          chi2((icell-1)*4+k+1) = real(j-1)*dy
+          chi3((icell-1)*4+k+1) = real(k)*dz
+          height_wth((icell-1)*4+k+1) = real(k)*dz
+        end do
+        do k = 0,2
+          height_w3((icell-1)*3+k+1) = (real(k)+0.5_r_def)*dz
+        end do
+        icell = icell + 1
+      end do
+    end do
+
+    ! Create the data
+    u(:) = 1.0_r_def
+    shear(:) = 0.0_r_def
+
+    u(stencil_map_w2(5,1,cell)+0) = 0.0_r_def
+    u(stencil_map_w2(5,1,cell)+1) = 1.0_r_def
+    u(stencil_map_w2(5,1,cell)+2) = 2.0_r_def
+    u(stencil_map_w2(5,1,cell)+3) = 3.0_r_def
+
+
+    ! Call the kernel
+    call smagorinsky_shear_code( nlayers,                               &
+                                 shear,                                 &
+                                 u,                                     &
+                                 5, stencil_map_w2(:,:,cell),           &
+                                 height_wth,                            &
+                                 5, stencil_map_wt(:,:,cell),           &
+                                 height_w3,                             &
+                                 5, stencil_map_w3(:,:,cell),           &
+                                 chi1, chi2, chi3,                      &
+                                 ndf_wt, undf_wt, map_wt(:,cell),       &
+                                 ndf_w2, undf_w2, map_w2(:,cell),       &
+                                 ndf_w3, undf_w3, map_w3(:,cell),       &
+                                 ndf_w0, undf_w0, map_w0(:,cell)        &
+                               )
+
+     answer = 0.7071067811e-3_r_def
+     k = 1
+     @assertEqual(answer, shear(map_wt(1,cell) + k), tol)
+
+
+  end subroutine test_all
+
+end module smagorinsky_shear_kernel_mod_test

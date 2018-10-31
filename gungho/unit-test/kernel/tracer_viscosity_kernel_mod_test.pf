@@ -87,9 +87,10 @@ contains
 
     this%stencil_t => theta_p%vspace%get_stencil_dofmap(STENCIL_CROSS,1)
 
-    call feign_mixing_config( smagorinsky  = .false., &
-                              viscosity    = .false., &
-                              viscosity_mu = 10.0_r_def )
+    call feign_mixing_config( smagorinsky  = .false.,    &
+                              viscosity    = .false.,    &
+                              viscosity_mu = 10.0_r_def, &
+                              mix_factor   = 0.0_r_def )
   end subroutine setUp
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -42,8 +42,7 @@ module iter_timestep_alg_mod
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod,           only: invoke_tracer_viscosity, &
-                                       invoke_momentum_viscosity, &
-                                       invoke_tracer_smagorinsky_diff
+                                       invoke_momentum_viscosity
 
   use field_bundle_mod,          only: clone_bundle,      & 
                                        bundle_axpy,       & 
@@ -53,10 +52,12 @@ module iter_timestep_alg_mod
                                        set_bundle_scalar, &
                                        bundle_ax 
   ! PsyKAl PSYClone kernels
-  use project_pressure_kernel_mod, only: project_pressure_kernel_type
-  use sort_ref_kernel_mod,         only: sort_ref_kernel_type
-  use extract_w_kernel_mod,        only: extract_w_kernel_type
-  use matrix_vector_kernel_mod,    only: matrix_vector_kernel_type
+  use project_pressure_kernel_mod,        only: project_pressure_kernel_type
+  use sort_ref_kernel_mod,                only: sort_ref_kernel_type
+  use extract_w_kernel_mod,               only: extract_w_kernel_type
+  use matrix_vector_kernel_mod,           only: matrix_vector_kernel_type
+  use smagorinsky_shear_kernel_mod,       only: smagorinsky_shear_kernel_type
+  use tracer_smagorinsky_diff_kernel_mod, only: tracer_smagorinsky_diff_kernel_type
 
   ! Derived Types
   use field_mod,                 only: field_type
@@ -128,6 +129,7 @@ module iter_timestep_alg_mod
   type( field_type ) :: u_adv   ! Advective wind (centered in time)
   type( field_type ) :: dtheta ! increment to theta
   type( field_type ) :: du ! increment to u
+  type( field_type ) :: shear ! shear term
   logical            :: helmholtz_solve
 
   public :: iter_alg_init
@@ -202,6 +204,13 @@ contains
     if (use_moisture)then
       call clone_bundle(mr, mr_after_slow, nummr)
       call clone_bundle(mr, mr_inc, nummr)
+    end if
+
+    if ( smagorinsky )then
+      ! Set up the shear field to be in the same space as theta
+      call theta%copy_field_properties( shear )
+      ! Initialise to zero
+      call invoke(setval_c(shear, 0.0_r_def))
     end if
 
     !--------------------------------------------------------------------
@@ -371,6 +380,16 @@ contains
       call w_physics%log_minmax(LOG_LEVEL_INFO, 'w_physics')
       if (write_xios_output) then
         call output_xios_nodal("w_physics", w_physics, w_physics%get_mesh_id() )
+      end if
+
+      if ( smagorinsky ) then
+        call log_event( 'Calculate 3D shear', LOG_LEVEL_INFO )
+        ! Calculate 3D shear
+        call invoke(smagorinsky_shear_kernel_type( shear,         &
+                                                   u_physics,  1, &
+                                                   height_wth, 1, &
+                                                   height_w3,  1, &
+                                                   chi ) )      
       end if
 
       !--------------------------------------------------------------------
@@ -584,8 +603,12 @@ contains
     ! Apply Smagorinsky subgrid mixing
     !--------------------------------------------------------------------
     if ( smagorinsky ) then
-      call log_event( 'Applying Smagorinsky mixing', LOG_LEVEL_INFO ) 
-      call invoke_tracer_smagorinsky_diff(inc(igh_t), state(igh_t), 1, delta)
+      !  Tracer mixing:
+      call log_event( 'Applying Smagorinsky mixing', LOG_LEVEL_INFO )
+      call invoke(tracer_smagorinsky_diff_kernel_type( inc(igh_t),        &
+                                                       state(igh_t), 1,   &
+                                                       delta,             &
+                                                       shear  ) )
       !  Placeholder code until the momentum mixing is implemented:
       !call invoke_momentum_smagorinsky_diff(inc(igh_u), state(igh_u), 1, delta)
       ! Set u increment to zero until momentum mixing is implemented:
@@ -642,6 +665,8 @@ contains
     call u_adv%field_final()
     call dtheta%field_final()
     call du%field_final()
+
+    if ( smagorinsky ) call shear%field_final()
 
     return
   end subroutine iter_alg_final

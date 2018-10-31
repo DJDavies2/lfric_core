@@ -7,17 +7,7 @@
 module tracer_smagorinsky_diff_kernel_mod_test
 
   use constants_mod,                 only : i_def, r_def
-  use function_space_collection_mod, only : function_space_collection_type, &
-                                            function_space_collection
-  use mesh_collection_mod,           only : mesh_collection_type, &
-                                            mesh_collection
-
-  use field_mod,                     only : field_type,      &
-                                            field_proxy_type
-  use fs_continuity_mod,             only : Wtheta
-  use function_space_mod,            only : function_space_type
   use pFUnit_Mod
-  use stencil_dofmap_mod,            only : stencil_dofmap_type, STENCIL_CROSS
   use yaxt,                          only : xt_initialize, xt_finalize
   use mpi_mod,                       only : store_comm, clear_comm
 
@@ -29,11 +19,6 @@ module tracer_smagorinsky_diff_kernel_mod_test
   @TestCase
   type, extends(MPITestCase), public :: tracer_smagorinsky_diff_test_type
     private
-    type(function_space_type), pointer :: wt_fs => null()
-    type(field_type)                   :: theta, theta_inc
-    type(field_type)                   :: delta
-    type(stencil_dofmap_type), pointer :: stencil_t => null()
-    integer(i_def)                     :: mesh_id 
 
   contains
     procedure setUp
@@ -41,51 +26,22 @@ module tracer_smagorinsky_diff_kernel_mod_test
     procedure test_all
   end type tracer_smagorinsky_diff_test_type
 
-  integer(i_def), parameter :: element_order = 0
-
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use finite_element_config_mod, only : finite_element_cellshape_quadrilateral
-    use mesh_mod,                  only : PLANE_BI_PERIODIC
     use gungho_feign_config_mod,   only : feign_mixing_config
 
     implicit none
 
     class(tracer_smagorinsky_diff_test_type), intent(inout) :: this
 
-    type(field_proxy_type) :: theta_p
-
-    integer(i_def) :: mesh_id
-
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
-    ! Store the MPI communicator for later use
+    !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
-
-    ! Create top level mesh collection
-    mesh_collection = mesh_collection_type()
-    ! Create top level function space collection
-    function_space_collection = function_space_collection_type()
-
-    ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
-    this%mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
-
-    this%wt_fs => function_space_collection%get_fs(this%mesh_id, element_order, Wtheta)
-
-    this%theta     = field_type( vector_space = this%wt_fs )
-    this%theta_inc = field_type( vector_space = this%wt_fs )
-    theta_p        = this%theta%get_proxy()
-
-    this%delta = field_type( vector_space = this%wt_fs ) 
-
-    this%stencil_t => theta_p%vspace%get_stencil_dofmap(STENCIL_CROSS,1)
-
-    call feign_mixing_config( smagorinsky  = .false., &
-                              viscosity    = .false., &
-                              viscosity_mu = 10.0_r_def )
+    call feign_mixing_config(viscosity=.false., viscosity_mu=0.0_r_def, smagorinsky=.false., mix_factor=0.2_r_def) 
 
   end subroutine setUp
 
@@ -98,10 +54,7 @@ contains
 
     class(tracer_smagorinsky_diff_test_type), intent(inout) :: this
 
-    call function_space_collection%clear()
-    call mesh_collection%clear()
     call final_configuration()
-
     ! Finalise YAXT
     call xt_finalize()
     ! Clear the stored MPI communicator
@@ -114,51 +67,61 @@ contains
   subroutine test_all( this )
 
     use tracer_smagorinsky_diff_kernel_mod, only : tracer_smagorinsky_diff_code
-    use mesh_mod,                           only : mesh_type
 
     implicit none
 
     class(tracer_smagorinsky_diff_test_type), intent(inout) :: this
 
+    integer(i_def), parameter :: nlayers = 3
+    integer(i_def), parameter :: ncells = 9
+    integer(i_def), parameter :: ndf_wt = 2      ! shear, height_wt
+    integer(i_def), parameter :: undf_wt = 36
+    
+    integer(i_def) :: map_wt(ndf_wt, ncells)
+    integer(i_def) :: stencil_map_wt(ndf_wt, 5, ncells)
+
+    real(r_def) :: theta(undf_wt)
+    real(r_def) :: theta_inc(undf_wt)
+    real(r_def) :: delta(undf_wt)
+    real(r_def) :: shear(undf_wt)
+
     real(r_def), parameter :: tol = 1.0e-12_r_def
+
     real(r_def) :: answer
+
     integer(i_def) :: cell
+    cell = 5
 
     ! Variables for testing tracer_smagorinsky_diff
 
-    integer(i_def) :: ndf_t, undf_t, df
+    ! Setup maps
+    map_wt(:,cell) = (/17,18/)
 
-    integer(i_def), pointer :: stencil_map_t(:,:,:) => null()
-
-    type(field_proxy_type)   :: t_p, t_inc_p, delta_p
-
-    delta_p = this%delta%get_proxy()
-    t_p     = this%theta%get_proxy()
-    t_inc_p = this%theta_inc%get_proxy()
-
-    ndf_t  = t_p%vspace%get_ndf( )
-    undf_t = t_p%vspace%get_undf( )
-
-    stencil_map_t => this%stencil_t%get_whole_dofmap()
+    stencil_map_wt(:,1,cell) = (/ 17,18 /)
+    stencil_map_wt(:,2,cell) = (/ 13,14 /)
+    stencil_map_wt(:,3,cell) = (/  5, 6 /)
+    stencil_map_wt(:,4,cell) = (/ 21,22 /)
+    stencil_map_wt(:,5,cell) = (/ 29,30 /)
 
     ! Create the data
-    cell = 5
-    t_p%data(:) = 300.0_r_def
-    t_inc_p%data(:) = 0.0_r_def
-    delta_p%data(:) = 1000.0_r_def
+    theta(:) = 300.0_r_def
+    theta_inc(:) = 0.0_r_def
+    delta(:) = 1000.0_r_def
+    shear(:) = 1.0_r_def
 
-    call tracer_smagorinsky_diff_code( &
-                               t_p%vspace%get_nlayers(), &
-                               t_inc_p%data, &
-                               t_p%data, &
-                               5, stencil_map_t(:,:,cell), &
-                               delta_p%data, &
-                               ndf_t, undf_t, &
-                               stencil_map_t(:,1,cell) &
+    ! Call the kernel
+    call tracer_smagorinsky_diff_code( nlayers,              &
+                               theta_inc,                    &
+                               theta,                        &
+                               5, stencil_map_wt(:,:,cell),  &
+                               delta,                        &
+                               shear,                        &
+                               ndf_wt, undf_wt,              &
+                               map_wt(:,cell)                &
                               )
 
      answer = 0.0_r_def 
-     @assertEqual(answer, t_inc_p%data(stencil_map_t(1,1,cell) ), tol)
+     @assertEqual(answer, theta_inc(map_wt(1,cell) ), tol)
 
   end subroutine test_all
 
