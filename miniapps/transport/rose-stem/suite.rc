@@ -448,8 +448,9 @@
             PROFILE               = {{build}}
             LFRIC_TARGET_PLATFORM = {{TARGET_OPT}}
             MAKE_THREADS          = 4
-	    RDEF_PRECISION        = {{RDEF_PRECISION}}
-
+{% if RDEF_PRECISION is defined %}
+            RDEF_PRECISION        = {{RDEF_PRECISION}}
+{% endif %}
 
         [[[directives]]]
 {%-       for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
@@ -822,10 +823,10 @@
             CONFIG     = {{configuration}}
             RES        = {{res_value}}{{dt_labels[i]}}
             RES_LABEL  = {{res_label}}{{dt_labels[i]}}
-{% if RDEF_PRECISION is none %}
-            KGO_PREC_DIR = 
+{% if RDEF_PRECISION is not defined %}
+            KGO_PREC_DIR = 64-bit
 {% else %}
-	    KGO_PREC_DIR = {{RDEF_PRECISION}}-bit
+            KGO_PREC_DIR = {{RDEF_PRECISION}}-bit
 {% endif %}
 
         [[[directives]]]
