@@ -13,8 +13,9 @@ module init_gungho_mod
   use constants_mod,                  only : i_def
   use field_mod,                      only : field_type, &
                                              write_diag_interface, &
-                                             checkpoint_interface, &
-                                             restart_interface
+                                             checkpoint_write_interface, &
+                                             checkpoint_read_interface
+  use field_collection_mod,           only : field_collection_type
   use finite_element_config_mod,      only : element_order, &
                                              vorticity_in_w1
   use fs_continuity_mod,              only : W0, W1, W2, W3, Wtheta
@@ -27,10 +28,10 @@ module init_gungho_mod
   use runtime_constants_mod,          only : create_runtime_constants
   use io_mod,                         only : xios_write_field_node, &
                                              xios_write_field_face, &
-                                             checkpoint_xios,   &
-                                             checkpoint_netcdf, &
-                                             restart_netcdf,    &
-                                             restart_xios
+                                             checkpoint_read_xios,   &
+                                             checkpoint_read_netcdf, &
+                                             checkpoint_write_netcdf,&
+                                             checkpoint_write_xios
   use io_config_mod,                  only : use_xios_io,     &
                                              write_diag,      &
                                              checkpoint_read, &
@@ -44,22 +45,19 @@ contains
   !>@brief Initialise the gungho model
   !> @param[in] mesh_id Identifier of the mesh
   !> @param[in,out] chi Spatial coordinates
-  !> @param[in,out] u Wind field
-  !> @param[in,out] rho Density field
-  !> @param[in,out] theta Potential temperature field
-  !> @param[in,out] exner Exner pressure field
+  !> @param[in,out] prognostic_fields The collection of prognostics
   !> @param[in,out] mr Moisture mixing ratios
   !> @param[in,out] moist_dyn Auxilliary fields for moist dynamics
   !> @param[in,out] xi Vorticity
-  subroutine init_gungho( mesh_id, chi, u, rho, theta, exner, mr, &
-                          moist_dyn, xi )
+  subroutine init_gungho( mesh_id, chi, prognostic_fields, mr, &
+                          moist_dyn, xi)
 
     implicit none
 
-    integer(i_def), intent(in)               :: mesh_id
+    integer(i_def), intent(in)                 :: mesh_id
     ! Prognostic fields
-    type( field_type ), intent(inout)        :: u, rho, theta, exner
-    type( field_type ), intent(inout)        :: mr(nummr)
+    type(field_collection_type), intent(inout) :: prognostic_fields
+    type( field_type ), intent(inout)          :: mr(nummr)
     ! Diagnostic fields
     type( field_type ), intent(inout)        :: xi
     type( field_type ), intent(inout)        :: moist_dyn(num_moist_factors)
@@ -69,27 +67,36 @@ contains
     integer(i_def)                           :: imr
 
     procedure(write_diag_interface), pointer :: tmp_write_diag_ptr
-    procedure(checkpoint_interface), pointer :: tmp_checkpoint_ptr
-    procedure(restart_interface), pointer    :: tmp_restart_ptr
+    procedure(checkpoint_write_interface), pointer :: tmp_checkpoint_write_ptr
+    procedure(checkpoint_read_interface), pointer  :: tmp_checkpoint_read_ptr
+
+    ! Temp fields to create prognostics
+    type( field_type )                         :: u, rho, theta, exner
 
     call log_event( 'GungHo: initialisation...', LOG_LEVEL_INFO )
 
     ! Create prognostic fields
     theta = field_type( vector_space = &
-                        function_space_collection%get_fs(mesh_id, element_order, Wtheta) )
+                        function_space_collection%get_fs(mesh_id, element_order, Wtheta), &
+                        name= "theta" )
     if ( vorticity_in_w1 ) then
       xi    = field_type( vector_space = &
-                          function_space_collection%get_fs(mesh_id, element_order, W1) )
+                          function_space_collection%get_fs(mesh_id, element_order, W1), &
+                          name = "xi" )
     else
       xi    = field_type( vector_space = &
-                          function_space_collection%get_fs(mesh_id, element_order, W2) )
+                          function_space_collection%get_fs(mesh_id, element_order, W2), &
+                          name = "xi" )
     end if
     u     = field_type( vector_space = &
-                        function_space_collection%get_fs(mesh_id, element_order, W2) )
+                        function_space_collection%get_fs(mesh_id, element_order, W2), &
+                        name = "u" )
     rho   = field_type( vector_space = &
-                        function_space_collection%get_fs(mesh_id, element_order, W3) )
+                        function_space_collection%get_fs(mesh_id, element_order, W3), &
+                        name = "rho" )
     exner = field_type( vector_space = &
-                        function_space_collection%get_fs(mesh_id, element_order, W3) )
+                        function_space_collection%get_fs(mesh_id, element_order, W3), &
+                        name = "exner" )
 
     do imr = 1,nummr
       mr(imr) = field_type( vector_space = &
@@ -150,8 +157,8 @@ contains
 
         ! Use XIOS for checkpoint / restart
 
-        tmp_checkpoint_ptr => checkpoint_xios
-        tmp_restart_ptr => restart_xios
+        tmp_checkpoint_write_ptr => checkpoint_write_xios
+        tmp_checkpoint_read_ptr => checkpoint_read_xios
 
         call log_event( 'GungHo: Using XIOS for checkpointing...', LOG_LEVEL_INFO )
 
@@ -159,41 +166,47 @@ contains
 
         ! Use old checkpoint and restart methods
 
-        tmp_checkpoint_ptr => checkpoint_netcdf
-        tmp_restart_ptr => restart_netcdf
+        tmp_checkpoint_write_ptr => checkpoint_write_netcdf
+        tmp_checkpoint_read_ptr => checkpoint_read_netcdf
 
        call log_event( 'GungHo: Using NetCDF for checkpointing...', LOG_LEVEL_INFO )
 
       end if
 
-      call xi%set_checkpoint_behaviour(tmp_checkpoint_ptr)
-      call u%set_checkpoint_behaviour(tmp_checkpoint_ptr)
-      call rho%set_checkpoint_behaviour(tmp_checkpoint_ptr)
-      call theta%set_checkpoint_behaviour(tmp_checkpoint_ptr)
-      call exner%set_checkpoint_behaviour(tmp_checkpoint_ptr)
+      call u%set_checkpoint_write_behaviour(tmp_checkpoint_write_ptr)
+      call rho%set_checkpoint_write_behaviour(tmp_checkpoint_write_ptr)
+      call theta%set_checkpoint_write_behaviour(tmp_checkpoint_write_ptr)
+      call exner%set_checkpoint_write_behaviour(tmp_checkpoint_write_ptr)
 
-      call xi%set_restart_behaviour(tmp_restart_ptr)
-      call u%set_restart_behaviour(tmp_restart_ptr)
-      call rho%set_restart_behaviour(tmp_restart_ptr)
-      call theta%set_restart_behaviour(tmp_restart_ptr)
-      call exner%set_restart_behaviour(tmp_restart_ptr)
+      call u%set_checkpoint_read_behaviour(tmp_checkpoint_read_ptr)
+      call rho%set_checkpoint_read_behaviour(tmp_checkpoint_read_ptr)
+      call theta%set_checkpoint_read_behaviour(tmp_checkpoint_read_ptr)
+      call exner%set_checkpoint_read_behaviour(tmp_checkpoint_read_ptr)
 
       do imr = 1,nummr
-        call mr(imr)%set_checkpoint_behaviour(tmp_checkpoint_ptr)
-        call mr(imr)%set_restart_behaviour(tmp_restart_ptr)
+        call mr(imr)%set_checkpoint_write_behaviour(tmp_checkpoint_write_ptr)
+        call mr(imr)%set_checkpoint_read_behaviour(tmp_checkpoint_read_ptr)
       end do
 
     end if
+
+    ! Create the prognostic field collection and populate it
+
+    prognostic_fields  =  field_collection_type(name="prognostics")
+    call prognostic_fields%add_field( theta )
+    call prognostic_fields%add_field( rho )
+    call prognostic_fields%add_field( u )
+    call prognostic_fields%add_field( exner )
+
     ! Create runtime_constants object. This in turn creates various things
     ! needed by the timestepping algorithms such as mass matrix operators, mass
     ! matrix diagonal fields and the geopotential field
     call create_runtime_constants(mesh_id, chi)
 
-    ! Initialise prognostic fields
-    call init_prognostic_fields_alg( u, rho, theta, exner, mr, moist_dyn, &
-                                     xi)
+    ! Initialise fields
+    call init_prognostic_fields_alg( prognostic_fields, mr, moist_dyn, xi )
 
-    nullify( tmp_write_diag_ptr, tmp_checkpoint_ptr, tmp_restart_ptr )
+    nullify( tmp_write_diag_ptr, tmp_checkpoint_write_ptr, tmp_checkpoint_read_ptr )
 
     call log_event( 'Gungho initialised', LOG_LEVEL_INFO )
 

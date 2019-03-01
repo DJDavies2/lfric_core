@@ -27,7 +27,8 @@ module gungho_driver_mod
                                          use_physics
   use function_space_collection_mod, &
                                   only : function_space_collection
-  use field_collection_mod,       only : field_collection_type
+  use field_collection_mod,       only : field_collection_type, &
+                                         field_collection_iterator_type
   use global_mesh_collection_mod, only : global_mesh_collection, &
                                          global_mesh_collection_type
   use gungho_configuration_mod,   only : final_configuration
@@ -37,13 +38,14 @@ module gungho_driver_mod
   use init_mesh_mod,              only : init_mesh
   use init_physics_mod,           only : init_physics
   use io_mod,                     only : xios_domain_init, &
-                                         ts_fname
+                                         ts_fname,         &
+                                         write_checkpoint
   use io_config_mod,              only : write_diag,           &
                                          diagnostic_frequency, &
                                          use_xios_io,          &
                                          nodal_output_on_w3,   &
                                          checkpoint_write,     &
-                                         restart_stem_name,    &
+                                         checkpoint_stem_name, &
                                          write_minmax_tseries, &
                                          subroutine_timers,    &
                                          subroutine_counters
@@ -94,31 +96,35 @@ module gungho_driver_mod
   private
   public initialise, run, finalise
 
-  ! Prognostic fields
-  type( field_type ) :: u,         &
-                        rho,       &
-                        theta,     &
-                        exner,     &
-                        xi,        &
-                        mr(nummr)
-
-  type( field_type ), pointer :: cf_area  => null()
-  type( field_type ), pointer :: cf_ice  => null()
-  type( field_type ), pointer :: cf_liq  => null()
-  type( field_type ), pointer :: cf_bulk  => null()
-  type( field_type ), pointer :: rhcrit_in_wth  => null()
-
-  ! A pointer used for retrieving fields for use in diagnostics
-  type( field_type ), pointer :: diag_ptr  => null()
-
-  ! Auxilliary fields for moist dynamics
-  type( field_type ) :: moist_dyn(num_moist_factors)
-
   ! Field collections
+  type( field_collection_type ) :: prognostic_fields
   type( field_collection_type ) :: derived_fields
   type( field_collection_type ) :: cloud_fields
   type( field_collection_type ) :: twod_fields
   type( field_collection_type ) :: physics_incs
+
+  ! Prognostic fields (pointers to fields in a collection)
+  type( field_type ), pointer   :: u => null()
+  type( field_type ), pointer   :: rho => null()
+  type( field_type ), pointer   :: theta => null()
+  type( field_type ), pointer   :: exner => null()
+
+  ! Auxiliary prognostic fields
+  ! Moisture mixing ratios
+  type( field_type ) :: mr(nummr)
+
+  ! Diagnostic fields
+  type( field_type ) :: xi  
+  ! Moist dynamics
+  type( field_type ) :: moist_dyn(num_moist_factors)
+
+  ! Iterator for field collection
+  type(field_collection_iterator_type)  :: iterator
+
+  ! A pointer used for retrieving fields from collections
+  ! when iterating over them
+  type( field_type ), pointer :: field_ptr  => null()
+
 
   ! Coordinate field
   type(field_type), target :: chi(3)
@@ -129,14 +135,6 @@ module gungho_driver_mod
   character(str_def) :: name
 
   integer(i_def) :: i 
-
-  ! Cloud fields names
-  character(str_short) :: cloudnames(5) = &
-     [ 'area_fraction  ', 'ice_fraction   ', 'liquid_fraction', 'bulk_fraction  ', &
-       'rhcrit         ']
-
-  character(str_short) :: twodnames(5) = &
-     [ 'tstar  ', 'zh     ', 'z0msea ', 'ntml   ', 'cumulus']
 
 contains
 
@@ -231,8 +229,15 @@ contains
 
     ! Create and initialise prognostic and auxilliary (diagnostic) fields
     timestep = 0
-    call init_gungho( mesh_id, chi, u, rho, theta, exner, mr, moist_dyn, &
-                      xi )
+    call init_gungho( mesh_id, chi, prognostic_fields, mr, moist_dyn, xi )
+
+    ! Get pointers to fields in the prognostic fields collection
+    ! for use downstream
+
+    theta => prognostic_fields%get_field('theta')
+    u => prognostic_fields%get_field('u')
+    rho => prognostic_fields%get_field('rho')
+    exner => prognostic_fields%get_field('exner')
 
     ! Create and initialise physics fields
     if (use_physics) then
@@ -277,11 +282,16 @@ contains
 
         ! Cloud fields
         if (use_physics .and. cloud_scheme /= physics_cloud_scheme_none) then
-          do i=1,5
-            diag_ptr => cloud_fields%get_field(trim(cloudnames(i)))
-            call write_scalar_diagnostic(trim(cloudnames(i)), diag_ptr, ts_init, mesh_id, nodal_output_on_w3)
+
+          iterator = cloud_fields%get_iterator()
+          do
+            if ( .not.iterator%has_next() ) exit
+              field_ptr => iterator%next()
+              name = trim(adjustl( field_ptr%get_name() ))
+              call write_scalar_diagnostic(trim(name), field_ptr, ts_init, mesh_id, nodal_output_on_w3)
           end do
-          diag_ptr => null()
+          field_ptr => null()
+
         end if
 
        ! Other derived diagnostics with special pre-processing
@@ -408,12 +418,17 @@ contains
 
         ! Cloud fields
         if (use_physics .and. cloud_scheme /= physics_cloud_scheme_none) then
-           do i=1,5
-            diag_ptr => cloud_fields%get_field(trim(cloudnames(i)))
-            call write_scalar_diagnostic(trim(cloudnames(i)), diag_ptr, timestep, mesh_id, nodal_output_on_w3)
-           end do 
-           diag_ptr => null()
-         end if
+
+          iterator = cloud_fields%get_iterator()
+          do
+            if ( .not.iterator%has_next() ) exit
+              field_ptr => iterator%next()
+              name = trim(adjustl( field_ptr%get_name() ))
+              call write_scalar_diagnostic(trim(name), field_ptr, timestep, mesh_id, nodal_output_on_w3)
+          end do
+          field_ptr => null()
+
+        end if
 
         ! Other derived diagnostics with special pre-processing
 
@@ -452,62 +467,30 @@ contains
     ! Write checkpoint files if required
     if( checkpoint_write ) then 
 
-       write(log_scratch_space,'(A,I6)') "Checkpointing rho at ts ", timestep_end 
-       call log_event(log_scratch_space,LOG_LEVEL_INFO)
-       call rho%write_checkpoint("checkpoint_rho", trim(ts_fname(restart_stem_name,&
-                                  "", "rho", timestep_end,"")))
 
-       write(log_scratch_space,'(A,I6)') "Checkpointing u at ts ", timestep_end 
-       call log_event(log_scratch_space,LOG_LEVEL_INFO)
-       call u%write_checkpoint("checkpoint_u", trim(ts_fname(restart_stem_name,&
-                                  "", "u", timestep_end,"")))
-
-       write(log_scratch_space,'(A,I6)') "Checkpointing theta at ts ", timestep_end
-       call log_event(log_scratch_space,LOG_LEVEL_INFO)
-       call theta%write_checkpoint("checkpoint_theta", trim(ts_fname(restart_stem_name,&
-                                  "", "theta", timestep_end,"")))
-
-       write(log_scratch_space,'(A,I6)') "Checkpointing exner at ts ", timestep_end 
-       call log_event(log_scratch_space,LOG_LEVEL_INFO)
-       call exner%write_checkpoint("checkpoint_exner", trim(ts_fname(restart_stem_name,&
-                                  "", "exner", timestep_end,"")))
-  
-       write(log_scratch_space,'(A,I6)') "Checkpointing xi at ts ", timestep_end 
-       call log_event(log_scratch_space,LOG_LEVEL_INFO)
-       call xi%write_checkpoint("checkpoint_xi", trim(ts_fname(restart_stem_name,&
-                                  "", "xi", timestep_end,"")))
+       call write_checkpoint(prognostic_fields, timestep_end)
 
        if (use_moisture)then
+
          do i=1,nummr
            write(name, '(A,A)') 'checkpoint_',trim(mr_names(i))
            write(log_scratch_space,'(A,A,A,I6)') "Checkpointing ",  trim(name), " at ts ",timestep_end
            call log_event(log_scratch_space,LOG_LEVEL_INFO)
-           call mr(i)%write_checkpoint(trim(name), trim(ts_fname(restart_stem_name,"", &
+           call mr(i)%write_checkpoint(trim(name), trim(ts_fname(checkpoint_stem_name,"", &
                             trim(mr_names(i)), timestep_end,"")))
          end do
 
-         if (use_physics .and. cloud_scheme /= physics_cloud_scheme_none)then
-           do i=1,5
-             diag_ptr => cloud_fields%get_field(trim(cloudnames(i)))
-             write(name, '(A,A)') 'checkpoint_',trim(cloudnames(i))
-             write(log_scratch_space,'(3A,I6)') "Checkpointing ", trim(name) ," at ts ",timestep_end
-             call log_event(log_scratch_space,LOG_LEVEL_INFO)
-             call diag_ptr%write_checkpoint(trim(name), trim(ts_fname(restart_stem_name,"", &
-                            trim(cloudnames(i)), timestep_end,"")))
-           end do 
-         endif
-
        end if
 
+       if (use_physics .and. cloud_scheme /= physics_cloud_scheme_none)then
+
+         call write_checkpoint(cloud_fields, timestep_end)
+
+       endif
+
        if (use_physics)then
-         do i=1,5
-           diag_ptr => twod_fields%get_field(trim(twodnames(i)))
-           write(name, '(A,A)') 'checkpoint_',trim(twodnames(i))
-           write(log_scratch_space,'(3A,I6)') "Checkpointing ", trim(name) ," at ts ",timestep_end
-           call log_event(log_scratch_space,LOG_LEVEL_INFO)
-           call diag_ptr%write_checkpoint(trim(name), trim(ts_fname(restart_stem_name,"", &
-                            trim(twodnames(i)), timestep_end,"")))
-         end do
+
+         call write_checkpoint(twod_fields, timestep_end)
 
        endif
 
@@ -531,21 +514,27 @@ contains
     end do
 
     if (use_moisture .and. use_physics) then
-      do i=1,5
-        ! Extract cloud fields
-        diag_ptr => cloud_fields%get_field(trim(cloudnames(i)))
-        ! Finalise cloud fields
-        call diag_ptr%field_final()
-      end do   
+
+      iterator = cloud_fields%get_iterator()
+      do
+        if ( .not.iterator%has_next() ) exit
+        field_ptr => iterator%next()
+        call field_ptr%field_final()
+      end do 
+      field_ptr => null()
+
     endif
 
     if (use_physics) then
-      do i=1,5
-        ! Extract twod fields
-        diag_ptr => twod_fields%get_field(trim(twodnames(i)))
-        ! Finalise twod fields
-        call diag_ptr%field_final()
-      end do
+
+      iterator = twod_fields%get_iterator()
+      do
+        if ( .not.iterator%has_next() ) exit
+        field_ptr => iterator%next()
+        call field_ptr%field_final()
+      end do 
+      field_ptr => null()
+
     endif
 
     if(write_minmax_tseries) call minmax_tseries_final(mesh_id)
@@ -563,6 +552,8 @@ contains
       call halo_calls%counter('gungho')
       call halo_calls%output_counters()
     end if
+
+    nullify( theta, rho, u, exner, field_ptr )
 
     call log_event( 'gungho completed', LOG_LEVEL_INFO )
 

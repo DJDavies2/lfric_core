@@ -13,8 +13,8 @@ class field_mod::field_type {
   -data_extant : logical
   -name : string
   -write_field_method : procedure <<pointer>>
-  -checkpoint_method : procedure <<pointer>>
-  -restart_method : procedure <<pointer>>
+  -checkpoint_write_method : procedure <<pointer>>
+  -checkpoint_read_method : procedure <<pointer>>
   <<create>>+field_constructor( <<in>>vector_space : function_space_type, <<in optional>> output_space : integer, <<in optional>> name : string ) : field_type
   <<destroy>>+field_destructor_scalar()
   <<destroy>>+field_destructor_array1d()
@@ -35,10 +35,11 @@ class field_mod::field_type {
   +write_field( <<in>> character: field_name)
   +set_write_field_behaviour(<<in>> procedure <<pointer>> : write_field_behaviour)
   +get_write_field_behaviour() :  procedure <<pointer>> : write_field_behaviour
-  +read_restart( <<in>> character: file_name )
-  +set_restart_behaviour(<<in>> procedure <<pointer>> : restart_behaviour)
+  +can_checkpoint() : logical
+  +read_checkpoint( <<in>> character: file_name )
+  +set_checkpoint_read_behaviour(<<in>> procedure <<pointer>> : checkpoint_read_behaviour)
   +write_checkpoint( <<in>> character: file_name )
-  +set_checkpoint_behaviour(<<in>> procedure <<pointer>> : checkpoint_behaviour)
+  +set_checkpoint_write_behaviour(<<in>> procedure <<pointer>> : checkpoint_write_behaviour)
   +field_final()
 }
 

@@ -14,8 +14,8 @@ module init_catalyst_demo_mod
   use constants_mod,                  only : i_def
   use field_mod,                      only : field_type, &
                                              write_diag_interface, &
-                                             checkpoint_interface, &
-                                             restart_interface
+                                             checkpoint_write_interface, &
+                                             checkpoint_read_interface
   use finite_element_config_mod,      only : element_order
 
   use fs_continuity_mod,              only : W0, W2, W3, Wtheta
@@ -34,10 +34,10 @@ module init_catalyst_demo_mod
                                              checkpoint_read
   use io_mod,                         only : xios_write_field_face, &
                                              xios_write_field_node, &
-                                             checkpoint_xios, &
-                                             checkpoint_netcdf, &
-                                             restart_netcdf, &
-                                             restart_xios
+                                             checkpoint_write_xios, &
+                                             checkpoint_write_netcdf, &
+                                             checkpoint_read_netcdf, &
+                                             checkpoint_read_xios
 
   use function_space_mod,             only : function_space_type
   use function_space_collection_mod,  only : function_space_collection
@@ -67,8 +67,8 @@ module init_catalyst_demo_mod
     integer(i_def) :: i
 
     procedure(write_diag_interface), pointer :: tmp_write_diag_ptr
-    procedure(checkpoint_interface), pointer :: tmp_checkpoint_ptr
-    procedure(restart_interface), pointer    :: tmp_restart_ptr
+    procedure(checkpoint_write_interface), pointer :: tmp_checkpoint_write_ptr
+    procedure(checkpoint_read_interface), pointer  :: tmp_checkpoint_read_ptr
 
     type(function_space_type),  pointer :: function_space => null()
 
@@ -148,8 +148,8 @@ module init_catalyst_demo_mod
 
         ! Use XIOS for checkpoint / restart
 
-        tmp_checkpoint_ptr => checkpoint_xios
-        tmp_restart_ptr => restart_xios
+        tmp_checkpoint_write_ptr => checkpoint_write_xios
+        tmp_checkpoint_read_ptr => checkpoint_read_xios
 
         call log_event( 'catalyst_demo: Using XIOS for checkpointing...', LOG_LEVEL_INFO )
 
@@ -157,20 +157,20 @@ module init_catalyst_demo_mod
 
         ! Use old checkpoint and restart methods
 
-        tmp_checkpoint_ptr => checkpoint_netcdf
-        tmp_restart_ptr => restart_netcdf
+        tmp_checkpoint_write_ptr => checkpoint_write_netcdf
+        tmp_checkpoint_read_ptr => checkpoint_read_netcdf
 
         call log_event( 'catalyst_demo: Using NetCDF for checkpointing...', LOG_LEVEL_INFO )
 
       end if
 
-      call wind%set_checkpoint_behaviour(tmp_checkpoint_ptr)
-      call pressure%set_checkpoint_behaviour(tmp_checkpoint_ptr)
-      call buoyancy%set_checkpoint_behaviour(tmp_checkpoint_ptr)
+      call wind%set_checkpoint_write_behaviour(tmp_checkpoint_write_ptr)
+      call pressure%set_checkpoint_write_behaviour(tmp_checkpoint_write_ptr)
+      call buoyancy%set_checkpoint_write_behaviour(tmp_checkpoint_write_ptr)
 
-      call wind%set_restart_behaviour(tmp_restart_ptr)
-      call pressure%set_restart_behaviour(tmp_restart_ptr)
-      call buoyancy%set_restart_behaviour(tmp_restart_ptr)
+      call wind%set_checkpoint_read_behaviour(tmp_checkpoint_read_ptr)
+      call pressure%set_checkpoint_read_behaviour(tmp_checkpoint_read_ptr)
+      call buoyancy%set_checkpoint_read_behaviour(tmp_checkpoint_read_ptr)
 
     end if
 
@@ -182,8 +182,8 @@ module init_catalyst_demo_mod
     ! Initialise prognostic fields
     call gw_init_fields_alg(wind, pressure, buoyancy)
 
-    nullify( tmp_write_diag_ptr, tmp_checkpoint_ptr, &
-             tmp_restart_ptr, function_space )
+    nullify( tmp_write_diag_ptr, tmp_checkpoint_write_ptr, &
+             tmp_checkpoint_read_ptr, function_space )
 
     call log_event( 'catalyst_demo: Miniapp initialised', LOG_LEVEL_INFO )
 

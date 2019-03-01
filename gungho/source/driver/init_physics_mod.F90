@@ -10,8 +10,8 @@ module init_physics_mod
   use constants_mod,                  only : i_def, l_def
   use field_mod,                      only : field_type, &
                                              write_diag_interface, &
-                                             checkpoint_interface, &
-                                             restart_interface
+                                             checkpoint_write_interface, &
+                                             checkpoint_read_interface
   use finite_element_config_mod,      only : element_order
   use function_space_collection_mod,  only : function_space_collection
   use field_collection_mod,           only : field_collection_type
@@ -184,11 +184,11 @@ contains
 
     use io_config_mod,      only : use_xios_io, &
                                    write_diag
-    use io_mod,             only : xios_write_field_face, &
-                                   checkpoint_xios,       &
-                                   checkpoint_netcdf,     &
-                                   restart_netcdf,        &
-                                   restart_xios
+    use io_mod,             only : xios_write_field_face,   &
+                                   checkpoint_write_xios,   &
+                                   checkpoint_write_netcdf, &
+                                   checkpoint_read_netcdf,  &
+                                   checkpoint_read_xios
 
     implicit none
     
@@ -202,18 +202,18 @@ contains
 
     ! pointers for xios write interface
     procedure(write_diag_interface), pointer   :: write_diag_behaviour => null()
-    procedure(checkpoint_interface), pointer   :: checkpoint_behaviour => null() 
-    procedure(restart_interface), pointer      :: restart_behaviour => null()
+    procedure(checkpoint_write_interface), pointer  :: checkpoint_write_behaviour => null() 
+    procedure(checkpoint_read_interface), pointer   :: checkpoint_read_behaviour => null()
 
     ! All physics fields currently require output on faces...
     write_diag_behaviour => xios_write_field_face
 
     if ( use_xios_io) then
-      checkpoint_behaviour => checkpoint_xios
-      restart_behaviour => restart_xios
+      checkpoint_write_behaviour => checkpoint_write_xios
+      checkpoint_read_behaviour => checkpoint_read_xios
     else
-      checkpoint_behaviour => checkpoint_netcdf
-      restart_behaviour => restart_netcdf
+      checkpoint_write_behaviour => checkpoint_write_netcdf
+      checkpoint_read_behaviour => checkpoint_read_netcdf
     endif
 
     new_field = field_type( vector_space, name=trim(name) )
@@ -222,8 +222,8 @@ contains
       call new_field%set_write_diag_behaviour(write_diag_behaviour)
     end if
     if (checkpoint_restart_flag) then
-      call new_field%set_checkpoint_behaviour(checkpoint_behaviour)
-      call new_field%set_restart_behaviour(restart_behaviour)
+      call new_field%set_checkpoint_write_behaviour(checkpoint_write_behaviour)
+      call new_field%set_checkpoint_read_behaviour(checkpoint_read_behaviour)
     endif
 
     call field_collection%add_field(new_field)

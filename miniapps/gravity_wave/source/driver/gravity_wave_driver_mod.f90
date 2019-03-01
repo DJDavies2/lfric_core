@@ -47,7 +47,7 @@ module gravity_wave_driver_mod
                                             use_xios_io,          &
                                             nodal_output_on_w3,   &
                                             checkpoint_write,     &
-                                            restart_stem_name,    &
+                                            checkpoint_stem_name, &
                                             subroutine_timers
   use time_config_mod,                only: timestep_start, &
                                             timestep_end
@@ -256,19 +256,19 @@ contains
     write(log_scratch_space,'(A,I6)') &
         "Checkpointing pressure at timestep ", timestep_end
     call log_event(log_scratch_space,LOG_LEVEL_INFO)
-    call pressure%write_checkpoint("checkpoint_pressure", trim(ts_fname(restart_stem_name,&
+    call pressure%write_checkpoint("checkpoint_pressure", trim(ts_fname(checkpoint_stem_name,&
                                   "", "pressure", timestep_end,"")))
 
     write(log_scratch_space,'(A,I6)') &
          "Checkpointing wind at timestep ", timestep_end
     call log_event(log_scratch_space,LOG_LEVEL_INFO)
-    call wind%write_checkpoint("checkpoint_wind", trim(ts_fname(restart_stem_name,&
+    call wind%write_checkpoint("checkpoint_wind", trim(ts_fname(checkpoint_stem_name,&
                                   "", "wind", timestep_end,"")))
 
     write(log_scratch_space,'(A,I6)') &
          "Checkpointing buoyancy at timestep ", timestep_end
     call log_event(log_scratch_space,LOG_LEVEL_INFO)
-    call buoyancy%write_checkpoint("checkpoint_buoyancy", trim(ts_fname(restart_stem_name,&
+    call buoyancy%write_checkpoint("checkpoint_buoyancy", trim(ts_fname(checkpoint_stem_name,&
                                   "", "buoyancy", timestep_end,"")))
   end if
 

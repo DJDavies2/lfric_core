@@ -40,7 +40,7 @@ l_multigrid=.false.,
 
 &io
   diag_stem_name            = 'diagDynamo'
-  restart_stem_name         = "restartSkeleton"
+  checkpoint_stem_name      = "restartSkeleton"
   use_xios_io               = .false.
   write_diag                = .true.
   diagnostic_frequency      = 1

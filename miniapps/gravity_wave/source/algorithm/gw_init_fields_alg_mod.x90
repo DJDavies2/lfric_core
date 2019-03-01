@@ -22,7 +22,7 @@ module gw_init_fields_alg_mod
   use finite_element_config_mod,         only: element_order
   use io_mod,                            only: ts_fname
   use io_config_mod,                     only: checkpoint_read, &
-                                               restart_stem_name
+                                               checkpoint_stem_name
   use time_config_mod,                   only: timestep_start
 
   ! PsyKAl PSYClone kernels
@@ -94,15 +94,15 @@ contains
     else                                   ! Recorded check point to start from
 
       call log_event('Reading checkpoint file to restart pressure',LOG_LEVEL_INFO)
-      call pressure%read_restart("restart_pressure", trim(ts_fname(restart_stem_name,"", &
+      call pressure%read_checkpoint("restart_pressure", trim(ts_fname(checkpoint_stem_name,"", &
                             "pressure", (timestep_start - 1),"")))
 
       call log_event('Reading checkpoint file to restart wind',LOG_LEVEL_INFO)
-      call wind%read_restart("restart_wind", trim(ts_fname(restart_stem_name,"", &
+      call wind%read_checkpoint("restart_wind", trim(ts_fname(checkpoint_stem_name,"", &
                             "wind", (timestep_start - 1),"")))
 
       call log_event('Reading checkpoint file to restart buoyancy',LOG_LEVEL_INFO)
-      call buoyancy%read_restart("restart_buoyancy", trim(ts_fname(restart_stem_name,"", &
+      call buoyancy%read_checkpoint("restart_buoyancy", trim(ts_fname(checkpoint_stem_name,"", &
                             "buoyancy", (timestep_start - 1),"")))
 
       call log_event( 'Gravity wave: Read prognostic fields from checkpoint files', LOG_LEVEL_INFO )

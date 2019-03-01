@@ -14,6 +14,8 @@ module io_mod
                                            str_def, str_max_filename,     &
                                            l_def, PI, radians_to_degrees
   use field_mod,                     only: field_type, field_proxy_type
+  use field_collection_mod,          only: field_collection_type, &
+                                           field_collection_iterator_type
   use finite_element_config_mod,     only: element_order
   use base_mesh_config_mod,          only: geometry, &
                                            base_mesh_geometry_spherical
@@ -24,7 +26,7 @@ module io_mod
   use function_space_mod,            only: function_space_type, BASIS
   use function_space_collection_mod, only: function_space_collection
   use project_output_mod,            only: project_output
-  use io_config_mod,                 only: restart_stem_name,    &
+  use io_config_mod,                 only: checkpoint_stem_name, &
                                            diagnostic_frequency, &
                                            checkpoint_write,     &
                                            checkpoint_read
@@ -48,15 +50,17 @@ module io_mod
 
   implicit none
   private
-  public :: ts_fname,              &
-            checkpoint_netcdf,     &
-            checkpoint_xios,       &
-            restart_netcdf,        &
-            restart_xios,          &
-            xios_domain_init,      &
-            nodal_write_field,     &
-            xios_write_field_node, &
-            xios_write_field_face, &
+  public :: ts_fname,                &
+            checkpoint_write_netcdf, &
+            checkpoint_write_xios,   &
+            checkpoint_read_netcdf,  &
+            checkpoint_read_xios,    &
+            write_checkpoint,        &
+            read_checkpoint,         &
+            xios_domain_init,        &
+            nodal_write_field,       &
+            xios_write_field_node,   &
+            xios_write_field_face,   &
             xios_write_field_edge
 
 contains
@@ -97,8 +101,8 @@ subroutine xios_domain_init(xios_ctx, mpi_comm, dtime, &
   type(xios_context)                   :: xios_ctx_hdl
   type(xios_file)                      :: cpfile_hdl, ofile_hdl, rsfile_hdl
   type(xios_fieldgroup)                :: cpfieldgroup_hdl
-  character(len=str_max_filename)      :: checkpoint_fname
-  character(len=str_max_filename)      :: restart_fname
+  character(len=str_max_filename)      :: checkpoint_write_fname
+  character(len=str_max_filename)      :: checkpoint_read_fname
   character(len=str_def)               :: domain_name, domain_fs_name
   integer(i_native), parameter         :: domain_function_spaces(5) &
                                                   = (/W0, W1, W2, W3, Wtheta/)
@@ -116,34 +120,34 @@ subroutine xios_domain_init(xios_ctx, mpi_comm, dtime, &
 
   call xios_diagnostic_domain_init(mesh_id, chi)
 
-  !!!!!!!!!!!!!!!!!!!!!! Setup checkpoint / restart domains !!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!! Setup checkpoint domains !!!!!!!!!!!!!!!!!!!!!
 
-  ! Create all the regular restart domains based on current function spaces
+  ! Create all the regular checkpoint domains based on current function spaces
   ! Loop over function spaces we need to create domains for
 
   do fs_index = lbound(domain_function_spaces, 1), &
                 ubound(domain_function_spaces, 1)
 
     domain_fs_name = name_from_functionspace(domain_function_spaces(fs_index))
-    domain_name = "restart_" // trim(domain_fs_name)
+    domain_name = "checkpoint_" // trim(domain_fs_name)
     
-    call xios_restart_domain_init(domain_function_spaces(fs_index), trim(domain_name), &
+    call xios_checkpoint_domain_init(domain_function_spaces(fs_index), trim(domain_name), &
                                      mesh_id, chi, .false.)
 
   end do
 
-  !!!!!! Setup finite difference restart domains for initial conditions !!!!!!!!
+  !!!!!! Setup finite difference checkpoint domains for initial conditions !!!!!!!!
 
-  domain_name = "fd_restart_W3"
-  call xios_restart_domain_init(W3, trim(domain_name), mesh_id, chi, .true.)
-  domain_name = "fd_restart_Wtheta"
-  call xios_restart_domain_init(Wtheta, trim(domain_name), mesh_id, chi, .true.)
+  domain_name = "fd_checkpoint_W3"
+  call xios_checkpoint_domain_init(W3, trim(domain_name), mesh_id, chi, .true.)
+  domain_name = "fd_checkpoint_Wtheta"
+  call xios_checkpoint_domain_init(Wtheta, trim(domain_name), mesh_id, chi, .true.)
 
-  ! Set up 2D restart domain - only W3 at the moment
+  ! Set up 2D checkpoint domain - only W3 at the moment
 
-  domain_name = "restart_W3_2D"
+  domain_name = "checkpoint_W3_2D"
 
-  call xios_restart_domain_init(W3, domain_name,  twod_mesh_id, chi, .true.)
+  call xios_checkpoint_domain_init(W3, domain_name,  twod_mesh_id, chi, .true.)
 
   !!!!!!!!!!!!! Setup diagnostic output context information !!!!!!!!!!!!!!!!!!
 
@@ -161,9 +165,9 @@ subroutine xios_domain_init(xios_ctx, mpi_comm, dtime, &
     call xios_set_attr(ofile_hdl, output_freq=av_freq)
   end if
 
-  !!!!!!!!!!!!! Setup checkpoint / restart context information !!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!! Setup checkpoint context information !!!!!!!!!!!!!!!!!!
 
-  ! Enable the checkpoint/restart field group
+  ! Enable the checkpoint field group
 
   if ( checkpoint_write .or. checkpoint_read ) then
 
@@ -172,43 +176,43 @@ subroutine xios_domain_init(xios_ctx, mpi_comm, dtime, &
 
   end if
 
-  ! Checkpointing
+  ! Checkpoint writing
   if ( checkpoint_write ) then
 
     ! Get the checkpoint file definition handle, set its filename and frequency
     ! and enable/disable as required
 
     ! Create checkpoint filename from stem and end timestep
-    write(checkpoint_fname,'(A,A,I6.6)') &
-                              trim(restart_stem_name),"_", timestep_end
+    write(checkpoint_write_fname,'(A,A,I6.6)') &
+                              trim(checkpoint_stem_name),"_", timestep_end
 
     ! Set checkpoint frequency (end timestep) in seconds
     cp_freq%second = timestep_end*dtime
 
-    call xios_get_handle("lfric_checkpoint",cpfile_hdl)
-    call xios_set_attr(cpfile_hdl,name=checkpoint_fname, enabled=.true.)
+    call xios_get_handle("lfric_checkpoint_write",cpfile_hdl)
+    call xios_set_attr(cpfile_hdl,name=checkpoint_write_fname, enabled=.true.)
     call xios_set_attr(cpfile_hdl, output_freq=cp_freq)
 
   end if
 
-  ! Restarting
+  ! Checkpoint reading
   if ( checkpoint_read ) then
 
-    ! Get the restart file definition handle, set its filename
+    ! Get the checkpoint file definition handle, set its filename
     ! and enable/disable as required
 
     ! Create checkpoint filename from stem and (start - 1) timestep
-    write(restart_fname,'(A,A,I6.6)') &
-                            trim(restart_stem_name),"_", (timestep_start - 1)
+    write(checkpoint_read_fname,'(A,A,I6.6)') &
+                            trim(checkpoint_stem_name),"_", (timestep_start - 1)
 
-    ! Set restart frequency (end timestep) in seconds
+    ! Set output frequency (end timestep) in seconds
     ! Note although this is a restart file and is going to be read and not
     ! written in this run, XIOS needs this to be set otherwise horrible things
     ! happen
     cp_freq%second = timestep_end*dtime
 
-    call xios_get_handle("lfric_restart",rsfile_hdl)
-    call xios_set_attr(rsfile_hdl, name=restart_fname, enabled=.true.)
+    call xios_get_handle("lfric_checkpoint_read",rsfile_hdl)
+    call xios_set_attr(rsfile_hdl, name=checkpoint_read_fname, enabled=.true.)
     call xios_set_attr(rsfile_hdl, output_freq=cp_freq)
 
 
@@ -705,9 +709,9 @@ subroutine xios_diagnostic_domain_init(mesh_id, chi)
 end subroutine xios_diagnostic_domain_init
 
 !-------------------------------------------------------------------------------
-!>  @brief    Performs XIOS restart domain initialisation
+!>  @brief    Performs XIOS checkpoint domain initialisation
 !!
-!!  @details  Performs restart domain init and returns
+!!  @details  Performs checkpoint domain init and returns
 !!            Assumes an unstructured 1D domain type
 !!
 !!  @param[in]      fs_id         Function space id
@@ -719,7 +723,7 @@ end subroutine xios_diagnostic_domain_init
 
 !-------------------------------------------------------------------------------
 
-subroutine xios_restart_domain_init(fs_id, domain_name, mesh_id, chi, use_index)
+subroutine xios_checkpoint_domain_init(fs_id, domain_name, mesh_id, chi, use_index)
 
 
   implicit none
@@ -737,12 +741,12 @@ subroutine xios_restart_domain_init(fs_id, domain_name, mesh_id, chi, use_index)
 
   integer(i_def)    :: i
 
-  ! Restart domain
-  integer(i_def)                      :: ibegin_restart
-  real(dp_xios),allocatable           :: restart_lon(:)
-  real(dp_xios),allocatable           :: restart_lat(:)
-  real(dp_xios),allocatable           :: bnd_restart_lon(:,:)
-  real(dp_xios),allocatable           :: bnd_restart_lat(:,:)
+  ! Checkpoint domain
+  integer(i_def)                      :: ibegin_checkpoint
+  real(dp_xios),allocatable           :: checkpoint_lon(:)
+  real(dp_xios),allocatable           :: checkpoint_lat(:)
+  real(dp_xios),allocatable           :: bnd_checkpoint_lon(:,:)
+  real(dp_xios),allocatable           :: bnd_checkpoint_lat(:,:)
   integer(i_halo_index),allocatable   :: domain_index(:)
 
 
@@ -759,9 +763,9 @@ subroutine xios_restart_domain_init(fs_id, domain_name, mesh_id, chi, use_index)
   ! Variables for the gather to determine global domain sizes
   ! from the local partitioned ones
 
-  integer(i_def)                :: global_undf_restart
+  integer(i_def)                :: global_undf_checkpoint
   integer(i_def), allocatable   :: local_undf(:)
-  integer(i_def), allocatable   :: all_undfs_restart_domain(:)
+  integer(i_def), allocatable   :: all_undfs_checkpoint_domain(:)
 
   ! Factor to convert coords from radians to degrees if needed
   ! set as 1.0 for biperiodic
@@ -779,9 +783,9 @@ subroutine xios_restart_domain_init(fs_id, domain_name, mesh_id, chi, use_index)
 
 
   allocate(local_undf(1))
-  allocate(all_undfs_restart_domain(get_comm_size()))
+  allocate(all_undfs_checkpoint_domain(get_comm_size()))
 
-  all_undfs_restart_domain = 0
+  all_undfs_checkpoint_domain = 0
 
   ! Create appropriate function space in order to be able to get the
   ! physical coordinates
@@ -819,48 +823,48 @@ subroutine xios_restart_domain_init(fs_id, domain_name, mesh_id, chi, use_index)
 
   !!!!!!!!!!!!  Global domain calculation !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  call all_gather ( local_undf, all_undfs_restart_domain, 1 )
+  call all_gather ( local_undf, all_undfs_checkpoint_domain, 1 )
 
   ! Now get the global sum of undf across all ranks to set the global domain sizes
-  ! for restart domain
+  ! for checkpoint domain
 
-  global_undf_restart = sum(all_undfs_restart_domain)
+  global_undf_checkpoint = sum(all_undfs_checkpoint_domain)
 
 
   ! Calculate ibegin for each rank as we have the array of undfs in order
   ! we can just sum to get it.
 
   if (get_comm_rank() == 0) then
-    ibegin_restart = 0
+    ibegin_checkpoint = 0
   else
-    ibegin_restart = sum(all_undfs_restart_domain(1:get_comm_rank()))
+    ibegin_checkpoint = sum(all_undfs_checkpoint_domain(1:get_comm_rank()))
   end if
 
-  ! Allocate coordinate arrays to be the size required for restart domain.
+  ! Allocate coordinate arrays to be the size required for checkpoint domain.
   ! Essentially up to last owned dof of the current partition.
 
-  allocate( restart_lon( size( proxy_coord_output(1)%data(1: local_undf(1)))) )
-  allocate( restart_lat( size( proxy_coord_output(2)%data(1: local_undf(1)))) )
+  allocate( checkpoint_lon( size( proxy_coord_output(1)%data(1: local_undf(1)))) )
+  allocate( checkpoint_lat( size( proxy_coord_output(2)%data(1: local_undf(1)))) )
 
   ! Populate the arrays with data
-  restart_lon =  proxy_coord_output(1)%data(1: local_undf(1)) * r2d
-  restart_lat =  proxy_coord_output(2)%data(1: local_undf(1)) * r2d
+  checkpoint_lon =  proxy_coord_output(1)%data(1: local_undf(1)) * r2d
+  checkpoint_lat =  proxy_coord_output(2)%data(1: local_undf(1)) * r2d
 
-  allocate(bnd_restart_lon(1,size(restart_lon)))
-  allocate(bnd_restart_lat(1,size(restart_lat)))
+  allocate(bnd_checkpoint_lon(1,size(checkpoint_lon)))
+  allocate(bnd_checkpoint_lat(1,size(checkpoint_lat)))
 
   ! Construct bounds arrays
-  bnd_restart_lon=(reshape(restart_lon, (/1, size(restart_lon)/) ) )
-  bnd_restart_lat=(reshape(restart_lat, (/1, size(restart_lat)/) ) )
+  bnd_checkpoint_lon=(reshape(checkpoint_lon, (/1, size(checkpoint_lon)/) ) )
+  bnd_checkpoint_lat=(reshape(checkpoint_lat, (/1, size(checkpoint_lat)/) ) )
 
 
-  call xios_set_domain_attr(trim(domain_name), ni_glo=global_undf_restart,    &
-                            ibegin=ibegin_restart, ni=local_undf(1),          &
+  call xios_set_domain_attr(trim(domain_name), ni_glo=global_undf_checkpoint,    &
+                            ibegin=ibegin_checkpoint, ni=local_undf(1),          &
                             type='unstructured')
-  call xios_set_domain_attr(trim(domain_name), lonvalue_1d=restart_lon,       &
-                            latvalue_1d=restart_lat)
-  call xios_set_domain_attr(trim(domain_name), bounds_lon_1d=bnd_restart_lon, &
-                            bounds_lat_1d=bnd_restart_lat)
+  call xios_set_domain_attr(trim(domain_name), lonvalue_1d=checkpoint_lon,       &
+                            latvalue_1d=checkpoint_lat)
+  call xios_set_domain_attr(trim(domain_name), bounds_lon_1d=bnd_checkpoint_lon, &
+                            bounds_lat_1d=bnd_checkpoint_lat)
 
   ! If we have requested to use domain index then get it and use it
 
@@ -878,17 +882,17 @@ subroutine xios_restart_domain_init(fs_id, domain_name, mesh_id, chi, use_index)
   end if 
 
 
-  if ( allocated(restart_lon) )     deallocate(restart_lon)
-  if ( allocated(restart_lat) )     deallocate(restart_lat)
+  if ( allocated(checkpoint_lon) )     deallocate(checkpoint_lon)
+  if ( allocated(checkpoint_lat) )     deallocate(checkpoint_lat)
   if ( allocated(domain_index) )    deallocate(domain_index)
-  if ( allocated(bnd_restart_lon) ) deallocate(bnd_restart_lon)
-  if ( allocated(bnd_restart_lat) ) deallocate(bnd_restart_lat)
+  if ( allocated(bnd_checkpoint_lon) ) deallocate(bnd_checkpoint_lon)
+  if ( allocated(bnd_checkpoint_lat) ) deallocate(bnd_checkpoint_lat)
   if ( allocated(local_undf) )      deallocate(local_undf)
-  if ( allocated(all_undfs_restart_domain) ) deallocate(all_undfs_restart_domain)
+  if ( allocated(all_undfs_checkpoint_domain) ) deallocate(all_undfs_checkpoint_domain)
   nullify( output_field_fs )
 
   return
-end subroutine xios_restart_domain_init
+end subroutine xios_checkpoint_domain_init
 
 
 
@@ -1141,10 +1145,10 @@ subroutine nodal_write_field(nodal_coordinates, level, nodal_output, &
 
 end subroutine nodal_write_field
 
-! Procedure to restart a field (original method)
+! Procedure to read a checkpoint into  a field (original method)
 ! Note this routine accepts a field name but doesn't use it - this
-! is to keep the restart interface the same for all methods 
-subroutine restart_netcdf(field_name, file_name, field_proxy)
+! is to keep the interface the same for all methods 
+subroutine checkpoint_read_netcdf(field_name, file_name, field_proxy)
   use field_io_ncdf_mod,    only : field_io_ncdf_type
 
   implicit none
@@ -1166,12 +1170,12 @@ subroutine restart_netcdf(field_name, file_name, field_proxy)
   deallocate(ncdf_file)
 
 
-end subroutine restart_netcdf
+end subroutine checkpoint_read_netcdf
 
-! Procedure to checkpoint a field (original method)
+! Procedure to write a field to a checkpoint file (original method)
 ! Note this routine accepts a field name but doesn't use it - this
-! is to keep the checkpoint interface the same for all methods 
-subroutine checkpoint_netcdf(field_name, file_name, field_proxy)
+! is to keep the interface the same for all methods 
+subroutine checkpoint_write_netcdf(field_name, file_name, field_proxy)
   use field_io_ncdf_mod,    only : field_io_ncdf_type
 
   implicit none
@@ -1192,12 +1196,12 @@ subroutine checkpoint_netcdf(field_name, file_name, field_proxy)
   deallocate(ncdf_file)
 
 
-end subroutine checkpoint_netcdf
+end subroutine checkpoint_write_netcdf
 
-! Procedure to read a restart file into a field via XIOS
+! Procedure to read a checkpoint into a field via XIOS
 ! Note this routine accepts a filename but doesn't use it - this
-! is to keep the restart interface the same for all methods 
-subroutine restart_xios(xios_field_name, file_name, field_proxy)
+! is to keep the interface the same for all methods 
+subroutine checkpoint_read_xios(xios_field_name, file_name, field_proxy)
 
   implicit none
 
@@ -1214,13 +1218,13 @@ subroutine restart_xios(xios_field_name, file_name, field_proxy)
   call xios_recv_field(xios_field_name, field_proxy%data(1:undf))
 
 
-end subroutine restart_xios
+end subroutine checkpoint_read_xios
 
 
 ! Procedure to checkpoint a field via XIOS
 ! Note this routine accepts a filename but doesn't use it - this
-! is to keep the checkpoint interface the same for all methods 
-subroutine checkpoint_xios(xios_field_name, file_name, field_proxy)
+! is to keep the interface the same for all methods 
+subroutine checkpoint_write_xios(xios_field_name, file_name, field_proxy)
 
   implicit none
 
@@ -1235,7 +1239,84 @@ subroutine checkpoint_xios(xios_field_name, file_name, field_proxy)
   call xios_send_field(xios_field_name, field_proxy%data(1:undf))
 
 
-end subroutine checkpoint_xios
+end subroutine checkpoint_write_xios
+
+
+!> @brief   Write a checkpoint from a collection of fields
+!> @details Iterate over a field collection and checkpoint each field
+!>          if it is enabled for checkpointing
+!>@param[in] state - a collection of fields to checkpoint
+!>@param[in] timestep the current timestep
+subroutine write_checkpoint(state, timestep)
+
+    implicit none
+
+    type( field_collection_type ), intent(inout) :: state
+    integer(i_def), intent(in) :: timestep
+
+    type( field_collection_iterator_type) :: iter
+    type( field_type ), pointer :: fld => null()
+
+    iter=state%get_iterator()
+    do
+      if(.not.iter%has_next())exit
+      fld=>iter%next()
+      if (fld%can_checkpoint()) then
+        write(log_scratch_space,'(3A,I6)') &
+            "Checkpointing ", trim(adjustl(fld%get_name())), " at timestep ", &
+            timestep
+        call log_event(log_scratch_space,LOG_LEVEL_INFO)
+        call fld%write_checkpoint("checkpoint_"//trim(adjustl(fld%get_name())), &
+                                  trim(ts_fname(checkpoint_stem_name,&
+                                  "", trim(adjustl(fld%get_name())),timestep,"")))
+      else
+
+        call log_event( 'Checkpoint method for  '// trim(adjustl(fld%get_name())) // &
+                        ' not set up', LOG_LEVEL_INFO )
+
+      end if
+
+    end do
+
+    nullify(fld)
+
+end subroutine write_checkpoint
+
+!> @brief   Read from a checkpoint into a collection of fields
+!> @details Iterate over a field collection and read each field
+!>          into a collection, if it is enabled for checkpointing
+!>@param[in] state -  the collection of fields to populate
+!>@param[in] timestep the current timestep
+subroutine read_checkpoint(state, timestep)
+
+    implicit none
+
+    type( field_collection_type ), intent(inout) :: state
+    integer(i_def), intent(in) :: timestep
+
+    type( field_collection_iterator_type) :: iter
+    type( field_type ), pointer :: fld => null()
+
+    iter=state%get_iterator()
+    do
+      if(.not.iter%has_next())exit
+      fld=>iter%next()
+      if (fld%can_checkpoint()) then
+        call log_event( &
+          'Reading checkpoint file to restart '//trim(adjustl(fld%get_name())), &
+          LOG_LEVEL_INFO)
+        call fld%read_checkpoint("restart_"//trim(adjustl(fld%get_name())), &
+                              trim(ts_fname(checkpoint_stem_name, &
+                              "", trim(adjustl(fld%get_name())),timestep,"")))
+      else
+        call log_event( 'Restart method for  '// trim(adjustl(fld%get_name())) // &
+                        ' not set up', LOG_LEVEL_INFO )
+      end if
+    end do
+
+    nullify(fld)
+
+end subroutine read_checkpoint
 
 
 !> @brief   Output a field in UGRID format on the node domain via XIOS

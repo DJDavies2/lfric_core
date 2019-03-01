@@ -18,14 +18,14 @@
       <domain id="face_half_levels" name="Mesh2d_half_levels" nvertex="4"/>
       <domain id="face_full_levels" name="Mesh2d_full_levels" nvertex="4"/>
       <domain id="edge_half_levels" name="Mesh2d_edge_half_levels" nvertex="2"/>
-      <domain id="restart_W0" name="restart_W0" nvertex="1"/>
-      <domain id="restart_W1" name="restart_W1" nvertex="1"/>
-      <domain id="restart_W2" name="restart_W2" nvertex="1"/>
-      <domain id="restart_W3" name="restart_W3" nvertex="1"/>
-      <domain id="restart_Wtheta" name="restart_Wtheta" nvertex="1"/>
-      <domain id="fd_restart_W3" name="fd_restart_W3" nvertex="1"/>
-      <domain id="fd_restart_Wtheta" name="fd_restart_Wtheta" nvertex="1"/>
-      <domain id="restart_W3_2D" name="restart_W3_2D" nvertex="1"/>
+      <domain id="checkpoint_W0" name="checkpoint_W0" nvertex="1"/>
+      <domain id="checkpoint_W1" name="checkpoint_W1" nvertex="1"/>
+      <domain id="checkpoint_W2" name="checkpoint_W2" nvertex="1"/>
+      <domain id="checkpoint_W3" name="checkpoint_W3" nvertex="1"/>
+      <domain id="checkpoint_Wtheta" name="checkpoint_Wtheta" nvertex="1"/>
+      <domain id="fd_checkpoint_W3" name="fd_checkpoint_W3" nvertex="1"/>
+      <domain id="fd_checkpoint_Wtheta" name="fd_checkpoint_Wtheta" nvertex="1"/>
+      <domain id="checkpoint_W3_2D" name="checkpoint_W3_2D" nvertex="1"/>
    </domain_definition>
    
    <grid_definition>
@@ -51,27 +51,26 @@
    
      <!-- Checkpoint group -->
      <field_group id="checkpoint_fields" freq_op="1ts" operation="once"  enabled=".FALSE." >
-       <field id="checkpoint_theta" name="theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_rho" name="rho" long_name="air_density" standard_name="air_density" unit="kg m-3" domain_ref="restart_W3" />
-       <field id="checkpoint_exner" name="exner" long_name="exner_pressure" unit="1" domain_ref="restart_W3" />
-       <field id="checkpoint_u" name="u" long_name="U" unit="m s-1" domain_ref="restart_W2" />
-       <field id="checkpoint_xi" name="xi" long_name="Xi" unit="s-1" domain_ref="restart_W1" />
-       <field id="checkpoint_m_v" name="m_v" long_name="m_v" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_cl" name="m_cl" long_name="m_cl" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_r" name="m_r" long_name="m_r" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_ci" name="m_ci" long_name="m_ci" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_s" name="m_s" long_name="m_s" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_g" name="m_g" long_name="m_g" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_area_fraction" name="area_fraction" long_name="area_fraction"  unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_ice_fraction" name="ice_fraction" long_name="ice_fraction"  unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_liquid_fraction" name="liquid_fraction" long_name="liquid_fraction"  unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_bulk_fraction" name="bulk_fraction" long_name="bulk_fraction"  unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_rhcrit" name="rhcrit" long_name="rhcrit"  unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_tstar" name="tstar" long_name="tstar"  unit="K" domain_ref="restart_W3_2D" />
-       <field id="checkpoint_zh" name="zh" long_name="zh"  unit="m" domain_ref="restart_W3_2D" />
-       <field id="checkpoint_z0msea" name="z0msea" long_name="z0msea"  unit="m" domain_ref="restart_W3_2D" />
-       <field id="checkpoint_ntml" name="ntml" long_name="ntml"  unit="1" domain_ref="restart_W3_2D" />
-       <field id="checkpoint_cumulus" name="cumulus" long_name="cumulus"  unit="1" domain_ref="restart_W3_2D" />
+       <field id="checkpoint_theta" name="theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_rho" name="rho" long_name="air_density" standard_name="air_density" unit="kg m-3" domain_ref="checkpoint_W3" />
+       <field id="checkpoint_exner" name="exner" long_name="exner_pressure" unit="1" domain_ref="checkpoint_W3" />
+       <field id="checkpoint_u" name="u" long_name="U" unit="m s-1" domain_ref="checkpoint_W2" />
+       <field id="checkpoint_m_v" name="m_v" long_name="m_v" unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_m_cl" name="m_cl" long_name="m_cl" unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_m_r" name="m_r" long_name="m_r" unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_m_ci" name="m_ci" long_name="m_ci" unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_m_s" name="m_s" long_name="m_s" unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_m_g" name="m_g" long_name="m_g" unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_area_fraction" name="area_fraction" long_name="area_fraction"  unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_ice_fraction" name="ice_fraction" long_name="ice_fraction"  unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_liquid_fraction" name="liquid_fraction" long_name="liquid_fraction"  unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_bulk_fraction" name="bulk_fraction" long_name="bulk_fraction"  unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_rhcrit" name="rhcrit" long_name="rhcrit"  unit="1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_tstar" name="tstar" long_name="tstar"  unit="K" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_zh" name="zh" long_name="zh"  unit="m" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_z0msea" name="z0msea" long_name="z0msea"  unit="m" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_ntml" name="ntml" long_name="ntml"  unit="1" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_cumulus" name="cumulus" long_name="cumulus"  unit="1" domain_ref="checkpoint_W3_2D" />
      </field_group>
      
      
@@ -133,15 +132,14 @@
       par_access="collective"
       time_counter="none">
       
-      <!-- Checkpoint/ Restart group -->
+      <!-- Checkpoint groups -->
       
       <!-- File definition for checkpoint write -->
-      <file id="lfric_checkpoint" name="lfric_checkpoint" output_freq="1ts" convention="CF" enabled=".FALSE.">
+      <file id="lfric_checkpoint_write" name="lfric_checkpoint_write" output_freq="1ts" convention="CF" enabled=".FALSE.">
         <field field_ref="checkpoint_theta"/>
         <field field_ref="checkpoint_exner"/>
         <field field_ref="checkpoint_rho"/>
         <field field_ref="checkpoint_u"/>
-        <field field_ref="checkpoint_xi"/>
         <field field_ref="checkpoint_m_v"/>
         <field field_ref="checkpoint_m_cl"/>
         <field field_ref="checkpoint_m_r"/>
@@ -160,29 +158,28 @@
         <field field_ref="checkpoint_cumulus"/>
       </file> 
       
-       <!-- file definition for restart read -->
-      <file id="lfric_restart" name="lfric_checkpoint" mode="read" output_freq="1ts" cyclic="true" enabled=".FALSE.">
-       <field id="restart_theta" name="theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_exner" name="exner" long_name="exner_pressure" unit="1" operation="instant" domain_ref="restart_W3" />
-       <field id="restart_rho" name="rho" long_name="air_density" standard_name="air_density" unit="kg m-3" operation="instant" domain_ref="restart_W3" />
-       <field id="restart_u" name="u" long_name="U" unit="m s-1" operation="instant" domain_ref="restart_W2" />
-       <field id="restart_xi" name="xi" long_name="Xi" unit="s-1" operation="instant" domain_ref="restart_W1" />
-       <field id="restart_m_v" name="m_v" long_name="m_v" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_cl" name="m_cl" long_name="m_cl" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_r" name="m_r" long_name="m_r" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_ci" name="m_ci" long_name="m_ci" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_s" name="m_s" long_name="m_s" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_g" name="m_g" long_name="m_g" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_area_fraction" name="area_fraction" long_name="area_fraction" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_ice_fraction" name="ice_fraction" long_name="ice_fraction" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_liquid_fraction" name="liquid_fraction" long_name="liquid_fraction" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_bulk_fraction" name="bulk_fraction" long_name="bulk_fraction" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_rhcrit" name="rhcrit" long_name="rhcrit" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_tstar" name="tstar" long_name="tstar" unit="K" operation="instant" domain_ref="restart_W3_2D" />
-       <field id="restart_zh" name="zh" long_name="zh" unit="m" operation="instant" domain_ref="restart_W3_2D" />
-       <field id="restart_z0msea" name="z0msea" long_name="z0msea" unit="m" operation="instant" domain_ref="restart_W3_2D" />
-       <field id="restart_ntml" name="ntml" long_name="ntml" unit="1" operation="instant" domain_ref="restart_W3_2D" />
-       <field id="restart_cumulus" name="cumulus" long_name="cumulus" unit="1" operation="instant" domain_ref="restart_W3_2D" />
+       <!-- file definition for checkpoint read -->
+      <file id="lfric_checkpoint_read" name="lfric_checkpoint_read" mode="read" output_freq="1ts" cyclic="true" enabled=".FALSE.">
+       <field id="restart_theta" name="theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_exner" name="exner" long_name="exner_pressure" unit="1" operation="instant" domain_ref="checkpoint_W3" />
+       <field id="restart_rho" name="rho" long_name="air_density" standard_name="air_density" unit="kg m-3" operation="instant" domain_ref="checkpoint_W3" />
+       <field id="restart_u" name="u" long_name="U" unit="m s-1" operation="instant" domain_ref="checkpoint_W2" />
+       <field id="restart_m_v" name="m_v" long_name="m_v" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_m_cl" name="m_cl" long_name="m_cl" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_m_r" name="m_r" long_name="m_r" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_m_ci" name="m_ci" long_name="m_ci" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_m_s" name="m_s" long_name="m_s" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_m_g" name="m_g" long_name="m_g" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_area_fraction" name="area_fraction" long_name="area_fraction" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_ice_fraction" name="ice_fraction" long_name="ice_fraction" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_liquid_fraction" name="liquid_fraction" long_name="liquid_fraction" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_bulk_fraction" name="bulk_fraction" long_name="bulk_fraction" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_rhcrit" name="rhcrit" long_name="rhcrit" unit="1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_tstar" name="tstar" long_name="tstar" unit="K" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_zh" name="zh" long_name="zh" unit="m" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_z0msea" name="z0msea" long_name="z0msea" unit="m" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_ntml" name="ntml" long_name="ntml" unit="1" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_cumulus" name="cumulus" long_name="cumulus" unit="1" operation="instant" domain_ref="checkpoint_W3_2D" />
       </file>
       
       

@@ -14,9 +14,9 @@ module init_cloud_twod_fields_alg_mod
 
   use constants_mod,                   only: r_def
 
-  use io_mod,                          only: ts_fname
-  use io_config_mod,                   only: checkpoint_read, &
-                                             restart_stem_name
+  use io_mod,                          only: ts_fname, &
+                                             read_checkpoint
+  use io_config_mod,                   only: checkpoint_read
 
   use time_config_mod,                 only: timestep_start
 
@@ -100,25 +100,7 @@ contains
 
     else                                   ! Recorded check point to start from
 
-      call log_event("Reading checkpoint file to restart area_fraction",LOG_LEVEL_INFO)
-      call cf_area%read_restart("restart_area_fraction", trim(ts_fname(restart_stem_name,"", &
-                            "area_fraction", (timestep_start - 1),"")))
-
-      call log_event("Reading checkpoint file to restart ice_fraction",LOG_LEVEL_INFO)
-      call cf_ice%read_restart("restart_ice_fraction", trim(ts_fname(restart_stem_name,"", &
-                            "ice_fraction", (timestep_start - 1),"")))
-
-      call log_event("Reading checkpoint file to restart liquid_fraction",LOG_LEVEL_INFO)
-      call cf_liq%read_restart("restart_liquid_fraction", trim(ts_fname(restart_stem_name,"", &
-                            "liquid_fraction", (timestep_start - 1),"")))
-
-      call log_event("Reading checkpoint file to restart bulk_fraction",LOG_LEVEL_INFO)
-      call cf_bulk%read_restart("restart_bulk_fraction", trim(ts_fname(restart_stem_name,"", &
-                            "bulk_fraction", (timestep_start - 1),"")))
-
-      call log_event("Reading checkpoint file to restart rhcrit",LOG_LEVEL_INFO)
-      call rhcrit_in_wth%read_restart("restart_rhcrit", trim(ts_fname(restart_stem_name,"", &
-                            "rhcrit", (timestep_start - 1),"")))
+      call read_checkpoint(cloud_fields, timestep_start-1)
 
       call log_event( "Gungho: Read cloud fields from files", LOG_LEVEL_INFO )
     end if
@@ -138,25 +120,7 @@ contains
 
     else                                   ! Recorded check point to start from
 
-      call log_event("Reading checkpoint file to restart tstar",LOG_LEVEL_INFO)
-      call tstar_twod%read_restart("restart_tstar", trim(ts_fname(restart_stem_name,"", &
-                            "tstar", (timestep_start - 1),"")))
-
-      call log_event("Reading checkpoint file to restart zh",LOG_LEVEL_INFO)
-      call zh_twod%read_restart("restart_zh", trim(ts_fname(restart_stem_name,"", &
-                            "zh", (timestep_start - 1),"")))
-
-      call log_event("Reading checkpoint file to restart z0msea",LOG_LEVEL_INFO)
-      call z0msea_twod%read_restart("restart_z0msea", trim(ts_fname(restart_stem_name,"", &
-                            "z0msea", (timestep_start - 1),"")))
-
-      call log_event("Reading checkpoint file to restart ntml",LOG_LEVEL_INFO)
-      call ntml_twod%read_restart("restart_ntml", trim(ts_fname(restart_stem_name,"", &
-                            "ntml", (timestep_start - 1),"")))
-
-      call log_event("Reading checkpoint file to restart cumulus",LOG_LEVEL_INFO)
-      call cumulus_twod%read_restart("restart_cumulus", trim(ts_fname(restart_stem_name,"", &
-                            "cumulus", (timestep_start - 1),"")))
+      call read_checkpoint(twod_fields, timestep_start-1)
 
       call log_event( "Gungho: Read twod fields from files", LOG_LEVEL_INFO )
     end if

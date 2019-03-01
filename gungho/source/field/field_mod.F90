@@ -63,8 +63,8 @@ module field_mod
     ! IO interface procedure pointers
 
     procedure(write_diag_interface), nopass, pointer  :: write_diag_method => null()
-    procedure(checkpoint_interface), nopass, pointer  :: checkpoint_method => null()
-    procedure(restart_interface), nopass, pointer  :: restart_method => null()
+    procedure(checkpoint_write_interface), nopass, pointer  :: checkpoint_write_method => null()
+    procedure(checkpoint_read_interface), nopass, pointer  :: checkpoint_read_method => null()
 
   contains
 
@@ -95,16 +95,19 @@ module field_mod
     procedure, public :: get_write_diag_behaviour
 
     !> Setter for the checkpoint method 
-    procedure, public :: set_checkpoint_behaviour
+    procedure, public :: set_checkpoint_write_behaviour
 
     !> Setter for the restart method 
-    procedure, public :: set_restart_behaviour
+    procedure, public :: set_checkpoint_read_behaviour
+
+    !> Routine to return whether field can be checkpointed
+    procedure, public :: can_checkpoint
 
     !> Routine to write field as a diagnostic
     procedure         :: write_diag
 
-    !> Routine to read a restart netCDF file
-    procedure         :: read_restart
+    !> Routine to read a checkpoint netCDF file
+    procedure         :: read_checkpoint
 
     !> Routine to write a checkpoint netCDF file
     procedure         :: write_checkpoint
@@ -252,25 +255,25 @@ module field_mod
       type(field_proxy_type ), intent(in)  :: field_proxy
     end subroutine write_diag_interface
 
-    subroutine checkpoint_interface(field_name, file_name, field_proxy)
+    subroutine checkpoint_write_interface(field_name, file_name, field_proxy)
       import r_def, field_proxy_type
       character(len=*),        intent(in)  :: field_name
       character(len=*),        intent(in)  :: file_name
       type(field_proxy_type ), intent(in)  :: field_proxy
-    end subroutine checkpoint_interface
+    end subroutine checkpoint_write_interface
 
-    subroutine restart_interface(field_name, file_name, field_proxy)
+    subroutine checkpoint_read_interface(field_name, file_name, field_proxy)
       import r_def, field_proxy_type
       character(len=*),        intent(in)  :: field_name
       character(len=*),        intent(in)  :: file_name
       type(field_proxy_type ), intent(inout)  :: field_proxy
-    end subroutine restart_interface
+    end subroutine checkpoint_read_interface
 
   end interface
 
  public :: write_diag_interface
- public :: checkpoint_interface
- public :: restart_interface
+ public :: checkpoint_write_interface
+ public :: checkpoint_read_interface
 
 contains
 
@@ -359,8 +362,8 @@ contains
 
     nullify( self%vspace,             &
              self%write_diag_method,  &
-             self%checkpoint_method,  &
-             self%restart_method )
+             self%checkpoint_write_method,  &
+             self%checkpoint_read_method )
 
   end subroutine field_final
 
@@ -423,8 +426,8 @@ contains
 
     dest%vspace => self%vspace
     dest%write_diag_method => self%write_diag_method
-    dest%checkpoint_method => self%checkpoint_method
-    dest%restart_method => self%restart_method
+    dest%checkpoint_write_method => self%checkpoint_write_method
+    dest%checkpoint_read_method => self%checkpoint_read_method
     dest%name = self%name
 
     allocate( dest%data(self%vspace%get_last_dof_halo()) )
@@ -487,26 +490,44 @@ contains
     return
   end subroutine get_write_diag_behaviour
 
-  !> Setter for checkpoint behaviour
+  !> Setter for checkpoint write behaviour
   !>
-  !> @param [in] pointer to procedure implementing checkpoint method 
-  subroutine set_checkpoint_behaviour(self, checkpoint_behaviour)
+  !> @param [in] pointer to procedure implementing checkpoint write method 
+  subroutine set_checkpoint_write_behaviour(self, checkpoint_write_behaviour)
     implicit none
     class(field_type), intent(inout)                  :: self
-    procedure(checkpoint_interface), pointer, intent(in)   :: checkpoint_behaviour
-    self%checkpoint_method => checkpoint_behaviour
-  end subroutine set_checkpoint_behaviour
+    procedure(checkpoint_write_interface), pointer, intent(in)   :: checkpoint_write_behaviour
+    self%checkpoint_write_method => checkpoint_write_behaviour
+  end subroutine set_checkpoint_write_behaviour
 
-  !> Setter for restart behaviour
+  !> Setter for checkpoint read behaviour
   !>
-  !> @param [in] pointer to procedure implementing restart method 
-  subroutine set_restart_behaviour(self, restart_behaviour)
+  !> @param [in] pointer to procedure implementing checkpoint read method 
+  subroutine set_checkpoint_read_behaviour(self, checkpoint_read_behaviour)
     implicit none
     class(field_type), intent(inout)                  :: self
-    procedure(restart_interface), pointer, intent(in)   :: restart_behaviour
-    self%restart_method => restart_behaviour
-  end subroutine set_restart_behaviour
+    procedure(checkpoint_read_interface), pointer, intent(in)   :: checkpoint_read_behaviour
+    self%checkpoint_read_method => checkpoint_read_behaviour
+  end subroutine set_checkpoint_read_behaviour
 
+  !> Returns whether field can be checkpointed
+  !>
+  !> @return .true. or .false.
+  function can_checkpoint(self) result(checkpointable)
+
+    implicit none
+
+    class(field_type), intent(in) :: self
+    logical(l_def) :: checkpointable
+
+    if (associated(self%checkpoint_write_method) .and. &
+       associated(self%checkpoint_read_method)) then
+      checkpointable = .true.
+    else
+      checkpointable = .false.
+    end if
+
+  end function can_checkpoint
 
   !---------------------------------------------------------------------------
   ! Contained functions/subroutines
@@ -712,9 +733,9 @@ contains
 
   end subroutine write_diag
 
-  !> Reads a restart file into the field
+  !> Reads a checkpoint file into the field
   !>
-  subroutine read_restart( self, field_name, file_name)
+  subroutine read_checkpoint( self, field_name, file_name)
     use log_mod,         only : log_event, &
                                 LOG_LEVEL_ERROR
 
@@ -728,11 +749,11 @@ contains
     type( field_proxy_type )                      :: tmp_proxy
 
 
-    if (associated(self%restart_method)) then
+    if (associated(self%checkpoint_read_method)) then
 
       tmp_proxy = self%get_proxy()
 
-      call self%restart_method(trim(field_name), trim(file_name), tmp_proxy)
+      call self%checkpoint_read_method(trim(field_name), trim(file_name), tmp_proxy)
 
       ! Set halos dirty here as for parallel read we only read in data for owned
       ! dofs and the halos will not be set
@@ -741,11 +762,11 @@ contains
 
     else
 
-      call log_event( 'Error trying to restart field '// trim(field_name) // &
-                      ', restart_method not set up', LOG_LEVEL_ERROR )
+      call log_event( 'Error trying to read checkpoint for field '// trim(field_name) // &
+                      ', checkpoint_read_method not set up', LOG_LEVEL_ERROR )
     end if
 
-  end subroutine read_restart
+  end subroutine read_checkpoint
 
   !> Writes a checkpoint file
   !>
@@ -760,14 +781,14 @@ contains
     character(len=*),     intent(in)              :: field_name
     character(len=*),     intent(in)              :: file_name
 
-    if (associated(self%checkpoint_method)) then
+    if (associated(self%checkpoint_write_method)) then
 
-      call self%checkpoint_method(trim(field_name), trim(file_name), self%get_proxy())
+      call self%checkpoint_write_method(trim(field_name), trim(file_name), self%get_proxy())
 
     else
 
-      call log_event( 'Error trying to checkpoint field '// trim(field_name) // &
-                      ', checkpoint_method not set up', LOG_LEVEL_ERROR )
+      call log_event( 'Error trying to write checkpoint for field '// trim(field_name) // &
+                      ', checkpoint_write_method not set up', LOG_LEVEL_ERROR )
     end if
 
   end subroutine write_checkpoint

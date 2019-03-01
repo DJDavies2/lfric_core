@@ -13,9 +13,7 @@ module init_transport_mod
 
   use constants_mod,                  only: i_def
   use field_mod,                      only: field_type,               &
-                                            write_diag_interface,     &
-                                            checkpoint_interface,     &
-                                            restart_interface
+                                            write_diag_interface
   use finite_element_config_mod,      only: element_order
   use fs_continuity_mod,              only: W2, W3
   use runtime_constants_mod,          only: create_runtime_constants
@@ -23,11 +21,7 @@ module init_transport_mod
   use function_space_collection_mod,  only: function_space_collection
   use io_config_mod,                  only: write_diag, &
                                             use_xios_io
-  use io_mod,                         only: xios_write_field_face,    &
-                                            checkpoint_xios,          &
-                                            checkpoint_netcdf,        &
-                                            restart_netcdf,           &
-                                            restart_xios
+  use io_mod,                         only: xios_write_field_face
   use log_mod,                        only: log_event,                &
                                             LOG_LEVEL_INFO
   use transport_init_fields_alg_mod,  only: transport_init_fields_alg
@@ -71,7 +65,6 @@ module init_transport_mod
 
     type(function_space_type), pointer       :: function_space => null()
     procedure(write_diag_interface), pointer :: tmp_write_diag_ptr => null()
-    procedure(restart_interface), pointer    :: tmp_restart_ptr => null()
 
     wind    = field_type( vector_space = &
                           function_space_collection%get_fs( mesh_id, element_order, W2 ) )
@@ -116,12 +109,7 @@ module init_transport_mod
        call divergence%set_write_diag_behaviour( tmp_write_diag_ptr )
     end if
 
-    call density%set_restart_behaviour( tmp_restart_ptr )
-    call wind%set_restart_behaviour( tmp_restart_ptr )
-    call increment%set_restart_behaviour( tmp_restart_ptr )
-    call divergence%set_restart_behaviour( tmp_restart_ptr )
-
-    nullify( function_space, tmp_write_diag_ptr, tmp_restart_ptr )
+    nullify( function_space, tmp_write_diag_ptr )
 
   end subroutine init_transport
 

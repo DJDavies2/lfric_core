@@ -41,7 +41,7 @@
 
 &io
   diag_stem_name            = 'gravity_wave'
-  restart_stem_name         = "restartGravityWave"
+  checkpoint_stem_name      = "restartGravityWave"
   use_xios_io               = .false.
   write_diag                = .true.
   diagnostic_frequency      = 36

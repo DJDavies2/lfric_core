@@ -69,7 +69,7 @@
 
 &io
   diag_stem_name            = 'diagDynamo'
-  restart_stem_name         = "restartIoDev"
+  checkpoint_stem_name      = "restartIoDev"
   use_xios_io               = .false.
   write_diag                = .true.
   diagnostic_frequency      = 1
