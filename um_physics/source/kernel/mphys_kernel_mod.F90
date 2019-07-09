@@ -206,12 +206,12 @@ subroutine mphys_code( nlayers,                     &
          p_theta_levels, ls_rain3d, ls_snow3d, ls_graup3d, rainfrac3d,         &
          n_drop_pot, n_drop_3d, so4_aitken_work, so4_accu_work, so4_diss_work, &
          aged_bmass_work, cloud_bmass_work, aged_ocff_work, cloud_ocff_work,   &
-         nitr_acc_work, nitr_diss_work, aerosol_work, biogenic
+         nitr_acc_work, nitr_diss_work, aerosol_work, biogenic, rho_r2
 
     real(r_um), dimension(row_length,rows,model_levels, 1) :: arcl
 
     real(r_um), dimension(row_length,rows,0:model_levels) :: flash_pot,        &
-                p_rho_minus_one, rho_r2
+                p_rho_minus_one
 
     real(r_um), dimension(row_length,rows) :: ls_rain, ls_snow, ls_graup,      &
                                               snow_depth, land_frac, hmteff, zb
