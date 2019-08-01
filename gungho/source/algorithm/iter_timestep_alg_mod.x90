@@ -60,6 +60,7 @@ module iter_timestep_alg_mod
   use matrix_vector_kernel_mod,           only: matrix_vector_kernel_type
   use smagorinsky_shear_kernel_mod,       only: smagorinsky_shear_kernel_type
   use tracer_smagorinsky_diff_kernel_mod, only: tracer_smagorinsky_diff_kernel_type
+  use momentum_smagorinsky_kernel_mod,    only: momentum_smagorinsky_kernel_type
   use moist_dyn_factors_kernel_mod,       only: moist_dyn_factors_kernel_type
 
   ! Derived Types
@@ -653,7 +654,7 @@ contains
     !--------------------------------------------------------------------
 
     !--------------------------------------------------------------------
-    ! Apply Smagorinsky subgrid mixing
+    ! Apply horizontal Smagorinsky subgrid mixing
     !--------------------------------------------------------------------
     if ( smagorinsky ) then
       call log_event( 'Applying Smagorinsky mixing', LOG_LEVEL_INFO )
@@ -665,6 +666,7 @@ contains
 
         ! Use stability-dependent diffusion coefficient from UM BL scheme
         ! This will be the blended BL-Smag coefficient if mixing_option='blending'
+        ! Vertical mixing is done by the BL scheme
         call log_event( 'Using stability-dependent Smagorinsky coefficient', LOG_LEVEL_INFO )
         ! Potential temperature:
         call invoke( tracer_smagorinsky_diff_kernel_type( inc(igh_t),           &
@@ -685,11 +687,21 @@ contains
                                                             visc_h,             &
                                                             chi  ) )
         end if
+        ! Momentum:
+        call invoke( momentum_smagorinsky_kernel_type( inc(igh_u),           &
+                                                       state(igh_u),         &
+                                                       smag_stencil_depth,   &
+                                                       height_w3,            &
+                                                       smag_stencil_depth,   &
+                                                       height_wth,           &
+                                                       smag_stencil_depth,   &
+                                                       visc_m,               &
+                                                       chi  ) )
 
       else
 
         call log_event( 'Using pure Smagorinsky coefficient', LOG_LEVEL_INFO )
-        ! Calculate visc_h as (mix_factor * delta)**2 * shear
+        ! Calculate visc_h and visc_m as (mix_factor * delta)**2 * shear
         ! Potential temperature:
         call invoke( a_times_X( visc_h, mix_factor, delta ),                    &
                      inc_X_powint_n( visc_h, 2 ),                               &
@@ -712,18 +724,28 @@ contains
                                                             visc_h,             &
                                                             chi  ) )
         end if    
-
+        ! Momentum:
+        call invoke( a_times_X( visc_m, mix_factor, delta ),                    &
+                     inc_X_powint_n( visc_m, 2 ),                               &
+                     inc_X_times_Y( visc_m, shear ),                            &
+                     momentum_smagorinsky_kernel_type( inc(igh_u),              &
+                                                       state(igh_u),            &
+                                                       smag_stencil_depth,      &
+                                                       height_w3,               &
+                                                       smag_stencil_depth,      &
+                                                       height_wth,              &
+                                                       smag_stencil_depth,      &
+                                                       visc_m,                  &
+                                                       chi  ) )
       end if
 
-      !  Momentum mixing is to be implemented in a future ticket
-
       ! Apply increments from Smagorinsky mixing
-      ! Set u increment to zero until momentum mixing is implemented:
-      call invoke( inc_X_plus_bY( state(igh_t), dt, inc(igh_t) ),   &
-                   inc_X_plus_bY( mr(imr_v), dt, mr_inc(imr_v) ),   &
-                   inc_X_plus_bY( mr(imr_cl), dt, mr_inc(imr_cl) ), &
-                   setval_c(inc(igh_u), 0.0_r_def),                 &
+      call invoke( inc_X_plus_bY( state(igh_t), dt, inc(igh_t) ),      &
                    inc_X_plus_bY( state(igh_u), dt, inc(igh_u) ) )
+      if (use_moisture) then
+        call invoke( inc_X_plus_bY( mr(imr_v), dt, mr_inc(imr_v) ),    &
+                     inc_X_plus_bY( mr(imr_cl), dt, mr_inc(imr_cl) ) )
+      end if    
     end if    
     
     ! ----------------------------------------------------------------------

@@ -163,7 +163,7 @@ subroutine smagorinsky_shear_code( nlayers,                                 &
   ! df = 1 is  u(i-1,   j-1/2, k-1/2)
   ! df = 2 is  v(i-1/2, j-1,   k-1/2)
   ! df = 3 is  u(i,     j-1/2, k-1/2)
-  ! df = 4 is  v(i-1,   j,     k-1/2)
+  ! df = 4 is  v(i-1/2, j,     k-1/2)
   ! df = 5 is  w(i-1/2, j-1/2, k-1  )
   ! df = 6 is  w(i-1/2, j-1/2, k    )
 

@@ -84,6 +84,10 @@ def make_figure(plotpath, nx, ny, field, component, timestep):
     elif field == 'm_v':
         background = 0.0
         cc = np.linspace(0.013, 0.0271, 12)
+    elif field in ['w3projection_u1', 'w3projection_u2', 'w3projection_u3']:
+        cc = np.linspace(-10, 10, 11)
+    elif field in ['u1_in_w3', 'u2_in_w3', 'u3_in_w3']:
+        cc = np.linspace(-10, 10, 11)
     else:
         cc = np.linspace(np.amin(zi), np.amax(zi), 11)
 
@@ -106,13 +110,14 @@ def make_figure(plotpath, nx, ny, field, component, timestep):
         + ".png"
     slice_fig.savefig(out_file_name, bbox_inches='tight')
 
+
 if __name__ == "__main__":
 
     try:
         config, datapath, nx, ny, fields, timesteps, plotpath = sys.argv[1:8]
     except ValueError:
-        print("Usage: {0} <file_stem_name> <datapath> <nx> <ny> <field_names> <timestep_list> \
-              <plotpath>".format(sys.argv[0]))
+        print("Usage: {0} <file_stem_name> <datapath> <nx> <ny> <field_names> \
+              <timestep_list> <plotpath>".format(sys.argv[0]))
         exit(1)
 
     # Split out the list of fields
@@ -123,7 +128,8 @@ if __name__ == "__main__":
 
     for field in field_list:
 
-        if field in ['rho', 'theta', 'exner', 'buoyancy', 'm_v', 'm_cl', 'm_r', 'm_ci', 'm_s', 'm_g']:
+        if field in ['rho', 'theta', 'exner', 'buoyancy', 'm_v', 'm_cl',
+                     'm_r', 'm_ci', 'm_s', 'm_g']:
             # Scalar fields
             ncomp = 1
             comp = 1
@@ -133,7 +139,8 @@ if __name__ == "__main__":
             # W3 projected U, V, W and XI components
             if field in ['w3projection_u1', 'w3projection_u2',
                          'w3projection_u3', 'w3projection_xi1',
-                         'w3projection_xi2', 'w3projection_xi3']:
+                         'w3projection_xi2', 'w3projection_xi3',
+                         'u1_in_w3', 'u2_in_w3', 'u3_in_w3']:
                 comp = 1
             elif (field == 'u' or field == 'xi'):
                 comp = [1, 2, 3]
