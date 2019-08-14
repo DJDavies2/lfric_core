@@ -73,6 +73,18 @@
        <field id="checkpoint_z0msea" name="z0msea" long_name="z0msea"  unit="m" domain_ref="checkpoint_W3_2D" />
        <field id="checkpoint_conv_rain" name="conv_rain" long_name="conv_rain"  unit="kg m-2 s-1" domain_ref="checkpoint_W3_2D" />
        <field id="checkpoint_conv_snow" name="conv_snow" long_name="conv_snow"  unit="kg m-2 s-1" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_lw_down_surf_rts" name="lw_down_surf_rts" long_name="Surface downward longwave flux" unit="W m-2" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_sw_down_surf_rts" name="sw_down_surf_rts" long_name="Surface downward shortwave flux" unit="W m-2" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_sw_direct_surf_rts" name="sw_direct_surf_rts" long_name="Surface direct shortwave flux" unit="W m-2" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_sw_down_blue_surf_rts" name="sw_down_blue_surf_rts" long_name="Surface downward 0-690nm flux" unit="W m-2" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_sw_direct_blue_surf_rts" name="sw_direct_blue_surf_rts" long_name="Surface direct 0-690nm flux" unit="W m-2" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_sw_heating_rate_rts" name="sw_heating_rate_rts" long_name="Shortwave heating rate" unit="K s-1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_lw_heating_rate_rts" name="lw_heating_rate_rts" long_name="Longwave heating rate" unit="K s-1" domain_ref="checkpoint_Wtheta" />
+       <field id="checkpoint_cos_zenith_angle_rts" name="cos_zenith_angle_rts" long_name="Cosine of the solar zenith angle" unit="1" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_lit_fraction_rts" name="lit_fraction_rts" long_name="Sunlit fraction of the timestep" unit="1" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_stellar_irradiance_rts" name="stellar_irradiance_rts" long_name="Stellar irradiance" unit="1" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_sin_stellar_declination_rts" name="sin_stellar_declination_rts" long_name="Sin stellar declination" unit="1" domain_ref="checkpoint_W3_2D" />
+       <field id="checkpoint_stellar_eqn_of_time_rts" name="stellar_eqn_of_time_rts" long_name="Stellar equation of time" unit="1" domain_ref="checkpoint_W3_2D" />
      </field_group>
 
      <!-- derived fields group -->
@@ -186,6 +198,25 @@
        <field id="lowest_cv_top" name="lowest_cv_top" long_name="lowest_cv_top" unit="model level" domain_ref="face_half_levels" />
        <field id="cv_base" name="cv_base" long_name="cv_base" unit="model level" domain_ref="face_half_levels" />
        <field id="cv_top" name="cv_top" long_name="cv_top" unit="model level" domain_ref="face_half_levels" />
+       <field id="lw_down_surf" name="lw_down_surf" long_name="Surface downward longwave flux" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_down_surf" name="sw_down_surf" long_name="Surface downward shortwave flux" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_direct_surf" name="sw_direct_surf" long_name="Surface direct shortwave flux" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_down_blue_surf" name="sw_down_blue_surf" long_name="Surface downward 0-690nm flux" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_direct_blue_surf" name="sw_direct_blue_surf" long_name="Surface direct 0-690nm flux" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_heating_rate" name="sw_heating_rate" long_name="Shortwave heating rate" unit="K s-1" grid_ref="full_level_face_grid" />
+       <field id="lw_heating_rate" name="lw_heating_rate" long_name="Longwave heating rate" unit="K s-1" grid_ref="full_level_face_grid" />
+       <field id="cos_zenith_angle" name="cos_zenith_angle" long_name="Cosine of the solar zenith angle" unit="1" domain_ref="face_half_levels" />
+       <field id="lit_fraction" name="lit_fraction" long_name="Sunlit fraction of the timestep" unit="1" domain_ref="face_half_levels" />
+       <field id="lw_down_surf_rts" name="lw_down_surf_rts" long_name="Surface downward longwave flux (radiative timestep)" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_down_surf_rts" name="sw_down_surf_rts" long_name="Surface downward shortwave flux (radiative timestep)" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_direct_surf_rts" name="sw_direct_surf_rts" long_name="Surface direct shortwave flux (radiative timestep)" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_down_blue_surf_rts" name="sw_down_blue_surf_rts" long_name="Surface downward 0-690nm flux (radiative timestep)" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_direct_blue_surf_rts" name="sw_direct_blue_surf_rts" long_name="Surface direct 0-690nm flux (radiative timestep)" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_heating_rate_rts" name="sw_heating_rate_rts" long_name="Shortwave heating rate (radiative timestep)" unit="K s-1" grid_ref="full_level_face_grid" />
+       <field id="lw_heating_rate_rts" name="lw_heating_rate_rts" long_name="Longwave heating rate (radiative timestep)" unit="K s-1" grid_ref="full_level_face_grid" />
+       <field id="cos_zenith_angle_rts" name="cos_zenith_angle_rts" long_name="Cosine of the solar zenith angle (radiative timestep)" unit="1" domain_ref="face_half_levels" />
+       <field id="lit_fraction_rts" name="lit_fraction_rts" long_name="Sunlit fraction of the timestep (radiative timestep)" unit="1" domain_ref="face_half_levels" />
+       <field id="stellar_irradiance_rts" name="stellar_irradiance_rts" long_name="Stellar irradiance (radiative timestep)" unit="1" domain_ref="face_half_levels" />
      </field_group>
 
       <!-- Initial conditions group -->
@@ -228,7 +259,7 @@
        <field id="mcf_in_wtheta" name="mcf_in_wtheta" long_name="cloud_ice_mixing_ratio"  unit="1" domain_ref="fd_checkpoint_Wtheta" /> 
        <field id="tstar" name="tstar" long_name="surface_temperature" standard_name="surface_temperature" unit="K" domain_ref="checkpoint_W3_2D" />
      </field_group>
-     
+
    </field_definition>
 
    <file_definition
@@ -262,6 +293,18 @@
         <field field_ref="checkpoint_z0msea"/>
         <field field_ref="checkpoint_conv_rain"/>
         <field field_ref="checkpoint_conv_snow"/>
+        <field field_ref="checkpoint_lw_down_surf_rts"/>
+        <field field_ref="checkpoint_sw_down_surf_rts"/>
+        <field field_ref="checkpoint_sw_direct_surf_rts"/>
+        <field field_ref="checkpoint_sw_down_blue_surf_rts"/>
+        <field field_ref="checkpoint_sw_direct_blue_surf_rts"/>
+        <field field_ref="checkpoint_sw_heating_rate_rts"/>
+        <field field_ref="checkpoint_lw_heating_rate_rts"/>
+        <field field_ref="checkpoint_cos_zenith_angle_rts"/>
+        <field field_ref="checkpoint_lit_fraction_rts"/>
+        <field field_ref="checkpoint_stellar_irradiance_rts"/>
+        <field field_ref="checkpoint_sin_stellar_declination_rts"/>
+        <field field_ref="checkpoint_stellar_eqn_of_time_rts"/>
       </file> 
       
        <!-- file definition for checkpoint read -->
@@ -288,6 +331,18 @@
        <field id="restart_z0msea" name="z0msea" long_name="z0msea" unit="m" operation="instant" domain_ref="checkpoint_W3_2D" />
        <field id="restart_conv_rain" name="conv_rain" long_name="conv_rain" unit="kg m-2 s-1" operation="instant" domain_ref="checkpoint_W3_2D" />
        <field id="restart_conv_snow" name="conv_snow" long_name="conv_snow" unit="kg m-2 s-1" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_lw_down_surf_rts" name="lw_down_surf_rts" long_name="Surface downward longwave flux" unit="W m-2" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_sw_down_surf_rts" name="sw_down_surf_rts" long_name="Surface downward shortwave flux" unit="W m-2" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_sw_direct_surf_rts" name="sw_direct_surf_rts" long_name="Surface direct shortwave flux" unit="W m-2" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_sw_down_blue_surf_rts" name="sw_down_blue_surf_rts" long_name="Surface downward 0-690nm flux" unit="W m-2" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_sw_direct_blue_surf_rts" name="sw_direct_blue_surf_rts" long_name="Surface direct 0-690nm flux" unit="W m-2" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_sw_heating_rate_rts" name="sw_heating_rate_rts" long_name="Shortwave heating rate" unit="K s-1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_lw_heating_rate_rts" name="lw_heating_rate_rts" long_name="Longwave heating rate" unit="K s-1" operation="instant" domain_ref="checkpoint_Wtheta" />
+       <field id="restart_cos_zenith_angle_rts" name="cos_zenith_angle_rts" long_name="Cosine of the solar zenith angle" unit="1" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_lit_fraction_rts" name="lit_fraction_rts" long_name="Sunlit fraction of the timestep" unit="1" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_stellar_irradiance_rts" name="stellar_irradiance_rts" long_name="Stellar irradiance" unit="1" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_sin_stellar_declination_rts" name="sin_stellar_declination_rts" long_name="Sin stellar declination" unit="1" operation="instant" domain_ref="checkpoint_W3_2D" />
+       <field id="restart_stellar_eqn_of_time_rts" name="stellar_eqn_of_time_rts" long_name="Stellar equation of time" unit="1" operation="instant" domain_ref="checkpoint_W3_2D" />
       </file>
 
       <file id="lfric_diag" name="lfric_diag" output_freq="10ts" convention="UGRID" enabled=".TRUE.">
@@ -363,6 +418,25 @@
         <field field_ref="lowest_cv_top"/>
         <field field_ref="cv_base"/>
         <field field_ref="cv_top"/>
+        <field field_ref="lw_down_surf"/>
+        <field field_ref="sw_down_surf"/>
+        <field field_ref="sw_direct_surf"/>
+        <field field_ref="sw_down_blue_surf"/>
+        <field field_ref="sw_direct_blue_surf"/>
+        <field field_ref="sw_heating_rate"/>
+        <field field_ref="lw_heating_rate"/>
+        <field field_ref="cos_zenith_angle"/>
+        <field field_ref="lit_fraction"/>
+        <field field_ref="lw_down_surf_rts"/>
+        <field field_ref="sw_down_surf_rts"/>
+        <field field_ref="sw_direct_surf_rts"/>
+        <field field_ref="sw_down_blue_surf_rts"/>
+        <field field_ref="sw_direct_blue_surf_rts"/>
+        <field field_ref="sw_heating_rate_rts"/>
+        <field field_ref="lw_heating_rate_rts"/>
+        <field field_ref="cos_zenith_angle_rts"/>
+        <field field_ref="lit_fraction_rts"/>
+        <field field_ref="stellar_irradiance_rts"/>
       </file>
 
       <file id="lfric_averages" name="lfric_averages" output_freq="10ts" convention="UGRID" enabled=".TRUE.">

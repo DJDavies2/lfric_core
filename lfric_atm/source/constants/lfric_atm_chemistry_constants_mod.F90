@@ -14,6 +14,7 @@ module lfric_atm_chemistry_constants_mod
 
   private
   public :: avogadro, boltzmann, density_so4,     &
+            stefan_boltzmann,                     &
             mean_free_path_reference,             &
             temperature_mean_free_path_reference, &
             pressure_mean_free_path_reference
@@ -23,6 +24,9 @@ module lfric_atm_chemistry_constants_mod
 
   !> Boltzmanns constant (J/K)
   real(r_def), parameter :: boltzmann = 1.3804e-23_r_def
+
+  !> Stefan-Boltzmann constant (W/m^2/K^4).
+  real(r_def), parameter :: stefan_boltzmann = 5.670374419e-08_r_def
 
   !> Density of SO4 particle (kg/m^3)
   real(r_def), parameter :: density_so4 = 1769.0_r_def

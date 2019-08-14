@@ -20,7 +20,10 @@ module create_physics_prognostics_mod
   use log_mod,                        only : log_event,         &
                                              LOG_LEVEL_INFO,         &
                                              LOG_LEVEL_ERROR
-  use section_choice_config_mod,      only : cloud, cloud_none
+  use radiation_config_mod,           only : n_radstep
+  use section_choice_config_mod,      only : cloud, cloud_none, &
+                                             radiation, radiation_none
+  use time_config_mod,                only : timestep_start, timestep_end
   implicit none
 
   private
@@ -35,6 +38,7 @@ contains
   !> @param[out]   derived_fields Collection of FD fields derived from FE fields
   !> @param[out]   cloud_fields Collection of FD cloud fields
   !> @param[out]   twod_fields Collection of two dimensional fields
+  !> @param[out]   radstep_fields Collection of radiation timestep fields
   !> @param[out]   physics_incs Collection of physics increments
   !> @param[out]   jules_ancils Ancillary fields for Jules
   !> @param[out]   jules_prognostics Prognostic fields for Jules
@@ -42,7 +46,8 @@ contains
                                          depository, &
                                          prognostic_fields, &
                                          derived_fields, cloud_fields, &
-                                         twod_fields, physics_incs, &
+                                         twod_fields, radstep_fields, &
+                                         physics_incs, &
                                          jules_ancils, jules_prognostics )
 
     implicit none
@@ -56,6 +61,7 @@ contains
     type(field_collection_type), intent(out) :: twod_fields
     type(field_collection_type), intent(out) :: cloud_fields
     type(field_collection_type), intent(out) :: derived_fields
+    type(field_collection_type), intent(out) :: radstep_fields
     type(field_collection_type), intent(out) :: physics_incs
     type(field_collection_type), intent(out) :: jules_ancils
     type(field_collection_type), intent(out) :: jules_prognostics
@@ -170,8 +176,6 @@ contains
     call add_physics_field(twod_fields, depository, prognostic_fields, &
       'lit_fraction',       vector_space, checkpoint_restart_flag, twod=.true.)
     call add_physics_field(twod_fields, depository, prognostic_fields, &
-      'stellar_irradiance', vector_space, checkpoint_restart_flag, twod=.true.)
-    call add_physics_field(twod_fields, depository, prognostic_fields, &
       'ls_rain',  vector_space, checkpoint_restart_flag, twod=.true.)
     call add_physics_field(twod_fields, depository, prognostic_fields, &
       'ls_snow',  vector_space, checkpoint_restart_flag, twod=.true.)
@@ -201,6 +205,64 @@ contains
       'cca', vector_space, checkpoint_restart_flag)
     call add_physics_field(cloud_fields, depository, prognostic_fields, &
       'ccw', vector_space, checkpoint_restart_flag)
+
+    !========================================================================
+    ! Radiation timestep fields
+    !========================================================================
+    radstep_fields = field_collection_type(name='radstep_fields')
+    if (radiation /= radiation_none) then
+      ! Checkpoint unless both the first timestep of this run and the
+      ! first timestep of the next run are radiation timesteps
+      checkpoint_restart_flag = &
+        mod(timestep_start-1, n_radstep) /= 0 .or. &
+        mod(timestep_end,     n_radstep) /= 0
+    else
+      checkpoint_restart_flag = .false.
+    end if
+
+    vector_space=>function_space_collection%get_fs(mesh_id, 0, Wtheta)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'sw_heating_rate_rts', vector_space, checkpoint_restart_flag)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'lw_heating_rate_rts', vector_space, checkpoint_restart_flag)
+
+    vector_space=> function_space_collection%get_fs(twod_mesh_id, 0, W3) 
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'lw_down_surf_rts', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'sw_down_surf_rts', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'sw_direct_surf_rts', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'sw_down_blue_surf_rts', vector_space, checkpoint_restart_flag, &
+      twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'sw_direct_blue_surf_rts', vector_space, checkpoint_restart_flag, &
+      twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'cos_zenith_angle_rts', vector_space, checkpoint_restart_flag, &
+      twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'lit_fraction_rts', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'stellar_irradiance_rts', vector_space, checkpoint_restart_flag, &
+      twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'sin_stellar_declination_rts', vector_space, checkpoint_restart_flag, &
+      twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'stellar_eqn_of_time_rts', vector_space, checkpoint_restart_flag, &
+      twod=.true.)
+
+    ! Multidimensional fields currently not able to be checkpointed.
+    checkpoint_restart_flag = .false.
+    vector_space=>function_space_collection%get_fs(twod_mesh_id, tile_order, W3)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'lw_up_tile_rts', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'sw_up_tile_rts', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(radstep_fields, depository, prognostic_fields, &
+      'sw_up_blue_tile_rts', vector_space, checkpoint_restart_flag, twod=.true.)
 
     !========================================================================
     ! Increment values from individual physics parametrizations

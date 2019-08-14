@@ -49,6 +49,7 @@ module step_gungho_mod
   !> @param[inout] derived_fields Collection of FD fields derived from FE fields
   !> @param[inout] cloud_fields Collection of cloud fields
   !> @param[inout] twod_fields 2D field collection for physics
+  !> @param[inout] radstep_fields Collection of radiation timestep fields
   !> @param[inout] physics_incs Collection of physics increments
   !> @param[inout] jules_ancils Collection of Jules ancillaries
   !> @param[inout] jules_prognostics Collection of Jules prognostics
@@ -62,6 +63,7 @@ module step_gungho_mod
                          derived_fields,    &
                          cloud_fields,      &
                          twod_fields,       &
+                         radstep_fields,    &
                          physics_incs,      &
                          jules_ancils,      &
                          jules_prognostics, &
@@ -78,6 +80,7 @@ module step_gungho_mod
     type( field_collection_type ), intent(inout) :: derived_fields
     type( field_collection_type ), intent(inout) :: cloud_fields
     type( field_collection_type ), intent(inout) :: twod_fields
+    type( field_collection_type ), intent(inout) :: radstep_fields
     type( field_collection_type ), intent(inout) :: physics_incs
     type( field_collection_type ), intent(inout) :: jules_ancils
     type( field_collection_type ), intent(inout) :: jules_prognostics
@@ -108,7 +111,8 @@ module step_gungho_mod
         case( method_semi_implicit )  ! Semi-Implicit
           call iter_alg_step(u, rho, theta, exner, mr, moist_dyn,           &
                              derived_fields, cloud_fields, twod_fields,     &
-                             physics_incs, jules_ancils, jules_prognostics, &
+                             radstep_fields, physics_incs,                  &
+                             jules_ancils, jules_prognostics,               &
                              timestep, twod_mesh_id)
         case( method_rk )             ! RK
           call rk_alg_step(u, rho, theta, moist_dyn, exner)

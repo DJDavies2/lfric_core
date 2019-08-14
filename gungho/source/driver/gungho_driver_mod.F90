@@ -108,6 +108,7 @@ module gungho_driver_mod
   type( field_collection_type ) :: derived_fields
   type( field_collection_type ) :: cloud_fields
   type( field_collection_type ) :: twod_fields
+  type( field_collection_type ) :: radstep_fields
   type( field_collection_type ) :: physics_incs
   type( field_collection_type ) :: fd_fields
 
@@ -192,7 +193,8 @@ contains
                                        depository, &
                                        prognostic_fields, &
                                        derived_fields, cloud_fields, &
-                                       twod_fields, physics_incs, &
+                                       twod_fields, radstep_fields, &
+                                       physics_incs, &
                                        jules_ancils, jules_prognostics )
     end if
 
@@ -388,6 +390,7 @@ contains
                         derived_fields,    &
                         cloud_fields,      &
                         twod_fields,       &
+                        radstep_fields,    &
                         physics_incs,      &
                         jules_ancils,      &
                         jules_prognostics, &

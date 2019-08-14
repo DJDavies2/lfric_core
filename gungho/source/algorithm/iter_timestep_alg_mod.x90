@@ -304,6 +304,7 @@ contains
   !> @param[in,out] derived_fields    Group of derived fields
   !> @param[in,out] cloud_fields      Group of cloud fields
   !> @param[in,out] twod_fields       2D fields for UM physics
+  !> @param[in,out] radstep_fields    Group of radiation timestep fields
   !> @param[in,out] physics_incs      Group of physics increments
   !> @param[in,out] jules_ancils      Ancillary fields for Jules
   !> @param[in,out] jules_prognostics Prognostic fields for Jules
@@ -311,7 +312,8 @@ contains
   !> @param[in]     twod_mesh_id      Identifier given to the current 2d mesh
   subroutine iter_alg_step(u, rho, theta, exner, mr, moist_dyn,           &
                            derived_fields, cloud_fields, twod_fields,     &
-                           physics_incs, jules_ancils, jules_prognostics, &
+                           radstep_fields, physics_incs,                  &
+                           jules_ancils, jules_prognostics,               &
                            timestep, twod_mesh_id)
 
     implicit none
@@ -327,6 +329,7 @@ contains
     type( field_collection_type ), intent( inout ) :: derived_fields
     type( field_collection_type ), intent( inout ) :: cloud_fields
     type( field_collection_type ), intent( inout ) :: twod_fields
+    type( field_collection_type ), intent( inout ) :: radstep_fields
     type( field_collection_type ), intent( inout ) :: physics_incs
     ! Timestep value
     integer, intent(in) :: timestep  
@@ -440,8 +443,10 @@ contains
       call slow_physics(du, dtheta, state_n(igh_t), state_n(igh_d),     &
                         state_n(igh_p), mr_n, mr,                       &
                         derived_fields, cloud_fields, twod_fields,      &
-                        physics_incs, jules_ancils, jules_prognostics,  &
-                        height_w3, height_wth, chi, twod_mesh_id)
+                        radstep_fields, physics_incs,                   &
+                        jules_ancils, jules_prognostics,                &
+                        height_w3, height_wth, chi, timestep,           &
+                        twod_mesh_id)
       ! update state prognostics including map back of winds
       call invoke(name="update_from_slow_physics",                      &
                   inc_X_plus_Y(state(igh_t), dtheta),                   &
