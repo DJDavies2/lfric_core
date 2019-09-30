@@ -54,8 +54,15 @@ module pressure_operator_alg_mod
      !> param[inout] y a fieldvector, the result.
      procedure, public  :: apply => apply_pressure_operator
      procedure, private :: apply_pressure_operator
+     !> performs a deep copy (for overriding the "=" operator)
+     !> @param[out] dest   pressure_operator_type lhs
+     !> @param[in]  source pressure_operator_type rhs
+     procedure, public  :: pressure_operator_assign
 
-     final :: destroy_pressure_operator
+     final              :: destroy_pressure_operator
+
+     !> Override default assignment for pressure_operator_type pairs.
+     generic            :: assignment(=) => pressure_operator_assign
 
   end type pressure_operator_type
 
@@ -99,6 +106,23 @@ contains
     call log_event( 'done', LOG_LEVEL_INFO )
 
   end function pressure_operator_constructor
+
+  !> Performs a deep copy between pressure_operator_type pairs.
+  !> (for overriding the "=" operator)
+  !>
+  !> @param[out] dest   pressure_operator_type lhs
+  !> @param[in]  source pressure_operator_type rhs
+  subroutine pressure_operator_assign(dest, source)
+
+    implicit none
+    class(pressure_operator_type), intent(in)  :: source
+    class(pressure_operator_type), intent(out) :: dest
+
+    ! Deep copy of the contents of the pressure_operator_type
+    dest%grad_p = source%grad_p
+    dest%div_grad_p = source%div_grad_p
+
+  end subroutine pressure_operator_assign
 
   !>@brief Apply Helmholtz operator to a pressure field to obtain \f$y=Hx\f$
   !>
