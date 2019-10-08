@@ -1,8 +1,13 @@
-{%- set projectName = 'infrastructure' %}
-{%- set projectDir  = 'infrastructure' %}
-{%- set miniappFlag = False %}
-{%- set fix_enums = False %}
-{%- set rdef_precision = "64" %}
+{%- set projectName = 'infrastructure' -%}
+{%- set projectDir  = 'infrastructure' -%}
+{%- set miniappFlag = False -%}
+{%- set fix_enums   = False -%}
+
+{# Set the  compiler debug profile for runs in this suite #}
+{# Options are ['fast-debug'|'full-debug'|'production'], omission defaults to 'fast-debug' #}
+{%- set run_application_profile = '' -%}
+
+{%- set rdef_precision = "64" -%}
 
 {%- set groups = {'developer': ['check_compilers("fast-debug", publish=True)',
                                 'api_documentation_graph(publish=True)',

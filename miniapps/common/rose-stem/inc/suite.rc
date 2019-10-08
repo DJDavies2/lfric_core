@@ -5,8 +5,8 @@
 {%- set appsToRun = [] -%}
 {%- set appConfigsCompilerRuns = {} -%}
 {%- set rose_suite_gui_headers = [] -%}
-{%- set science_label = TARGET_SCIENCE_COMPILER + '_fast-debug' %}
-
+{%- set science_label = TARGET_SCIENCE_COMPILER + '_'
+                      + run_application_profile|default('fast-debug', true) %}
 {%- for compiler, setup in TARGET_COMPILER_SETUP|batch(2) -%}
 {%-   do compiler_setup.update({compiler : [setup]}) -%}
 {%- endfor -%}
@@ -27,8 +27,9 @@
 {%-   set appPathFragment = '' %}
 {%- endif %}
 
-{{set_hosts_dictionary()}}
+{%- set build_profiles = ['fast-debug', 'full-debug', 'production'] %}
 
+{{set_hosts_dictionary()}}
 
 {# crunInfo is dictionary containing variables needed to dynamically    #}
 {# construct the graph for cruns:                                       #}
@@ -235,7 +236,7 @@
 ##############################################################################
 
 {%- for compiler in compiler_setup.keys() -%}
-{%-   for build in 'fast-debug', 'full-debug' %}
+{%-   for build in build_profiles %}
 {%-     set label = compiler | lower + '_' + build | lower %}
 {%-     set family = label | upper %}
 
@@ -476,7 +477,7 @@
 
 {%-     if appLabel in appConfigsCompilerRuns.keys() %}
 {%-       for compiler in appConfigsCompilerRuns[appLabel] %}
-{%-         for build in 'fast-debug', 'full-debug' %}
+{%-         for build in build_profiles %}
 
 {%-           set label = compiler | lower + '_' + build | lower %}
 {%-           set family = label | upper %}
@@ -521,7 +522,7 @@
 
 {%-     if appLabel in appConfigsCompilerRuns.keys() %}
 {%-       for compiler in appConfigsCompilerRuns[appLabel] %}
-{%-         for build in 'fast-debug', 'full-debug' %}
+{%-         for build in build_profiles %}
 
 {%-           set label = compiler | lower + '_' + build | lower %}
 {%-           set family = label | upper %}
@@ -796,7 +797,7 @@
 
 {# MESH GENERATION #}
 {%- for compiler in compiler_setup.keys() %}
-{%-   for build in 'fast-debug', 'full-debug' %}
+{%-   for build in build_profiles %}
 {%-     set label = (compiler + '_' + build) %}
 {%-     set family = label|upper %}
 {%-     for mesh_name in mesh_names|sort %}

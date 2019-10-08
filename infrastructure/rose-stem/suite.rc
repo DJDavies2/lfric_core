@@ -5,7 +5,8 @@
 %include suite_control.rc
 
 {# SETUP SOME JINJA2 VARIABLES #}
-{%- set hosts_dictionary = {} %}
+{%- set hosts_dictionary = {} -%}
+{%- set build_profiles = ['fast-debug', 'full-debug', 'production'] -%}
 {%- set rose_suite_gui_headers = [] -%}
 {%- set compiler_setup = {} -%}
 {%- for compiler, setup in TARGET_COMPILER_SETUP|batch(2) -%}
@@ -213,7 +214,7 @@
 ##############################################################################
 
 {%- for compiler in compiler_setup.keys() -%}
-{%-   for build in 'fast-debug', 'full-debug' %}
+{%-   for build in build_profiles %}
 {%-     set label = compiler | lower + '_' + build | lower %}
 {%-     set family = label | upper %}
 

@@ -4,9 +4,10 @@
 %include inc/suite_macros.rc
 %include suite_control.rc
 
-{%- set hosts_dictionary = {} %}
+{%- set build_profiles = ['fast-debug', 'full-debug', 'production'] -%}
+{%- set hosts_dictionary = {} -%}
 {%- set rose_suite_gui_headers = [] -%}
-{%- set publish_destination = '$CYLC_SUITE_SHARE_DIR/publish-mesh_tools-' + TARGET_OPT %}
+{%- set publish_destination = '$CYLC_SUITE_SHARE_DIR/publish-mesh_tools-' + TARGET_OPT -%}
 {%- set compiler_setup = {} -%}
 {%- for compiler, setup in TARGET_COMPILER_SETUP|batch(2) -%}
 {%-   do compiler_setup.update({compiler : [setup]}) -%}
@@ -183,7 +184,7 @@
 ##############################################################################
 
 {%- for compiler in compiler_setup.keys() -%}
-{%-   for build in 'fast-debug', 'full-debug' %}
+{%-   for build in build_profiles %}
 {%-     set label = compiler | lower + '_' + build | lower %}
 {%-     set family = label | upper %}
 

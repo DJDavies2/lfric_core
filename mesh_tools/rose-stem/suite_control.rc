@@ -1,8 +1,12 @@
-{%- set projectName = 'mesh_tools' %}
-{%- set projectDir  = 'mesh_tools' %}
-{%- set miniappFlag = False %}
-{%- set fix_enums = False %}
-{%- set mesh_rdef_precision = "64" %}
+{%- set projectName = 'mesh_tools' -%}
+{%- set projectDir  = 'mesh_tools' -%}
+{%- set miniappFlag = False -%}
+{%- set fix_enums   = False -%}
+{%- set mesh_rdef_precision = "64" -%}
+
+{# Set the  compiler debug profile for runs in this suite #}
+{# Options are ['fast-debug'|'full-debug'|'production'], omission defaults to 'fast-debug' #}
+{%- set run_application_profile = '' -%}
 
 {%- set groups = {'developer': ['validate_rose_meta_graph("mesh_tools")',
                                 'check_style_graph()',

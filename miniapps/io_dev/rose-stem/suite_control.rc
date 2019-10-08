@@ -1,11 +1,16 @@
 #!jinja2
-{%- set projectName = 'io_dev' %}
-{%- set projectDir  = 'io_dev' %}
-{%- set miniappFlag = True %}
-{%- set fix_enums = False %}
-{%- set appDiagStemName = 'diagIoDev' %}
-{%- set rdef_precision = "64" %}
-{%- set mesh_rdef_precision = "64" %}
+{%- set projectName = 'io_dev' -%}
+{%- set projectDir  = 'io_dev' -%}
+{%- set miniappFlag = True -%}
+{%- set fix_enums   = False -%}
+
+{# Set the  compiler debug profile for runs in this suite #}
+{# Options are ['fast-debug'|'full-debug'|'production'], omission defaults to 'fast-debug' #}
+{%- set run_application_profile = '' -%}
+
+{%- set appDiagStemName = 'diagIoDev' -%}
+{%- set rdef_precision = "64" -%}
+{%- set mesh_rdef_precision = "64" -%}
 
 {%- set application_configurations = { 'io_dev' : ['default'] } %}
 

@@ -28,8 +28,10 @@
 {%-     do appConfigsCompilerRuns[appLabel].extend(difference) %}
 {%-   endif%}
 
+{%-   set run_application_profile = run_application_profile|default('fast-debug', true) %}
+
 {%-   for compiler in appConfigsCompilerRuns[appLabel] %}
-{%-     set label = compiler|lower + '_fast-debug' %}
+{%-     set label = compiler|lower + '_' + run_application_profile %}
 {%-     for resolution in resolutions %}
 {%-       set res_value, dt_values, res_label, dt_labels, res_opt = resolution | get_resolution_labels() %}
 {%-       for i in range(0,dt_values|length) %}
