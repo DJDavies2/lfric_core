@@ -1,5 +1,5 @@
 &biperiodic_mesh_generator
-  mesh_filename = mesh_BiP64x16-25x25.nc
+  mesh_filename = 'mesh_BiP64x16-25x25.nc'
   nmeshes       = 5
   mesh_names    = 'physics', 'dynamics', 'multigrid_l1', 'multigrid_l2', 'multigrid_l3'
   edge_cells_x  = 192, 64, 32, 16, 8
