@@ -27,7 +27,7 @@
                                                               'static_isothermal_x', 'static_isothermal_y', 'static_isothermal_x_long',
                                                               'agnesi_hyd_cart', 'agnesi_nhyd_cart', 'schar3d_cart_8s',
                                                               'schar_cart_8s', 'schar_cart_8s_inconsistent', 'schar_cart_40s', 'bell_3d_cart',
-                                                              'default' ] } %}
+                                                              'baroclinic48', 'baroclinic96', 'default' ] } %}
 
 {%- set canned_configurations  = ['gungho'] %}
 
@@ -204,18 +204,27 @@
                                                            "wallclock":"01:30:00"} } },
                              plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 200 4 theta:w3projection_xi2 T000000:T001152:T001728 $PLOT_DIR",
                              publish=True )',
-            'run_application("gungho", "baroclinic",
-                             resolutions=[("C48",1800.0),("C96",900.0)],
+            'run_application("gungho", "baroclinic48",
+                             resolutions=[("C48",1800.0),],
+		             support_meshes=["C24","C12","C6"],	
                              checkkgo=False,
                              env={"crun":10,
-                                  "nrun":{"default":96,
-                                          ("C48",1800.0):48},
+                                  "nrun":{"default":48,},
                                   "directives": {"C48":{"mpi_parts":24,
                                                         "threads":1,
-                                                        "wallclock":"01:30:00"},
-                                                 "C96":{"mpi_parts":96,
+                                                        "wallclock":"01:30:00"}, }
+                                 },
+                             plotstr="baroclinic.py $NODAL_DATA_DIR/lfric_diag.nc $PLOT_DIR dcmip u1:u2:u3:surface_pressure_temperature",
+                             publish=True )',
+            'run_application("gungho", "baroclinic96",
+                             resolutions=[("C96",900.0),],
+		             support_meshes=["C48","C24","C12"],	
+                             checkkgo=False,
+                             env={"crun":10,
+                                  "nrun":{"default":96,},
+                                  "directives": {"C96":{"mpi_parts":96,
                                                         "threads":1,
-                                                        "wallclock":"01:30:00"} }
+                                                        "wallclock":"01:30:00"}, }
                                  },
                              plotstr="baroclinic.py $NODAL_DATA_DIR/lfric_diag.nc $PLOT_DIR dcmip u1:u2:u3:surface_pressure_temperature",
                              publish=True )',
