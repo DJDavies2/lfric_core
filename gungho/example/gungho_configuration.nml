@@ -1,3 +1,7 @@
+&aerosol
+  c_aerosol='glomap_mode_climatology'
+/
+
 &base_mesh
   filename        = 'mesh_C24.nc'
   prime_mesh_name = 'dynamics'
@@ -286,6 +290,7 @@ radiation='socrates'
 boundary_layer='none'
 convection='none'
 microphysics='none'
+aerosol='none'
 cloud='none'
 spectral_gwd='none'
 orographic_drag='none'

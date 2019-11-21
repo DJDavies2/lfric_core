@@ -7,32 +7,34 @@
 !>@brief Calls to the slow physics schemes
 module slow_physics_alg_mod
 
-  use section_choice_config_mod, only: microphysics,       &
-                                       microphysics_um,    &
-                                       radiation,          &
-                                       radiation_socrates, &
-                                       spectral_gwd,       &
-                                       spectral_gwd_um,    &
-                                       orographic_drag,    &
-                                       orographic_drag_um, &
-                                       boundary_layer,     &
-                                       boundary_layer_um
+  use section_choice_config_mod, only: aerosol,                                &
+                                       aerosol_um,                             &
+                                       boundary_layer,                         &
+                                       boundary_layer_um,                      &
+                                       microphysics,                           &
+                                       microphysics_um,                        &
+                                       orographic_drag,                        &
+                                       orographic_drag_um,                     &
+                                       radiation,                              &
+                                       radiation_socrates,                     &
+                                       spectral_gwd,                           &
+                                       spectral_gwd_um
 
   use constants_mod,    only: i_def,r_def
   use log_mod,          only: log_event,                         &
                               LOG_LEVEL_WARNING, LOG_LEVEL_INFO, &
                               LOG_LEVEL_ERROR
 
-  use physics_config_mod, only: heldsuarez_thermo_placement, &
-                                heldsuarez_wind_placement,   &
-                                microphysics_placement,      &
-                                radiation_placement,         &
-                                spectral_gwd_placement,      &
-                                orographic_drag_placement,   &
-                                microphysics_placement_slow, &
-                                radiation_placement_slow,    &
-                                spectral_gwd_placement_slow, &
-                                orographic_drag_placement_slow
+  use physics_config_mod, only: heldsuarez_thermo_placement,                   &
+                                heldsuarez_wind_placement,                     &
+                                microphysics_placement,                        &
+                                microphysics_placement_slow,                   &
+                                orographic_drag_placement,                     &
+                                orographic_drag_placement_slow,                &
+                                radiation_placement,                           &
+                                radiation_placement_slow,                      &
+                                spectral_gwd_placement,                        &
+                                spectral_gwd_placement_slow
 
   ! PsyKAl PSYClone kernels
   use held_suarez_fv_kernel_mod,      only: held_suarez_fv_kernel_type
@@ -70,6 +72,9 @@ module slow_physics_alg_mod
   use spectral_gwd_alg_mod,      only: spectral_gwd_alg_step
   use orographic_drag_alg_mod,   only: orographic_drag_alg_step
   use bl_exp_alg_mod,            only: bl_exp_alg_step
+  use glomap_aerosol_alg_mod,    only: glomap_aerosol_alg_step
+  use aerosol_config_mod,        only: c_aerosol,                              &
+                                       c_aerosol_glomap_mode_climatology
 #endif
 
   implicit none
@@ -78,39 +83,36 @@ contains
 
   !> @details Collection of procedures for subgrid physics that act
   !>          before the outer loop of the solver
-  !> @param[in,out] du                Increment to wind field
-  !> @param[in,out] dtheta            Increment to theta field
-  !> @param[in]     theta             Theta field
-  !> @param[in]     rho               Rho on w3 space
-  !> @param[in]     exner             Exner pressure on w3 space
-  !> @param[in]     mr_n              Mixing ratios at start of timestep
-  !> @param[in,out] mr                Mixing ratios to be updated
-  !> @param[in,out] derived_fields    Group of derived fields
-  !> @param[in,out] cloud_fields      Group of cloud fields
-  !> @param[in,out] twod_fields       Group of 2D fields
-  !> @param[in,out] radstep_fields    Group of radiation timestep fields
-  !> @param[in,out] physics_incs      Group of physics increments
-  !> @param[in]     orography_fields  Group of 2D orography fields
-  !> @param[in,out] jules_ancils      Ancillary fields for Jules
-  !> @param[in,out] jules_prognostics Prognostic fields for Jules
-  !> @param[in]     height_w3         Height in w3
-  !> @param[in]     height_wth        Height in wth
-  !> @param[in]     chi               Coordinate array
-  !> @param[in]     timestep          Model timestep number
-  !> @param[in]     shear             3D wind shear on wtheta points
-  !> @param[in]     delta             Edge length on wtheta points
-  !> @param[in]     max_diff_smag     Maximum diffusion coefficient allowed
-  !> @param[in,out] visc_m_blend      Blended BL-Smag diffusion coefficient for momentum
-  !> @param[in,out] visc_h_blend      Blended BL-Smag diffusion coefficient for heat
-  !> @param[in]     twod_mesh_id      Identifier given to the current 2d mesh
-  subroutine slow_physics(du, dtheta, theta, rho, exner, mr_n, mr,       &
-                          derived_fields, cloud_fields, twod_fields,     &
-                          radstep_fields, physics_incs, orography_fields,&
-                          jules_ancils, jules_prognostics,               &
-                          height_w3, height_wth, chi, timestep,          &
-                          shear, delta, max_diff_smag,                   &
-                          visc_m_blend, visc_h_blend,                    &
-                          twod_mesh_id)
+  !> @param[in,out] du                     Increment to wind field
+  !> @param[in,out] dtheta                 Increment to theta field
+  !> @param[in]     theta                  Theta field
+  !> @param[in]     rho                    Rho on w3 space
+  !> @param[in]     exner                  Exner pressure on w3 space
+  !> @param[in]     mr_n                   Mixing ratios at start of timestep
+  !> @param[in,out] mr                     Mixing ratios to be updated
+  !> @param[in]     derived_fields         Group of derived fields
+  !> @param[in,out] aerosol_fields         Group of aerosol fields
+  !> @param[in,out] cloud_fields           Group of cloud fields
+  !> @param[in,out] twod_fields            Group of 2D fields
+  !> @param[in,out] radstep_fields         Group of radiation timestep fields
+  !> @param[in,out] physics_incs           Group of physics increments
+  !> @param[in]     orography_fields       Group of 2D orography fields
+  !> @param[in,out] jules_ancils           Ancillary fields for Jules
+  !> @param[in,out] jules_prognostics      Prognostic fields for Jules
+  !> @param[in]     height_w3              Height in w3
+  !> @param[in]     height_wth             Height in wth
+  !> @param[in]     chi                    Coordinate array
+  !> @param[in]     timestep               Model timestep number
+  !> @param[in]     twod_mesh_id           Identifier given to current 2d mesh
+  subroutine slow_physics( du, dtheta, theta, rho, exner, mr_n, mr,            &
+                           derived_fields, aerosol_fields,                     &
+                           cloud_fields, twod_fields,                          &
+                           radstep_fields, physics_incs, orography_fields,     &
+                           jules_ancils, jules_prognostics,                    &
+                           height_w3, height_wth, chi, timestep,               &
+                           shear, delta, max_diff_smag,                        &
+                           visc_m_blend, visc_h_blend,                         &
+                           twod_mesh_id )
 
     implicit none
 
@@ -127,6 +129,7 @@ contains
 
     ! Field groups
     type( field_collection_type ), intent(inout) :: derived_fields
+    type( field_collection_type ), intent(inout) :: aerosol_fields
     type( field_collection_type ), intent(inout) :: cloud_fields
     type( field_collection_type ), intent(inout) :: twod_fields
     type( field_collection_type ), intent(inout) :: radstep_fields
@@ -146,7 +149,8 @@ contains
     ! Timestep value
     integer, intent(in) :: timestep
 
-    ! Local fields (should be created at initialization, but done here for the time being)
+    ! Local fields (should be created at initialization,
+    !               but done here for the time being)
     type( field_type ) :: dtheta_hs, dtheta_rad
     type( field_type ) :: du_hs
     type( field_type ) :: dmr_mphys(nummr)
@@ -219,6 +223,19 @@ contains
     end if
 
 #ifdef UM_PHYSICS
+    ! Later if aerosol_um .and. (microphysics_um .or. radiation_socrates)
+    if ( ( aerosol == aerosol_um ) .and.                                       &
+         ( microphysics == microphysics_um ) ) then
+      ! Calculate CDNC field from GLOMAP-mode climatology fields
+      if ( c_aerosol == c_aerosol_glomap_mode_climatology ) then
+
+        call glomap_aerosol_alg_step ( aerosol_fields,                         &
+                                       theta,                                  &
+                                       exner_in_wth )
+
+      end if
+    end if
+
     if ( microphysics == microphysics_um .and. &
          microphysics_placement == microphysics_placement_slow) then
       if (use_moisture) then
@@ -233,7 +250,8 @@ contains
 
         call mphys_alg_step( mr_n, theta,  exner, height_w3, height_wth,   &
                              derived_fields, cloud_fields, twod_fields,    &
-                             dmr_mphys, dtheta_mphys, physics_incs )
+                             aerosol_fields, dmr_mphys, dtheta_mphys,      &
+                             physics_incs )
 
         ! N.B. Call to microphysics passes in mr_n, which is intent(in) and
         !      represents the start of the timestep value of the mixing

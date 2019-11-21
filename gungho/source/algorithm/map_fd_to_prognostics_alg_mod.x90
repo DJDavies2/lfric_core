@@ -31,11 +31,12 @@ module map_fd_to_prognostics_alg_mod
 contains
 
   !> @details Setting FE prognostic fields from FD fields
-  !> @param[in,out] prognostic_fields Collection of prognostic fields
-  !> @param[in,out] mr Array of moisture mixing ratios
-  !> @param[in,out] cloud_fields Collection of cloud fields
-  !> @param[in,out] twod_fields Collection of 2D fields
-  !> @param[in]     fd_fields Collection of input Finite Difference fields
+  !> @param[in,out] prognostic_fields  Collection of prognostic fields
+  !> @param[in,out] mr                 Array of moisture mixing ratios
+  !> @param[in,out] cloud_fields       Collection of cloud fields
+  !> @param[in,out] twod_fields        Collection of 2D fields
+  !> @param[in]     fd_fields          Collection of input Finite Difference
+  !>                                    fields
   subroutine map_fd_to_prognostics(prognostic_fields, diagnostic_fields, &
                                    mr, moist_dyn,         &
                                    cloud_fields,          &
@@ -43,17 +44,18 @@ contains
                                    fd_fields)
 
 
-    use mr_indices_mod,             only : imr_v, imr_cl, imr_ci, imr_r, imr_s, imr_g
+    use mr_indices_mod,             only : imr_v, imr_cl, imr_ci, imr_r, &
+                                           imr_s, imr_g
     use moist_dyn_mod,              only : num_moist_factors
     use moist_dyn_factors_alg_mod,  only : moist_dyn_factors_alg
 
     implicit none
 
     ! FE Prognostic fields
-    type( field_collection_type), intent( inout ) :: prognostic_fields
-    type( field_collection_type), intent( inout ) :: diagnostic_fields
-    type( field_type ),           intent( inout ) :: mr(:)
-    type( field_type ),           intent( inout ) :: moist_dyn(num_moist_factors)
+    type(field_collection_type), intent( inout ) :: prognostic_fields
+    type(field_collection_type), intent( inout ) :: diagnostic_fields
+    type(field_type),            intent( inout ) :: mr(:)
+    type(field_type),            intent( inout ) :: moist_dyn(num_moist_factors)
 
     type( field_collection_type), intent( inout ) :: cloud_fields
     type( field_collection_type), intent( inout ) :: twod_fields

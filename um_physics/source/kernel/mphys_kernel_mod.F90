@@ -19,36 +19,38 @@ implicit none
 !-------------------------------------------------------------------------------
 ! Public types
 !-------------------------------------------------------------------------------
-!> The type declaration for the kernel. Contains the metadata needed by the Psy layer
+!> The type declaration for the kernel.
+!> Contains the metadata needed by the Psy layer
 
 type, public, extends(kernel_type) :: mphys_kernel_type
   private
-  type(arg_type) :: meta_args(25) = (/                                 &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    W3),                           &
-       arg_type(GH_FIELD,   GH_READ,    W3),                           &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    W3),                           &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_READ,    W3),                           &
-       arg_type(GH_FIELD,   GH_READ,    W3),                           &
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                       &
-       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                       &
-       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                       &
-       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                       &
-       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                       &
-       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                       &
-       arg_type(GH_FIELD,   GH_WRITE,   ANY_SPACE_1),                  & ! ls_rain
-       arg_type(GH_FIELD,   GH_WRITE,   ANY_SPACE_1),                  & ! ls_snow
-       arg_type(GH_FIELD,   GH_WRITE,   WTHETA)                        &
+  type(arg_type) :: meta_args(26) = (/                   &
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! mv_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! ml_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! mi_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! mr_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! mg_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! cf_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! cfl_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! cff_wth
+       arg_type(GH_FIELD,   GH_READ,    W3),             & ! u1_in_w3
+       arg_type(GH_FIELD,   GH_READ,    W3),             & ! u2_in_w3
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! w_phys
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! theta_in_wth
+       arg_type(GH_FIELD,   GH_READ,    W3),             & ! exner_in_w3
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! exner_in_wth
+       arg_type(GH_FIELD,   GH_READ,    W3),             & ! wetrho_in_w3
+       arg_type(GH_FIELD,   GH_READ,    W3),             & ! height_w3
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! height_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),         & ! cloud_drop_no_conc
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),         & ! dmv_wth
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),         & ! dml_wth
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),         & ! dmi_wth
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),         & ! dmr_wth
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),         & ! dmg_wth
+       arg_type(GH_FIELD,   GH_WRITE,   ANY_SPACE_1),    & ! ls_rain
+       arg_type(GH_FIELD,   GH_WRITE,   ANY_SPACE_1),    & ! ls_snow
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA)          & ! theta_inc
        /)
    integer :: iterates_over = CELLS
 contains
@@ -59,40 +61,52 @@ public mphys_code
 contains
 
 !> @brief Interface to the microphysics scheme
-!! @param[in] mv_wth vapour mass mixing ratio
-!! @param[in] ml_wth liquid cloud mass mixing ratio
-!! @param[in] mi_wth ice cloud mass mixing ratio
-!! @param[in] mr_wth rain mass mixing ratio
-!! @param[in] mg_wth graupel mass mixing ratio
-!! @param[in] cf_wth bulk cloud fraction
-!! @param[in] cfl_wth liquid cloud fraction
-!! @param[in] cff_wth ice cloud fraction
-!! @param[in] u1_in_w3 'zonal' wind in density space
-!! @param[in] u2_in_w3 'meridional' wind in density space
-!! @param[in] w_phys 'vertical' wind in theta space
-!! @param[in] theta_in_wth Potential temperature field
-!! @param[in] exner_in_w3 Exner pressure field in density space
-!! @param[in] exner_in_wth Exner pressure in potential temperature space
-!! @param[in] wetrho_in_w3 Wet density in density space
-!! @param[in] height_w3 Height of density space levels above surface
-!! @param[in] height_wth Height of potential temperature space levels above surface
-!! @param[out] dmv_wth increment to vapour mass mixing ratio
-!! @param[out] dml_wth increment to liquid cloud mass mixing ratio
-!! @param[out] dmi_wth increment to ice cloud mass mixing ratio
-!! @param[out] dmr_wth increment to rain mass mixing ratio
-!! @param[out] dmg_wth increment to graupel mass mixing ratio
-!! @param[out] ls_rain_2d large scale rain from twod_fields
-!! @param[out] ls_snow_2d large scale snow from twod_fields
-!! @param[out] theta_inc increment to theta
-!! @param[in] ndf_wth Number of degrees of freedom per cell for potential temperature space
-!! @param[in] undf_wth Number unique of degrees of freedom  for potential temperature space
-!! @param[in] map_wth Dofmap for the cell at the base of the column for potential temperature space
-!! @param[in] ndf_w3 Number of degrees of freedom per cell for density space
-!! @param[in] undf_w3 Number unique of degrees of freedom  for density space
-!! @param[in] map_w3 Dofmap for the cell at the base of the column for density space
-!! @param[in] ndf_2d Number of degrees of freedom per cell for 2D fields
-!! @param[in] undf_2d Number unique of degrees of freedom  for 2D fields
-!! @param[in] map_2d  Dofmap for the cell at the base of the column for 2D fields
+!> @param[in]  nlayers
+!> @param[in]  mv_wth              vapour mass mixing ratio
+!> @param[in]  ml_wth              liquid cloud mass mixing ratio
+!> @param[in]  mi_wth              ice cloud mass mixing ratio
+!> @param[in]  mr_wth              rain mass mixing ratio
+!> @param[in]  mg_wth              graupel mass mixing ratio
+!> @param[in]  cf_wth              bulk cloud fraction
+!> @param[in]  cfl_wth             liquid cloud fraction
+!> @param[in]  cff_wth             ice cloud fraction
+!> @param[in]  u1_in_w3            'zonal' wind in density space
+!> @param[in]  u2_in_w3            'meridional' wind in density space
+!> @param[in]  w_phys              'vertical' wind in theta space
+!> @param[in]  theta_in_wth        Potential temperature field
+!> @param[in]  exner_in_w3         Exner pressure field in density space
+!> @param[in]  exner_in_wth        Exner pressure in potential temperature space
+!> @param[in]  wetrho_in_w3        Wet density in density space
+!> @param[in]  height_w3           Height of density space levels above surface
+!> @param[in]  height_wth          Height of potential temperature space levels
+!>                                  above surface
+!> @param[in]  cloud_drop_no_conc  Cloud Droplet Number Concentration
+!> @param[out] dmv_wth             increment to vapour mass mixing ratio
+!> @param[out] dml_wth             increment to liquid cloud mass mixing ratio
+!> @param[out] dmi_wth             increment to ice cloud mass mixing ratio
+!> @param[out] dmr_wth             increment to rain mass mixing ratio
+!> @param[out] dmg_wth             increment to graupel mass mixing ratio
+!> @param[out] ls_rain_2d          large scale rain from twod_fields
+!> @param[out] ls_snow_2d          large scale snow from twod_fields
+!> @param[out] theta_inc           increment to theta
+!> @param[in]  ndf_wth             Number of degrees of freedom per cell for
+!>                                  potential temperature space
+!> @param[in]  undf_wth            Number unique of degrees of freedom for
+!>                                  potential temperature space
+!> @param[in]  map_wth             Dofmap for the cell at the base of the
+!>                                  column for potential temperature space
+!> @param[in]  ndf_w3              Number of degrees of freedom per cell for
+!>                                  density space
+!> @param[in]  undf_w3             Number unique of degrees of freedom for
+!>                                  density space
+!> @param[in]  map_w3              Dofmap for the cell at the base of the
+!>                                  column for density space
+!> @param[in]  ndf_2d              Number of degrees of freedom per cell for
+!>                                  2D fields
+!> @param[in]  undf_2d             Number unique of degrees of freedom for
+!>                                  2D fields
+!> @param[in]  map_2d              Dofmap for the cell at the base of the
+!>                                  column for 2D fields
 subroutine mphys_code( nlayers,                     &
                        mv_wth,   ml_wth,   mi_wth,  &
                        mr_wth,   mg_wth,            &
@@ -101,6 +115,7 @@ subroutine mphys_code( nlayers,                     &
                        theta_in_wth, exner_in_w3,   &
                        exner_in_wth, wetrho_in_w3,  &
                        height_w3, height_wth,       &
+                       cloud_drop_no_conc,          &
                        dmv_wth,  dml_wth,  dmi_wth, &
                        dmr_wth,  dmg_wth,           &
                        ls_rain_2d, ls_snow_2d,      &
@@ -109,9 +124,7 @@ subroutine mphys_code( nlayers,                     &
                        ndf_w3,  undf_w3,  map_w3,   &
                        ndf_2d, undf_2d, map_2d)
 
-    use constants_mod, only: r_def, i_def, r_um, i_um
-
-    use log_mod,       only: log_event, LOG_LEVEL_ERROR
+    use constants_mod,             only: r_def, i_def, r_um, i_um
 
     !---------------------------------------
     ! UM modules
@@ -165,6 +178,7 @@ subroutine mphys_code( nlayers,                     &
     real(kind=r_def), intent(in),  dimension(undf_w3)  :: wetrho_in_w3
     real(kind=r_def), intent(in),  dimension(undf_w3)  :: height_w3
     real(kind=r_def), intent(in),  dimension(undf_wth) :: height_wth
+    real(kind=r_def), intent(in),  dimension(undf_wth) :: cloud_drop_no_conc
     real(kind=r_def), intent(out), dimension(undf_wth) :: dmv_wth
     real(kind=r_def), intent(out), dimension(undf_wth) :: dml_wth
     real(kind=r_def), intent(out), dimension(undf_wth) :: dmi_wth
@@ -192,7 +206,8 @@ subroutine mphys_code( nlayers,                     &
          p_theta_levels, ls_rain3d, ls_snow3d, ls_graup3d, rainfrac3d,         &
          n_drop_pot, n_drop_3d, so4_aitken_work, so4_accu_work, so4_diss_work, &
          aged_bmass_work, cloud_bmass_work, aged_ocff_work, cloud_ocff_work,   &
-         nitr_acc_work, nitr_diss_work, aerosol_work, biogenic, rho_r2
+         nitr_acc_work, nitr_diss_work, aerosol_work, biogenic, rho_r2,        &
+         ukca_cdnc_array
 
     real(r_um), dimension(row_length,rows,model_levels, 1) :: arcl
 
@@ -207,7 +222,7 @@ subroutine mphys_code( nlayers,                     &
 
     real(r_um), dimension(model_levels) :: rhcpt
 
-    real(r_um), dimension(1,1,1) :: sea_salt_film, sea_salt_jet, ukca_cdnc
+    real(r_um), dimension(1,1,1) :: sea_salt_film, sea_salt_jet
 
     real(r_um) :: stashwork21(1)
 
@@ -247,12 +262,17 @@ subroutine mphys_code( nlayers,                     &
     easyaerosol_cdnc % dim2 = 1_i_um
     easyaerosol_cdnc % dim3 = 1_i_um
 
+    cdnc_dim1   = 1_i_um
+    cdnc_dim2   = 1_i_um
+    cdnc_dim3   = nlayers
+    do k = 1, nlayers
+      ukca_cdnc_array(1,1,k) = cloud_drop_no_conc(map_wth(1) + k)
+    end do
+
     salt_dim1   = 1_i_um    ! N.B. Ensure that l_use_seasalt is False
     salt_dim2   = 1_i_um
     salt_dim3   = 1_i_um
-    cdnc_dim1   = 1_i_um
-    cdnc_dim2   = 1_i_um
-    cdnc_dim3   = 1_i_um
+
     error_code  = 0_i_um
 
     rhc_row_length = 1_i_um
@@ -285,9 +305,8 @@ subroutine mphys_code( nlayers,                     &
 
     l_cosp_lsp = .false.
 
-    sea_salt_film(1,1,1) = 0.0_r_um
-    sea_salt_jet(1,1,1)  = 0.0_r_um
-    ukca_cdnc(1,1,1)     = 0.0_r_um
+    sea_salt_film(1,1,1)   = 0.0_r_um
+    sea_salt_jet(1,1,1)    = 0.0_r_um
 
     snow_depth(1,1) = 0.0_r_um
     land_frac(1,1)  = 0.0_r_um
@@ -313,14 +332,14 @@ subroutine mphys_code( nlayers,                     &
           r_rho_levels(i,j,k)   = height_w3(map_w3(1) + k-1) + planet_radius
           r_theta_levels(i,j,k) = height_wth(map_wth(1) + k) + planet_radius
 
-          rho_r2(i,j,k) = wetrho_in_w3(map_w3(1) + k-1) *                       &
+          rho_r2(i,j,k) = wetrho_in_w3(map_w3(1) + k-1) *                      &
                           ( r_rho_levels(i,j,k)**2 )
 
           u_on_p(i,j,k) = u1_in_w3(map_w3(1) + k-1)
           v_on_p(i,j,k) = u2_in_w3(map_w3(1) + k-1)
           w(i,j,k)   = w_phys(map_wth(1) + k)
 
-          t_n(i,j,k)    = theta_in_wth(map_wth(1) + k) *                        &
+          t_n(i,j,k)    = theta_in_wth(map_wth(1) + k) *                       &
                           exner_in_wth(map_wth(1) + k)
           t_work(i,j,k) = t_n(i,j,k)
 
@@ -455,7 +474,7 @@ subroutine mphys_code( nlayers,                     &
                 u_on_p, v_on_p,                                                &
                 sea_salt_film, sea_salt_jet,                                   &
                 salt_dim1, salt_dim2, salt_dim3,                               &
-                ukca_cdnc,                                                     &
+                ukca_cdnc_array,                                               &
                 cdnc_dim1, cdnc_dim2, cdnc_dim3,                               &
                 easyaerosol_cdnc,                                              &
                 biogenic,                                                      &

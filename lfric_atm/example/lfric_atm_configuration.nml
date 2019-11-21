@@ -1,3 +1,7 @@
+&aerosol
+    c_aerosol='glomap_mode_climatology'
+/
+
 &base_mesh
     f_lat_deg       = 45.0,
     filename        = 'mesh_BiP4x4-10000x10000.nc',
@@ -271,13 +275,13 @@
 &physics
     blayer_placement='fast',
     convection_placement='fast',
-    radiation_placement='slow',
-    microphysics_placement='slow',
-    spectral_gwd_placement='slow',
     orographic_drag_placement='slow',
     heldsuarez_thermo_placement=0,
     heldsuarez_wind_placement=0,
     hs_random=.false.,
+    microphysics_placement='slow',
+    radiation_placement='slow',
+    spectral_gwd_placement='slow'
 /
 
 &blayer
@@ -346,12 +350,14 @@
 /
 
 &section_choice
-    radiation='none',
+    aerosol='none',
     boundary_layer='um',
+    cloud='none',
     convection='none',
+    dynamics='gungho',
     microphysics='none',
-    cloud='none'
-    spectral_gwd='none'
+    radiation='socrates',
+    spectral_gwd='none',
     surface='jules'
     orographic_drag='none'
 /

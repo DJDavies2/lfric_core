@@ -7,15 +7,22 @@
 
 module um_init_mod
 
+  use aerosol_config_mod,   only : c_aerosol,                                  &
+                                   c_aerosol_glomap_mode_climatology
+
   use blayer_config_mod,    only : flux_bc_opt_in => flux_bc_opt
   use constants_mod,        only : i_def, i_um, r_def, r_um
-  use section_choice_config_mod, only : cloud,      &
-                                        cloud_um,   &
-                                        convection, &
+  use section_choice_config_mod, only : aerosol,                               &
+                                        aerosol_um,                            &
+                                        cloud,                                 &
+                                        cloud_um,                              &
+                                        convection,                            &
                                         convection_um
+
   use cloud_config_mod,      only : scheme,       &
                                     scheme_smith, &
                                     rh_crit
+
   use extrusion_config_mod,  only : domain_top
   use field_collection_mod,  only : field_collection_type
   use log_mod,               only : log_event,         &
@@ -94,6 +101,9 @@ contains
     use dyn_coriolis_mod, only: f3_at_u
     use dynamics_input_mod, only: numcycles
     use fsd_parameters_mod, only: fsd_eff_lam, fsd_eff_phi
+    use glomap_clim_option_mod, only: i_glomap_clim_setup,                 &
+                                      i_gc_sussocbc_5mode,                 &
+                                      l_glomap_clim_aie2
     use gen_phys_inputs_mod, only: l_mr_physics
     use jules_hydrology_mod, only: l_hydrology
     use jules_sea_seaice_mod, only: nice_use, iseasurfalg, emis_sea,       &
@@ -156,6 +166,7 @@ contains
     use init_jules_alg_mod, only: n_land_tile, n_sea_ice_tile, n_soil_levs
     use timestepping_config_mod, only: dt, outer_iterations
     use well_mixed_gases_config_mod, only: co2_mix_ratio
+    use ukca_mode_setup, only: ukca_mode_sussbcoc_5mode
 
     implicit none
 
@@ -503,6 +514,23 @@ contains
     else
       i_cld_vn = i_cld_off
     end if
+
+    if ( aerosol == aerosol_um ) then
+      ! later can add glomap_mode_interactive (aka UKCA), easyaerosol, etc
+      select case (c_aerosol)
+      case(c_aerosol_glomap_mode_climatology)
+        ! Set up the second aerosol indirect effect as true
+        l_glomap_clim_aie2 = .true.
+        ! Set up the correct mode and components for GLOMAP-mode
+        ! Default is 5 mode with SU SS OC BC components
+        i_glomap_clim_setup = i_gc_sussocbc_5mode
+        call ukca_mode_sussbcoc_5mode
+      case default
+        write( log_scratch_space, '(A,I0)' )                                   &
+        'Invalid aerosol option, stopping', c_aerosol
+        call log_event( log_scratch_space, LOG_LEVEL_ERROR )
+      end select
+    endif
 
     i_rhcpt               = rhcpt_off
     forced_cu             = off

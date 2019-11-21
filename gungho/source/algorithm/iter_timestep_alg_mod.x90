@@ -301,26 +301,28 @@ contains
   !>          by default. This means that there is one evaluation of old time
   !>          level terms, 2 evaluation of advective terms and 4 evaluations
   !>          of new time level terms and increment updates per timestep
-  !> @param[in,out] u                 3D wind field
-  !> @param[in,out] rho               Density
-  !> @param[in,out] theta             Potential temperature
-  !> @param[in,out] exner             Exner pressure
-  !> @param[in,out] mr                Mixing ratios
-  !> @param[in,out] moist_dyn         Factors for moist dynamics
-  !> @param[in,out] derived_fields    Group of derived fields
-  !> @param[in,out] cloud_fields      Group of cloud fields
-  !> @param[in,out] twod_fields       2D fields for UM physics
-  !> @param[in,out] radstep_fields    Group of radiation timestep fields
-  !> @param[in,out] physics_incs      Group of physics increments
-  !> @param[in]     orography_fields  Group of orography fields
-  !> @param[in,out] jules_ancils      Ancillary fields for Jules
-  !> @param[in,out] jules_prognostics Prognostic fields for Jules
-  !> @param[in]     timestep          Model timestep number
-  !> @param[in]     twod_mesh_id      Identifier given to the current 2d mesh
-  subroutine iter_alg_step(u, rho, theta, exner, mr, moist_dyn,           &
-                           derived_fields, cloud_fields, twod_fields,     &
-                           radstep_fields, physics_incs, orography_fields,&
-                           jules_ancils, jules_prognostics,               &
+  !> @param[in,out] u                      3D wind field
+  !> @param[in,out] rho                    Density
+  !> @param[in,out] theta                  Potential temperature
+  !> @param[in,out] exner                  Exner pressure
+  !> @param[in,out] mr                     Mixing ratios
+  !> @param[in,out] moist_dyn              Factors for moist dynamics
+  !> @param[in,out] derived_fields         Group of derived fields
+  !> @param[in,out] aerosol_fields         Group of aerosol fields
+  !> @param[in,out] cloud_fields           Group of cloud fields
+  !> @param[in,out] twod_fields            2D fields for UM physics
+  !> @param[in,out] radstep_fields         Group of radiation timestep fields
+  !> @param[in,out] physics_incs           Group of physics increments
+  !> @param[in,out] orography_fields       Group of orography fields
+  !> @param[in,out] jules_ancils           Ancillary fields for Jules
+  !> @param[in,out] jules_prognostics      Prognostic fields for Jules
+  !> @param[in]     timestep               Model timestep number
+  !> @param[in]     twod_mesh_id           Identifier given to current 2d mesh
+  subroutine iter_alg_step(u, rho, theta, exner, mr, moist_dyn,                &
+                           derived_fields, aerosol_fields,                     &
+                           cloud_fields, twod_fields,                          &
+                           radstep_fields, physics_incs, orography_fields,     &
+                           jules_ancils, jules_prognostics,                    &
                            timestep, twod_mesh_id)
 
     implicit none
@@ -334,6 +336,7 @@ contains
     type( field_collection_type ), intent(inout) :: jules_prognostics
     ! field groups
     type( field_collection_type ), intent( inout ) :: derived_fields
+    type( field_collection_type ), intent( inout ) :: aerosol_fields
     type( field_collection_type ), intent( inout ) :: cloud_fields
     type( field_collection_type ), intent( inout ) :: twod_fields
     type( field_collection_type ), intent( inout ) :: radstep_fields
@@ -465,14 +468,15 @@ contains
       call invoke( setval_c(dtheta, 0.0_r_def), &
                    setval_c(du, 0.0_r_def) )
 
-      call slow_physics(du, dtheta, state_n(igh_t), state_n(igh_d),     &
-                        state_n(igh_p), mr_n, mr_after_slow,            &
-                        derived_fields, cloud_fields, twod_fields,      &
-                        radstep_fields, physics_incs, orography_fields, &
-                        jules_ancils, jules_prognostics,                &
-                        height_w3, height_wth, chi, timestep,           &
-                        shear, delta, max_diff_smag,                    &
-                        visc_m, visc_h, twod_mesh_id)
+      call slow_physics( du, dtheta, state_n(igh_t), state_n(igh_d),           &
+                         state_n(igh_p), mr_n, mr_after_slow,                  &
+                         derived_fields, aerosol_fields,                       &
+                         cloud_fields, twod_fields,                            &
+                         radstep_fields, physics_incs, orography_fields,       &
+                         jules_ancils, jules_prognostics,                      &
+                         height_w3, height_wth, chi, timestep,                 &
+                         shear, delta, max_diff_smag,                          &
+                         visc_m, visc_h, twod_mesh_id )
       if (use_moisture) then
         do i_mr = 1, nummr
           call invoke( enforce_lower_bound_kernel_type (mr_after_slow(i_mr), 0.0_r_def) )

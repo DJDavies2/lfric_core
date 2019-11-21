@@ -46,6 +46,7 @@ module gungho_model_data_mod
   use map_fd_to_prognostics_alg_mod,    only : map_fd_to_prognostics
   use init_gungho_prognostics_alg_mod,  only : init_gungho_prognostics_alg
   use init_physics_prognostics_alg_mod, only : init_physics_prognostics_alg
+  use init_aerosol_alg_mod,             only : init_aerosol_alg
   use update_tstar_alg_mod,             only : update_tstar_alg
   use moist_dyn_factors_alg_mod,        only : moist_dyn_factors_alg
   use initial_cloud_alg_mod,            only : initial_cloud_alg
@@ -83,6 +84,8 @@ module gungho_model_data_mod
     type( field_collection_type ), public   :: diagnostic_fields
     !> FD fields derived from FE fields for use in physics time-stepping schemes
     type( field_collection_type ), public   :: derived_fields
+    !> Aerosol fields used by the physics time-stepping schemes
+    type( field_collection_type ), public   :: aerosol_fields
     !> Cloud fields used by the physics time-stepping schemes
     type( field_collection_type ), public   :: cloud_fields
     !> 2D fields used by the UM physics
@@ -93,7 +96,8 @@ module gungho_model_data_mod
     type( field_collection_type ), public   :: physics_incs
     !> Orography fields
     type( field_collection_type ), public :: orography_fields
-    !> Array of fields containing the moisture mixing ratios (auxiliary prognostic)
+    !> Array of fields containing the moisture mixing ratios
+    !>  (auxiliary prognostic)
     type( field_type ), allocatable, public :: mr(:)
     !> Array of fields containing the moist dynamics (auxiliary prognostic)
     type( field_type ), allocatable, public :: moist_dyn(:)
@@ -166,6 +170,7 @@ contains
                                        model_data%depository,        &
                                        model_data%prognostic_fields, &
                                        model_data%derived_fields,    &
+                                       model_data%aerosol_fields,    &
                                        model_data%cloud_fields,      &
                                        model_data%twod_fields,       &
                                        model_data%radstep_fields,    &
@@ -209,6 +214,7 @@ contains
 
         if (use_physics) then
           call init_physics_prognostics_alg( model_data%derived_fields,   &
+                                             model_data%aerosol_fields,   &
                                              model_data%cloud_fields,     &
                                              model_data%twod_fields,      &
                                              model_data%physics_incs,     &
@@ -249,7 +255,11 @@ contains
           call init_fd_prognostics_dump( model_data%fd_fields )
 
           ! Initialise jules fields
-          call init_jules_alg( model_data%jules_ancils, model_data%jules_prognostics )
+          call init_jules_alg( model_data%jules_ancils,                        &
+                               model_data%jules_prognostics )
+
+          ! Initialise aerosol climatology fields
+          call init_aerosol_alg( model_data%aerosol_fields )
 
           ! Initialise orography fields
           call init_orography_fields_alg(model_data%orography_fields)
@@ -392,6 +402,7 @@ contains
       call model_data%jules_ancils%clear()
       call model_data%jules_prognostics%clear()
       call model_data%derived_fields%clear()
+      call model_data%aerosol_fields%clear()
       call model_data%cloud_fields%clear()
       call model_data%twod_fields%clear()
       call model_data%radstep_fields%clear()
@@ -401,7 +412,8 @@ contains
       if (allocated(model_data%mr)) deallocate(model_data%mr)
       if (allocated(model_data%moist_dyn)) deallocate(model_data%moist_dyn)
 
-      call log_event( 'finalise_model_data: all fields have been cleared', LOG_LEVEL_INFO )
+      call log_event( 'finalise_model_data: all fields have been cleared',     &
+                       LOG_LEVEL_INFO )
 
   end subroutine finalise_model_data
 

@@ -24,7 +24,7 @@
   element_order    = 0
   coordinate_order = 2
   rehabilitate     = .true.
-  vorticity_in_w1  = .true. 
+  vorticity_in_w1  = .true.
 /
 
 &formulation
@@ -33,7 +33,7 @@
   use_moisture         = .false.
   shallow              = .false.
   use_physics          = .false.
-  use_wavedynamics     = .true. 
+  use_wavedynamics     = .true.
   dlayer_on            = .false.
   dry_static_adjust    = .false.
   set_hydrostatic_init = .false.
@@ -246,9 +246,10 @@ phi_centre_dec      = 0.0
 /
 
 &section_choice
-radiation='none',
+aerosol='none',
 boundary_layer='none',
+cloud='none',
 convection='none',
 microphysics='none',
-cloud='none'
+radiation='none'
 /

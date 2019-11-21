@@ -45,15 +45,17 @@ contains
 
     use extrusion_config_mod, only: method_uniform
     use cloud_config_mod,     only: scheme_smith
-    use section_choice_config_mod, only: boundary_layer_none, &
-                                         cloud_um,            &
-                                         convection_none,     &
-                                         dynamics_none,       &
-                                         surface_none,        &
-                                         microphysics_none,   &
-                                         radiation_none,      &
-                                         spectral_gwd_none,   &
-                                         orographic_drag_none
+
+    use section_choice_config_mod, only: aerosol_none,                         &
+                                         boundary_layer_none,                  &
+                                         cloud_um,                             &
+                                         convection_none,                      &
+                                         dynamics_none,                        &
+                                         microphysics_none,                    &
+                                         orographic_drag_none,                 &
+                                         radiation_none,                       &
+                                         spectral_gwd_none,                    &
+                                         surface_none
 
     implicit none
 
@@ -73,6 +75,7 @@ contains
     nlayers  = 3_i_def
 
     call feign_section_choice_config(              &
+             aerosol = aerosol_none,               &
              boundary_layer = boundary_layer_none, &
              cloud = cloud_um,                     &
              convection = convection_none,         &

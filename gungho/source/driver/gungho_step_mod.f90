@@ -66,6 +66,7 @@ module gungho_step_mod
     type( field_type ),            pointer :: mr(:) => null()
     type( field_type ),            pointer :: moist_dyn(:) => null()
     type( field_collection_type ), pointer :: derived_fields => null()
+    type( field_collection_type ), pointer :: aerosol_fields => null()
     type( field_collection_type ), pointer :: cloud_fields => null()
     type( field_collection_type ), pointer :: twod_fields => null()
     type( field_collection_type ), pointer :: radstep_fields => null()
@@ -90,6 +91,7 @@ module gungho_step_mod
     mr => model_data%mr
     moist_dyn => model_data%moist_dyn
     derived_fields => model_data%derived_fields
+    aerosol_fields => model_data%aerosol_fields
     cloud_fields => model_data%cloud_fields
     twod_fields => model_data%twod_fields
     radstep_fields => model_data%radstep_fields
@@ -116,10 +118,11 @@ module gungho_step_mod
     else  ! Not transport_only
       select case( method )
         case( method_semi_implicit )  ! Semi-Implicit
-          call iter_alg_step(u, rho, theta, exner, mr, moist_dyn,            &
-                             derived_fields, cloud_fields, twod_fields,      &
-                             radstep_fields, physics_incs, orography_fields, &
-                             jules_ancils, jules_prognostics,                &
+          call iter_alg_step(u, rho, theta, exner, mr, moist_dyn,              &
+                             derived_fields, aerosol_fields,                   &
+                             cloud_fields, twod_fields,                        &
+                             radstep_fields, physics_incs, orography_fields,   &
+                             jules_ancils, jules_prognostics,                  &
                              timestep, twod_mesh_id)
         case( method_rk )             ! RK
           call rk_alg_step(u, rho, theta, moist_dyn, exner)

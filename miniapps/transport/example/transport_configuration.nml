@@ -115,9 +115,10 @@ planar_domain_min_y=-1.0,
 /
 
 &section_choice
-radiation='none',
+aerosol='none',
 boundary_layer='none',
+cloud='none',
 convection='none',
 microphysics='none',
-cloud='none'
+radiation='none'
 /
