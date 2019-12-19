@@ -10,9 +10,6 @@ module pc2_pressure_forcing_alg_mod
 
    use field_mod,            only: field_type
    use field_collection_mod, only: field_collection_type
-   use log_mod,              only: log_event,         &
-                                   LOG_LEVEL_WARNING, LOG_LEVEL_INFO, &
-                                   LOG_LEVEL_ERROR
 
    implicit none
 

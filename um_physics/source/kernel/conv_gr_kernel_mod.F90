@@ -29,7 +29,7 @@ module conv_gr_kernel_mod
   !>
   type, public, extends(kernel_type) :: conv_gr_kernel_type
     private
-    type(arg_type) :: meta_args(76) = (/                &
+    type(arg_type) :: meta_args(79) = (/                &
         arg_type(GH_INTEGER, GH_READ),                  &! outer
         arg_type(GH_FIELD,   GH_READ,      W3),         &! rho_in_w3
         arg_type(GH_FIELD,   GH_READ,      W3),         &! wetrho_in_w3
@@ -105,11 +105,14 @@ module conv_gr_kernel_mod
         arg_type(GH_FIELD,   GH_READ,      ANY_SPACE_1),&! wstar_2d
         arg_type(GH_FIELD,   GH_READ,      ANY_SPACE_1),&! thv_flux
         arg_type(GH_FIELD,   GH_READ,      ANY_SPACE_1),&! parcel_buoyancy
-        arg_type(GH_FIELD,   GH_READ,      ANY_SPACE_1) &! qsat_at_lcl
+        arg_type(GH_FIELD,   GH_READ,      ANY_SPACE_1),&! qsat_at_lcl
+        arg_type(GH_FIELD,   GH_WRITE,     WTHETA),     &! dcfl_conv
+        arg_type(GH_FIELD,   GH_WRITE,     WTHETA),     &! dcfl_conv
+        arg_type(GH_FIELD,   GH_WRITE,     WTHETA)      &! dcfl_conv
         /)
     integer :: iterates_over = CELLS
   contains
-    procedure, nopass ::conv_gr_code
+    procedure, nopass :: conv_gr_code
   end type
 
   public conv_gr_code
@@ -197,6 +200,9 @@ contains
   !> @param[in]     thv_flux             Surface flux of theta_v
   !> @param[in]     parcel_buoyancy      Integral of parcel buoyancy
   !> @param[in]     qsat_at_lcl          Saturation specific hum at LCL
+  !> @param[out]    dcfl_conv            Increment to liquid cloud fraction from convection
+  !> @param[out]    dcff_conv            Increment to ice cloud fraction from convection
+  !> @param[out]    dbcf_conv            Increment to bulk cloud fraction from convection
   !> @param[in]     ndf_w3               Number of DOFs per cell for density space
   !> @param[in]     undf_w3              Number of unique DOFs  for density space
   !> @param[in]     map_w3               dofmap for the cell at the base of the column for density space
@@ -286,6 +292,9 @@ contains
                           thv_flux,                          &
                           parcel_buoyancy,                   &
                           qsat_at_lcl,                       &
+                          dcfl_conv,                         &
+	                  dcff_conv,                         &
+	                  dbcf_conv,                         &
                           ndf_w3,                            &
                           undf_w3,                           &
                           map_w3,                            &
@@ -384,6 +393,10 @@ contains
                            deep_term, cape_timescale, conv_rain, conv_snow, &
                            lowest_cv_base, lowest_cv_top, cv_base, cv_top
 
+    real(kind=r_def), dimension(undf_wth), intent(out) :: dcfl_conv
+    real(kind=r_def), dimension(undf_wth), intent(out) :: dcff_conv
+    real(kind=r_def), dimension(undf_wth), intent(out) :: dbcf_conv
+
     real(kind=r_def), intent(in) :: tile_fraction(undf_tile)
 
     !-----------------------------------------------------------------------
@@ -416,7 +429,7 @@ contains
          it_dq_deep, it_dq_shall, it_dq_midlev,                              &
          it_du_deep, it_du_shall, it_du_midlev,                              &
          it_dv_deep, it_dv_shall, it_dv_midlev,                              &
-         it_dt_dd, it_dq_dd, cf_liquid_inc, cf_frozen_inc, bulk_cf_inc
+         it_dt_dd, it_dq_dd
 
     ! profile fields from level 0 upwards
     real(r_um), dimension(row_length,rows,0:nlayers) ::                      &
@@ -945,12 +958,8 @@ contains
         if ( (qcl_conv(1,1,k)/cf_liquid_conv(1,1,k) ) > 2.0e-3_r_um ) then
           orig_value = cf_liquid_conv(1,1,k)
           cf_liquid_conv(1,1,k) = min(1.0,qcl_conv(1,1,k)/2.0e-3_r_um)
-          cf_liquid_inc(1,1,k)  = cf_liquid_inc(1,1,k)                   &
-                                  + cf_liquid_conv(1,1,k) - orig_value
           bulk_cf_conv(1,1,k) = bulk_cf_conv(1,1,k)                      &
                                 + cf_liquid_conv(1,1,k) - orig_value
-          bulk_cf_inc(1,1,k) = bulk_cf_inc(1,1,k)                        &
-                               + cf_liquid_conv(1,1,k) - orig_value
         end if
       end if
 
@@ -959,15 +968,21 @@ contains
         if ( (qcf_conv(1,1,k)/cf_frozen_conv(1,1,k)) > 2.0e-3_r_um ) then
           orig_value = cf_frozen_conv(1,1,k)
           cf_frozen_conv(1,1,k) = min(1.0,qcf_conv(1,1,k)/2.0e-3_r_um)
-          cf_frozen_inc(1,1,k)  = cf_frozen_inc(1,1,k)                  &
-                                  + cf_frozen_conv(1,1,k) - orig_value
           bulk_cf_conv(1,1,k) = bulk_cf_conv(1,1,k)                     &
                                 + cf_frozen_conv(1,1,k) - orig_value
-          bulk_cf_inc(1,1,k) = bulk_cf_inc(1,1,k)                       &
-                               + cf_frozen_conv(1,1,k) - orig_value
         end if
       end if
     end do
+
+    ! Store cloud fraction increments for adding on later if using PC2
+    do k = 1, n_conv_levels
+      dcfl_conv(map_wth(1) + k) = cf_liquid_conv(1,1,k) - cf_liq(map_wth(1) + k)
+      dcff_conv(map_wth(1) + k) = cf_frozen_conv(1,1,k) - cf_ice(map_wth(1) + k)
+      dbcf_conv(map_wth(1) + k) = bulk_cf_conv(1,1,k)   - cf_bulk(map_wth(1) + k)
+    end do
+    dcfl_conv(map_wth(1) + 0) = dcfl_conv(map_wth(1) + 1)
+    dcff_conv(map_wth(1) + 0) = dcff_conv(map_wth(1) + 1)
+    dbcf_conv(map_wth(1) + 0) = dbcf_conv(map_wth(1) + 1)
 
     ! Store convective downdraught mass fluxes at cloud base
     ! if required for surface exchange.

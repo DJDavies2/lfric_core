@@ -16,6 +16,8 @@ module cld_kernel_mod
 
   implicit none
 
+  private
+
   !> Kernel metadata type.
   !>
   type, public, extends(kernel_type) :: cld_kernel_type
@@ -38,7 +40,7 @@ module cld_kernel_mod
         /)
     integer :: iterates_over = CELLS
   contains
-    procedure, nopass ::cld_code
+    procedure, nopass :: cld_code
   end type
 
   public cld_code
@@ -46,30 +48,35 @@ module cld_kernel_mod
 contains
 
 !> @brief Interface to the cloud scheme
-!! @param[in]    nlayers       Number of layers
-!! @param[in]    theta_in_wth  predicted theta in its native space
-!! @param[in]    exner_in_w3   Pressure in the w3 space
-!! @param[in]    exner_in_wth  Exner Pressure in the theta space
-!! @param[in]    rh_crit_wth   Critical Relative Humidity
-!! @param[in]    ntml_2d       Boundary layer top level
-!! @param[in]    cumulus_2d    Cumulus flag
-!! @param[in,out] m_v           Vapour mixing ratio in wth
-!! @param[in,out] m_cl          Cloud liquid mixing ratio in wth
-!! @param[in,out] m_ci          Ice liquid mixing ratio in wth
-!! @param[in,out] cf_area       Area cloud fraction
-!! @param[in,out] cf_ice        Ice cloud fraction
-!! @param[in,out] cf_liq        Liquid cloud fraction
-!! @param[in,out] cf_bulk       Bulk cloud fraction
-!! @param[out]   theta_inc     increment to theta
-!! @param[in]    ndf_wth       Number of degrees of freedom per cell for potential temperature space
-!! @param[in]    undf_wth      Number unique of degrees of freedom  for potential temperature space
-!! @param[in]    map_wth       Dofmap for the cell at the base of the column for potential temperature space
-!! @param[in]    ndf_w3        Number of degrees of freedom per cell for density space
-!! @param[in]    undf_w3       Number unique of degrees of freedom  for density space
-!! @param[in]    map_w3        Dofmap for the cell at the base of the column for density space
-!! @param[in]    ndf_2d        Number of degrees of freedom per cell for 2D fields
-!! @param[in]    undf_2d       Number unique of degrees of freedom  for 2D fields
-!! @param[in]    map_2d        Dofmap for the cell at the base of the column for 2D  ields
+!> @details The UM large-scale cloud scheme:
+!>          determines the fraction of the grid-box that is covered by cloud
+!>          and the amount of liquid and ice condensate present in those clouds. 
+!>          Here there is an interface to the Smith cloud scheme. Which is the 
+!>          scheme described in UMDP 29.
+!> @param[in]     nlayers       Number of layers
+!> @param[in]     theta_in_wth  predicted theta in its native space
+!> @param[in]     exner_in_w3   Pressure in the w3 space
+!> @param[in]     exner_in_wth  Exner Pressure in the theta space
+!> @param[in]     rh_crit_wth   Critical Relative Humidity
+!> @param[in]     ntml_2d       Boundary layer top level
+!> @param[in]     cumulus_2d    Cumulus flag
+!> @param[in,out] m_v           Vapour mixing ratio in wth
+!> @param[in,out] m_cl          Cloud liquid mixing ratio in wth
+!> @param[in,out] m_ci          Ice liquid mixing ratio in wth
+!> @param[in,out] cf_area       Area cloud fraction
+!> @param[in,out] cf_ice        Ice cloud fraction
+!> @param[in,out] cf_liq        Liquid cloud fraction
+!> @param[in,out] cf_bulk       Bulk cloud fraction
+!> @param[out]    theta_inc     increment to theta
+!> @param[in]     ndf_wth       Number of degrees of freedom per cell for potential temperature space
+!> @param[in]     undf_wth      Number unique of degrees of freedom  for potential temperature space
+!> @param[in]     map_wth       Dofmap for the cell at the base of the column for potential temperature space
+!> @param[in]     ndf_w3        Number of degrees of freedom per cell for density space
+!> @param[in]     undf_w3       Number unique of degrees of freedom  for density space
+!> @param[in]     map_w3        Dofmap for the cell at the base of the column for density space
+!> @param[in]     ndf_2d        Number of degrees of freedom per cell for 2D fields
+!> @param[in]     undf_2d       Number unique of degrees of freedom  for 2D fields
+!> @param[in]     map_2d        Dofmap for the cell at the base of the column for 2D  ields
 
 subroutine cld_code(nlayers,      &
                     theta_in_wth, &
@@ -109,32 +116,31 @@ subroutine cld_code(nlayers,      &
 
     implicit none
 
-      ! Arguments
-      integer(kind=i_def), intent(in)     :: nlayers
-      integer(kind=i_def), intent(in)     :: ndf_wth, ndf_w3
-      integer(kind=i_def), intent(in)     :: ndf_2d, undf_2d
-      integer(kind=i_def), intent(in)     :: undf_wth, undf_w3
+    ! Arguments
+    integer(kind=i_def), intent(in)     :: nlayers
+    integer(kind=i_def), intent(in)     :: ndf_wth, ndf_w3
+    integer(kind=i_def), intent(in)     :: ndf_2d, undf_2d
+    integer(kind=i_def), intent(in)     :: undf_wth, undf_w3
 
-      integer(kind=i_def), intent(in),    dimension(ndf_wth)  :: map_wth
-      integer(kind=i_def), intent(in),    dimension(ndf_w3)   :: map_w3
-      integer(kind=i_def), intent(in),    dimension(ndf_2d)   :: map_2d
+    integer(kind=i_def), intent(in),    dimension(ndf_wth)  :: map_wth
+    integer(kind=i_def), intent(in),    dimension(ndf_w3)   :: map_w3
+    integer(kind=i_def), intent(in),    dimension(ndf_2d)   :: map_2d
 
-      real(kind=r_def),    intent(in),    dimension(undf_w3)  :: exner_in_w3
-      real(kind=r_def),    intent(in),    dimension(undf_wth) :: exner_in_wth
-      real(kind=r_def),    intent(in),    dimension(undf_wth) :: theta_in_wth
-      real(kind=r_def),    intent(in),    dimension(undf_wth) :: rh_crit_wth
-      real(kind=r_def),    intent(in),    dimension(undf_2d)  :: ntml_2d, cumulus_2d
-      real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_v
-      real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_cl
-      real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_ci
-      real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_area
-      real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_ice
-      real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_liq
-      real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_bulk
-      real(kind=r_def),    intent(out),   dimension(undf_wth) :: theta_inc
+    real(kind=r_def),    intent(in),    dimension(undf_w3)  :: exner_in_w3
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: exner_in_wth
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: theta_in_wth
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: rh_crit_wth
+    real(kind=r_def),    intent(in),    dimension(undf_2d)  :: ntml_2d, cumulus_2d
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_v
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_cl
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_ci
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_area
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_ice
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_liq
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_bulk
+    real(kind=r_def),    intent(out),   dimension(undf_wth) :: theta_inc
 
-! local variables for the kernel
-
+    ! Local variables for the kernel
     integer (i_um):: k
 
     integer (i_um):: rhc_row_length, rhc_rows
@@ -218,8 +224,6 @@ subroutine cld_code(nlayers,      &
                  cfl_inout, cff_inout ,                               &
                  errorstatus)
 
-
-
     ! update main model prognostics
     !-----------------------------------------------------------------------
 
@@ -244,7 +248,6 @@ subroutine cld_code(nlayers,      &
     cf_liq(map_wth(1) + 0) = cf_liq(map_wth(1) + 1)
     cf_ice(map_wth(1) + 0) = cf_ice(map_wth(1) + 1)
     cf_area(map_wth(1) + 0) = cf_area(map_wth(1) + 1)
-
 
 end subroutine cld_code
 

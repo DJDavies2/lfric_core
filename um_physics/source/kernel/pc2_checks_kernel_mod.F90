@@ -16,6 +16,8 @@ use kernel_mod,   only: kernel_type
 
 implicit none
 
+private
+
 !-------------------------------------------------------------------------------
 ! Public types
 !-------------------------------------------------------------------------------
@@ -45,23 +47,14 @@ contains
   procedure, nopass :: pc2_checks_code
 end type
 
-!-------------------------------------------------------------------------------
-! Constructors
-!-------------------------------------------------------------------------------
-
-! Overload the default structure constructor for function space
-interface pc2_checks_kernel_type
-   module procedure pc2_checks_kernel_constructor
-end interface
-
 public pc2_checks_code
 contains
 
-type(pc2_checks_kernel_type) function pc2_checks_kernel_constructor() result(self)
-  return
-end function pc2_checks_kernel_constructor
-
 !> @brief Interface to the pc2 checks code
+!> @details Performs some consistency checks as part of the PC2
+!>          as a result of combining cloud increments caculated in 
+!>          parallel without knowledge of each other.
+!>          The PC2 cloud scheme is described in UMDP 30.
 !> @param[in]  nlayers              Number of layers
 !> @param[in]  mv_wth               vapour mass mixing ratio
 !> @param[in]  ml_wth               liquid cloud mass mixing ratio
@@ -83,6 +76,7 @@ end function pc2_checks_kernel_constructor
 !> @param[in]  map_wth  Dofmap for the cell at the base of the column for potential temperature space
 
 subroutine pc2_checks_code( nlayers,                   &
+                                           ! Atm fields
                             mv_wth,                    &
                             ml_wth,                    &
                             mi_wth,                    &
@@ -112,10 +106,8 @@ subroutine pc2_checks_code( nlayers,                   &
 
     use nlsizes_namelist_mod,       only: row_length, rows, model_levels
     use pc2_checks_mod,             only: pc2_checks
-    use level_heights_mod,          only: r_rho_levels, r_theta_levels
-    use planet_constants_mod,       only: p_zero, kappa, planet_radius
+    use planet_constants_mod,       only: p_zero, kappa
     use gen_phys_inputs_mod,        only: l_mr_physics
-    use atm_step_local,             only: rhc_row_length, rhc_rows
 
     implicit none
 
@@ -182,7 +174,7 @@ subroutine pc2_checks_code( nlayers,                   &
       cff_work(1,1,k) = cff_wth(map_wth(1) + k)
     end do
 
-    CALL pc2_checks( pressure,                                 &
+    call pc2_checks( pressure,                                 &
                      t_work, bcf_work, cfl_work, cff_work,     &
                      qv_work, qcl_work, qcf_work, l_mr_physics,&
                      row_length, rows, model_levels,           &

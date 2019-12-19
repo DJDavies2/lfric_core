@@ -16,6 +16,8 @@ use kernel_mod,   only: kernel_type
 
 implicit none
 
+private
+
 !-------------------------------------------------------------------------------
 ! Public types
 !-------------------------------------------------------------------------------
@@ -46,21 +48,8 @@ contains
   procedure, nopass :: pc2_homogeneous_code
 end type
 
-!-------------------------------------------------------------------------------
-! Constructors
-!-------------------------------------------------------------------------------
-
-! Overload the default structure constructor for function space
-interface pc2_homogeneous_kernel_type
-   module procedure pc2_homogeneous_kernel_constructor
-end interface
-
 public pc2_homogeneous_code
 contains
-
-type(pc2_homogeneous_kernel_type) function pc2_homogeneous_kernel_constructor() result(self)
-  return
-end function pc2_homogeneous_kernel_constructor
 
 !> @brief Interface to the pc2 homogeneous forcing code
 !> @param[in]    nlayers            Number of layers
@@ -225,7 +214,7 @@ subroutine pc2_homogeneous_code( nlayers,                    &
                              dpdt,               & !   pressure forcing
                                                    ! Quantities for PC2 erosion:
                              zero,               & !    dbsdtbs0
-                             zero,               & !       dbsdtbs1
+                             zero,               & !    dbsdtbs1
                                                    ! Model switches
                              l_mr_physics )        !   mixing ratio
 

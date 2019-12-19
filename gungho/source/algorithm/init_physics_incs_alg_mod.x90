@@ -34,12 +34,17 @@ contains
     ! local fields to unpack
     type( field_type ), pointer :: dt_conv => null()
     type( field_type ), pointer :: dmv_conv => null()
-    ! Convective cloud increments
+    ! Convective cloud condensate increments
     type( field_type ), pointer :: dmcl_conv => null()
     type( field_type ), pointer :: dmcf_conv => null()
-    ! convective CMT increments
+    ! Convective cloud fraction increments
+    type( field_type ), pointer :: dcfl_conv => null()
+    type( field_type ), pointer :: dcff_conv => null()
+    type( field_type ), pointer :: dbcf_conv => null()
+    ! Convective momentum transport increments
     type( field_type ), pointer :: du_conv => null()
     type( field_type ), pointer :: dv_conv => null()
+    ! Other
     type( field_type ), pointer :: dtl_mphys => null()
     type( field_type ), pointer :: dmt_mphys => null()
     type( field_type ), pointer :: sw_heating_rate => null()
@@ -53,6 +58,9 @@ contains
     dmv_conv => physics_incs%get_field('dmv_conv')
     dmcl_conv => physics_incs%get_field('dmcl_conv')
     dmcf_conv => physics_incs%get_field('dmcf_conv')
+    dcfl_conv => physics_incs%get_field('dcfl_conv')
+    dcff_conv => physics_incs%get_field('dcff_conv')
+    dbcf_conv => physics_incs%get_field('dbcf_conv')
     du_conv => physics_incs%get_field('du_conv')
     dv_conv => physics_incs%get_field('dv_conv')
     dtl_mphys => physics_incs%get_field('dtl_mphys')
@@ -68,6 +76,9 @@ contains
                  setval_c(dmv_conv, 0.0_r_def),        &
                  setval_c(dmcl_conv, 0.0_r_def),       &
                  setval_c(dmcf_conv, 0.0_r_def),       &
+                 setval_c(dcfl_conv, 0.0_r_def),       &
+                 setval_c(dcff_conv, 0.0_r_def),       &
+                 setval_c(dbcf_conv, 0.0_r_def),       &
                  setval_c(du_conv, 0.0_r_def),         &
                  setval_c(dv_conv, 0.0_r_def),         &
                  setval_c(dtl_mphys, 0.0_r_def),       &

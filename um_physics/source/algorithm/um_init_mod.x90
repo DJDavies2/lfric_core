@@ -76,7 +76,8 @@ contains
          rhcrit, ice_fraction_method,falliceshear_method, cff_spread_rate, &
          l_subgrid_qv, ice_width, smith_orig, i_eacf,                      &
          i_pc2_checks_cld_frac_method, l_ensure_min_in_cloud_qcf,          &
-         l_simplify_pc2_init_logic, dbsdtbs_turb_0
+         l_simplify_pc2_init_logic, dbsdtbs_turb_0,                        &
+         i_pc2_erosion_method
     use cv_run_mod, only: icvdiag, cvdiag_inv, cvdiag_sh_wtest,            &
          limit_pert_opt, tv1_sd_opt, iconv_congestus, iconv_deep,          &
          ent_fac_dp, cldbase_opt_dp, cldbase_opt_sh, w_cape_limit,         &
@@ -153,7 +154,8 @@ contains
          rows, land_field, ntiles, sm_levels, tr_vars, cloud_levels,       &
          n_cca_lev
     use pc2_constants_mod, only: i_cld_off, i_cld_smith, i_cld_pc2,        &
-         rhcpt_off, acf_off, real_shear
+         rhcpt_off, acf_off, real_shear,                                   &
+         pc2eros_exp_rh,pc2eros_hybrid_allfaces,pc2eros_hybrid_sidesonly
     use rad_input_mod, only: two_d_fsd_factor, co2_mmr
     use timestep_mod, only: timestep
     use trignometric_mod, only: cos_theta_latitude
@@ -549,6 +551,7 @@ contains
 
     if ( scheme == scheme_pc2 ) then
       i_pc2_checks_cld_frac_method = 2
+      i_pc2_erosion_method         = pc2eros_hybrid_sidesonly
       l_ensure_min_in_cloud_qcf    = .true.
       l_simplify_pc2_init_logic    = .true.
       dbsdtbs_turb_0               = 1.50e-4_r_um

@@ -16,6 +16,8 @@ use kernel_mod,   only: kernel_type
 
 implicit none
 
+private
+
 !-------------------------------------------------------------------------------
 ! Public types
 !-------------------------------------------------------------------------------
@@ -29,7 +31,7 @@ type, public, extends(kernel_type) :: pc2_initiation_kernel_type
        arg_type(GH_FIELD,   GH_READ,    WTHETA),      & ! mi_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),      & ! cfl_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),      & ! cff_wth
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),      & ! cf_wth
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),      & ! bcf_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),      & ! theta_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),      & ! exner_wth
        arg_type(GH_FIELD,   GH_READ,    W3),          & ! exner_w3
@@ -53,55 +55,46 @@ contains
   procedure, nopass :: pc2_initiation_code
 end type
 
-!-------------------------------------------------------------------------------
-! Constructors
-!-------------------------------------------------------------------------------
-
-! Overload the default structure constructor for function space
-interface pc2_initiation_kernel_type
-   module procedure pc2_initiation_kernel_constructor
-end interface
-
 public pc2_initiation_code
 contains
 
-type(pc2_initiation_kernel_type) function pc2_initiation_kernel_constructor() result(self)
-  return
-end function pc2_initiation_kernel_constructor
-
-!> @brief Interface to the microphysics scheme
-!> @param[in] mv_wth vapour mass mixing ratio
-!> @param[in] ml_wth liquid cloud mass mixing ratio
-!> @param[in] mi_wth liquid cloud mass mixing ratio
-!> @param[in] cfl_wth liquid cloud fraction
-!> @param[in] cff_wth ice cloud fraction
-!> @param[in] bcf_wth bulk cloud fraction
-!> @param[in] theta_wth Potential temperature field
-!> @param[in] exner_wth Exner pressure in potential temperature space
-!> @param[in] exner_w3 Exner pressure in w3 space
-!> @param[in] mv_n_wth Start of timestep vapour mass mixing ratio
-!> @param[in] ml_n_wth Start of timestep liquid cloud mass mixing ratio
-!> @param[in] theta_n_wth Start of timestep theta in theta space
-!> @param[in] exner_n_wth Start of timestep exner in theta space
-!> @param[in] zlcl_mixed The height of the lifting condensation level in the mixed layer
-!> @param[in] r_cumulus A real number representing the logical cumulus flag
+!> @brief Interface to pc2 initiation 
+!> @details Calculates whether cloud should be created from clear-sky conditions
+!>          or whether overcast conditions should be broken up.
+!>          More info is in UMDP 30.
+!> @param[in] nlayers         Number of layers
+!> @param[in] mv_wth          Vapour mass mixing ratio
+!> @param[in] ml_wth          Liquid cloud mass mixing ratio
+!> @param[in] mi_wth          Liquid cloud mass mixing ratio
+!> @param[in] cfl_wth         Liquid cloud fraction
+!> @param[in] cff_wth         Ice cloud fraction
+!> @param[in] bcf_wth         Bulk cloud fraction
+!> @param[in] theta_wth       Potential temperature field
+!> @param[in] exner_wth       Exner pressure in theta space
+!> @param[in] exner_w3        Exner pressure in w3 space
+!> @param[in] mv_n_wth        Start of timestep vapour mass mixing ratio
+!> @param[in] ml_n_wth        Start of timestep liquid cloud mass mixing ratio
+!> @param[in] theta_n_wth     Start of timestep theta in theta space
+!> @param[in] exner_n_wth     Start of timestep exner in theta space
+!> @param[in] zlcl_mixed      The height of the lifting condensation level in the mixed layer
+!> @param[in] r_cumulus       A real number representing the logical cumulus flag
 !> @param[out] dtheta_inc_wth Increment to theta in theta space
-!> @param[out] dqv_inc_wth Increment to water vapour in theta space
-!> @param[out] dqcl_inc_wth Increment to liquid water content in theta space
-!> @param[out] dqcf_inc_wth Increment to ice water content in theta space
-!> @param[out] dcfl_inc_wth Increment to liquid cloud fraction in theta space
-!> @param[out] dcff_inc_wth Increment to ice cloud fraction in theta space
-!> @param[out] dbcf_inc_wth Increment to bulk cloud fraction in theta space
-!> @param[in] rh_crit_wth Critical relative humidity in theta space
-!> @param[in] ndf_wth Number of degrees of freedom per cell for potential temperature space
-!> @param[in] undf_wth Number unique of degrees of freedom  for potential temperature space
-!> @param[in] map_wth Dofmap for the cell at the base of the column for potential temperature space
-!> @param[in] ndf_w3 Number of degrees of freedom per cell for density space
-!> @param[in] undf_w3 Number unique of degrees of freedom  for density space
-!> @param[in] map_w3 Dofmap for the cell at the base of the column for density space
-!> @param[in] ndf_2d Number of degrees of freedom per cell for density space
-!> @param[in] undf_2d Number unique of degrees of freedom  for density space
-!> @param[in] map_2d Dofmap for the cell at the base of the column for density space
+!> @param[out] dqv_inc_wth    Increment to water vapour in theta space
+!> @param[out] dqcl_inc_wth   Increment to liquid water content in theta space
+!> @param[out] dqcf_inc_wth   Increment to ice water content in theta space
+!> @param[out] dcfl_inc_wth   Increment to liquid cloud fraction in theta space
+!> @param[out] dcff_inc_wth   Increment to ice cloud fraction in theta space
+!> @param[out] dbcf_inc_wth   Increment to bulk cloud fraction in theta space
+!> @param[in] rh_crit_wth     Critical relative humidity in theta space
+!> @param[in] ndf_wth         Number of degrees of freedom per cell for theta space
+!> @param[in] undf_wth        Number unique of degrees of freedom  for theta space
+!> @param[in] map_wth         Dofmap for the cell at the base of the column for theta space
+!> @param[in] ndf_w3          Number of degrees of freedom per cell for density space
+!> @param[in] undf_w3         Number unique of degrees of freedom  for density space
+!> @param[in] map_w3          Dofmap for the cell at the base of the column for density space
+!> @param[in] ndf_2d          Number of degrees of freedom per cell for density space
+!> @param[in] undf_2d         Number of unique degrees of freedom for density space
+!> @param[in] map_2d          Dofmap for the cell at the base of the column for density space
 
 subroutine pc2_initiation_code( nlayers,                           &
                                 mv_wth,                            &
@@ -218,17 +211,14 @@ subroutine pc2_initiation_code( nlayers,                           &
 
     integer(i_um) :: k
 
-    ! Hardwired things for PC2 development
+    ! Hardwired things for PC2
     !
-    integer(i_um), parameter :: nSCMDpkgs=15
-
-    logical, parameter :: l_scmdiags(nscmdpkgs)=.false.
-
     integer(i_um), dimension(row_length,rows) :: i_dummy
+    integer(i_um), parameter :: nSCMDpkgs=15
+    logical,       parameter :: l_scmdiags(nscmdpkgs) = .false.
+    logical,       parameter :: calculate_increments  = .false.
 
-    LOGICAL, PARAMETER :: calculate_increments=.false.
-
-    ! Convert cumulus flag from read to logical
+    ! Convert cumulus flag from real to logical
     if (r_cumulus(map_2d(1))>0.5_r_def) then
       l_cumulus(1,1) = .true.
     else

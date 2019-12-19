@@ -1,0 +1,113 @@
+!-------------------------------------------------------------------------------
+! (c) Crown copyright 2019 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-------------------------------------------------------------------------------
+
+!> @brief Interface to the PC2 cloud scheme
+
+module pc2_conv_coupling_alg_mod
+
+   use field_mod,            only: field_type
+   use field_collection_mod, only: field_collection_type
+   use mr_indices_mod,       only: nummr, imr_v, imr_cl, imr_ci
+
+   implicit none
+
+   private
+
+   public pc2_conv_coupling_alg_step
+
+contains
+  !>@brief Run pc2_conv_coupling
+  !>@details Convection affects cloud condensate and cloud fraction.
+  !>         Increments from detrainment get calculated by the convection
+  !>         scheme itself.
+  !>         Increments from subsidence advection, subsidence warming and
+  !>         erosion get calculated downward from here.
+  !>         Fields do not get updated. Increments are passed back out.
+  !>         See UMDP30 for full scheme details.
+  !>@param[in,out] mr               Mixing ratios
+  !>@param[in,out] cloud_fields     Group of cloud fields
+  !>@param[in]     derived_fields   Group of derived fields
+  !>@param[in,out] physics_incs     Group of physics increments
+
+  subroutine pc2_conv_coupling_alg_step( mr, cloud_fields, &
+                                         derived_fields, physics_incs )
+
+    use io_config_mod,                only: subroutine_timers
+    use timer_mod,                    only: timer
+    use pc2_conv_coupling_kernel_mod, only: pc2_conv_coupling_kernel_type
+
+    implicit none
+
+    type( field_type ), intent( inout ) :: mr(nummr)
+
+    type( field_collection_type ), intent(inout) :: cloud_fields
+    type( field_collection_type ), intent(in)    :: derived_fields
+    type( field_collection_type ), intent(inout) :: physics_incs
+
+    ! Temporary unpacked fields from collections
+    type( field_type ), pointer :: exner_wth       => null()
+    type( field_type ), pointer :: theta_star      => null()
+
+    type( field_type ), pointer :: liquid_fraction => null()
+    type( field_type ), pointer :: ice_fraction    => null()
+    type( field_type ), pointer :: bulk_fraction   => null()
+
+    type( field_type ), pointer :: dt_conv         => null()
+    type( field_type ), pointer :: dmv_conv        => null()
+    type( field_type ), pointer :: dmcl_conv       => null()
+    type( field_type ), pointer :: dmcf_conv       => null()
+    type( field_type ), pointer :: dcfl_conv       => null()
+    type( field_type ), pointer :: dcff_conv       => null()
+    type( field_type ), pointer :: dbcf_conv       => null()
+
+    if ( subroutine_timers ) call timer ("pc2_conv_coupling_alg_step")
+
+    exner_wth       => derived_fields%get_field('exner_in_wth')
+    theta_star      => derived_fields%get_field('theta_star')
+
+    liquid_fraction => cloud_fields%get_field('liquid_fraction')
+    ice_fraction    => cloud_fields%get_field('ice_fraction')
+    bulk_fraction   => cloud_fields%get_field('bulk_fraction')
+
+    dt_conv         => physics_incs%get_field('dt_conv')
+    dmv_conv        => physics_incs%get_field('dmv_conv')
+    dmcl_conv       => physics_incs%get_field('dmcl_conv')
+    dmcf_conv       => physics_incs%get_field('dmcf_conv')
+    dcfl_conv       => physics_incs%get_field('dcfl_conv')
+    dcff_conv       => physics_incs%get_field('dcff_conv')
+    dbcf_conv       => physics_incs%get_field('dbcf_conv')
+
+    call invoke ( name="update_from_pc2_conv_coupling",            &
+                                                                   !
+                  pc2_conv_coupling_kernel_type ( theta_star,      &
+                                                  mr(imr_v),       &
+                                                  mr(imr_cl),      &
+                                                  mr(imr_ci),      &
+                                                  liquid_fraction, &
+                                                  ice_fraction,    &
+                                                  bulk_fraction,   &
+                                                  exner_wth,       &
+                                                  dt_conv,         &
+                                                  dmv_conv,        &
+                                                  dmcl_conv,       &
+                                                  dmcf_conv,       &
+                                                  dcfl_conv,       &
+                                                  dcff_conv,       &
+                                                  dbcf_conv ),     &
+                                                                   !
+                  ! All variables are being updated apart from theta
+                  inc_X_plus_Y(mr(imr_v),       dmv_conv),         &
+                  inc_X_plus_Y(mr(imr_cl),      dmcl_conv),        &
+                  inc_X_plus_Y(mr(imr_ci),      dmcf_conv),        &
+                  inc_X_plus_Y(liquid_fraction, dcfl_conv),        &
+                  inc_X_plus_Y(ice_fraction,    dcff_conv),        &
+                  inc_X_plus_Y(bulk_fraction,   dbcf_conv)         )
+
+    if ( subroutine_timers ) call timer ("pc2_conv_coupling_alg_step")
+
+  end subroutine pc2_conv_coupling_alg_step
+
+end module pc2_conv_coupling_alg_mod

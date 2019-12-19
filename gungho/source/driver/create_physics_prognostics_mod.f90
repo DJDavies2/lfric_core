@@ -456,6 +456,12 @@ contains
       'dmcl_conv', vector_space, checkpoint_restart_flag )
     call add_physics_field( physics_incs, depository, prognostic_fields,       &
       'dmcf_conv', vector_space, checkpoint_restart_flag )
+    call add_physics_field(physics_incs, depository, prognostic_fields,        &
+      'dcfl_conv', vector_space, checkpoint_restart_flag)
+    call add_physics_field(physics_incs, depository, prognostic_fields,        &
+      'dcff_conv', vector_space, checkpoint_restart_flag)
+    call add_physics_field(physics_incs, depository, prognostic_fields,        &
+      'dbcf_conv', vector_space, checkpoint_restart_flag)
     call add_physics_field( physics_incs, depository, prognostic_fields,       &
       'dtl_mphys', vector_space, checkpoint_restart_flag )
     call add_physics_field( physics_incs, depository, prognostic_fields,       &
