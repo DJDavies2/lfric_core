@@ -54,17 +54,19 @@ contains
   !! @param[in] nlayers   Number of layers.
   !! @param[in] ncell_3d  ncell*ndf
   !! @param[out] mm       Local stencil or mass matrix.
-  !! @param[in] chi1      Physical coordinate in the 1st dir.
-  !! @param[in] chi2      Physical coordinate in the 2nd dir.
-  !! @param[in] chi3      Physical coordinate in the 3rd dir.
-  !! @param[in] ndf_w2b   Degrees of freedom per cell.
-  !! @param[in] basis_w2b Vector basis functions evaluated at quadrature points.
-  !! @param[in] ndf_chi   Degrees of freedum per cell for chi field.
-  !! @param[in] undf_chi  Unique degrees of freedum  for chi field.
+  !! @param[in] chi1      Physical coordinates in the 1st dir.
+  !! @param[in] chi2      Physical coordinates in the 2nd dir.
+  !! @param[in] chi3      Physical coordinates in the 3rd dir.
+  !! @param[in] ndf_w2b   Degrees of freedom per cell for W2broken space.
+  !! @param[in] basis_w2b Vector basis functions evaluated at quadrature points
+  !!                      for W2broken space.
+  !! @param[in] ndf_chi   Degrees of freedom per cell for chi field.
+  !! @param[in] undf_chi  Unique degrees of freedom for chi field.
   !! @param[in] map_chi   Dofmap for the cell at the base of the column, for the
   !!                      space on which the chi field lives.
   !! @param[in] diff_basis_chi Vector differential basis functions evaluated at
-  !!                           quadrature points.
+  !!                      quadrature points for the space on which the chi
+  !!                      field lives.
   !! @param[in] nqp_h     Number of horizontal quadrature points.
   !! @param[in] nqp_v     Number of vertical quadrature points.
   !! @param[in] wqp_h     Horizontal quadrature weights.

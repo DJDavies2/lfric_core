@@ -51,32 +51,30 @@ module compute_broken_div_operator_kernel_mod
 contains
 
   !> @brief Computes the broken (cell-local) divergence operator
-  !! @param[in] cell     Cell number
+  !! @param[in] cell     Cell number.
   !! @param[in] nlayers  Number of layers.
   !! @param[in] ncell_3d ncell*ndf
   !! @param[out] broken_div Local stencil of the broken div operator.
-  !! @param[in] chi1     Data array for chi in the 1st dir
-  !! @param[in] chi2     Data array for chi in the 2nd dir
-  !! @param[in] chi3     Data array for chi in the 3rd dir
-  !! @param[in] ndf_w3   Number of degrees of freedom per cell.
-  !! @param[in] basis_w3 Scalar basis functions
-  !!                     evaluated at quadrature points.
-  !! @param[in] ndf_w2b  Number of degrees of freedom per cell.
-  !! @param[in] diff_basis_w2b Differential vector basis
-  !!                     functions evaluated at quadrature points.
-  !! @param[in] ndf_chi  Number of degrees of freedom per cell for chi
-  !!                     field.
-  !! @param[in] undf_chi Number of unique degrees of freedom  for chi
-  !!                     field.
-  !! @param[in] map_chi  Dofmap for the cell at the
-  !!                     base of the column, for the space on which the chi field
-  !!                     lives.
-  !! @param[in] diff_basis_chi Vector differential
-  !!                    basis functions evaluated at quadrature points.
-  !! @param[in] nqp_h    Number of horizontal quadrature points
-  !! @param[in] nqp_v    Number of vertical quadrature points
-  !! @param[in] wqp_h    Horizontal quadrature weights
-  !! @param[in] wqp_v    Vertical quadrature weights
+  !! @param[in] chi1     Physical coordinates in the 1st dir.
+  !! @param[in] chi2     Physical coordinates in the 2nd dir.
+  !! @param[in] chi3     Physical coordinates in the 3rd dir.
+  !! @param[in] ndf_w3   Number of degrees of freedom per cell for W3 space.
+  !! @param[in] basis_w3 Scalar basis functions evaluated at quadrature points
+  !!                     for W3 space.
+  !! @param[in] ndf_w2b  Number of degrees of freedom per cell for W2broken space.
+  !! @param[in] diff_basis_w2b Differential vector basis functions evaluated
+  !!                     at quadrature points for W2broken space.
+  !! @param[in] ndf_chi  Number of degrees of freedom per cell for chi field.
+  !! @param[in] undf_chi Number of unique degrees of freedom for chi field.
+  !! @param[in] map_chi  Dofmap for the cell at the base of the column, for the
+  !!                     space on which the chi field lives.
+  !! @param[in] diff_basis_chi Vector differential basis functions evaluated at
+  !!                     quadrature points for the space on which the chi
+  !!                     field lives.
+  !! @param[in] nqp_h    Number of horizontal quadrature points.
+  !! @param[in] nqp_v    Number of vertical quadrature points.
+  !! @param[in] wqp_h    Horizontal quadrature weights.
+  !! @param[in] wqp_v    Vertical quadrature weights.
   subroutine compute_broken_div_operator_code(cell, nlayers, ncell_3d,       &
                                               broken_div,                    &
                                               chi1, chi2, chi3,              &

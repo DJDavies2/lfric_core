@@ -76,20 +76,20 @@ contains
 
   !> @brief Compute the boundary integral terms in the hybridized formulation of
   !!        the momentum and transmission equations (terms with Lagrange multipliers).
-  !! @param[in] cell The cell id
-  !! @param[in] nlayers Number of layers
+  !! @param[in] cell The cell id.
+  !! @param[in] nlayers Number of layers.
   !! @param[in] ncell_3d ncell*nlayers
-  !! @param[out] trace_op The operator coupling broken W2 and W2 trace functions
-  !! @param[in] ndf_w2b Number of degrees of freedom per cell for w2b
-  !! @param[in] ndf_w2t Number of degrees of freedom per cell for w2t
-  !! @param[in] nqp Number of quadrature points on each face
-  !! @param[in] wqp quadrature weights
-  !! @param[in] w2b_basis Basis functions in W2broken evaluated at gaussian
-  !!                      quadrature points on horizontal and vertical faces
-  !! @param[in] w2t_basis Basis functions in W2trace evaluated at gaussian
-  !!                      quadrature points on horizontal and vertical faces
+  !! @param[out] trace_op The operator coupling broken W2 and W2 trace functions.
+  !! @param[in] ndf_w2b Number of degrees of freedom per cell for W2broken space.
+  !! @param[in] ndf_w2t Number of degrees of freedom per cell for W2trace space.
+  !! @param[in] nqp Number of quadrature points on each face.
+  !! @param[in] wqp Quadrature weights for quadrature points on faces.
+  !! @param[in] w2b_basis Basis functions in W2broken space evaluated at gaussian
+  !!                      quadrature points on horizontal and vertical faces.
+  !! @param[in] w2t_basis Basis functions in W2trace space evaluated at gaussian
+  !!                      quadrature points on horizontal and vertical faces.
   !! @param[in] face_entity_map Array mapping dof index to face entity.
-  !! @param[in] nfaces_re The number of faces (3D) or edges (2D) in each cell
+  !! @param[in] nfaces_re The number of faces (3D) or edges (2D) in each cell.
   !! @param[in] outward_normals_to_faces Vector of normals to the reference
   !!                                     element "outward faces".
   !!

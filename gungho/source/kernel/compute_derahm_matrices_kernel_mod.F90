@@ -17,17 +17,13 @@ module compute_derahm_matrices_kernel_mod
   use argument_mod,            only: arg_type, func_type,     &
                                      GH_OPERATOR, GH_FIELD,   &
                                      GH_READ, GH_WRITE,       &
-                                     ANY_SPACE_1,             &
                                      ANY_SPACE_9,             &
                                      GH_BASIS, GH_DIFF_BASIS, &
                                      CELLS, GH_QUADRATURE_XYoZ
   use constants_mod,           only: r_def, i_def
   use coordinate_jacobian_mod, only: pointwise_coordinate_jacobian, &
                                      pointwise_coordinate_jacobian_inverse
-  ! NOTE: Eventually we want to get W2broken recognized by Psyclone. That
-  ! way, we can avoid using the place-holder space "ANY_SPACE_1".
-  ! This is addressed in PSyClone issue #204
-  use fs_continuity_mod,       only: W0, W1, W2, W3, Wtheta
+  use fs_continuity_mod,       only: W0, W1, W2, W2broken, W3, Wtheta
   use kernel_mod,              only: kernel_type
 
   implicit none
@@ -40,24 +36,24 @@ module compute_derahm_matrices_kernel_mod
 
   type, public, extends(kernel_type) :: compute_derahm_matrices_kernel_type
     private
-    type(arg_type) :: meta_args(11) = (/                           &
-        arg_type(GH_OPERATOR, GH_WRITE, W0, W0),                   &
-        arg_type(GH_OPERATOR, GH_WRITE, W1, W1),                   &
-        arg_type(GH_OPERATOR, GH_WRITE, W2, W2),                   &
-        arg_type(GH_OPERATOR, GH_WRITE, ANY_SPACE_1, ANY_SPACE_1), &
-        arg_type(GH_OPERATOR, GH_WRITE, W3, W3),                   &
-        arg_type(GH_OPERATOR, GH_WRITE, Wtheta, Wtheta),           &
-        arg_type(GH_OPERATOR, GH_WRITE, W1, W0),                   &
-        arg_type(GH_OPERATOR, GH_WRITE, W2, W1),                   &
-        arg_type(GH_OPERATOR, GH_WRITE, W3, W2),                   &
-        arg_type(GH_OPERATOR, GH_WRITE, W3, ANY_SPACE_1),          &
-        arg_type(GH_FIELD*3,  GH_READ,  ANY_SPACE_9)               &
+    type(arg_type) :: meta_args(11) = (/                     &
+        arg_type(GH_OPERATOR, GH_WRITE, W0, W0),             &
+        arg_type(GH_OPERATOR, GH_WRITE, W1, W1),             &
+        arg_type(GH_OPERATOR, GH_WRITE, W2, W2),             &
+        arg_type(GH_OPERATOR, GH_WRITE, W2broken, W2broken), &
+        arg_type(GH_OPERATOR, GH_WRITE, W3, W3),             &
+        arg_type(GH_OPERATOR, GH_WRITE, Wtheta, Wtheta),     &
+        arg_type(GH_OPERATOR, GH_WRITE, W1, W0),             &
+        arg_type(GH_OPERATOR, GH_WRITE, W2, W1),             &
+        arg_type(GH_OPERATOR, GH_WRITE, W3, W2),             &
+        arg_type(GH_OPERATOR, GH_WRITE, W3, W2broken),       &
+        arg_type(GH_FIELD*3,  GH_READ,  ANY_SPACE_9)         &
         /)
     type(func_type) :: meta_funcs(7) = (/                &
         func_type(W0,          GH_BASIS, GH_DIFF_BASIS), &
         func_type(W1,          GH_BASIS, GH_DIFF_BASIS), &
         func_type(W2,          GH_BASIS, GH_DIFF_BASIS), &
-        func_type(ANY_SPACE_1, GH_BASIS, GH_DIFF_BASIS), &
+        func_type(W2broken,    GH_BASIS, GH_DIFF_BASIS), &
         func_type(W3,          GH_BASIS),                &
         func_type(Wtheta,      GH_BASIS),                &
         func_type(ANY_SPACE_9,           GH_DIFF_BASIS)  &
@@ -76,31 +72,31 @@ module compute_derahm_matrices_kernel_mod
 contains
 
 !> @brief This subroutine computes the operator matrices for the modified DeRahm complex
-!! @param[in] cell Cell number
+!! @param[in] cell Cell number.
 !! @param[in] nlayers Number of layers.
 !! @param[in] ncell_3d0 ncell*nlayers
-!! @param[out] mm0 Local assembly mass matrix for W0 space
+!! @param[out] mm0 Local assembly mass matrix for W0 space.
 !! @param[in] ncell_3d1 ncell*nlayers
-!! @param[out] mm1 Local assembly mass matrix for W1 space
+!! @param[out] mm1 Local assembly mass matrix for W1 space.
 !! @param[in] ncell_3d2 ncell*nlayers
-!! @param[out] mm2 Local assembly mass matrix for W2 space
+!! @param[out] mm2 Local assembly mass matrix for W2 space.
 !! @param[in] ncell_3db ncell*nlayers
-!! @param[out] mm2b Local assembly mass matrix for W2b space
+!! @param[out] mm2b Local assembly mass matrix for W2broken space.
 !! @param[in] ncell_3d3 ncell*nlayers
-!! @param[out] mm3 Local assembly mass matrix for W3 space
+!! @param[out] mm3 Local assembly mass matrix for W3 space.
 !! @param[in] ncell_3dt ncell*nlayers
-!! @param[out] mmt Local assembly mass matrix for Wtheta space
+!! @param[out] mmt Local assembly mass matrix for Wtheta space.
 !! @param[in] ncell_3d4 ncell*nlayers
-!! @param[out] grad Local assembly gradient matrix
+!! @param[out] grad Local assembly gradient matrix.
 !! @param[in] ncell_3d5 ncell*nlayers
-!! @param[out] curl Local assembly curl matrix
+!! @param[out] curl Local assembly curl matrix.
 !! @param[in] ncell_3d6 ncell*nlayers
-!! @param[out] div Local assembly divergence matrix
+!! @param[out] div Local assembly divergence matrix.
 !! @param[in] ncell_3d7 ncell*nlayers
-!! @param[out] broken_div Local assembly divergence matrix for W2b
-!! @param[in] chi1 Physical coordinates in the 1st dir
-!! @param[in] chi2 Physical coordinates in the 2nd dir
-!! @param[in] chi3 Physical coordinates in the 3rd dir
+!! @param[out] broken_div Local assembly divergence matrix for W2broken.
+!! @param[in] chi1 Physical coordinates in the 1st dir.
+!! @param[in] chi2 Physical coordinates in the 2nd dir.
+!! @param[in] chi3 Physical coordinates in the 3rd dir.
 !! @param[in] ndf_w0 Number of degrees of freedom per cell for W0 space.
 !! @param[in] basis_w0 Basis functions evaluated at quadrature points for W0 space.
 !! @param[in] diff_basis_w0 Differential of basis functions evaluated at quadrature points for W0 space.
@@ -110,9 +106,9 @@ contains
 !! @param[in] ndf_w2 Number of degrees of freedom per cell for W2 space.
 !! @param[in] basis_w2 Basis functions evaluated at quadrature points for W2 space.
 !! @param[in] diff_basis_w2 Differential of basis functions evaluated at quadrature points for W2 space.
-!! @param[in] ndf_w2b Number of degrees of freedom per cell for W2b space.
-!! @param[in] basis_w2b Basis functions evaluated at quadrature points for W2b space.
-!! @param[in] diff_basis_w2b Differential of basis functions evaluated at quadrature points for W2b space.
+!! @param[in] ndf_w2b Number of degrees of freedom per cell for W2broken space.
+!! @param[in] basis_w2b Basis functions evaluated at quadrature points for W2broken space.
+!! @param[in] diff_basis_w2b Differential of basis functions evaluated at quadrature points for W2broken space.
 !! @param[in] ndf_w3 Number of degrees of freedom per cell for W3 space.
 !! @param[in] basis_w3 Basis functions evaluated at quadrature points for W3 space.
 !! @param[in] ndf_wt Number of degrees of freedom per cell for Wtheta space.
