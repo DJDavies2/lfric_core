@@ -466,7 +466,7 @@ contains
     ! Fields which are not used and only required for subroutine argument list,
     ! hence are unset in the kernel
     ! if they become set, please move up to be with other variables
-    type(scm_convss_dg_type), allocatable :: scm_convss_dg(:,:)
+    type(scm_convss_dg_type), allocatable :: scm_convss_dg(:)
 
     real(r_um), dimension(row_length,rows,nlayers) :: rho_dry_theta,         &
          it_mf_congest, it_dt_congest, it_dq_congest, it_du_congest,         &
@@ -669,7 +669,12 @@ contains
       allocate( tot_tracer(1, 1, ntra_lev, ntra_fld) )
     end if
 
-    l_scm_convss_dg = .false.  ! not allowing sub-timestep SCM diags
+    ! We do not want any sub-timestep SCM diagnostics but we still have
+    ! to allocate some amount of memory to it as something is still trying
+    ! to access it. Needless to say this will be caught by run-time checking.
+    !
+    l_scm_convss_dg = .false.
+    allocate( scm_convss_dg(0) )
 
     n_congestus = 0
     n_deep = 0
