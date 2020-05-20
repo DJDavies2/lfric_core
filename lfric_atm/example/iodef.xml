@@ -552,6 +552,8 @@
        <field id="cv_top" name="cv_top" long_name="cv_top" unit="model level" domain_ref="face_half_levels" />
        <field id="lw_down_surf" name="lw_down_surf" long_name="Surface downward longwave flux" unit="W m-2" domain_ref="face_half_levels" />
        <field id="sw_down_surf" name="sw_down_surf" long_name="Surface downward shortwave flux" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_up_soil" name="sw_up_soil" long_name="Surface upward shortwave flux on soil tile" unit="W m-2" domain_ref="face_half_levels" />
+       <field id="sw_up_sea" name="sw_up_sea" long_name="Surface upward shortwave flux on sea tile" unit="W m-2" domain_ref="face_half_levels" />
        <field id="sw_direct_surf" name="sw_direct_surf" long_name="Surface direct shortwave flux" unit="W m-2" domain_ref="face_half_levels" />
        <field id="sw_down_blue_surf" name="sw_down_blue_surf" long_name="Surface downward 0-690nm flux" unit="W m-2" domain_ref="face_half_levels" />
        <field id="sw_direct_blue_surf" name="sw_direct_blue_surf" long_name="Surface direct 0-690nm flux" unit="W m-2" domain_ref="face_half_levels" />
@@ -1125,6 +1127,8 @@
         <field field_ref="cv_top"/>
         <field field_ref="lw_down_surf"/>
         <field field_ref="sw_down_surf"/>
+        <field field_ref="sw_up_soil"/>
+        <field field_ref="sw_up_sea"/>
         <field field_ref="sw_direct_surf"/>
         <field field_ref="sw_down_blue_surf"/>
         <field field_ref="sw_direct_blue_surf"/>
