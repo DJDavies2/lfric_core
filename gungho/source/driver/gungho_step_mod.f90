@@ -82,6 +82,7 @@ module gungho_step_mod
     type( field_collection_type ), pointer :: soil_fields => null()
     type( field_collection_type ), pointer :: snow_fields => null()
     type( field_collection_type ), pointer :: aerosol_fields => null()
+    type( field_collection_type ), pointer :: lbc_fields => null()
 
     type( field_type), pointer :: theta => null()
     type( field_type), pointer :: u => null()
@@ -111,6 +112,7 @@ module gungho_step_mod
     soil_fields => model_data%soil_fields
     snow_fields => model_data%snow_fields
     aerosol_fields => model_data%aerosol_fields
+    lbc_fields => model_data%lbc_fields
 
     ! Get pointers to fields in the prognostic/diagnostic field collections
     ! for use downstream
@@ -147,7 +149,7 @@ module gungho_step_mod
                                       turbulence_fields, convection_fields,    &
                                       cloud_fields, surface_fields,            &
                                       soil_fields, snow_fields,                &
-                                      aerosol_fields,                          &
+                                      aerosol_fields, lbc_fields,              &
                                       clock, twod_mesh_id)
         case( method_rk )             ! RK
           call rk_alg_step(u, rho, theta, moist_dyn, exner)

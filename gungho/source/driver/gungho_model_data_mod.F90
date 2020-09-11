@@ -40,6 +40,8 @@ module gungho_model_data_mod
                                                read_state
   use write_methods_mod,                only : write_checkpoint, &
                                                write_state
+  use boundaries_config_mod,            only : limited_area
+  use create_lbcs_mod,                  only : create_lbc_fields
   use create_gungho_prognostics_mod,    only : create_gungho_prognostics
   use create_physics_prognostics_mod,   only : create_physics_prognostics
   use section_choice_config_mod,        only : cloud, cloud_none
@@ -80,6 +82,8 @@ module gungho_model_data_mod
     type( field_collection_type ), public   :: diagnostic_fields
     !> FD fields derived from FE fields for use in physics time-stepping schemes
     type( field_collection_type ), public   :: derived_fields
+    !> LBC fields - lateral boundary conditions to run a limited area model
+    type( field_collection_type ), public   :: lbc_fields
     !> Fields owned by the radiation scheme
     type( field_collection_type ), public   :: radiation_fields
     !> Fields owned by the microphysics scheme
@@ -177,6 +181,11 @@ contains
                                     model_data%diagnostic_fields,   &
                                     model_data%mr,                  &
                                     model_data%moist_dyn )
+
+    if (limited_area) call create_lbc_fields( mesh_id,                      &
+                                              model_data%depository,        &
+                                              model_data%prognostic_fields, &
+                                              model_data%lbc_fields )
 
     ! Create prognostics used by physics
     if (use_physics) then
@@ -403,6 +412,7 @@ contains
       call model_data%snow_fields%clear()
       call model_data%aerosol_fields%clear()
       call model_data%fd_fields%clear()
+      call model_data%lbc_fields%clear()
       if (allocated(model_data%mr)) deallocate(model_data%mr)
       if (allocated(model_data%moist_dyn)) deallocate(model_data%moist_dyn)
 

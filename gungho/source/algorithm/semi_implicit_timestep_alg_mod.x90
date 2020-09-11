@@ -262,6 +262,7 @@ contains
   !> @param[in,out] soil_fields            Fields for soil hydrology scheme
   !> @param[in,out] snow_fields            Fields for snow scheme
   !> @param[in,out] aerosol_fields         Fields for aerosol scheme
+  !> @param[in,out] lbc_fields             Fields for lateral boundaries
   !> @param[in]     clock                  Model time
   !> @param[in]     twod_mesh_id           Identifier given to current 2d mesh
   subroutine semi_implicit_alg_step(u, rho, theta, exner, mr, moist_dyn,       &
@@ -269,7 +270,7 @@ contains
                                     microphysics_fields, orography_fields,     &
                                     turbulence_fields, convection_fields,      &
                                     cloud_fields, surface_fields, soil_fields, &
-                                    snow_fields, aerosol_fields,               &
+                                    snow_fields, aerosol_fields, lbc_fields,  &
                                     clock, twod_mesh_id)
 
     implicit none
@@ -290,6 +291,7 @@ contains
     type( field_collection_type ), intent( inout ) :: soil_fields
     type( field_collection_type ), intent( inout ) :: snow_fields
     type( field_collection_type ), intent( inout ) :: aerosol_fields
+    type( field_collection_type ), intent( inout ) :: lbc_fields
 
     class(clock_type), intent(in) :: clock
 
