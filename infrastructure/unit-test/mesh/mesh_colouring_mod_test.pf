@@ -18,6 +18,7 @@ module mesh_colouring_mod_test
                                         mesh_collection
   use yaxt,                       only : xt_initialize, xt_finalize
   use mpi_mod,                    only : store_comm, clear_comm
+  use ugrid_mesh_data_mod,        only : ugrid_mesh_data_type
 
   use pFUnit_Mod
 
@@ -104,7 +105,9 @@ subroutine test_compute_colours_cubedsphere(this)
   integer                          :: total_colours, total_cells, colour_idx
   integer                          :: nc_colour, cic_colour, nc_colour_subset
   type(partition_type)             :: partition
-  type(global_mesh_type), pointer  :: global_mesh => null()
+  type(ugrid_mesh_data_type)       :: ugrid_mesh_data
+  type(global_mesh_type), pointer  :: global_mesh_ptr => null()
+  type(global_mesh_type)           :: global_mesh
   type(uniform_extrusion_type)     :: extrusion
   procedure(partitioner_interface), pointer  :: partitioner_ptr => null()
 
@@ -123,14 +126,16 @@ subroutine test_compute_colours_cubedsphere(this)
   npanels = 6
   filename = "data/mesh_C4.nc"
 
-  global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                mesh_name, &
-                                                                npanels )
-  global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+  call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+  global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+  call ugrid_mesh_data%clear()
+  global_mesh_id = global_mesh%get_id()
+  call global_mesh_collection%add_new_global_mesh( global_mesh )
+  global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
   partitioner_ptr => partitioner_cubedsphere_serial
 
-  partition = partition_type( global_mesh, &
+  partition = partition_type( global_mesh_ptr, &
                             partitioner_ptr, &
                             this%xproc, &
                             this%yproc, &
@@ -141,7 +146,7 @@ subroutine test_compute_colours_cubedsphere(this)
                                       10000.0_r_def, &
                                       this%num_layers )
   ! Construct a mesh which is  uniform in vertical for purpose of the test
-  mesh_id = mesh_collection%add_new_mesh( global_mesh,     &
+  mesh_id = mesh_collection%add_new_mesh( global_mesh_ptr, &
                                           partition,       &
                                           extrusion )
   mesh => mesh_collection%get_mesh( mesh_id )
@@ -200,7 +205,9 @@ subroutine test_compute_colours_biperiodic(this)
   integer                          :: nc_colour, cic_colour, nc_colour_subset
   type(partition_type)             :: partition
   type(uniform_extrusion_type)     :: extrusion
-  type(global_mesh_type), pointer  :: global_mesh => null()
+  type(ugrid_mesh_data_type)       :: ugrid_mesh_data
+  type(global_mesh_type), pointer  :: global_mesh_ptr => null()
+  type(global_mesh_type)           :: global_mesh
   procedure(partitioner_interface), pointer  :: partitioner_ptr => null()
 
   integer(i_def)                   :: num_cells
@@ -217,14 +224,16 @@ subroutine test_compute_colours_biperiodic(this)
   npanels = 1
   filename = "data/mesh_BiP8x8-6000x2000.nc"
 
-  global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                mesh_name, &
-                                                                npanels )
-  global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+  call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+  global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+  call ugrid_mesh_data%clear()
+  global_mesh_id = global_mesh%get_id()
+  call global_mesh_collection%add_new_global_mesh( global_mesh )
+  global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
   partitioner_ptr => partitioner_planar
 
-  partition = partition_type(global_mesh, &
+  partition = partition_type(global_mesh_ptr, &
                             partitioner_ptr, &
                             this%xproc, &
                             this%yproc, &
@@ -236,7 +245,7 @@ subroutine test_compute_colours_biperiodic(this)
                                       this%num_layers )
 
   ! Construct a mesh which is  uniform in vertical for purpose of the test
-  mesh_id = mesh_collection%add_new_mesh( global_mesh, &
+  mesh_id = mesh_collection%add_new_mesh( global_mesh_ptr, &
                                           partition,   &
                                           extrusion  )
   mesh => mesh_collection%get_mesh( mesh_id )
@@ -296,7 +305,9 @@ subroutine test_compute_colours_generic(this)
   integer                          :: nc_colour, cic_colour
   type(partition_type)             :: partition
   type(uniform_extrusion_type)     :: extrusion
-  type(global_mesh_type), pointer  :: global_mesh => null()
+  type(ugrid_mesh_data_type)       :: ugrid_mesh_data
+  type(global_mesh_type), pointer  :: global_mesh_ptr => null()
+  type(global_mesh_type)           :: global_mesh
   procedure(partitioner_interface), pointer  :: partitioner_ptr => null()
 
   integer(i_def)                   :: num_cells
@@ -314,14 +325,16 @@ subroutine test_compute_colours_generic(this)
   ! it's a cubed sphere
   npanels = IMDI
   filename = "data/mesh_C4.nc"
-  global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                mesh_name, &
-                                                                npanels )
-  global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+  call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+  global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+  call ugrid_mesh_data%clear()
+  global_mesh_id = global_mesh%get_id()
+  call global_mesh_collection%add_new_global_mesh( global_mesh )
+  global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
   partitioner_ptr => partitioner_cubedsphere_serial
 
-  partition = partition_type( global_mesh, &
+  partition = partition_type( global_mesh_ptr, &
                             partitioner_ptr, &
                             this%xproc, &
                             this%yproc, &
@@ -333,7 +346,7 @@ subroutine test_compute_colours_generic(this)
                                       this%num_layers )
 
   ! Construct a mesh which is  uniform in vertical for purpose of the test
-  mesh_id = mesh_collection%add_new_mesh( global_mesh, &
+  mesh_id = mesh_collection%add_new_mesh( global_mesh_ptr, &
                                           partition,   &
                                           extrusion )
   mesh => mesh_collection%get_mesh( mesh_id )

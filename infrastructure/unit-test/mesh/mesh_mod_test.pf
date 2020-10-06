@@ -31,6 +31,7 @@ module mesh_mod_test
                                   partitioner_cubedsphere_serial
   use yaxt,                 only: xt_initialize, xt_finalize
   use mpi_mod,              only: store_comm, clear_comm
+  use ugrid_mesh_data_mod,  only: ugrid_mesh_data_type
 
   implicit none
 
@@ -734,8 +735,10 @@ contains
     integer(i_def) :: target_mesh_id
     integer(i_def) :: mesh_map_id
     integer(i_def) :: test_integer
-    type(global_mesh_type), pointer :: source_global_mesh => null()
-    type(global_mesh_type), pointer :: target_global_mesh => null()
+    type(ugrid_mesh_data_type) :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: source_global_mesh_ptr => null()
+    type(global_mesh_type), pointer :: target_global_mesh_ptr => null()
+    type(global_mesh_type)          :: global_mesh
 
     type(mesh_type), pointer :: source_mesh => null()
     type(mesh_type), pointer :: target_mesh => null()
@@ -763,19 +766,22 @@ contains
     ! Add global meshes to the global mesh collection for later generation
     ! of local meshes, the order in which they are added should create
     ! a global mesh map between the source and target global meshes.
-    source_global_mesh_id = global_mesh_collection %                    &
-                                add_new_global_mesh( MultiGridFiles(1), &
-                                                     mesh_name, npanels )
-
-    target_global_mesh_id = global_mesh_collection %                    &
-                                add_new_global_mesh( MultiGridFiles(2), &
-                                                     mesh_name, npanels )
+    call ugrid_mesh_data%read_from_file(trim(MultiGridFiles(1)), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    source_global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
+    call ugrid_mesh_data%read_from_file(trim(MultiGridFiles(2)), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    target_global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
 
     ! Get pointers to the global objects
-    source_global_mesh => global_mesh_collection % &
-                          get_global_mesh( source_global_mesh_id )
-    target_global_mesh => global_mesh_collection % &
-                          get_global_mesh( target_global_mesh_id )
+    source_global_mesh_ptr => global_mesh_collection % &
+                              get_global_mesh( source_global_mesh_id )
+    target_global_mesh_ptr => global_mesh_collection % &
+                              get_global_mesh( target_global_mesh_id )
 
     ! Generate the partition
     partitioner_ptr => partitioner_cubedsphere_serial
@@ -783,14 +789,14 @@ contains
     extrusion = uniform_extrusion_type( radius, domain_top, nlayers )
 
     ! Generate the local meshes
-    partition = partition_type(source_global_mesh, partitioner_ptr,1,1,1,0,1)
-    source_mesh_id = mesh_collection%add_new_mesh( source_global_mesh, &
-                                                   partition,          &
+    partition = partition_type(source_global_mesh_ptr, partitioner_ptr,1,1,1,0,1)
+    source_mesh_id = mesh_collection%add_new_mesh( source_global_mesh_ptr, &
+                                                   partition,              &
                                                    extrusion )
 
-    partition = partition_type(target_global_mesh, partitioner_ptr,1,1,1,0,1)
-    target_mesh_id = mesh_collection%add_new_mesh( target_global_mesh, &
-                                                   partition,          &
+    partition = partition_type(target_global_mesh_ptr, partitioner_ptr,1,1,1,0,1)
+    target_mesh_id = mesh_collection%add_new_mesh( target_global_mesh_ptr, &
+                                                   partition,              &
                                                    extrusion )
 
     source_mesh => mesh_collection%get_mesh(source_mesh_id)

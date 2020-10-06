@@ -24,6 +24,7 @@ use global_mesh_collection_mod,    only: global_mesh_collection_type, &
                                          global_mesh_collection
 use yaxt,                          only: xt_initialize, xt_finalize
 use mpi_mod,                       only: store_comm, clear_comm
+use ugrid_mesh_data_mod,           only: ugrid_mesh_data_type
 use pFUnit_Mod
 
 implicit none
@@ -89,9 +90,11 @@ implicit none
 
 class( function_space_chain_test_type ), intent( inout ) :: this
 
-type(global_mesh_type),    pointer :: global_mesh        => null()
+type(ugrid_mesh_data_type)         :: ugrid_mesh_data
+type(global_mesh_type),    pointer :: global_mesh_ptr    => null()
 type(global_mesh_type),    pointer :: source_global_mesh => null()
 type(global_mesh_type),    pointer :: target_global_mesh => null()
+type(global_mesh_type)             :: global_mesh
 
 type(partition_type)               :: partition
 type(uniform_extrusion_type)       :: extrusion
@@ -121,20 +124,21 @@ function_space_collection = function_space_collection_type()
 
 do i=1, size(filenames)
 
-  global_mesh_id =  global_mesh_collection %               &
-                        add_new_global_mesh( filenames(i), &
-                                             mesh_name,    &
-                                             npanels )
+  call ugrid_mesh_data%read_from_file(trim(filenames(i)), mesh_name)
+  global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+  call ugrid_mesh_data%clear()
+  global_mesh_id = global_mesh%get_id()
+  call global_mesh_collection%add_new_global_mesh( global_mesh )
 
-  global_mesh    => global_mesh_collection % get_global_mesh( global_mesh_id )
+  global_mesh_ptr => global_mesh_collection % get_global_mesh( global_mesh_id )
 
-  partition =  partition_type( global_mesh, partitioner_ptr,    &
-                               xproc, yproc, max_stencil_depth, &
+  partition =  partition_type( global_mesh_ptr, partitioner_ptr, &
+                               xproc, yproc, max_stencil_depth,  &
                                local_rank, total_ranks )
   extrusion = uniform_extrusion_type( radius, domain_top, nlayers )
 
-  mesh_id(i) =  mesh_collection % add_new_mesh( global_mesh, &
-                                                partition,   &
+  mesh_id(i) =  mesh_collection % add_new_mesh( global_mesh_ptr, &
+                                                partition,       &
                                                 extrusion )
 end do
 

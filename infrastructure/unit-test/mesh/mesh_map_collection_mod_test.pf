@@ -25,6 +25,7 @@ module mesh_map_collection_mod_test
   use mesh_collection_mod,        only: mesh_collection_type, mesh_collection
   use yaxt,                       only : xt_initialize, xt_finalize
   use mpi_mod,                    only : store_comm, clear_comm
+  use ugrid_mesh_data_mod,        only : ugrid_mesh_data_type
 
   use pFUnit_Mod
 
@@ -38,7 +39,7 @@ module mesh_map_collection_mod_test
   type, extends( MPITestCase ) :: mesh_map_collection_test_type
     private
 
-    type(global_mesh_map_type), pointer :: CoarseToFine_global_mesh_map => null()
+    type(global_mesh_map_type), pointer :: CoarseTofine_global_mesh_map => null()
     type(mesh_type), pointer    :: coarse_mesh => null()
     type(mesh_type), pointer    :: fine_mesh   => null()
 
@@ -83,8 +84,11 @@ contains
 
     class( mesh_map_collection_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type), pointer :: coarse_global_mesh => null()
-    type(global_mesh_type), pointer :: fine_global_mesh   => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: coarse_global_mesh_ptr => null()
+    type(global_mesh_type), pointer :: fine_global_mesh_ptr   => null()
+    type(global_mesh_type)          :: coarse_global_mesh
+    type(global_mesh_type)          :: fine_global_mesh
     type(partition_type)            :: coarse_partition
     type(partition_type)            :: fine_partition
     type(uniform_extrusion_type)    :: extrusion
@@ -114,40 +118,46 @@ contains
 
 
     npanels = 6
-    coarse_global_mesh_id =                          &
-        global_mesh_collection % add_new_global_mesh &
-                                 ( coarse_ugrid, mesh_name, npanels )
+    call ugrid_mesh_data%read_from_file(trim(coarse_ugrid), mesh_name)
+    coarse_global_mesh = global_mesh_type( ugrid_mesh_data, npanels)
+    call ugrid_mesh_data%clear()
+    coarse_global_mesh_id = coarse_global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( coarse_global_mesh )
 
-    fine_global_mesh_id   =                          &
-        global_mesh_collection % add_new_global_mesh &
-                                 ( fine_ugrid, mesh_name, npanels )
+    call ugrid_mesh_data%read_from_file(trim(fine_ugrid), mesh_name)
+    fine_global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    fine_global_mesh_id = fine_global_mesh%get_id()
+    call global_mesh_collection % add_new_global_mesh( fine_global_mesh )
 
-    coarse_global_mesh => &
+    coarse_global_mesh_ptr => &
         global_mesh_collection%get_global_mesh( coarse_global_mesh_id )
-    fine_global_mesh   => &
+    fine_global_mesh_ptr   => &
         global_mesh_collection%get_global_mesh( fine_global_mesh_id   )
 
-    this%CoarseToFine_global_mesh_map => &
-         coarse_global_mesh%get_global_mesh_map( fine_global_mesh_id )
+    this%CoarseTofine_global_mesh_map => &
+         coarse_global_mesh_ptr%get_global_mesh_map( fine_global_mesh_id )
 
-    coarse_partition = partition_type( coarse_global_mesh, partitioner_ptr, &
+    coarse_partition = partition_type( coarse_global_mesh_ptr, partitioner_ptr, &
                                        xproc, yproc, max_stencil_depth,     &
                                        local_rank, total_ranks )
 
     ncells = coarse_partition%get_num_cells_in_layer()
 
-    fine_partition   = partition_type( fine_global_mesh, partitioner_ptr, &
+    fine_partition   = partition_type( fine_global_mesh_ptr, partitioner_ptr, &
                                        xproc, yproc, max_stencil_depth,   &
                                        local_rank, total_ranks )
 
     extrusion = uniform_extrusion_type( radius, domain_top, nlayers )
 
-    coarse_mesh_id   = mesh_collection%add_new_mesh(                         &
-                                       coarse_global_mesh, coarse_partition, &
+    coarse_mesh_id   = mesh_collection%add_new_mesh(           &
+                                       coarse_global_mesh_ptr, &
+                                       coarse_partition,       &
                                        extrusion )
 
-    fine_mesh_id     = mesh_collection%add_new_mesh(                     &
-                                       fine_global_mesh, fine_partition, &
+    fine_mesh_id     = mesh_collection%add_new_mesh(         &
+                                       fine_global_mesh_ptr, &
+                                       fine_partition,       &
                                        extrusion )
 
     this%coarse_mesh => mesh_collection%get_mesh( coarse_mesh_id )
@@ -230,9 +240,9 @@ contains
     mesh_maps = mesh_map_collection_type()
 
     ntarget_cells_per_source_cell = &
-        this%CoarseToFine_global_mesh_map%get_ntarget_cells_per_source_cell()
+        this%CoarseTofine_global_mesh_map%get_ntarget_cells_per_source_cell()
     nsource_cells                 = &
-        this%CoarseToFine_global_mesh_map%get_nsource_cells()
+        this%CoarseTofine_global_mesh_map%get_nsource_cells()
     allocate(map(ntarget_cells_per_source_cell,nsource_cells))
 
     ! For this test we don't care what's in the map

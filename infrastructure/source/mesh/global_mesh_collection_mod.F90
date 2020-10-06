@@ -122,8 +122,7 @@ contains
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !> @brief Adds a global mesh object to the collection from a ugrid file
-  !>        which contains the requested global mesh topology.
+  !> @brief Adds a global mesh object to the collection
   !>
   !> Maps between each global mesh are created on the fly between subsequent
   !> global meshes in the collection in the order that they are added.
@@ -135,30 +134,18 @@ contains
   !> When multiple global meshes per file are possible there will be a need
   !> to use a hash function to identify each global mesh object read in.
   !>
-  !> @param[in] filename  File containing details of global
-  !>                      mesh object(s).
-  !> @param[in] global_mesh_name The name of the global mesh
-  !>                             to read from the file.
-  !> @param[in] npanels Number of panels in the passed mesh.
+  !> @param[in] global_mesh_to_add The global mesh object to be added to the
+  !>                               collection
   !>
-  !> @return ID of the global mesh added to collection.
-  !>
-  function add_new_global_mesh( self,             &
-                                filename,         &
-                                global_mesh_name, &
-                                npanels ) result( global_mesh_id )
-
+  subroutine add_new_global_mesh( self, global_mesh_to_add )
     implicit none
 
     class(global_mesh_collection_type), intent(inout) :: self
-    character(str_max_filename),        intent(in)    :: filename
-    character(str_def),                 intent(in)    :: global_mesh_name
-    integer(i_def),                     intent(in)    :: npanels
+    type (global_mesh_type),            intent(in)    :: global_mesh_to_add
 
-
-    integer(i_def)          :: n_global_meshes
     integer(i_def)          :: global_mesh_id
-    type (global_mesh_type) :: global_mesh_to_add
+    character(str_def)      :: global_mesh_name
+    integer(i_def)          :: n_global_meshes
     type (global_mesh_type), pointer :: global_mesh_at_tail => null()
 
     integer(i_def) :: source_global_mesh_id
@@ -167,6 +154,9 @@ contains
 
     ! Pointer to linked list - used for looping through the list
     type(linked_list_item_type), pointer :: list_item => null()
+
+    global_mesh_id = global_mesh_to_add%get_id()
+    global_mesh_name = global_mesh_to_add%get_mesh_name()
 
     ! 1.0 Perform some checks based on the existings contents
     !     of the collection
@@ -177,9 +167,9 @@ contains
     !     will be used to set the constraint for the number of
     !     panels used by subsequent meshes added to this collection.
     if (n_global_meshes < 1) then
-      self%npanels = npanels
+      self%npanels = global_mesh_to_add%get_npanels()
     else
-      if (self%npanels /= npanels) then
+      if (self%npanels /= global_mesh_to_add%get_npanels()) then
         write(log_scratch_space,'(A,I0,A)')        &
             'This global mesh collection is '//    &
             'for global meshes of comprising of ', &
@@ -188,12 +178,6 @@ contains
         call log_event(log_scratch_space,LOG_LEVEL_ERROR)
       end if
     end if
-
-    ! 2.0 Read in the requested mesh topology from file.
-    !=================================================================
-    global_mesh_to_add = global_mesh_type( trim(filename), &
-                                           global_mesh_name )
-    global_mesh_id = global_mesh_to_add%get_id()
 
     if (implement_consolidated_multigrid) then
 
@@ -208,19 +192,14 @@ contains
       ! As these are assumed to be read in from the same mesh input
       ! file specifed for a given run, if the name is already in the
       ! collection it will be the same mesh.
-      if (self%check_for(global_mesh_name)) then
+      if (self%check_for(global_mesh_to_add%get_mesh_name())) then
         do i=1, size(self%name_tags)
-          if ( trim(self%name_tags(i)) == trim(global_mesh_name) ) then
+          if ( trim(self%name_tags(i)) == &
+                 trim(global_mesh_to_add%get_mesh_name()) ) then
             return
           end if
         end do
       end if
-
-      ! Read in the named mesh to add from the mesh input file
-      global_mesh_to_add = global_mesh_type( filename, &
-                                             global_mesh_name )
-
-      global_mesh_id = global_mesh_to_add%get_id()
 
       ! Now add the requested mesh to the collection
       call self%global_mesh_list%insert_item( global_mesh_to_add )
@@ -265,7 +244,7 @@ contains
                           global_mesh_name, &
                           global_mesh_id )
     return
-  end function add_new_global_mesh
+  end subroutine add_new_global_mesh
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

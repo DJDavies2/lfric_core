@@ -16,8 +16,9 @@ module analytic_orography_field_spherical_mod_test
   use mesh_collection_mod,        only : mesh_collection_type, &
                                          mesh_collection
   use analytic_orography_mod,     only : orography_profile
-  use yaxt,                          only : xt_initialize, xt_finalize
-  use mpi_mod,                       only : store_comm, clear_comm
+  use yaxt,                       only : xt_initialize, xt_finalize
+  use mpi_mod,                    only : store_comm, clear_comm
+  use ugrid_mesh_data_mod,        only : ugrid_mesh_data_type
 
   use pFUnit_Mod
 
@@ -182,7 +183,9 @@ contains
     ! Mesh and partition types
     integer(i_def)                            :: global_mesh_id
     integer(i_def)                            :: mesh_id
-    type(global_mesh_type),           pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)                :: ugrid_mesh_data
+    type(global_mesh_type),           pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)                    :: global_mesh
     type(mesh_type),                  pointer :: mesh => null()
     type(partition_type)                      :: partition
     procedure(partitioner_interface), pointer :: partitioner_ptr => null()
@@ -198,14 +201,16 @@ contains
     real(r_def)               :: vertex_coords_2d(3,1), chi_surf, chi_test
 
     ! Add global mesh
-    global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                  mesh_name, &
-                                                                  npanels )
-    global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
     ! Assign partitioner
     partitioner_ptr => partitioner_cubedsphere_serial
-    partition = partition_type( global_mesh,     &
+    partition = partition_type( global_mesh_ptr, &
                                 partitioner_ptr, &
                                 xproc,           &
                                 yproc,           &
@@ -216,8 +221,8 @@ contains
     extrusion = uniform_extrusion_type( radius, domain_top, nlayers )
 
     ! Construct a mesh which is  uniform in vertical for purpose of the test
-    mesh_id = mesh_collection%add_new_mesh( global_mesh, &
-                                            partition,   &
+    mesh_id = mesh_collection%add_new_mesh( global_mesh_ptr, &
+                                            partition,       &
                                             extrusion )
     mesh => mesh_collection%get_mesh( mesh_id )
 
@@ -226,7 +231,7 @@ contains
 
     ! Test assigning orography for selected number of points
     i = 905
-    call global_mesh%get_vert_coords(i,vertex_coords_2d(:,1))
+    call global_mesh_ptr%get_vert_coords(i,vertex_coords_2d(:,1))
     ! Create horizontal chi_1 and chi_2 fields from mesh coordinates
     chi_1 = vertex_coords_2d(1,1)
     chi_2 = vertex_coords_2d(2,1)

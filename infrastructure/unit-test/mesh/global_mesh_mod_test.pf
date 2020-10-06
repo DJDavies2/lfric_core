@@ -15,6 +15,7 @@ module global_mesh_mod_test
   use global_mesh_map_mod,        only: global_mesh_map_type
   use global_mesh_collection_mod, only: global_mesh_collection_type, &
                                         global_mesh_collection
+  use ugrid_mesh_data_mod,        only: ugrid_mesh_data_type
 
   use yaxt,    only: xt_initialize, xt_finalize
   use mpi_mod, only: store_comm, clear_comm
@@ -96,7 +97,8 @@ contains
 
     class( global_mesh_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type) :: global_mesh
+    type(ugrid_mesh_data_type) :: ugrid_mesh_data
+    type(global_mesh_type)     :: global_mesh
 
     integer(i_def) :: cell_id
     integer(i_def) :: verts(4)
@@ -121,12 +123,16 @@ contains
 
     character(len = str_max_filename) :: filename
 
+    integer(i_def) :: npanels = 1
+
     !-------------------------------------
     ! Test construction of a biperiodic mesh
     !-------------------------------------
 
     filename = 'data/mesh_BiP8x8-6000x2000.nc'
-    global_mesh = global_mesh_type( filename, mesh_name )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
 
     ! Check the global mesh id
     global_mesh_id1 = global_mesh%get_id()
@@ -200,6 +206,10 @@ contains
     @assertEqual( [ 63, 8, 57, 56], cell_next(:,64) )
     deallocate( cell_next )
 
+    ! Check number of panels
+    npanels = global_mesh%get_npanels( )
+    @assertEqual(  1, npanels )
+
   end subroutine test_biperiodic_global_mesh
 
 
@@ -210,7 +220,8 @@ contains
 
     class( global_mesh_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type) :: global_mesh
+    type(ugrid_mesh_data_type)        :: ugrid_mesh_data
+    type(global_mesh_type)            :: global_mesh
     character(len = str_max_filename) :: filename
 
     integer(i_def) :: cell_id
@@ -235,11 +246,15 @@ contains
     type(global_mesh_type) :: global_mesh_mg
     character(str_def)     :: mesh_name_mg = 'C4'
 
+    integer(i_def) :: npanels = 6
+
     !---------------------------------------
     ! Test construction of a cubed-sphere mesh
     !---------------------------------------
     filename = 'data/mesh_C4.nc'
-    global_mesh = global_mesh_type( filename, mesh_name )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
 
     ! Check the global mesh id
     global_mesh_id2 = global_mesh%get_id()
@@ -316,6 +331,10 @@ contains
     @assertEqual( [ 76, 79, 20, 33], cell_next(:,80) )
     deallocate( cell_next )
 
+    ! Check number of panels
+    npanels = global_mesh%get_npanels( )
+    @assertEqual(  6, npanels )
+
   end subroutine test_cubedsphere_global_mesh
 
 
@@ -332,9 +351,10 @@ contains
 
     class( global_mesh_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type) :: global_mesh_C4
-    type(global_mesh_type) :: global_mesh_C8
-    type(global_mesh_type) :: global_mesh_C16
+    type(ugrid_mesh_data_type)  :: ugrid_mesh_data
+    type(global_mesh_type)      :: global_mesh_C4
+    type(global_mesh_type)      :: global_mesh_C8
+    type(global_mesh_type)      :: global_mesh_C16
 
     character(len = str_max_filename) :: filename
 
@@ -372,6 +392,8 @@ contains
     integer(i_def) :: multigrid_ids(4)
     integer(i_def) :: i, j, k
 
+    integer(i_def) :: npanels = 6
+
     call feign_development_config(                              &
              implement_consolidated_multigrid = test_log,       &
              single_mesh_input='data/mesh_C32_MG.nc',           &
@@ -383,7 +405,9 @@ contains
     !-------------------------------------------------
     filename  = single_mesh_input
     mesh_name = 'C4'
-    global_mesh = global_mesh_type( filename, mesh_name )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
 
     ! Check details of C4 mesh
 
@@ -478,9 +502,10 @@ contains
 
     class( global_mesh_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type) :: global_mesh_C4
-    type(global_mesh_type) :: global_mesh_C8
-    type(global_mesh_type) :: global_mesh_C16
+    type(ugrid_mesh_data_type)  :: ugrid_mesh_data
+    type(global_mesh_type)      :: global_mesh_C4
+    type(global_mesh_type)      :: global_mesh_C8
+    type(global_mesh_type)      :: global_mesh_C16
 
     character(len = str_max_filename) :: filename
 
@@ -524,9 +549,10 @@ contains
     integer(i_def) :: multigrid_ids(4), npanels
 
     type(global_mesh_type)              :: test_meshes(4)
-   type(global_mesh_type),     pointer :: global_mesh => null()
-    type(global_mesh_type),     pointer :: target_mesh => null()
+    type(global_mesh_type),     pointer :: global_mesh_ptr => null()
+    type(global_mesh_type),     pointer :: target_mesh_ptr => null()
     type(global_mesh_map_type), pointer :: global_mesh_map => null()
+    type(global_mesh_type)              :: global_mesh
     integer(i_def), allocatable         :: mesh_map(:,:)
 
 
@@ -550,10 +576,11 @@ contains
     ! on the global mesh ids. So all the required global mesh
     ! topologies must be read in first.
     do i=1, size(multigrid_mesh_names)
-      MultiGrid_ids(i) = global_mesh_collection %                          &
-                             add_new_global_mesh( filename,                &
-                                                  multigrid_mesh_names(i), &
-                                                  npanels )
+      call ugrid_mesh_data%read_from_file(trim(filename), multigrid_mesh_names(i))
+      global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+      call ugrid_mesh_data%clear()
+      MultiGrid_ids(i) = global_mesh%get_id()
+      call global_mesh_collection%add_new_global_mesh( global_mesh )
     end do
 
     ! 2.0 Now extract each global mesh, retrieve and add it's target mesh
@@ -561,9 +588,9 @@ contains
     call file_handler%file_open(filename)
     do i=1, size(multigrid_mesh_names)
 
-      global_mesh => global_mesh_collection%get_global_mesh( multigrid_mesh_names(i) )
+      global_mesh_ptr => global_mesh_collection%get_global_mesh( multigrid_mesh_names(i) )
 
-      call global_mesh%get_target_mesh_names(target_mesh_names)
+      call global_mesh_ptr%get_target_mesh_names(target_mesh_names)
 
       do j=1, size(target_mesh_names)
         if (global_mesh_collection%check_for(target_mesh_names(j))) then
@@ -572,9 +599,9 @@ contains
                                       target_mesh_names(j),    &
                                       mesh_map )
 
-          target_mesh => global_mesh_collection%get_global_mesh( target_mesh_names(j) )
+          target_mesh_ptr => global_mesh_collection%get_global_mesh( target_mesh_names(j) )
 
-          call global_mesh%add_global_mesh_map(target_mesh, mesh_map)
+          call global_mesh_ptr%add_global_mesh_map(target_mesh_ptr, mesh_map)
         end if
       end do
 
@@ -584,19 +611,19 @@ contains
     ! 3.0 Check that the retrieved maps are as expected
     do i=1, size(multigrid_mesh_names)
 
-      global_mesh => global_mesh_collection%get_global_mesh( multigrid_mesh_names(i) )
-      call global_mesh%get_target_mesh_names(target_mesh_names)
+      global_mesh_ptr => global_mesh_collection%get_global_mesh( multigrid_mesh_names(i) )
+      call global_mesh_ptr%get_target_mesh_names(target_mesh_names)
 
       do j=1, size(target_mesh_names)
         if (global_mesh_collection%check_for(target_mesh_names(j))) then
-          target_mesh => global_mesh_collection%get_global_mesh( target_mesh_names(j) )
-          global_mesh_map => global_mesh%get_global_mesh_map( target_mesh%get_id() )
+          target_mesh_ptr => global_mesh_collection%get_global_mesh( target_mesh_names(j) )
+          global_mesh_map => global_mesh_ptr%get_global_mesh_map( target_mesh_ptr%get_id() )
 
           ! Is this map the same as what we expect from the file
-          @assertTrue(global_mesh%get_id()     == global_mesh_map%get_source_id())
-          @assertTrue(target_mesh%get_id()     == global_mesh_map%get_target_id())
-          @assertTrue(global_mesh%get_ncells() == global_mesh_map%get_nsource_cells())
-          kgo_integer  = max(target_mesh%get_ncells()/global_mesh%get_ncells(),1)
+          @assertTrue(global_mesh_ptr%get_id()     == global_mesh_map%get_source_id())
+          @assertTrue(target_mesh_ptr%get_id()     == global_mesh_map%get_target_id())
+          @assertTrue(global_mesh_ptr%get_ncells() == global_mesh_map%get_nsource_cells())
+          kgo_integer  = max(target_mesh_ptr%get_ncells()/global_mesh_ptr%get_ncells(),1)
           test_integer = global_mesh_map%get_ntarget_cells_per_source_cell()
           @assertTrue( kgo_integer == test_integer )
         end if
@@ -611,19 +638,19 @@ contains
     ! The 'C16' is chosen t test as it will have 2 targets,
     ! one coarser and on finer than itself.
     mesh_name='C16'
-    global_mesh => global_mesh_collection%get_global_mesh( mesh_name )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( mesh_name )
 
     ! Check map array for C16 -> C8
     target_name='C8'
-    target_mesh     => global_mesh_collection%get_global_mesh( target_name )
-    global_mesh_map => global_mesh%get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr => global_mesh_collection%get_global_mesh( target_name )
+    global_mesh_map => global_mesh_ptr%get_global_mesh_map( target_mesh_ptr%get_id() )
 
     ! Check data here
 
     ! Check map array for C16 -> C32
     target_name='C32'
-    target_mesh     => global_mesh_collection%get_global_mesh( target_name )
-    global_mesh_map => global_mesh%get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr => global_mesh_collection%get_global_mesh( target_name )
+    global_mesh_map => global_mesh_ptr%get_global_mesh_map( target_mesh_ptr%get_id() )
 
     ! CHECK DATA HERE ??
     ! The correct mappings of integrid map data after they are read in

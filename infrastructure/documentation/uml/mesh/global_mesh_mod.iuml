@@ -24,14 +24,16 @@ class global_mesh_mod::global_mesh_type {
   -vert_cell_owner: integer[] <<allocatable>>
   -vert_coords: real[::] <<allocatable>>
   -vert_on_cell_2d: integer[::] <<allocatable>>
+  -npanels: integer
   -global_mesh_maps: global_mesh_map_collection_type <<allocatable>>
 
-  +<<create>>  global_mesh_constructor( <<in>>filename: string,<<in>>global_mesh_name: string ): global_mesh_type
+  +<<create>>  global_mesh_constructor( <<in>>ugrid_mesh_data: ugrid_mesh_data_type, <<in>>npanels: integer ): global_mesh_type
   +<<create>>  global_mesh_unit_test_data(): global_mesh_type
   +<<destroy>> global_mesh_destructor()
   +clear()
 
   +get_mesh_name(): string
+  +get_npanels(): integer
   +get_target_mesh_names(): string[] <<allocatable>>
   +get_nmaps(): integer
   +get_all_cells_next(): integer[::]

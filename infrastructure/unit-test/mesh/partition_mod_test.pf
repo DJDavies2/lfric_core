@@ -21,6 +21,7 @@ module partition_mod_test
   use pFUnit_Mod
   use reference_element_mod,      only: reference_cube_type
   use yaxt, only : xt_initialize, xt_finalize
+  use ugrid_mesh_data_mod,        only : ugrid_mesh_data_type
 
   implicit none
 
@@ -99,7 +100,9 @@ contains
 
     class( partition_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type), pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)          :: global_mesh
     type(partition_type)            :: partition
 
     procedure (partitioner_interface), pointer :: partitioner_ptr => null()
@@ -146,15 +149,17 @@ contains
 
     filename = 'data/mesh_BiP8x8-6000x2000.nc'
     npanels  = 1
-    global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                  mesh_name, &
-                                                                  npanels )
-    global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
     partitioner_ptr => partitioner_planar
     !
     ! Generate the partition
-    partition = partition_type( global_mesh, &
+    partition = partition_type( global_mesh_ptr, &
                                 partitioner_ptr, &
                                 xproc, &
                                 yproc, &
@@ -279,7 +284,9 @@ contains
 
     class( partition_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type), pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)          :: global_mesh
     type(partition_type)            :: partition
 
     procedure (partitioner_interface), pointer :: partitioner_ptr => null()
@@ -327,16 +334,18 @@ contains
     filename = 'data/mesh_planar.nc'
     npanels  = 1
 
-    global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                  mesh_name, &
-                                                                  npanels )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
 
-    global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
     partitioner_ptr => partitioner_planar
     !
     ! Generate the partition
-    partition = partition_type( global_mesh, &
+    partition = partition_type( global_mesh_ptr, &
                                 partitioner_ptr, &
                                 xproc, &
                                 yproc, &
@@ -460,7 +469,9 @@ contains
 
     class( partition_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type), pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)          :: global_mesh
     type(partition_type)            :: partition
 
     procedure (partitioner_interface), pointer :: partitioner_ptr => null()
@@ -508,16 +519,18 @@ contains
     filename = 'data/mesh_trench_x.nc'
     npanels  = 1
 
-    global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                  mesh_name, &
-                                                                  npanels )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
 
-    global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
     partitioner_ptr => partitioner_planar
     !
     ! Generate the partition
-    partition = partition_type( global_mesh, &
+    partition = partition_type( global_mesh_ptr, &
                                 partitioner_ptr, &
                                 xproc, &
                                 yproc, &
@@ -641,7 +654,9 @@ contains
 
     class( partition_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type), pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)          :: global_mesh
     type(partition_type)            :: partition
 
     procedure (partitioner_interface), pointer :: partitioner_ptr => null()
@@ -689,16 +704,18 @@ contains
     filename = 'data/mesh_trench_y.nc'
     npanels  = 1
 
-    global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                  mesh_name, &
-                                                                  npanels )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
 
-    global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
     partitioner_ptr => partitioner_planar
     !
     ! Generate the partition
-    partition = partition_type( global_mesh, &
+    partition = partition_type( global_mesh_ptr, &
                                 partitioner_ptr, &
                                 xproc, &
                                 yproc, &
@@ -825,7 +842,9 @@ contains
 
     class( partition_test_type ), intent( inout ) :: this
 
-    type(global_mesh_type), pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)          :: global_mesh
     type(partition_type)            :: partition
 
     procedure (partitioner_interface), pointer :: partitioner_ptr => null()
@@ -863,14 +882,16 @@ contains
 
     filename = 'data/mesh_C4.nc'
     npanels  = 6
-    global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                  mesh_name, &
-                                                                  npanels )
-    global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
     partitioner_ptr => partitioner_cubedsphere_serial
 
-    partition = partition_type( global_mesh, &
+    partition = partition_type( global_mesh_ptr, &
                                 partitioner_ptr, &
                                 xproc, &
                                 yproc, &

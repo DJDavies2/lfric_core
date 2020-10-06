@@ -69,7 +69,8 @@ module global_mesh_mod
     integer(i_def)       :: nedges_per_cell
   ! maximum number of cells around a vertex
     integer(i_def)       :: max_cells_per_vertex
-
+  ! Number of panels on the mesh to be constructed
+    integer(i_def)       :: npanels
   ! Target of global mesh name
     integer(i_def) :: ntarget_meshes
     character(str_def), allocatable :: target_global_mesh_names(:)
@@ -78,6 +79,7 @@ module global_mesh_mod
 
   contains
     procedure, public :: get_mesh_name
+    procedure, public :: get_npanels
     procedure, public :: get_mesh_class
     procedure, public :: get_mesh_periodicity
     procedure, public :: get_cell_id
@@ -132,75 +134,51 @@ contains
   !> the 2D topology of the mesh.
   !>
   !> @param[in] filename         Filename for global 2D mesh(es) ugrid file.
+  !> @param[in] npanels          Number of panels in the mesh
   !> @param[in] global_mesh_name Name of ugrid mesh topology to create
   !>                             global mesh object from.
   !>
   !> @return Freshly minted global_mesh_type object.
   !>
-  function global_mesh_constructor( filename, global_mesh_name ) result(self)
+  function global_mesh_constructor( ugrid_mesh_data, &
+                                    npanels ) result(self)
 
-    use ugrid_2d_mod,   only: ugrid_2d_type
-    use ugrid_file_mod, only: ugrid_file_type
-    use ncdf_quad_mod,  only: ncdf_quad_type
+    use ugrid_mesh_data_mod, only: ugrid_mesh_data_type
 
     implicit none
 
-    character(*), intent(in) :: filename
-    character(*), intent(in) :: global_mesh_name
+    type(ugrid_mesh_data_type), intent(in) :: ugrid_mesh_data
+    integer(i_def),             intent(in) :: npanels
 
     type(global_mesh_type) :: self
-
-    type(ugrid_2d_type) :: ugrid_2d
-
-    class(ugrid_file_type), allocatable :: file_handler
-
-    ! dimensions from file
-    integer(i_def) :: nvert_in
-    integer(i_def) :: nface_in
-    integer(i_def) :: nedge_in
-    integer(i_def) :: num_nodes_per_face
-    integer(i_def) :: num_nodes_per_edge
-    integer(i_def) :: num_edges_per_face
-    integer(i_def) :: max_num_faces_per_node
 
     ! loop counter over entities (vertices or edges)
     integer(i_def) :: ientity
 
-    self%mesh_name = trim(global_mesh_name)
-    allocate( ncdf_quad_type :: file_handler )
-    call ugrid_2d%set_file_handler( file_handler )
-    call ugrid_2d%set_from_file_read( trim(global_mesh_name), trim(filename) )
-    call ugrid_2d%get_dimensions                           &
-            ( num_nodes              = nvert_in,           &
-              num_edges              = nedge_in,           &
-              num_faces              = nface_in,           &
-              num_nodes_per_face     = num_nodes_per_face, &
-              num_edges_per_face     = num_edges_per_face, &
-              num_nodes_per_edge     = num_nodes_per_edge, &
-              max_num_faces_per_node = max_num_faces_per_node )
-    call ugrid_2d%get_metadata                          &
-            ( mesh_class        = self%mesh_class,      &
-              periodic_x        = self%periodic_x,      &
-              periodic_y        = self%periodic_y,      &
-              nmaps             = self%ntarget_meshes,  &
-              target_mesh_names = self%target_global_mesh_names )
+    call ugrid_mesh_data%get_data( self%mesh_name, &
+                                   self%nverts, &
+                                   self%nedges, &
+                                   self%ncells, &
+                                   self%nverts_per_cell, &
+                                   self%nverts_per_edge, &
+                                   self%nedges_per_cell, &
+                                   self%max_cells_per_vertex, &
+                                   self%mesh_class, &
+                                   self%periodic_x, &
+                                   self%periodic_y, &
+                                   self%ntarget_meshes,  &
+                                   self%target_global_mesh_names, &
+                                   self%vert_coords, &
+                                   self%cell_coords, &
+                                   self%cell_next_2d, &
+                                   self%vert_on_cell_2d, &
+                                   self%edge_on_cell_2d )
+
+    self%npanels = npanels
 
     global_mesh_id_counter = global_mesh_id_counter + 1
 
     call self%set_id(global_mesh_id_counter)
-    self%nverts  = nvert_in
-    self%nedges  = nedge_in
-    self%ncells  = nface_in
-    self%nverts_per_cell      = num_nodes_per_face
-    self%nverts_per_edge      = num_nodes_per_edge
-    self%nedges_per_cell      = num_edges_per_face
-    self%max_cells_per_vertex = max_num_faces_per_node
-
-    allocate( self%vert_coords(2, self%nverts) )
-    call ugrid_2d%get_node_coords(self%vert_coords)
-
-    allocate( self%cell_coords(2, self%ncells) )
-    self%cell_coords = ugrid_2d%get_face_coords()
 
     ! CF Standard for longitude/latitude is in degrees
     ! though many functions assume radians. Convert
@@ -211,44 +189,35 @@ contains
       self%cell_coords(:,:) = self%cell_coords(:,:) * degrees_to_radians
     end if
 
-    allocate( self%cell_next_2d( num_edges_per_face, nface_in ) )
-    call ugrid_2d%get_face_face_connectivity( self%cell_next_2d )
-
-    allocate( self%vert_on_cell_2d( num_nodes_per_face, nface_in ) )
-    call ugrid_2d%get_face_node_connectivity( self%vert_on_cell_2d )
-
-    allocate( self%edge_on_cell_2d( num_edges_per_face, nface_in ) )
-    call ugrid_2d%get_face_edge_connectivity( self%edge_on_cell_2d )
-
-    allocate( self%cell_on_vert_2d( self%max_cells_per_vertex, nvert_in ) )
+    allocate( self%cell_on_vert_2d( self%max_cells_per_vertex, self%nverts ) )
     call calc_cell_on_vertex( self%vert_on_cell_2d, &
-                              num_nodes_per_face, &
-                              nface_in, &
+                              self%nverts_per_cell, &
+                              self%ncells, &
                               self%cell_on_vert_2d, &
                               self%max_cells_per_vertex, &
-                              nvert_in)
+                              self%nverts)
 
     ! Populate cells either side of each edge
     ! There can only ever be 2 cells incident on an edge (whatever the
     ! topography!)
-    allocate( self%cell_on_edge_2d(2,nedge_in) )
+    allocate( self%cell_on_edge_2d(2,self%nedges) )
     call calc_cell_on_edge( self%edge_on_cell_2d, &
-                            num_edges_per_face, &
-                            nface_in, &
+                            self%nedges_per_cell, &
+                            self%ncells, &
                             self%cell_on_edge_2d, &
-                            nedge_in )
+                            self%nedges )
 
     ! Allocate each vertex to the cell with the highest global cell index
     ! of the cells neighbouring the vertex
-    allocate( self%vert_cell_owner(nvert_in) )
-    do ientity=1,nvert_in
+    allocate( self%vert_cell_owner(self%nverts) )
+    do ientity=1,self%nverts
       self%vert_cell_owner(ientity)=maxval( self%cell_on_vert_2d(:,ientity) )
     end do
 
     ! Allocate each edge to the cell with the highest global cell index
     ! of the cells neighbouring the edge
-    allocate( self%edge_cell_owner(nedge_in) )
-    do ientity=1,nedge_in
+    allocate( self%edge_cell_owner(self%nedges) )
+    do ientity=1,self%nedges
       self%edge_cell_owner(ientity)=maxval( self%cell_on_edge_2d(:,ientity) )
     end do
 
@@ -523,6 +492,28 @@ contains
   end do
 
   end subroutine calc_cell_on_edge
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief  Returns the number of panels in the mesh.
+  !>
+  !> @details Returns the number of panels in the mesh -
+  !>          cubedsphere = 6,
+  !>          planar = 1
+  !>
+  !> @return npanels The number of panels in the mesh.
+  !>
+  function get_npanels( self ) result ( npanels )
+
+    implicit none
+
+    class(global_mesh_type), intent(in) :: self
+
+    integer(i_def) :: npanels
+
+    npanels = self%npanels
+
+  end function get_npanels
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

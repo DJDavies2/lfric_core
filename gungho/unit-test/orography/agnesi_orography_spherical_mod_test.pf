@@ -18,6 +18,7 @@ module agnesi_orography_spherical_mod_test
   use analytic_orography_mod,     only : orography_profile
   use yaxt,                       only : xt_initialize, xt_finalize
   use mpi_mod,                    only : store_comm, clear_comm
+  use ugrid_mesh_data_mod,        only : ugrid_mesh_data_type
 
   use pFUnit_Mod
 
@@ -171,7 +172,9 @@ contains
     ! Mesh and partition types
     integer(i_def)                            :: global_mesh_id
     integer(i_def)                            :: mesh_id
-    type(global_mesh_type),           pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)                :: ugrid_mesh_data
+    type(global_mesh_type),           pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)                    :: global_mesh
     type(mesh_type),                  pointer :: mesh => null()
     type(partition_type)                      :: partition
     procedure(partitioner_interface), pointer :: partitioner_ptr => null()
@@ -182,14 +185,16 @@ contains
     integer(i_def)         :: itest
 
     ! Add global mesh
-    global_mesh_id =  global_mesh_collection%add_new_global_mesh( filename,  &
-                                                                  mesh_name, &
-                                                                  npanels )
-    global_mesh    => global_mesh_collection%get_global_mesh( global_mesh_id )
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_id )
 
     ! Assign partitioner
     partitioner_ptr => partitioner_cubedsphere_serial
-    partition = partition_type( global_mesh,     &
+    partition = partition_type( global_mesh_ptr, &
                                 partitioner_ptr, &
                                 xproc,           &
                                 yproc,           &
@@ -199,21 +204,21 @@ contains
     extrusion = uniform_extrusion_type( radius, domain_top, nlayers )
 
     ! Construct a mesh which is uniform in vertical for purpose of the test
-    mesh_id = mesh_collection%add_new_mesh( global_mesh, &
-                                            partition,   &
+    mesh_id = mesh_collection%add_new_mesh( global_mesh_ptr, &
+                                            partition,       &
                                             extrusion )
     mesh => mesh_collection%get_mesh( mesh_id )
 
     ! Calculate surface height for selected number of points
     itest = 905
-    call global_mesh%get_vert_coords(itest,vertex_coords_2d)
+    call global_mesh_ptr%get_vert_coords(itest,vertex_coords_2d)
     chi_surf = orography_profile%analytic_orography(vertex_coords_2d(1), &
                                                     vertex_coords_2d(2))
     chi_test = this%mountain_height
     @assertEqual( chi_surf, chi_test, tol )
 
     itest = 1514
-    call global_mesh%get_vert_coords(itest,vertex_coords_2d)
+    call global_mesh_ptr%get_vert_coords(itest,vertex_coords_2d)
     chi_surf = orography_profile%analytic_orography(vertex_coords_2d(1), &
                                                     vertex_coords_2d(2))
     chi_test = 49.90231_r_def

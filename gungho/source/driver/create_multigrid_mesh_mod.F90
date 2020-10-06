@@ -19,6 +19,7 @@ use mesh_collection_mod,        only: mesh_collection
 use mesh_mod,                   only: mesh_type
 use multigrid_config_mod,       only: ugrid, multigrid_chain_nitems
 use partition_mod,              only: partition_type, partitioner_interface
+use ugrid_mesh_data_mod,        only: ugrid_mesh_data_type
 
 implicit none
 
@@ -52,10 +53,12 @@ integer(i_def) :: global_mesh_ids (multigrid_chain_nitems)
 integer(i_def) :: i
 
 type(mesh_type),        pointer :: prime_mesh => null()
-type(global_mesh_type), pointer :: global_mesh => null()
+type(global_mesh_type), pointer :: global_mesh_ptr => null()
+type(global_mesh_type)          :: global_mesh
 type(partition_type) :: partition
 class(extrusion_type), allocatable :: extrusion
 type(uniform_extrusion_type)       :: extrusion_sl
+type(ugrid_mesh_data_type) :: ugrid_mesh_data
 
 character(str_def) :: mesh_name
 
@@ -85,19 +88,25 @@ end if
 ! maps should be created in the order they are added.
 !===================================================================
 do i=2, multigrid_chain_nitems
-  global_mesh_ids(i) = global_mesh_collection %                    &
-                                   add_new_global_mesh( ugrid(i),  &
-                                                        mesh_name, &
-                                                        npanels )
 
-  global_mesh => global_mesh_collection % get_global_mesh( global_mesh_ids(i) )
+  call ugrid_mesh_data%read_from_file(trim(ugrid(i)), mesh_name)
 
-  partition =  partition_type( global_mesh, partitioner,        &
+  global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+
+  call ugrid_mesh_data%clear()
+
+  global_mesh_ids(i) = global_mesh%get_id()
+
+  call global_mesh_collection%add_new_global_mesh( global_mesh )
+
+  global_mesh_ptr => global_mesh_collection%get_global_mesh( global_mesh_ids(i) )
+
+  partition =  partition_type( global_mesh_ptr, partitioner,    &
                                xproc, yproc, max_stencil_depth, &
                                local_rank, total_ranks )
 
-  mesh_ids(i) = mesh_collection % add_new_mesh( global_mesh, &
-                                                partition,   &
+  mesh_ids(i) = mesh_collection % add_new_mesh( global_mesh_ptr, &
+                                                partition,       &
                                                 extrusion )
 
 end do
@@ -106,14 +115,14 @@ twod_mesh_ids(1) = twod_mesh_id
 prime_mesh => mesh_collection%get_mesh( twod_mesh_id )
 do i=2, multigrid_chain_nitems
 
-  global_mesh => global_mesh_collection % get_global_mesh( global_mesh_ids(i) )
+  global_mesh_ptr => global_mesh_collection%get_global_mesh(global_mesh_ids(i))
 
-  partition =  partition_type( global_mesh, partitioner,        &
+  partition =  partition_type( global_mesh_ptr, partitioner,    &
                                xproc, yproc, max_stencil_depth, &
                                local_rank, total_ranks )
 
-  twod_mesh_ids(i) = mesh_collection % add_new_mesh( global_mesh, &
-                                                     partition,   &
+  twod_mesh_ids(i) = mesh_collection % add_new_mesh( global_mesh_ptr, &
+                                                     partition,       &
                                                      extrusion_sl )
 
 end do

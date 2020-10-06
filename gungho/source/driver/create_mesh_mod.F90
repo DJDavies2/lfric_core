@@ -55,6 +55,7 @@ module create_mesh_mod
   use mixing_config_mod,          only: smagorinsky
 
   use ugrid_2d_mod,               only: ugrid_2d_type
+  use ugrid_mesh_data_mod,        only: ugrid_mesh_data_type
   use ugrid_file_mod,             only: ugrid_file_type
 
   implicit none
@@ -90,6 +91,7 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, &
 
   ! Local variables
   procedure (partitioner_interface), pointer :: partitioner_ptr => null()
+  type (global_mesh_type)                    :: global_mesh
   type(global_mesh_type),            pointer :: global_mesh_ptr => null()
   class(extrusion_type),         allocatable :: extrusion
   class(extrusion_type),         allocatable :: shifted_extrusion
@@ -126,6 +128,7 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, &
 
   character(str_def)  :: domain_desc
   type(ugrid_2d_type) :: ugrid_2d
+  type(ugrid_mesh_data_type) :: ugrid_mesh_data
 
   class(ugrid_file_type), allocatable :: file_handler
   character(str_def),     allocatable :: mesh_names(:)
@@ -278,10 +281,16 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, &
   ! are use i.e. in function space chains.
   do i=1, n_meshes
     if (trim(mesh_names(i)) == trim(prime_mesh_name)) then
-      global_mesh_id = global_mesh_collection %                 &
-                           add_new_global_mesh ( filename,      &
-                                                 mesh_names(i), &
-                                                 npanels )
+
+      call ugrid_mesh_data%read_from_file(trim(filename), mesh_names(i))
+
+      global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+
+      call ugrid_mesh_data%clear()
+
+      global_mesh_id = global_mesh%get_id()
+
+      call global_mesh_collection%add_new_global_mesh ( global_mesh )
 
       global_mesh_ptr => global_mesh_collection % &
                              get_global_mesh( global_mesh_id )

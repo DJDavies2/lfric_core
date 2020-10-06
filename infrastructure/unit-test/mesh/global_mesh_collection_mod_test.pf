@@ -15,6 +15,7 @@ module global_mesh_collection_mod_test
   use global_mesh_map_collection_mod, only: global_mesh_map_collection_type
   use global_mesh_collection_mod,     only: global_mesh_collection_type, &
                                             global_mesh_collection
+  use ugrid_mesh_data_mod,            only: ugrid_mesh_data_type
 
   use yaxt,    only: xt_initialize, xt_finalize
   use mpi_mod, only: store_comm, clear_comm
@@ -109,7 +110,9 @@ contains
 
     class(global_mesh_collection_test_type), intent(inout) :: this
 
-    type(global_mesh_type), pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)          :: global_mesh
     character(str_max_filename)     :: filename
 
     integer (i_def) :: global_mesh_id
@@ -119,18 +122,19 @@ contains
     npanels  = 6
     filename = CubedSphereFile
 
-    global_mesh_id =  global_mesh_collection %          &
-                        add_new_global_mesh( filename,  &
-                                             mesh_name, &
-                                             npanels )
-    global_mesh    => global_mesh_collection % &
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
+    global_mesh_ptr => global_mesh_collection % &
                         get_global_mesh( global_mesh_id )
 
     ! Test that something is returned
-    @assertAssociated ( global_mesh )
+    @assertAssociated ( global_mesh_ptr )
 
     ! Test that it has the right id
-    @assertTrue ( global_mesh%get_id() == global_mesh_id )
+    @assertTrue ( global_mesh_ptr%get_id() == global_mesh_id )
 
   end subroutine test_cubesphere
 
@@ -142,7 +146,9 @@ contains
 
     class(global_mesh_collection_test_type), intent(inout) :: this
 
-    type(global_mesh_type), pointer :: global_mesh => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type)          :: global_mesh
     character(str_max_filename)     :: filename
 
     integer (i_def) :: global_mesh_id
@@ -152,18 +158,19 @@ contains
     npanels  = 1
     filename = BiPeriodicFile
 
-    global_mesh_id =  global_mesh_collection %          &
-                        add_new_global_mesh( filename,  &
-                                             mesh_name, &
-                                             npanels )
-    global_mesh    => global_mesh_collection % &
+    call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
+    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+    call ugrid_mesh_data%clear()
+    global_mesh_id = global_mesh%get_id()
+    call global_mesh_collection%add_new_global_mesh( global_mesh )
+    global_mesh_ptr => global_mesh_collection % &
                         get_global_mesh( global_mesh_id )
 
     ! Test that something is returned
-    @assertAssociated ( global_mesh )
+    @assertAssociated ( global_mesh_ptr )
 
     ! Test that it has the right id
-    @assertTrue ( global_mesh%get_id() == global_mesh_id )
+    @assertTrue ( global_mesh_ptr%get_id() == global_mesh_id )
 
   end subroutine test_biperiodic
 
@@ -204,12 +211,13 @@ contains
 
     class(global_mesh_collection_test_type), intent(inout) :: this
 
-    type(global_mesh_type), pointer :: global_mesh => null()
-    type(global_mesh_type), pointer :: MultiGrid1  => null()
-    type(global_mesh_type), pointer :: MultiGrid2  => null()
-    type(global_mesh_type), pointer :: MultiGrid3  => null()
-    type(global_mesh_type), pointer :: MultiGrid4  => null()
-
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type), pointer :: MultiGrid1_ptr  => null()
+    type(global_mesh_type), pointer :: MultiGrid2_ptr  => null()
+    type(global_mesh_type), pointer :: MultiGrid3_ptr  => null()
+    type(global_mesh_type), pointer :: MultiGrid4_ptr  => null()
+    type(global_mesh_type)          :: MultiGrid
 
     type(global_mesh_type), pointer :: tmp_global_mesh  => null()
 
@@ -229,16 +237,17 @@ contains
     npanels = 6
 
     do i=1, 4
-      MultiGrid_id(i) = global_mesh_collection %                  &
-                          add_new_global_mesh( MultiGridFiles(i), &
-                                               mesh_name,         &
-                                               npanels )
+      call ugrid_mesh_data%read_from_file(trim(MultiGridFiles(i)), mesh_name)
+      MultiGrid = global_mesh_type( ugrid_mesh_data, npanels )
+      call ugrid_mesh_data%clear()
+      MultiGrid_id(i) = MultiGrid%get_id()
+      call global_mesh_collection%add_new_global_mesh( MultiGrid )
     end do
 
-    MultiGrid1 => global_mesh_collection%get_global_mesh( MultiGrid_id(1) )
-    MultiGrid2 => global_mesh_collection%get_global_mesh( MultiGrid_id(2) )
-    MultiGrid3 => global_mesh_collection%get_global_mesh( MultiGrid_id(3) )
-    MultiGrid4 => global_mesh_collection%get_global_mesh( MultiGrid_id(4) )
+    MultiGrid1_ptr => global_mesh_collection%get_global_mesh( MultiGrid_id(1) )
+    MultiGrid2_ptr => global_mesh_collection%get_global_mesh( MultiGrid_id(2) )
+    MultiGrid3_ptr => global_mesh_collection%get_global_mesh( MultiGrid_id(3) )
+    MultiGrid4_ptr => global_mesh_collection%get_global_mesh( MultiGrid_id(4) )
 
     ! Test ids are different
     @assertTrue ( MultiGrid_id(1) /= MultiGrid_id(2) )
@@ -253,36 +262,36 @@ contains
     ! Multigrid4  mesh should have 1 maps
     !===========================================================================
     ! MultiGrid 1
-    global_mesh     => global_mesh_collection % get_global_mesh(MultiGrid_id(1))
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(2))
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(1))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(2))
     @assertAssociated( global_mesh_map )
 
 
     ! MultiGrid 2
-    global_mesh     => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(1))
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(1))
     @assertAssociated( global_mesh_map )
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(3))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(3))
     @assertAssociated( global_mesh_map )
 
     ! MultiGrid 3
-    global_mesh     => global_mesh_collection % get_global_mesh(MultiGrid_id(3))
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(2))
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(3))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(2))
     @assertAssociated( global_mesh_map )
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(4))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(4))
     @assertAssociated( global_mesh_map )
 
     ! MultiGrid 4
-    global_mesh     => global_mesh_collection % get_global_mesh(MultiGrid_id(4))
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(3))
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(4))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(3))
     @assertAssociated( global_mesh_map )
 
 
     ! Check the maps
     !==============================================================================
     ! 96 cell --> 384 cell
-    global_mesh     => global_mesh_collection % get_global_mesh(MultiGrid_id(1))
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(2))
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(1))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(2))
 
     tmp_int = global_mesh_map % get_source_id()
     @assertEqual( tmp_int, MultiGrid_id(1) )
@@ -315,8 +324,8 @@ contains
     deallocate(test_global_id_map)
 
     ! 384 cell --> 96 cell
-    global_mesh     => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(1))
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(1))
 
     tmp_int = global_mesh_map%get_source_id()
     @assertEqual( tmp_int, MultiGrid_id(2) )
@@ -350,8 +359,8 @@ contains
 
 
     ! 384 cell --> 1536 cell
-    global_mesh     => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
-    global_mesh_map => global_mesh % get_global_mesh_map(MultiGrid_id(3))
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(3))
 
     tmp_int = global_mesh_map%get_source_id()
     @assertEqual( tmp_int, MultiGrid_id(2) )
@@ -400,10 +409,12 @@ contains
 
     class(global_mesh_collection_test_type), intent(inout) :: this
 
-    type(global_mesh_type), pointer :: global_mesh        => null()
-    type(global_mesh_type), pointer :: target_mesh        => null()
-    type(global_mesh_type), pointer :: test_global_mesh_A => null()
-    type(global_mesh_type), pointer :: test_global_mesh_B => null()
+    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
+    type(global_mesh_type), pointer :: global_mesh_ptr    => null()
+    type(global_mesh_type), pointer :: target_mesh_ptr    => null()
+    type(global_mesh_type)          :: global_mesh
+    type(global_mesh_type), pointer :: test_global_mesh_A_ptr => null()
+    type(global_mesh_type), pointer :: test_global_mesh_B_ptr => null()
 
     character(str_def), parameter :: &
         MultiGrid_mesh_names(4) = ['C4 ','C8 ','C16','C32' ]
@@ -455,17 +466,21 @@ contains
     ! topologies must be read in first.
     do i=1, size(multigrid_mesh_names)
 
-      multiGrid_ids(i) = global_mesh_collection %                          &
-                             add_new_global_mesh( single_mesh_input,       &
-                                                  multigrid_mesh_names(i), &
-                                                  npanels )
+      call ugrid_mesh_data%read_from_file( trim(single_mesh_input), &
+                                      multigrid_mesh_names(i) )
+      global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+      call ugrid_mesh_data%clear()
+      multiGrid_ids(i) = global_mesh%get_id()
+      call global_mesh_collection%add_new_global_mesh( global_mesh )
     end do
 
     do i=1, size(another_chain)
-      another_chain_ids(i) = global_mesh_collection %                &
-                             add_new_global_mesh( single_mesh_input, &
-                                                  another_chain(i),  &
-                                                  npanels )
+      call ugrid_mesh_data%read_from_file( trim(single_mesh_input), &
+                                      another_chain(i) )
+      global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+      call ugrid_mesh_data%clear()
+      another_chain_ids(i) = global_mesh%get_id()
+      call global_mesh_collection%add_new_global_mesh( global_mesh )
     end do
 
     ! Check that collection returns correct number of meshes read in.
@@ -485,9 +500,9 @@ contains
     ! Check that requesting global mesh by id returns the same as when
     ! requesting it by name.
     !=================================================================
-    test_global_mesh_A => global_mesh_collection % get_global_mesh( multigrid_mesh_names(2) )
-    test_global_mesh_B => global_mesh_collection % get_global_mesh( multigrid_ids(2) )
-    @assertEqual( test_global_mesh_A%get_id(),test_global_mesh_B%get_id() )
+    test_global_mesh_A_ptr => global_mesh_collection % get_global_mesh( multigrid_mesh_names(2) )
+    test_global_mesh_B_ptr => global_mesh_collection % get_global_mesh( multigrid_ids(2) )
+    @assertEqual( test_global_mesh_A_ptr%get_id(),test_global_mesh_B_ptr%get_id() )
 
     ! Test the query routine
     !=================================================================
@@ -518,15 +533,15 @@ contains
     !=================================================================
     call file_handler%file_open(trim(single_mesh_input))
     do i=1, size(multigrid_mesh_names)
-      global_mesh => global_mesh_collection%get_global_mesh( multigrid_mesh_names(i) )
-      call global_mesh%get_target_mesh_names(target_mesh_names)
+      global_mesh_ptr => global_mesh_collection%get_global_mesh( multigrid_mesh_names(i) )
+      call global_mesh_ptr%get_target_mesh_names(target_mesh_names)
       do j=1, size(target_mesh_names)
         if (global_mesh_collection%check_for(target_mesh_names(j))) then
           call file_handler%read_map( multigrid_mesh_names(i), &
                                       target_mesh_names(j),    &
                                       mesh_map )
-          target_mesh => global_mesh_collection%get_global_mesh( target_mesh_names(j) )
-          call global_mesh%add_global_mesh_map(target_mesh, mesh_map)
+          target_mesh_ptr => global_mesh_collection%get_global_mesh( target_mesh_names(j) )
+          call global_mesh_ptr%add_global_mesh_map(target_mesh_ptr, mesh_map)
         end if
       end do
     end do
@@ -543,72 +558,72 @@ contains
     !=================================================================
     ! MultiGrid C4:C8, C4:C12
     mesh_name   = 'C4'
-    global_mesh => global_mesh_collection%get_global_mesh( mesh_name )
+    global_mesh_ptr => global_mesh_collection%get_global_mesh( mesh_name )
 
     target_mesh_name = 'C8'
-    target_mesh      => global_mesh_collection%get_global_mesh( target_mesh_name )
-    global_mesh_map  => global_mesh%get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr  => global_mesh_collection%get_global_mesh( target_mesh_name )
+    global_mesh_map  => global_mesh_ptr%get_global_mesh_map( target_mesh_ptr%get_id() )
     @assertAssociated( global_mesh_map )
-    @assertEqual( global_mesh%get_id(), global_mesh_map%get_source_id() )
-    @assertEqual( target_mesh%get_id(), global_mesh_map%get_target_id() )
+    @assertEqual( global_mesh_ptr%get_id(), global_mesh_map%get_source_id() )
+    @assertEqual( target_mesh_ptr%get_id(), global_mesh_map%get_target_id() )
 
     target_mesh_name = 'C12'
-    target_mesh      => global_mesh_collection%get_global_mesh( target_mesh_name )
-    global_mesh_map  => global_mesh%get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr  => global_mesh_collection%get_global_mesh( target_mesh_name )
+    global_mesh_map  => global_mesh_ptr%get_global_mesh_map( target_mesh_ptr%get_id() )
     @assertAssociated( global_mesh_map )
-    @assertEqual( global_mesh%get_id(), global_mesh_map%get_source_id() )
-    @assertEqual( target_mesh%get_id(), global_mesh_map%get_target_id() )
+    @assertEqual( global_mesh_ptr%get_id(), global_mesh_map%get_source_id() )
+    @assertEqual( target_mesh_ptr%get_id(), global_mesh_map%get_target_id() )
 
 
     ! MultiGrid C4:C8:C16
     mesh_name   = 'C8'
-    global_mesh => global_mesh_collection % get_global_mesh( mesh_name )
+    global_mesh_ptr => global_mesh_collection % get_global_mesh( mesh_name )
 
     target_mesh_name = 'C4'
-    target_mesh      => global_mesh_collection % get_global_mesh( target_mesh_name )
-    global_mesh_map  => global_mesh % get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr  => global_mesh_collection % get_global_mesh( target_mesh_name )
+    global_mesh_map  => global_mesh_ptr % get_global_mesh_map( target_mesh_ptr%get_id() )
     @assertAssociated( global_mesh_map )
-    @assertEqual( global_mesh%get_id(), global_mesh_map%get_source_id() )
-    @assertEqual( target_mesh%get_id(), global_mesh_map%get_target_id() )
+    @assertEqual( global_mesh_ptr%get_id(), global_mesh_map%get_source_id() )
+    @assertEqual( target_mesh_ptr%get_id(), global_mesh_map%get_target_id() )
 
     target_mesh_name = 'C16'
-    target_mesh      => global_mesh_collection % get_global_mesh( target_mesh_name )
-    global_mesh_map  => global_mesh % get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr  => global_mesh_collection % get_global_mesh( target_mesh_name )
+    global_mesh_map  => global_mesh_ptr % get_global_mesh_map( target_mesh_ptr%get_id() )
     @assertAssociated( global_mesh_map )
-    @assertEqual( global_mesh%get_id(), global_mesh_map%get_source_id() )
-    @assertEqual( target_mesh%get_id(), global_mesh_map%get_target_id() )
+    @assertEqual( global_mesh_ptr%get_id(), global_mesh_map%get_source_id() )
+    @assertEqual( target_mesh_ptr%get_id(), global_mesh_map%get_target_id() )
 
 
     ! MultiGrid C8:C16:C32
     mesh_name   = 'C16'
-    global_mesh => global_mesh_collection % get_global_mesh( mesh_name )
+    global_mesh_ptr => global_mesh_collection % get_global_mesh( mesh_name )
 
     target_mesh_name = 'C8'
-    target_mesh      => global_mesh_collection % get_global_mesh( target_mesh_name )
-    global_mesh_map  => global_mesh % get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr  => global_mesh_collection % get_global_mesh( target_mesh_name )
+    global_mesh_map  => global_mesh_ptr % get_global_mesh_map( target_mesh_ptr%get_id() )
     @assertAssociated( global_mesh_map )
-    @assertEqual( global_mesh%get_id(), global_mesh_map%get_source_id() )
-    @assertEqual( target_mesh%get_id(), global_mesh_map%get_target_id() )
+    @assertEqual( global_mesh_ptr%get_id(), global_mesh_map%get_source_id() )
+    @assertEqual( target_mesh_ptr%get_id(), global_mesh_map%get_target_id() )
 
     target_mesh_name = 'C32'
-    target_mesh      => global_mesh_collection % get_global_mesh( target_mesh_name )
-    global_mesh_map  => global_mesh % get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr  => global_mesh_collection % get_global_mesh( target_mesh_name )
+    global_mesh_map  => global_mesh_ptr % get_global_mesh_map( target_mesh_ptr%get_id() )
     @assertAssociated( global_mesh_map )
-    @assertEqual( global_mesh%get_id(), global_mesh_map%get_source_id() )
-    @assertEqual( target_mesh%get_id(), global_mesh_map%get_target_id() )
+    @assertEqual( global_mesh_ptr%get_id(), global_mesh_map%get_source_id() )
+    @assertEqual( target_mesh_ptr%get_id(), global_mesh_map%get_target_id() )
 
 
     ! MultiGrid C16:C32
     mesh_name   = 'C32'
-    global_mesh => global_mesh_collection % get_global_mesh( mesh_name )
+    global_mesh_ptr => global_mesh_collection % get_global_mesh( mesh_name )
 
     target_mesh_name = 'C16'
-    target_mesh      => global_mesh_collection % get_global_mesh( target_mesh_name )
-    global_mesh_map  => global_mesh % get_global_mesh_map( target_mesh%get_id() )
+    target_mesh_ptr  => global_mesh_collection % get_global_mesh( target_mesh_name )
+    global_mesh_map  => global_mesh_ptr % get_global_mesh_map( target_mesh_ptr%get_id() )
 
     @assertAssociated( global_mesh_map )
-    @assertEqual( global_mesh%get_id(), global_mesh_map%get_source_id() )
-    @assertEqual( target_mesh%get_id(), global_mesh_map%get_target_id() )
+    @assertEqual( global_mesh_ptr%get_id(), global_mesh_map%get_source_id() )
+    @assertEqual( target_mesh_ptr%get_id(), global_mesh_map%get_target_id() )
 
     !==============================================================================
     ! CHECK THE MAPS
@@ -617,21 +632,21 @@ contains
     !==============================================================================
     mesh_name = 'C4'
     target_mesh_name = 'C8'
-    global_mesh     => global_mesh_collection % get_global_mesh(mesh_name)
-    target_mesh     => global_mesh_collection % get_global_mesh(target_mesh_name)
-    global_mesh_map => global_mesh % get_global_mesh_map(target_mesh%get_id())
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(mesh_name)
+    target_mesh_ptr => global_mesh_collection % get_global_mesh(target_mesh_name)
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(target_mesh_ptr%get_id())
 
     test_integer = global_mesh_map % get_source_id()
-    @assertEqual( test_integer, global_mesh%get_id() )
+    @assertEqual( test_integer, global_mesh_ptr%get_id() )
 
     test_integer = global_mesh_map % get_target_id()
-    @assertEqual( test_integer, target_mesh%get_id() )
+    @assertEqual( test_integer, target_mesh_ptr%get_id() )
 
     test_integer = global_mesh_map % get_nsource_cells()
-    @assertEqual( global_mesh%get_ncells(), test_integer )
+    @assertEqual( global_mesh_ptr%get_ncells(), test_integer )
 
     test_integer = global_mesh_map % get_ntarget_cells_per_source_cell()
-    kgo_integer  = max( target_mesh%get_ncells()/global_mesh%get_ncells(),1 )
+    kgo_integer  = max( target_mesh_ptr%get_ncells()/global_mesh_ptr%get_ncells(),1 )
     @assertEqual( kgo_integer, test_integer )
 
     ! Check global ID map
@@ -656,21 +671,21 @@ contains
     !==============================================================================
     mesh_name = 'C4'
     target_mesh_name = 'C12'
-    global_mesh     => global_mesh_collection % get_global_mesh(mesh_name)
-    target_mesh     => global_mesh_collection % get_global_mesh(target_mesh_name)
-    global_mesh_map => global_mesh % get_global_mesh_map(target_mesh%get_id())
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(mesh_name)
+    target_mesh_ptr => global_mesh_collection % get_global_mesh(target_mesh_name)
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(target_mesh_ptr%get_id())
 
     test_integer = global_mesh_map % get_source_id()
-    @assertEqual( test_integer, global_mesh%get_id() )
+    @assertEqual( test_integer, global_mesh_ptr%get_id() )
 
     test_integer = global_mesh_map % get_target_id()
-    @assertEqual( test_integer, target_mesh%get_id() )
+    @assertEqual( test_integer, target_mesh_ptr%get_id() )
 
     test_integer = global_mesh_map % get_nsource_cells()
-    @assertEqual( global_mesh%get_ncells(), test_integer )
+    @assertEqual( global_mesh_ptr%get_ncells(), test_integer )
 
     test_integer = global_mesh_map % get_ntarget_cells_per_source_cell()
-    kgo_integer  = max( target_mesh%get_ncells()/global_mesh%get_ncells(),1 )
+    kgo_integer  = max( target_mesh_ptr%get_ncells()/global_mesh_ptr%get_ncells(),1 )
     @assertEqual( kgo_integer, test_integer )
 
     ! Check global ID map
@@ -696,22 +711,22 @@ contains
     !==============================================================================
     mesh_name = 'C8'
     target_mesh_name = 'C4'
-    global_mesh     => global_mesh_collection % get_global_mesh(mesh_name)
-    target_mesh     => global_mesh_collection % get_global_mesh(target_mesh_name)
-    global_mesh_map => global_mesh % get_global_mesh_map(target_mesh%get_id())
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(mesh_name)
+    target_mesh_ptr => global_mesh_collection % get_global_mesh(target_mesh_name)
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(target_mesh_ptr%get_id())
 
 
     test_integer = global_mesh_map%get_source_id()
-    @assertEqual( test_integer, global_mesh%get_id() )
+    @assertEqual( test_integer, global_mesh_ptr%get_id() )
 
     test_integer = global_mesh_map%get_target_id()
-    @assertEqual( test_integer, target_mesh%get_id() )
+    @assertEqual( test_integer, target_mesh_ptr%get_id() )
 
     test_integer = global_mesh_map%get_nsource_cells()
-    @assertEqual( global_mesh%get_ncells(), test_integer )
+    @assertEqual( global_mesh_ptr%get_ncells(), test_integer )
 
     test_integer = global_mesh_map%get_ntarget_cells_per_source_cell()
-    kgo_integer  = max( target_mesh%get_ncells()/global_mesh%get_ncells(),1 )
+    kgo_integer  = max( target_mesh_ptr%get_ncells()/global_mesh_ptr%get_ncells(),1 )
     @assertEqual( kgo_integer, test_integer )
 
     ! Check global ID map
@@ -737,22 +752,22 @@ contains
     !==============================================================================
     mesh_name = 'C8'
     target_mesh_name = 'C16'
-    global_mesh     => global_mesh_collection % get_global_mesh(mesh_name)
-    target_mesh     => global_mesh_collection % get_global_mesh(target_mesh_name)
-    global_mesh_map => global_mesh % get_global_mesh_map(target_mesh%get_id())
+    global_mesh_ptr => global_mesh_collection % get_global_mesh(mesh_name)
+    target_mesh_ptr => global_mesh_collection % get_global_mesh(target_mesh_name)
+    global_mesh_map => global_mesh_ptr % get_global_mesh_map(target_mesh_ptr%get_id())
 
 
     test_integer = global_mesh_map%get_source_id()
-    @assertEqual( test_integer, global_mesh%get_id() )
+    @assertEqual( test_integer, global_mesh_ptr%get_id() )
 
     test_integer = global_mesh_map%get_target_id()
-    @assertEqual( test_integer, target_mesh%get_id() )
+    @assertEqual( test_integer, target_mesh_ptr%get_id() )
 
     test_integer = global_mesh_map%get_nsource_cells()
-    @assertEqual( global_mesh%get_ncells(), test_integer )
+    @assertEqual( global_mesh_ptr%get_ncells(), test_integer )
 
     test_integer = global_mesh_map%get_ntarget_cells_per_source_cell()
-    kgo_integer  = max( target_mesh%get_ncells()/global_mesh%get_ncells(),1 )
+    kgo_integer  = max( target_mesh_ptr%get_ncells()/global_mesh_ptr%get_ncells(),1 )
     @assertEqual( kgo_integer, test_integer )
 
     ! Check global ID map
