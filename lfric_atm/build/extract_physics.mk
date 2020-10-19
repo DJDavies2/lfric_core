@@ -32,7 +32,7 @@ extract:
 	# Retrieve and preprocess the UM, Jules and Socrates code
 	# The UM_ENV file contains the appropriate locations and UM side
 	# environment variables
-	$Qsource $(PROJECT_DIR)/fcm-make/parameters.sh \
+	$Q. $(PROJECT_DIR)/fcm-make/parameters.sh \
 	   && fcm make -C $(SCRATCH_DIR) -f $(PROJECT_DIR)/fcm-make/extract.cfg
 	# Note that if wanting to modify UM source this should be done via the
 	# UM repository either through a working copy or branch
