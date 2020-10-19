@@ -25,7 +25,7 @@ module constants_mod
             r_def, r_double, r_ncdf, r_native, r_second, r_single, r_um, &
             CMDI, EIMDI, EMDI, IMDI, RMDI,                               &
             real_type, integer_type, logical_type,                       &
-            EPS,                                                         &
+            EPS, tiny_eps,                                               &
             str_def, str_long, str_max_filename, str_short,              &
             LARGE_REAL_NEGATIVE, LARGE_REAL_POSITIVE, xios_max_int,      &
             PI, degrees_to_radians, radians_to_degrees,                  &
@@ -126,7 +126,9 @@ module constants_mod
 
   !> @name Numerical constants
   !> @{
-  real(kind=r_def), parameter :: EPS = 3.0e-15_r_def !< Relative precision: if (abs(x-y) > EPS) then assume x==y.
+  real(kind=r_def), parameter :: EPS = 3.0e-15_r_def      !< Relative precision: if (abs(x-y) > EPS) then assume x==y.
+  real(kind=r_def), parameter :: tiny_eps = 1.0e-30_r_def !< Similar to EPS but lot smaller, which can be used where
+  !<                             x/y < EPS but (x-y) is not considered to be zero like many chemistry tracers.
   !> @}
 
   !> @name Mathematical constants

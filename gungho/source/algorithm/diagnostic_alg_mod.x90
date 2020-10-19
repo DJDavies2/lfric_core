@@ -37,6 +37,7 @@ module diagnostic_alg_mod
    public :: vector_nodal_diagnostic_alg
    public :: scalar_ugrid_diagnostic_alg
    public :: vorticity_diagnostic_alg
+   public :: l2norm_diff_2fields
 
 contains
 
@@ -569,5 +570,49 @@ contains
     end if
 
   end subroutine vorticity_diagnostic_alg
+
+  !> @brief Computes the relative l2-norm between 2 fields.
+  !> @details l2-norm=SQRT(SUM[(field-field_ref)**2])/SQRT(SUM[field_ref**2]).
+  !>          If field_ref=0 l2-norm=SQRT(SUM[field**2])/SQRT(SUM[ones**2]).
+  !>          This may be replaced with PSyclone built-in (PSyclone issue #892).
+  !> @param[out] l2norm     L2-norm
+  !> @param[in]  field      Field for which l2-norm diff is computed
+  !> @param[in]  field_ref  Second field which is the reference against
+  !>                        which the relative l2-norm is computed
+
+  subroutine l2norm_diff_2fields(l2norm, field, field_ref )
+    use field_mod,       only: field_type
+    use constants_mod,   only: r_def, tiny_eps
+
+    implicit none
+
+    type(field_type), intent(in)  :: field, field_ref
+    real(r_def), intent(out)      :: l2norm
+    type(field_type)              :: field_diff
+    real(r_def)                   :: f_min, f_max, fc_max
+    real(r_def)                   :: num, deno
+
+    call field_diff%initialise( vector_space = field%get_function_space())
+
+    call field_ref%field_minmax(f_min, f_max)
+    fc_max = max(abs(f_max),abs(f_min))
+
+    if ( fc_max > tiny_eps ) then
+        call invoke( X_innerproduct_X(deno, field_ref) )
+     else
+        ! This to avoid dividing by zero when the field_ref=0
+        ! In this case l2norm=SQRT(SUM[field**2]/size(field))
+        ! Tiny_eps has to be the smallest real possible.
+
+        call invoke( setval_c(field_diff,1.0_r_def),    &
+                     X_innerproduct_X(deno, field_diff) )
+    end if
+
+    call invoke( X_minus_Y(field_diff,field,field_ref),  &
+                 X_innerproduct_X(num, field_diff)    )
+
+    l2norm = sqrt(num)/sqrt(deno)
+
+  end subroutine l2norm_diff_2fields
 
 end module diagnostic_alg_mod

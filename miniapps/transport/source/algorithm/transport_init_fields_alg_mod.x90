@@ -4,10 +4,12 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 
-!>@brief Initialisation of density field for the transport miniapp.
+!-----------------------------------------------------------------------------
+!> @brief Initialisation of density field for the transport miniapp.
+!> @details The initial density field can be generated either by sampling
+!>          or by projection.
+!-----------------------------------------------------------------------------
 
-!>@details The initial density field can be generated either by sampling or by
-!>         projection.
 module transport_init_fields_alg_mod
 
   use constants_mod,                     only: r_def
@@ -23,21 +25,35 @@ module transport_init_fields_alg_mod
   implicit none
 
   private
+
   public :: transport_init_fields_alg
 
 contains
-  !> @param[inout] density Density field
-  subroutine transport_init_fields_alg( wind_n,    &
-                                        density,   &
-                                        dep_pts_x, &
-                                        dep_pts_y, &
-                                        dep_pts_z, &
-                                        divergence )
+!-----------------------------------------------------------------------------
+!> @brief Initialisation of density and theta fields
+!>        for the transport miniapp.
+!> @param[in,out] wind_n  3D initial wind
+!> @param[in,out] density Density field
+!> @param[in,out] theta   theta/tracer field
+!> @param[in,out] dep_pts_x X-coordinates of departure points
+!> @param[in,out] dep_pts_y Y-coordinates of departure points
+!> @param[in,out] dep_pts_z Z-coordinates of departure points
+!> @param[in,out] divergence Divergence of the initial wind
+!-----------------------------------------------------------------------------
+
+subroutine transport_init_fields_alg( wind_n,    &
+                                      density,   &
+                                      theta,     &
+                                      dep_pts_x, &
+                                      dep_pts_y, &
+                                      dep_pts_z, &
+                                      divergence )
 
     implicit none
 
     type(field_type), intent(inout)     :: wind_n
     type(field_type), intent(inout)     :: density
+    type(field_type), intent(inout)     :: theta
     type(field_type), intent(inout)     :: dep_pts_x
     type(field_type), intent(inout)     :: dep_pts_y
     type(field_type), intent(inout)     :: dep_pts_z
@@ -58,9 +74,11 @@ contains
                  setval_c( divergence, 1.0_r_def) )
 
     if ( sample_init_rho ) then
-      call invoke( initial_rho_sample_kernel_type( density, chi, initial_time ) )
-    else
-      call invoke( set_rho_kernel_type( density, chi, initial_time, qr ) )
+      call invoke( initial_rho_sample_kernel_type( density, chi, initial_time ), &
+                   initial_rho_sample_kernel_type( theta  , chi, initial_time )  )
+     else
+      call invoke( set_rho_kernel_type( density, chi, initial_time, qr ), &
+                   set_rho_kernel_type( theta  , chi, initial_time, qr )  )
     end if
 
   end subroutine transport_init_fields_alg

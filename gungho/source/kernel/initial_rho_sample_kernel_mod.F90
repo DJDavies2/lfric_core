@@ -6,19 +6,21 @@
 !
 !-------------------------------------------------------------------------------
 
-!> @brief Computes initial rho field
+!> @brief Computes initial rho/tracer type field.
+!> @brief This could be used to initialise any tracer field either in rho
+!>        or theta/tracers spaces.
 
 module initial_rho_sample_kernel_mod
 
-  use argument_mod,         only : arg_type, func_type, &
-                                   GH_FIELD, GH_REAL,   &
-                                   GH_READ, GH_WRITE,   &
-                                   ANY_SPACE_9, CELLS,  &
-                                   GH_BASIS,            &
-                                   GH_DIFF_BASIS,       &
+  use argument_mod,         only : arg_type, func_type,        &
+                                   GH_FIELD, GH_REAL,          &
+                                   GH_READ, GH_WRITE,          &
+                                   ANY_SPACE_9, CELLS,         &
+                                   ANY_DISCONTINUOUS_SPACE_1,  &
+                                   GH_BASIS,                   &
                                    GH_EVALUATOR
+  use fs_continuity_mod,    only : Wchi
   use constants_mod,        only : r_def, i_def
-  use fs_continuity_mod,    only : W3
   use idealised_config_mod, only : test
   use kernel_mod,           only : kernel_type
 
@@ -31,13 +33,13 @@ module initial_rho_sample_kernel_mod
   !>
   type, public, extends(kernel_type) :: initial_rho_sample_kernel_type
     private
-    type(arg_type) :: meta_args(3) = (/             &
-        arg_type(GH_FIELD,   GH_WRITE,  W3),        &
-        arg_type(GH_FIELD*3, GH_READ, ANY_SPACE_9), &
-        arg_type(GH_REAL,    GH_READ)               &
+    type(arg_type) :: meta_args(3) = (/                            &
+        arg_type(GH_FIELD,   GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), &
+        arg_type(GH_FIELD*3, GH_READ, Wchi),                       &
+        arg_type(GH_REAL,    GH_READ)                              &
         /)
-    type(func_type) :: meta_funcs(1) = (/           &
-         func_type(ANY_SPACE_9, GH_BASIS)           &
+    type(func_type) :: meta_funcs(1) = (/                          &
+         func_type(Wchi, GH_BASIS)                                 &
         /)
     integer :: iterates_over = CELLS
     integer :: gh_shape = GH_EVALUATOR
@@ -54,14 +56,14 @@ contains
 
   !> @details Assigns initial rho field with analytic profile from analytic_density_profiles_mod
   !! @param[in] nlayers Number of layers
-  !! @param[out] rho Density
+  !! @param[out] rho Density/tracer field
   !! @param[in] chi_1 X component of the chi coordinate field
   !! @param[in] chi_2 Y component of the chi coordinate field
   !! @param[in] chi_3 Z component of the chi coordinate field
   !! @param[in] time Current time of the model run
-  !! @param[in] ndf_w3 Number of degrees of freedom per cell for rho
-  !! @param[in] undf_w3 Total number of degrees of freedom for rho
-  !! @param[in] map_w3 Dofmap for the cell at the base of the column for rho
+  !! @param[in] ndf_rho Number of degrees of freedom per cell for rho
+  !! @param[in] undf_rho Total number of degrees of freedom for rho
+  !! @param[in] map_rho Dofmap for the cell at the base of the column for rho
   !! @param[in] ndf_chi Number of degrees of freedom per cell for chi
   !! @param[in] undf_chi Number of degrees of freedom for chi
   !! @param[in] map_chi Dofmap for the cell at the base of the column for chi
@@ -70,7 +72,7 @@ contains
                                             rho,                        &
                                             chi_1, chi_2, chi_3,        &
                                             time,                       &
-                                            ndf_w3, undf_w3, map_w3,    &
+                                            ndf_rho, undf_rho, map_rho, &
                                             ndf_chi, undf_chi, map_chi, &
                                             chi_basis)
 
@@ -80,12 +82,12 @@ contains
 
     ! Arguments
     integer(kind=i_def),                            intent(in)  :: nlayers
-    integer(kind=i_def),                            intent(in)  :: ndf_w3, ndf_chi, undf_w3, undf_chi
-    integer(kind=i_def), dimension(ndf_w3),         intent(in)  :: map_w3
+    integer(kind=i_def),                            intent(in)  :: ndf_rho, ndf_chi, undf_rho, undf_chi
+    integer(kind=i_def), dimension(ndf_rho),        intent(in)  :: map_rho
     integer(kind=i_def), dimension(ndf_chi),        intent(in)  :: map_chi
-    real(kind=r_def), dimension(undf_w3),           intent(out) :: rho
+    real(kind=r_def), dimension(undf_rho),          intent(out) :: rho
     real(kind=r_def), dimension(undf_chi),          intent(in)  :: chi_1, chi_2, chi_3
-    real(kind=r_def), dimension(1,ndf_chi, ndf_w3), intent(in)  :: chi_basis
+    real(kind=r_def), dimension(1,ndf_chi,ndf_rho), intent(in)  :: chi_basis
     real(kind=r_def),                               intent(in)  :: time
     ! Internal variables
     integer(kind=i_def)                                         :: df1, df, k
@@ -101,7 +103,7 @@ contains
         chi_3_e(df1) = chi_3( map_chi(df1) + k)
       end do
 
-      do df = 1, ndf_w3
+      do df = 1, ndf_rho
         x(:) = 0.0_r_def
         do df1 = 1, ndf_chi
           x(1) = x(1) + chi_1_e(df1)*chi_basis(1,df1,df)
@@ -109,7 +111,7 @@ contains
           x(3) = x(3) + chi_3_e(df1)*chi_basis(1,df1,df)
         end do
 
-        rho(map_w3(df) + k) = analytic_density(x, test, time)
+        rho(map_rho(df) + k) = analytic_density(x, test, time)
 
       end do
     end do

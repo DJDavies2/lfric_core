@@ -33,13 +33,12 @@ contains
 
     character(*), intent(in) :: filename
     character(*), parameter  :: &
-                      required_configuration(9) = ['base_mesh             ', &
+                      required_configuration(8) = ['base_mesh             ', &
                                                    'planet                ', &
                                                    'extrusion             ', &
                                                    'initial_temperature   ', &
                                                    'initial_wind          ', &
                                                    'initial_density       ', &
-                                                   'subgrid               ', &
                                                    'transport             ', &
                                                    'timestepping          ']
     logical                  :: okay

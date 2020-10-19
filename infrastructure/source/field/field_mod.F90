@@ -81,6 +81,9 @@ module field_mod
     procedure, public :: log_minmax
     procedure, public :: log_absmax
 
+    !> Return global min and max of field
+    procedure, public :: field_minmax
+
     !> Setter for the field write method
     procedure, public :: set_write_behaviour
 
@@ -693,6 +696,32 @@ contains
     call log_event( log_scratch_space, log_level )
 
   end subroutine log_absmax
+
+  !> @brief Returns the min/max of a field.
+  !> @param[out] fmin Minimum value of the field
+  !> @param[out] fmax Maximum value of the field
+  !>
+  !> This routine should be PSy built-in (intrinsic) function.
+  !> PSyclone issue #489
+  !>
+  subroutine field_minmax( self, fmin, fmax )
+
+    use scalar_mod, only : scalar_type
+    implicit none
+
+    class( field_type ), target, intent(in) :: self
+    real(r_def) , intent(out)               :: fmin, fmax
+    integer(i_def)                          :: undf
+    type(scalar_type)                       :: fmin1, fmax1
+
+    undf = self%vspace%get_last_dof_owned()
+    fmin1 = scalar_type( minval( self%data(1:undf) ) )
+    fmax1 = scalar_type( maxval( self%data(1:undf) ) )
+
+    fmin = fmin1%get_min()
+    fmax = fmax1%get_max()
+
+  end subroutine field_minmax
 
   !> Calls the underlying IO implementation for writing a field
   !> throws an error if this has not been set

@@ -77,10 +77,15 @@ y2=0.0,
 &transport
 consistent_metric=.false.,
 enforce_monotonicity=.false.,
-fv_advective_order=3,
+fv_advective_order=2,
 fv_flux_order=2,
 operators='fv',
 scheme='horz_cosmic',
+rho_splitting='none',
+theta_splitting='none',
+cfl_mol_1d_stab=1.0,
+cfl_mol_1d_stab=1.0,
+cfl_mol_3d_stab=0.5
 /
 &planet
 cp=1005.0

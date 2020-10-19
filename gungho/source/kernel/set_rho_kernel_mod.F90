@@ -3,22 +3,25 @@
 ! For further details please refer to the file LICENCE.original which you
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
-!> @brief Computes LHS of Galerkin projection and solves equation in W3 space.
+!> @brief Initialise a rho/tracer at either rho or theta/tracers spaces.
 !>
 module set_rho_kernel_mod
 
   use argument_mod,         only : arg_type, func_type,         &
                                    GH_FIELD, GH_READ, GH_WRITE, &
                                    ANY_SPACE_9,                 &
+                                   ANY_DISCONTINUOUS_SPACE_1,   &
                                    GH_BASIS, GH_DIFF_BASIS,     &
                                    CELLS, GH_QUADRATURE_XYoZ,   &
                                    GH_REAL
+  use fs_continuity_mod,    only : Wchi
   use constants_mod,        only : r_def
-  use fs_continuity_mod,    only : W3
   use idealised_config_mod, only : test
   use kernel_mod,           only : kernel_type
 
   implicit none
+
+  private
 
   !---------------------------------------------------------------------------
   ! Public types
@@ -28,14 +31,14 @@ module set_rho_kernel_mod
   !>
   type, public, extends(kernel_type) :: set_rho_kernel_type
     private
-    type(arg_type) :: meta_args(3) = (/             &
-        arg_type(GH_FIELD,   GH_WRITE,  W3),        &
-        arg_type(GH_FIELD*3, GH_READ, ANY_SPACE_9), &
-        arg_type(GH_REAL,    GH_READ)               &
+    type(arg_type) :: meta_args(3) = (/                              &
+        arg_type(GH_FIELD,   GH_WRITE,  ANY_DISCONTINUOUS_SPACE_1),  &
+        arg_type(GH_FIELD*3, GH_READ, Wchi),                         &
+        arg_type(GH_REAL,    GH_READ)                                &
         /)
     type(func_type) :: meta_funcs(2) = (/               &
-        func_type(W3, GH_BASIS),                        &
-        func_type(ANY_SPACE_9, GH_BASIS, GH_DIFF_BASIS) &
+        func_type(ANY_DISCONTINUOUS_SPACE_1, GH_BASIS), &
+        func_type(Wchi, GH_BASIS, GH_DIFF_BASIS)        &
         /)
     integer :: iterates_over = CELLS
     integer :: gh_shape = GH_QUADRATURE_XYoZ
@@ -50,12 +53,12 @@ module set_rho_kernel_mod
 
 contains
 
-!> @brief Computes LHS of Galerkin projection and solves equation in W3 space
+!> @brief Initialise a rho/tracer field at either rho or theta/tracers spaces.
 !! @param[in] nlayers Number of layers
-!! @param[in] ndf_w3 Number of degrees of freedom per cell
-!! @param[in] undf_w3 Total number of degrees of freedom
-!! @param[in] map_w3 Dofmap for the cell at the base of the column
-!! @param[in] w3_basis Basis functions evaluated at gaussian quadrature points
+!! @param[in] ndf_rho Number of degrees of freedom per cell
+!! @param[in] undf_rho Total number of degrees of freedom
+!! @param[in] map_rho Dofmap for the cell at the base of the column
+!! @param[in] rho_basis Basis functions evaluated at gaussian quadrature points
 !! @param[inout] rho Density
 !! @param[inout] time Time evaluated as a real value
 !! @param[in] ndf_chi Number of degrees of freedom per cell for chi
@@ -70,10 +73,10 @@ contains
 !! @param[in] nqp_v Number of vertical quadrature points
 !! @param[in] wqp_h Weights of horizontal quadrature points
 !! @param[in] wqp_v Weights of vertical quadrature points
-subroutine set_rho_code(nlayers, rho, chi_1, chi_2, chi_3, time, &
-                            ndf_w3, undf_w3, map_w3, w3_basis, &
-                            ndf_chi, undf_chi, map_chi, chi_basis, chi_diff_basis, &
-                            nqp_h, nqp_v, wqp_h, wqp_v )
+subroutine set_rho_code(nlayers, rho, chi_1, chi_2, chi_3, time,               &
+                        ndf_rho, undf_rho, map_rho, rho_basis,                 &
+                        ndf_chi, undf_chi, map_chi, chi_basis, chi_diff_basis, &
+                        nqp_h, nqp_v, wqp_h, wqp_v                             )
 
    use matrix_invert_mod,             only : matrix_invert
    use coordinate_jacobian_mod,       only : coordinate_jacobian
@@ -84,11 +87,11 @@ subroutine set_rho_code(nlayers, rho, chi_1, chi_2, chi_3, time, &
   implicit none
 
   !Arguments
-  integer, intent(in) :: nlayers, ndf_w3, ndf_chi, undf_w3, undf_chi, nqp_h, nqp_v
-  integer, dimension(ndf_w3), intent(in) :: map_w3
+  integer, intent(in) :: nlayers, ndf_rho, ndf_chi, undf_rho, undf_chi, nqp_h, nqp_v
+  integer, dimension(ndf_rho), intent(in) :: map_rho
   integer, dimension(ndf_chi), intent(in) :: map_chi
-  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v),  intent(in)    :: w3_basis
-  real(kind=r_def), dimension(undf_w3),               intent(inout) :: rho
+  real(kind=r_def), dimension(1,ndf_rho,nqp_h,nqp_v), intent(in)    :: rho_basis
+  real(kind=r_def), dimension(undf_rho),              intent(inout) :: rho
   real(kind=r_def),                                   intent(in)    :: time
   real(kind=r_def), dimension(undf_chi),              intent(in)    :: chi_1, chi_2, chi_3
   real(kind=r_def), dimension(3,ndf_chi,nqp_h,nqp_v), intent(in)    :: chi_diff_basis
@@ -100,8 +103,8 @@ subroutine set_rho_code(nlayers, rho, chi_1, chi_2, chi_3, time, &
   integer               :: df1, df2, k
   integer               :: qp1, qp2
 
-  real(kind=r_def), dimension(ndf_w3)          :: rho_e, rhs_e
-  real(kind=r_def), dimension(ndf_w3,ndf_w3)   :: mass_matrix_w3, inv_mass_matrix_w3
+  real(kind=r_def), dimension(ndf_rho)         :: rho_e, rhs_e
+  real(kind=r_def), dimension(ndf_rho,ndf_rho) :: mass_matrix_w3, inv_mass_matrix_w3
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
   real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
   real(kind=r_def), dimension(ndf_chi)         :: chi_1_e, chi_2_e, chi_3_e
@@ -118,7 +121,7 @@ subroutine set_rho_code(nlayers, rho, chi_1, chi_2, chi_3, time, &
     call coordinate_jacobian(ndf_chi, nqp_h, nqp_v, chi_1_e, chi_2_e, chi_3_e, &
                              chi_diff_basis, jac, dj)
 ! Compute RHS
-    do df1 = 1, ndf_w3
+    do df1 = 1, ndf_rho
       rhs_e(df1) = 0.0_r_def
       do qp2 = 1, nqp_v
         do qp1 = 1, nqp_h
@@ -130,19 +133,19 @@ subroutine set_rho_code(nlayers, rho, chi_1, chi_2, chi_3, time, &
           end do
           rho_ref = analytic_density(x, test, time)
 
-          integrand =  w3_basis(1,df1,qp1,qp2) * rho_ref * dj(qp1,qp2)
+          integrand =  rho_basis(1,df1,qp1,qp2) * rho_ref * dj(qp1,qp2)
           rhs_e(df1) = rhs_e(df1) + wqp_h(qp1)*wqp_v(qp2)*integrand
         end do
       end do
     end do
 ! Commpute LHS
-    do df1 = 1, ndf_w3
-       do df2 = 1, ndf_w3
+    do df1 = 1, ndf_rho
+       do df2 = 1, ndf_rho
           mass_matrix_w3(df1,df2) = 0.0_r_def
           do qp2 = 1, nqp_v
              do qp1 = 1, nqp_h
-                integrand =  w3_basis(1,df1,qp1,qp2) * &
-                             w3_basis(1,df2,qp1,qp2) * dj(qp1,qp2)
+                integrand =  rho_basis(1,df1,qp1,qp2) * &
+                             rho_basis(1,df2,qp1,qp2) * dj(qp1,qp2)
                  mass_matrix_w3(df1,df2) = mass_matrix_w3(df1,df2) &
                                          + wqp_h(qp1)*wqp_v(qp2)*integrand
              end do
@@ -150,10 +153,10 @@ subroutine set_rho_code(nlayers, rho, chi_1, chi_2, chi_3, time, &
        end do
     end do
 ! Solve
-    call matrix_invert(mass_matrix_w3,inv_mass_matrix_w3,ndf_w3)
+    call matrix_invert(mass_matrix_w3,inv_mass_matrix_w3,ndf_rho)
     rho_e = matmul(inv_mass_matrix_w3,rhs_e)
-    do df1 = 1,ndf_w3
-      rho(map_w3(df1)+k) = rho_e(df1)
+    do df1 = 1,ndf_rho
+      rho(map_rho(df1)+k) = rho_e(df1)
     end do
   end do
 

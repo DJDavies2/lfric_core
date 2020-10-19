@@ -47,11 +47,16 @@ module transport_driver_mod
   use mpi_mod,                        only: store_comm,    &
                                             get_comm_size, &
                                             get_comm_rank
-  use transport_config_mod,           only: key_from_scheme,      &
-                                            scheme,               &
-                                            scheme_yz_bip_cosmic, &
-                                            scheme_cosmic_3D,     &
-                                            scheme_horz_cosmic
+  use transport_config_mod,           only: key_from_scheme,            &
+                                            scheme,                     &
+                                            scheme_yz_bip_cosmic,       &
+                                            scheme_cosmic_3D,           &
+                                            scheme_horz_cosmic,         &
+                                            scheme_method_of_lines,     &
+                                            rho_splitting,              &
+                                            rho_splitting_none,         &
+                                            theta_splitting,            &
+                                            theta_splitting_none
   use mass_conservation_alg_mod,      only: mass_conservation
   use yz_bip_cosmic_alg_mod,          only: yz_bip_cosmic_step
   use cusph_cosmic_transport_alg_mod, only: set_winds,      &
@@ -66,6 +71,18 @@ module transport_driver_mod
   use yaxt,                           only: xt_initialize, xt_finalize
   use xios,                           only: xios_context_finalize, &
                                             xios_update_calendar
+  use rk_transport_rho_mod,           only: rk_transport_rho_step,    &
+                                            rk_transport_rho_init,    &
+                                            rk_transport_rho_final,   &
+                                            rk_transport_rho_multistep
+  use rk_transport_theta_mod,         only: rk_transport_theta_step,  &
+                                            rk_transport_theta_init,  &
+                                            rk_transport_theta_final, &
+                                            split_transport_theta_step
+  use runge_kutta_init_mod,           only: runge_kutta_init, &
+                                            runge_kutta_final
+  use split_mol_cosmic_alg_mod,       only: split_transport_rho_step
+  use diagnostic_alg_mod,             only: l2norm_diff_2fields
 
   implicit none
 
@@ -76,6 +93,7 @@ module transport_driver_mod
   ! Prognostic fields
   type(field_type) :: wind_n
   type(field_type) :: density
+  type(field_type) :: theta
   type(field_type) :: dep_pts_x
   type(field_type) :: dep_pts_y
   type(field_type) :: dep_pts_z
@@ -122,8 +140,7 @@ contains
 
     character(len=*), parameter :: xios_ctx  = "transport"
 
-    integer(i_def) :: total_ranks, local_rank
-
+    integer(i_def)    :: total_ranks, local_rank
     integer(i_native) :: log_level
 
     !Store the MPI communicator for later use
@@ -190,18 +207,39 @@ contains
     call init_fem( mesh_id, chi, shifted_mesh_id, shifted_chi )
 
     ! Transport initialisation
-    call init_transport( mesh_id, twod_mesh_id, chi, shifted_mesh_id,          &
-                         shifted_chi, wind_n, density, dep_pts_x, dep_pts_y,   &
-                         dep_pts_z, increment, wind_divergence,                &
+    call init_transport( mesh_id, twod_mesh_id, chi, shifted_mesh_id,                &
+                         shifted_chi, wind_n, density, theta, dep_pts_x, dep_pts_y,  &
+                         dep_pts_z, increment, wind_divergence,                      &
                          wind_shifted, density_shifted )
+
+    ! Initialise dependencies
+    ! scheme_method_of_lines                  -> runge_kutta_init
+    ! rho_splitting /= rho_splitting_none     -> rk_transport_rho_init
+    ! theta_splitting /= theta_splitting_none -> rk_transport_theta_init
+    !
+    if ( scheme == scheme_method_of_lines    .or.  &
+         rho_splitting /= rho_splitting_none .or.  &
+         theta_splitting /= theta_splitting_none   ) then
+      call runge_kutta_init()
+      call rk_transport_rho_init( mesh_id )
+      call rk_transport_theta_init( mesh_id, wind_n, theta)
+    end if
 
     ! Calculate det(J) at W2 dofs for chi and shifted_chi fields.
     ! The calculation of det(J) for the shifted_chi field is done in preparation
     ! for Ticket #1608.
     detj_at_w2 => get_detj_at_w2()
     detj_at_w2_shifted => get_detj_at_w2_shifted()
-    cell_orientation => get_cell_orientation()
-    cell_orientation_shifted => get_cell_orientation_shifted()
+
+    ! Set cell cell_orientation (and shifted) if using splitting scheme.
+    ! Cell orientation is used by Cosmic and splitting schemes
+    !
+    if (scheme /= scheme_method_of_lines    .or. &
+        rho_splitting /= rho_splitting_none .or. &
+        theta_splitting /= theta_splitting_none  ) then
+      cell_orientation => get_cell_orientation()
+      cell_orientation_shifted => get_cell_orientation_shifted()
+    end if
 
     if ( use_xios_io ) then
       call initialise_xios( xios_ctx,     &
@@ -228,6 +266,8 @@ contains
                                       mesh_id, nodal_output_on_w3 )
         call write_scalar_diagnostic( 'density', density, clock, &
                                       mesh_id, nodal_output_on_w3 )
+        call write_scalar_diagnostic( 'theta', theta, clock, &
+                                      mesh_id, nodal_output_on_w3 )
 
      end if
 
@@ -242,12 +282,31 @@ contains
 
     implicit none
 
+    type(field_type)    :: density_t0
+    type(field_type)    :: theta_t0
+    real(r_def)         :: err_rho, err_theta
+
+
+    call density_t0%initialise( vector_space = density%get_function_space() )
+    call theta_t0%initialise( vector_space = theta%get_function_space() )
+
+    call density%copy_field(density_t0)
+    call theta%copy_field(theta_t0)
+
     call log_event( 'Running '//program_name//' ...', LOG_LEVEL_ALWAYS )
     call log_event( program_name//': Miniapp will run with default precision set as:', LOG_LEVEL_INFO )
     write(log_scratch_space, '(I1)') kind(1.0_r_def)
     call log_event( program_name//':        r_def kind = '//log_scratch_space , LOG_LEVEL_INFO )
     write(log_scratch_space, '(I1)') kind(1_i_def)
     call log_event( program_name//':        i_def kind = '//log_scratch_space , LOG_LEVEL_INFO )
+
+    if ( theta_splitting == theta_splitting_none ) then
+      ! Currently there is no other theta transport option in the tranport miniapp except splitting
+      write( log_scratch_space, '(A)' ) ' WARNING == Invalid option for theta advection for the miniapp transport'
+      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+      write( log_scratch_space, '(A)' ) ' In this case theta is not advected and remains at the initial state '
+      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    end if
 
     !--------------------------------------------------------------------------
     ! Model step
@@ -269,37 +328,72 @@ contains
 
       ! Update the wind each timestep.
       call set_winds( wind_n, mesh_id, clock%get_step() )
-      ! Calculate departure points.
-      ! Here the wind is assumed to be the same at timestep n and timestep n+1
-      call calc_dep_pts( dep_pts_x, dep_pts_y, dep_pts_z, wind_divergence,    &
-                         wind_n, wind_n, detj_at_w2, chi, cell_orientation )
 
-      if ( subroutine_timers ) call timer( 'cosmic step' )
+      if (scheme /= scheme_method_of_lines    .or. &
+          rho_splitting /= rho_splitting_none .or. &
+          theta_splitting /= theta_splitting_none  ) then
+        ! Calculate departure points.
+        ! Here the wind is assumed to be the same at timestep n and timestep n+1
+        call calc_dep_pts( dep_pts_x, dep_pts_y, dep_pts_z, wind_divergence,    &
+                           wind_n, wind_n, detj_at_w2, chi, cell_orientation )
+      end if
 
-      select case( scheme )
-        case ( scheme_yz_bip_cosmic )
-          call yz_bip_cosmic_step( increment, density, dep_pts_y, dep_pts_z,  &
-                                                                   detj_at_w2 )
-        case ( scheme_horz_cosmic )
-          call cusph_cosmic_transport_step( increment, density, dep_pts_x,    &
-                                      dep_pts_y, detj_at_w2, cell_orientation )
-        case ( scheme_cosmic_3D )
-          call cosmic_threed_transport_step( increment, density, dep_pts_x,   &
-                           dep_pts_y, dep_pts_z, detj_at_w2, cell_orientation )
-        case default
-          write(log_scratch_space, '(A, A)') &
-            "Unrecognised transport scheme: ", key_from_scheme(scheme)
-          call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-          stop
-      end select
+      if ( subroutine_timers ) call timer( 'transport step' )
 
-      if ( subroutine_timers ) call timer( 'cosmic step' )
+      ! Transport of rho field
+      if ( rho_splitting == rho_splitting_none) then
+        ! No splitting, so use a '3D' implementation
+        select case( scheme )
+          case ( scheme_yz_bip_cosmic )
+            call yz_bip_cosmic_step( increment, density, dep_pts_y, dep_pts_z, &
+                                                                   detj_at_w2  )
+            call density_inc_update_alg(density, increment)
 
-      ! Add the increment to density
-      call density_inc_update_alg(density, increment)
+          case ( scheme_horz_cosmic )
+            call cusph_cosmic_transport_step( increment, density, dep_pts_x,    &
+                                        dep_pts_y, detj_at_w2, cell_orientation )
+            call density_inc_update_alg(density, increment)
+
+          case ( scheme_cosmic_3D )
+            call cosmic_threed_transport_step( increment, density, dep_pts_x,   &
+                             dep_pts_y, dep_pts_z, detj_at_w2, cell_orientation )
+            call density_inc_update_alg(density, increment)
+
+          case ( scheme_method_of_lines )
+
+            call rk_transport_rho_multistep( wind_n, density)
+
+          case default
+            write(log_scratch_space, '(A, A)') &
+               "Unrecognised transport scheme: ", key_from_scheme(scheme)
+            call log_event( log_scratch_space, LOG_LEVEL_ERROR )
+            stop
+        end select
+      else
+        ! Use the split scheme
+        call split_transport_rho_step( wind_n, density )
+      end if
+
+      ! Transport of theta field
+      if ( theta_splitting /= theta_splitting_none ) then
+        call split_transport_theta_step( wind_n, theta)
+      end if
+
+      if ( subroutine_timers ) call timer( 'transport step' )
+
       call write_density_diagnostic( density, clock )
-
       call mass_conservation( clock%get_step(), density )
+
+      call density%log_minmax( LOG_LEVEL_INFO, 'density' )
+      call   theta%log_minmax( LOG_LEVEL_INFO, 'theta'   )
+      call l2norm_diff_2fields(err_rho, density, density_t0 )
+      call l2norm_diff_2fields(err_theta, theta, theta_t0 )
+
+      write( log_scratch_space, '(A,E16.8)' ) ' L2(rho-rho0)/L2(rho0)       = ',err_rho
+      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+      write( log_scratch_space, '(A,E16.8)' ) ' L2(theta-theta0)/L2(theta0) = ',err_theta
+      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
 
       write( log_scratch_space, '(A,I0)' ) 'End of timestep ', clock%get_step()
       call log_event( log_scratch_space, LOG_LEVEL_INFO )
@@ -316,10 +410,29 @@ contains
                                       clock, mesh_id, nodal_output_on_w3)
         call write_scalar_diagnostic( 'wind_divergence', wind_divergence, &
                                       clock, mesh_id, nodal_output_on_w3)
+        call write_scalar_diagnostic( 'theta', theta,                     &
+                                      clock, mesh_id, nodal_output_on_w3)
 
       end if
 
     end do ! while clock%is_running()
+
+    call l2norm_diff_2fields(err_rho, density, density_t0 )
+    call l2norm_diff_2fields(err_theta, theta, theta_t0 )
+
+    write( log_scratch_space, '(A,E16.8)' ) ' l2-norm error (rho)   @ END = ',err_rho
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    write( log_scratch_space, '(A,E16.8)' ) ' l2-norm error (theta) @ END = ',err_theta
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
+
+    if ( scheme == scheme_method_of_lines    .or.  &
+         rho_splitting /= rho_splitting_none .or.  &
+         theta_splitting /= theta_splitting_none   ) then
+      call runge_kutta_final()
+      call rk_transport_rho_final()
+      call rk_transport_theta_final()
+    end if
 
     nullify( detj_at_w2, detj_at_w2_shifted, cell_orientation, &
              cell_orientation_shifted )
@@ -339,7 +452,9 @@ contains
     call log_event( 'Finalising '//program_name//' ...', LOG_LEVEL_ALWAYS )
 
     ! Write checksums to file
-    call checksum_alg( program_name, density, 'density', wind_n, 'wind' )
+    call checksum_alg( program_name, density, 'density',  &
+                                     wind_n, 'wind',      &
+                                     theta, 'theta'       )
 
     if ( subroutine_timers ) then
       call timer( program_name )

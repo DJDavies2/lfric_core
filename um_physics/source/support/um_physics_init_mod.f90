@@ -283,7 +283,7 @@ contains
           idyndiag = DynDiag_Ribased
       end select
 
-      ! Interpolate the vertical gradients of sl,qw and calculate 
+      ! Interpolate the vertical gradients of sl,qw and calculate
       ! stability dbdz and Kh on theta-levels
       i_interp_local = i_interp_local_gradients
 

@@ -1,0 +1,375 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2020 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
+!> @brief A Runge-Kutta time-discretisation of the density transport equation
+!         and routines to do splitting approach.
+!> @details An algorithm for timstepping the 3D transport equation using a
+!>          multistage explicit Runge-Kutta algorithm and also to perform
+!>          a splitting strategy.
+!-----------------------------------------------------------------------------
+module rk_transport_rho_mod
+
+  use constants_mod,                     only: r_def, i_def, tiny_eps
+  use log_mod,                           only: log_event,         &
+                                               LOG_LEVEL_INFO,    &
+                                               LOG_LEVEL_ERROR
+  use fs_continuity_mod,                 only: W1, W3
+  ! Configuration options
+  use finite_element_config_mod,         only: element_order
+  use timestepping_config_mod,           only: dt
+  use runge_kutta_init_mod,              only: num_rk_stage, ak
+  use runtime_constants_mod,             only: get_mass_matrix,                &
+                                               get_mass_matrix_diagonal,       &
+                                               get_inverse_lumped_mass_matrix, &
+                                               get_qr,                         &
+                                               w2_id, w3_id, w3inv_id,         &
+                                               wt_id, theta_space_id,          &
+                                               get_coordinates,                &
+                                               get_detj_at_w2
+
+  use transport_config_mod,              only: operators,                      &
+                                               fv_flux_order,                  &
+                                               fv_advective_order,             &
+                                               operators_fv,                   &
+                                               operators_fem,                  &
+                                               oned_reconstruction,            &
+                                               consistent_metric,              &
+                                               cfl_mol_3d_stab
+  ! PsyKAl-lite kernels
+  use psykal_lite_mol_mod,               only: psykal_lite_mol_flux_init,      &
+                                               invoke_poly1d_flux,             &
+                                               invoke_poly1d_flux_coeffs,      &
+                                               invoke_poly1d_vert_flux,        &
+                                               invoke_poly1d_vert_flux_coeffs, &
+                                               invoke_poly2d_flux,             &
+                                               invoke_poly2d_flux_coeffs
+
+  ! PsyKAl PSYClone kernels
+  use rrho_kernel_mod,                   only: rrho_kernel_type
+  use rtheta_kernel_mod,                 only: rtheta_kernel_type
+  use poly_advective_kernel_mod,         only: poly_advective_kernel_type
+
+  ! Derived Types
+  use field_mod,                         only: field_type
+  use function_space_mod,                only: function_space_type
+  use function_space_collection_mod,     only: function_space_collection
+  use quadrature_xyoz_mod,               only: quadrature_xyoz_type
+  use operator_mod,                      only: operator_type
+
+  ! Algorithms
+  use mass_matrix_solver_alg_mod,        only: mass_matrix_solver_alg
+  ! Log
+  use io_config_mod,                     only: subroutine_timers
+  use timer_mod,                         only: timer
+  use matrix_vector_kernel_mod,          only: matrix_vector_kernel_type
+
+  implicit none
+
+  private
+
+  ! 'State' items that need to be created once but used every step
+  type( field_type )              :: rho_n, r_u, r_rho, rho_inc, mass_flux
+  type( field_type ), allocatable :: rr_prediction(:)
+  type( field_type )              :: mt_lumped
+  type( field_type )              :: rho0
+  type( field_type )              :: ones
+  type( field_type )              :: advective_av_chi3, theta_metrics, chi3_at_wt
+
+  ! Needed for nonuniform FV operators
+  type( field_type ), allocatable :: flux_coeffs(:,:), vert_flux_coeffs(:,:)
+
+  integer(i_def) :: flux_stencil_extent,      &
+                    advective_stencil_extent, &
+                    flux2d_stencil_size,      &
+                    advective2d_stencil_size
+  integer(i_def) :: nfaces_h, nfaces_v
+
+  public :: rk_transport_rho_init
+  public :: rk_transport_rho_step
+  public :: rk_transport_rho_multistep
+  public :: rk_transport_rho_final
+
+contains
+
+  !> @brief Initialisation routine to setup everything needed for
+  !>        the Runge-Kutta (or Method of Line) transport scheme.
+  !> @param[in]    mesh_id Mesh id of mesh of the model
+   subroutine rk_transport_rho_init( mesh_id )
+
+    use reference_element_mod,          only: reference_element_type
+    use mesh_mod,                       only: mesh_type
+    use quadrature_rule_gaussian_mod,   only: quadrature_rule_gaussian_type
+    use quadrature_face_mod,            only: quadrature_face_type
+
+    implicit none
+
+    integer(i_def),  intent(in) :: mesh_id
+
+    integer(i_def)              :: flux_stencil_size,  &
+                                   direction, polynomial
+    type( field_type ), pointer :: chi(:) => null()
+    type( field_type ), pointer :: md_w3 => null()
+
+    type( quadrature_rule_gaussian_type )      :: gaussian_quadrature
+
+    type( quadrature_xyoz_type )           :: qr
+    type( quadrature_face_type )           :: qrf
+    type( function_space_type ), pointer   :: w3_fs => null()
+    type( field_type )                     :: w3_field
+    class(reference_element_type), pointer :: reference_element => null()
+    type(mesh_type),               pointer :: mesh => null()
+    integer(i_def)                         :: face_quad_order, stage
+    integer(i_def)                         :: nqp_xy, nqp_z, nqp_xyz
+
+    w3_fs => function_space_collection%get_fs( mesh_id, element_order, W3 )
+    allocate( rr_prediction(num_rk_stage) )
+    do stage = 1,num_rk_stage
+      call rr_prediction(stage)%initialise( vector_space = w3_fs )
+    end do
+
+    if ( operators == operators_fv ) then
+      if ( element_order == 0 ) then
+        ! Compute stencil extents
+        flux_stencil_extent = int(real(fv_flux_order+1,r_def)/2.0,i_def)
+        !======================================================================!
+        ! Compute stencil for nonuniform polynomial fit
+        ! Initialise PSy layer arrays (this will not be needed when
+        ! multi-dimensional field arrays are supported)
+        ! This needs some temporary fields for computing undf in the PSy layer
+
+        call w3_field%initialise( vector_space = w3_fs )
+
+        ! Get topology information from the reference element
+        mesh              => w3_field%get_mesh()
+        reference_element => mesh%get_reference_element()
+        ! Number of horizontal neighbours
+        nfaces_h = reference_element%get_number_horizontal_faces()
+        ! Number of vertical neighbours
+        nfaces_v = reference_element%get_number_vertical_faces()
+
+        if ( oned_reconstruction ) then
+          flux_stencil_size = fv_flux_order + 1_i_def
+        else
+          ! Compute the maximum number of cells in the flux stencil
+          ! This occurs on a uniform mesh
+          ! (this computation is only correct for quadrilateral meshes)
+          flux2d_stencil_size = 1
+          do polynomial = 1, fv_flux_order
+            if ( mod(polynomial, 2) == 0 ) then
+              flux2d_stencil_size = flux2d_stencil_size + nfaces_h
+            else
+              flux2d_stencil_size = flux2d_stencil_size + nfaces_h*polynomial
+            end if
+          end do
+          flux_stencil_size = flux2d_stencil_size
+        end if
+        call psykal_lite_mol_flux_init(w3_field, fv_flux_order,   &
+                                       flux_stencil_size,         &
+                                       nfaces_h, nfaces_v         )
+
+        chi => get_coordinates()
+        nqp_xyz = fv_flux_order+1
+        qr = quadrature_xyoz_type(nqp_xyz, gaussian_quadrature)
+        if ( oned_reconstruction ) then
+          face_quad_order = 1
+        else
+          face_quad_order = fv_flux_order+1
+        end if
+        ! Quadrature rule on lateral faces with 1 point in the vertical
+        nqp_xy = face_quad_order
+        nqp_z  = 1
+        qrf = quadrature_face_type(nqp_xy, nqp_z, .true., .false.,      &
+                                   reference_element, gaussian_quadrature)
+
+        call log_event( "Gungho: computing horizontal flux coeffs", LOG_LEVEL_INFO )
+        md_w3 => get_mass_matrix_diagonal(w3_id)
+        allocate( flux_coeffs(flux_stencil_size, nfaces_h) )
+        do direction = 1, nfaces_h
+          do polynomial = 1,flux_stencil_size
+             call flux_coeffs(polynomial,direction)%initialise( vector_space = w3_fs )
+          end do
+        end do
+        if ( oned_reconstruction ) then
+          call invoke_poly1d_flux_coeffs( flux_coeffs, md_w3, chi, qr, qrf, &
+                                          fv_flux_order,                    &
+                                          flux_stencil_extent, nfaces_h )
+        else
+          call invoke_poly2d_flux_coeffs( flux_coeffs, md_w3, chi, qr, qrf, &
+                                          fv_flux_order,                    &
+                                          flux2d_stencil_size, nfaces_h )
+        end if
+        call log_event( "Gungho: computing vertical flux coeffs", LOG_LEVEL_INFO )
+        ! Vertical flux coeffs
+        allocate( vert_flux_coeffs(fv_flux_order+1, nfaces_v) )
+        do direction = 1, nfaces_v
+          do polynomial = 1,fv_flux_order+1
+            call vert_flux_coeffs(polynomial,direction)%initialise( vector_space = w3_fs )
+          end do
+        end do
+        ! Quadrature rule on vertical faces with 1 point in both horizontal and
+        ! vertical directions
+        nqp_xyz = 1
+        qrf = quadrature_face_type(nqp_xyz, .false., .true.,                  &
+                                   reference_element, gaussian_quadrature)
+        call invoke_poly1d_vert_flux_coeffs( vert_flux_coeffs, md_w3, chi,    &
+                                             qr, qrf, fv_flux_order, nfaces_v )
+      else
+        call log_event( "Gungho: subgrid mappings needed for FV MoL with high &
+                         order elements", LOG_LEVEL_ERROR )
+      end if
+    end if
+
+    nullify( chi, md_w3, w3_fs, reference_element, mesh )
+
+  end subroutine rk_transport_rho_init
+
+  !> @brief A Runge-Kutta time-discretisation of the density transport equation.
+  !> @param[in]     u 3D wind field
+  !> @param[in,out] rho Density-like tracer
+  !> @param[in]     dts Local time-step, which could be different from model timestep
+
+  subroutine rk_transport_rho_step( u, rho, dts)
+
+    implicit none
+
+    ! Prognostic fields
+    type( field_type ),  intent( in    ) :: u
+    type( field_type ),  intent( inout ) :: rho
+    real( kind = r_def), intent( in    ) :: dts
+    ! The quadrature object
+    type( quadrature_xyoz_type )          :: qr
+    ! Coordinate fields
+    type( field_type ), pointer :: chi(:) => null()
+    type(function_space_type), pointer :: u_fs     => null()
+    type(function_space_type), pointer :: rho_fs   => null()
+
+    integer(i_def) :: stage, st
+
+
+    ! Temps for retrieving objects back from runtime constants
+    type(operator_type), pointer :: mm_w3_inv => null()
+    type(field_type), pointer    :: mt_lumped_inv => null()
+    mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
+
+    if ( subroutine_timers ) call timer('rk_transport_rho_alg')
+
+    qr = get_qr()
+    chi => get_coordinates()
+    u_fs   => u%get_function_space()
+    rho_fs => rho%get_function_space()
+
+    ! Create operators needed for timestepping
+    mm_w3_inv => get_mass_matrix(w3inv_id)
+
+    call rho_n%initialise( vector_space = rho_fs )
+    call r_rho%initialise( vector_space = rho_fs )
+    call rho_inc%initialise( vector_space = rho_fs )
+    call mass_flux%initialise( vector_space = u_fs )
+
+    call invoke( setval_X(rho_n, rho) )
+
+    ! Runge-Kutta algorithm
+    do stage = 1,num_rk_stage
+      ! Compute advection terms
+      ! mass flux ( F = rho * u )
+
+      if ( oned_reconstruction ) then
+         call invoke_poly1d_flux( mass_flux, u, rho, flux_coeffs,    &
+                                 fv_flux_order, flux_stencil_extent, &
+                                 nfaces_h )
+
+      else
+        ! Use 2d flux code
+         call invoke_poly2d_flux( mass_flux, u, rho, flux_coeffs,      &
+                                  fv_flux_order, flux2d_stencil_size,  &
+                                  nfaces_h )
+
+      end if
+
+      ! Compute vertical components of mass flux
+       call invoke_poly1d_vert_flux( mass_flux, u, rho,     &
+                                     vert_flux_coeffs,      &
+                                     fv_flux_order, nfaces_v)
+
+      ! Compute rrho = div(F)
+      call invoke( rrho_kernel_type(rr_prediction(stage), mass_flux, qr), &
+                   setval_c(r_rho,   0.0_r_def)                           )
+
+      do st = 1, stage
+        call invoke( inc_X_plus_bY(r_rho, ak(stage,st), rr_prediction(st)) )
+      end do
+
+      ! Invert mass matrices and add increments
+      ! Rho
+      call invoke( name = "Invert mass matrices and add increments",     &
+                   setval_c(rho_inc, 0.0_r_def),                         &
+                   matrix_vector_kernel_type(rho_inc, r_rho, mm_w3_inv), &
+                   aX_plus_Y(rho, dts, rho_inc, rho_n)                   )
+
+    end do
+
+    nullify( mm_w3_inv, mt_lumped_inv, chi, u_fs, rho_fs )
+
+    if ( subroutine_timers ) call timer('rk_transport_rho_alg')
+
+  end subroutine rk_transport_rho_step
+
+  !> @brief A routine to transport a density using multiple substeps (RK-method)
+  !>        depending on the maximum Courant number.
+  !> @param[in]     u 3D wind field
+  !> @param[in,out] rho Density like tracer
+
+  subroutine rk_transport_rho_multistep(wind, density)
+
+   implicit none
+
+   type(field_type), intent(in)       :: wind
+   type(field_type), intent(inout)    :: density
+
+   type(function_space_type), pointer :: w2_fs => null()
+   type(field_type),          pointer :: detj_at_w2 => null()
+   type(field_type)                   :: wind2
+   real(r_def)            :: dt_substep
+   real(r_def)            :: cfl_min, cfl_max
+   integer(i_def)         :: sub_step_count, mol_substeps
+
+   if ( subroutine_timers ) call timer('rk_transport_rho_multistep')
+
+   w2_fs =>  wind%get_function_space()
+   call wind2%initialise( vector_space = w2_fs )
+   detj_at_w2 => get_detj_at_w2()
+
+   call invoke( X_divideby_Y(wind2,wind,detj_at_w2), &
+                inc_a_times_X(dt, wind2 )            )
+   call wind2%field_minmax(cfl_min, cfl_max)
+   cfl_max = max(abs(cfl_max),abs(cfl_min))
+   mol_substeps = int(cfl_max/(cfl_mol_3d_stab+tiny_eps),i_def) + 1_i_def
+   dt_substep = dt/real(mol_substeps, r_def)
+
+   do sub_step_count = 1, mol_substeps
+      call rk_transport_rho_step( wind, density, dt_substep)
+   end do
+
+   nullify( w2_fs, detj_at_w2 )
+
+   if ( subroutine_timers ) call timer('rk_transport_rho_multistep')
+
+  end subroutine rk_transport_rho_multistep
+
+  !===========================================================================
+  !> @brief Deallocate arrays used in transport.
+  !===========================================================================
+  subroutine rk_transport_rho_final()
+
+    implicit none
+
+    if (allocated(flux_coeffs)     )     deallocate(flux_coeffs     )
+    if (allocated(vert_flux_coeffs))     deallocate(vert_flux_coeffs)
+    if (allocated(rr_prediction)   )     deallocate(rr_prediction   )
+
+  end subroutine rk_transport_rho_final
+
+end module rk_transport_rho_mod

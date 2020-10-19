@@ -195,6 +195,8 @@
   consistent_metric  = .false.
   enforce_monotonicity = .false.
   oned_reconstruction = .false.
+  rho_splitting = 'none'
+  theta_splitting = 'none'
 /
 
 &partitioning

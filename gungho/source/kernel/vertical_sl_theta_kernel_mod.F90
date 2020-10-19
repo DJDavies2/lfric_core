@@ -1,0 +1,152 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2020 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!
+!-------------------------------------------------------------------------------
+!> @brief Kernel to do a semi-Lagragian advection of theta-type tracer using
+!>        the vertical wind (w) only.
+!-------------------------------------------------------------------------------
+
+module vertical_sl_theta_kernel_mod
+
+use argument_mod,      only : arg_type,                           &
+                              GH_FIELD, GH_READWRITE, GH_READ,    &
+                              CELLS, GH_REAL
+use fs_continuity_mod, only : W2, Wtheta
+use constants_mod,     only : r_def, i_def
+use kernel_mod,        only : kernel_type
+
+implicit none
+
+private
+
+!-------------------------------------------------------------------------------
+! Public types
+!-------------------------------------------------------------------------------
+!> The type declaration for the kernel. Contains the metadata needed
+!>                                      by the PSy layer.
+type, public, extends(kernel_type) :: vertical_sl_theta_kernel_type
+  private
+  type(arg_type) :: meta_args(3) = (/                           &
+       arg_type(GH_FIELD,   GH_READ,       W2    ),             &
+       arg_type(GH_FIELD,   GH_READWRITE,  Wtheta),             &
+       arg_type(GH_REAL,    GH_READ)                            &
+       /)
+  integer  :: iterates_over = CELLS
+contains
+  procedure, nopass :: vertical_sl_theta_code
+end type
+
+!-------------------------------------------------------------------------------
+! Contained functions/subroutines
+!-------------------------------------------------------------------------------
+public vertical_sl_theta_code
+contains
+
+!-------------------------------------------------------------------------------
+!> @details This kernel calculates the departure point of w/theta-points using
+!>          only w (i.e., vertical motion only), then interpolates theta at the
+!>          departure point using 1d-Cubic-Lagrange interpolation.
+!> @param[in]  nlayers      The number of layers
+!> @param[in]  u_adv        The wind field used for advection
+!> @param[in,out] theta     The theta field at time level n --> theta_d (SL)
+!> @param[in]  dts          Local dt which could be different from model dt
+!> @param[in]  ndf_w2       The number of degrees of freedom per cell
+!!                          on W2 space
+!> @param[in]  undf_w2      The number of unique degrees of freedom
+!!                          on W2 space
+!> @param[in]  map_w2       The dofmap for the cell at the base of the column
+!!                          on W2 space
+!> @param[in]  ndf_wtheta   The number of degrees of freedom per cell
+!!                          on Wtheta space
+!> @param[in]  undf_wtheta  The number of unique degrees of freedom
+!!                          on Wtheta space
+!> @param[in]  map_wtheta   The dofmap for the cell at the base of the column
+!!                          on Wtheta space
+!-------------------------------------------------------------------------------
+
+subroutine vertical_sl_theta_code( nlayers,                             &
+                                   u_adv,                               &
+                                   theta,                               &
+                                   dts,                                 &
+                                   ndf_w2, undf_w2, map_w2,             &
+                                   ndf_wtheta, undf_wtheta, map_wtheta  )
+
+  implicit none
+
+  ! Arguments
+  integer(kind=i_def), intent(in)                         :: nlayers
+  integer(kind=i_def), intent(in)                         :: ndf_w2
+  integer(kind=i_def), intent(in)                         :: undf_w2
+  integer(kind=i_def), dimension(ndf_w2), intent(in)      :: map_w2
+  integer(kind=i_def), intent(in)                         :: ndf_wtheta
+  integer(kind=i_def), intent(in)                         :: undf_wtheta
+  integer(kind=i_def), dimension(ndf_wtheta), intent(in)  :: map_wtheta
+
+  real(kind=r_def), dimension(undf_w2), intent(in)        :: u_adv
+  real(kind=r_def), dimension(undf_wtheta), intent(inout) :: theta
+  real(kind=r_def), intent(in)                            :: dts
+
+  integer(kind=i_def) :: ncelledges, k, k1, k2, k3, k4
+  real(kind=r_def)    :: zd,s,c1,c2,c3,c4
+  real(kind=r_def)    :: z_surf, z_top
+  real(kind=r_def),allocatable :: u_local(:)
+  real(kind=r_def),allocatable :: theta_local(:)
+  real(kind=r_def),allocatable :: theta_d_local(:)
+
+  ncelledges = nlayers + 1_i_def
+  allocate(u_local(1:ncelledges))
+  allocate(theta_local(1:ncelledges))
+  allocate(theta_d_local(1:ncelledges))
+
+  ! Extract and fill local column from global variables
+  z_surf = 1.0_r_def
+  z_top  = real(ncelledges,r_def)
+
+  do k=0,nlayers
+           u_local(k+1) = u_adv(map_w2(5)+k)
+       theta_local(k+1) = theta(map_wtheta(1)+k)
+  end do
+
+  do k=1,ncelledges
+    zd = real(k,r_def) - dts*u_local(k)
+    zd = min(z_top,max(z_surf,zd))
+    k2 = floor(zd)
+    s  = zd - real(k2, r_def)
+    k1 = max(1_i_def, k2 - 1_i_def)
+    k3 = min(ncelledges, k2 + 1_i_def)
+    k4 = min(ncelledges, k2 + 2_i_def)
+
+    c1 = -(1.0_r_def/6.0_r_def)*s*(s-1.0_r_def)*(s-2.0_r_def)
+    c2 =  (1.0_r_def/2.0_r_def)*(s+1.0_r_def)*(s-1.0_r_def)*(s-2.0_r_def)
+    c3 = -(1.0_r_def/2.0_r_def)*s*(s+1.0_r_def)*(s-2.0_r_def)
+    c4 =  (1.0_r_def/6.0_r_def)*s*(s+1.0_r_def)*(s-1.0_r_def)
+
+    ! Do linear intepolation if you are next to the boundary.
+    ! This if could be removed but this is equivalent to imposing
+    ! zero-gradient assumption near the top and bottom boundaries
+
+    if( k1 == k2 .or. k3 == k4) then
+       c1 = 0.0_r_def
+       c4 = 0.0_r_def
+       c2 = 1.0_r_def - s
+       c3 = s
+    end if
+
+    theta_d_local(k) = c1*theta_local(k1) + c2*theta_local(k2) + &
+                       c3*theta_local(k3) + c4*theta_local(k4)
+  end do
+
+  do k=0,nlayers
+    theta(map_wtheta(1)+k) = theta_d_local(k+1)
+  end do
+
+  deallocate(u_local      )
+  deallocate(theta_local  )
+  deallocate(theta_d_local)
+
+end subroutine vertical_sl_theta_code
+
+end module vertical_sl_theta_kernel_mod
