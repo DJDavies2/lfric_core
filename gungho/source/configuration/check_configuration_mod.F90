@@ -61,8 +61,6 @@ contains
     use damping_layer_config_mod,    only: dl_base,                            &
                                            dl_str
     use extrusion_config_mod,        only: domain_top
-    use orography_config_mod,        only: profile,                            &
-                                           profile_none
     use mixed_solver_config_mod,     only: reference_reset_freq
     use helmholtz_solver_config_mod, only:                                     &
                             helmholtz_solver_preconditioner => preconditioner, &
@@ -172,10 +170,6 @@ contains
           write( log_scratch_space, '(A,I4)' ) 'Invalid Choice: inner_iterations must be at least 1:', &
           inner_iterations
           call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-        else if ( inner_iterations > 1 ) then
-          write( log_scratch_space, '(A,I4,A)' ) 'Inner_iterations ',inner_iterations, &
-            ' > 1 is known to have stability issues:'
-          call log_event( log_scratch_space, LOG_LEVEL_WARNING )
         end if
       end if
 
@@ -242,11 +236,6 @@ contains
           write( log_scratch_space, '(A)' ) 'xios output may not work with element order > 0'
           call log_event( log_scratch_space, LOG_LEVEL_WARNING )
         end if
-      end if
-
-      if ( profile /= profile_none .and. abs(alpha - 0.5_r_def) < EPS ) then
-        write( log_scratch_space, '(A)' ) 'Orography with alpha = 1/2 produces noisy results'
-        call log_event( log_scratch_space, LOG_LEVEL_WARNING )
       end if
 
       if ( method == method_semi_implicit ) then
