@@ -14,7 +14,6 @@ class mesh_collection_mod::mesh_collection_type {
   +clear()
 
   +add_new_mesh(<<in>>mesh: mesh_type ) : mesh_id<<integer>>
-  +add_unit_test_mesh( <<in>>mesh_cfg: integer ) : mesh_id<<integer>>
 
   +n_meshes(): integer
   +get_mesh_names(): string[] <<allocatable>>

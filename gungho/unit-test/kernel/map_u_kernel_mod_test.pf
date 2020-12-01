@@ -64,7 +64,7 @@ contains
                                           partitioner_planar
     use finite_element_config_mod, only : cellshape_quadrilateral
     use feign_config_mod,          only : feign_base_mesh_config
-    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use mesh_mod,                  only : mesh_type, PLANE_BI_PERIODIC
 
     implicit none
 
@@ -81,7 +81,9 @@ contains
     integer(i_def) :: ndf_w0, ndf_w2, ndf_w3, ndf_wt
     integer(i_def) :: undf_w0, undf_w2, undf_w3, undf_wt
     integer(i_def) :: diff_dim_w0, dim_w0, dim_w2, dim_w3, dim_wt
-    integer(i_def) :: mesh_id
+
+    type(mesh_type) :: unit_test_mesh
+    integer(i_def)  :: mesh_id
 
     integer :: i
 
@@ -110,7 +112,8 @@ contains
     nqp_v=this%qr_proxy%np_z
 
     ! Dummy mesh mod has 9 cells, 3 layers
-    mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+    unit_test_mesh = mesh_type( PLANE_BI_PERIODIC )
+    mesh_id = mesh_collection%add_new_mesh( unit_test_mesh )
 
     this%w0_fs => function_space_collection%get_fs( mesh_id, element_order, W0 )
     this%w2_fs => function_space_collection%get_fs( mesh_id, element_order, W2 )

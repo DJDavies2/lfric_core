@@ -96,6 +96,7 @@ contains
     type(field_type)          :: f1, f2, f3
     type(field_proxy_type)    :: f1_p, f2_p, f3_p
 
+    type(mesh_type)           :: unit_test_mesh
     integer(i_def)            :: mesh_id
 
     type(function_space_type), pointer :: w2_fs    => null()
@@ -107,7 +108,8 @@ contains
     real(r_def) :: test, answer
 
     ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
-    mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+    unit_test_mesh = mesh_type( PLANE_BI_PERIODIC )
+    mesh_id = mesh_collection%add_new_mesh( unit_test_mesh )
 
     ! Make a field with a function space
     w2_fs => function_space_collection%get_fs( mesh_id, element_order, W2 )

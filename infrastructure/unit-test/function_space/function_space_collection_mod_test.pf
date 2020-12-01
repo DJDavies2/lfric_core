@@ -49,11 +49,13 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use mesh_mod, only : PLANE_BI_PERIODIC
+    use mesh_mod, only : mesh_type, PLANE_BI_PERIODIC
 
     implicit none
 
     class(function_space_collection_test_type), intent(inout) :: this
+
+    type(mesh_type) :: unit_test_mesh
 
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
@@ -68,7 +70,8 @@ contains
 
     ! create the mesh
     ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
-    this%mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+    unit_test_mesh = mesh_type( PLANE_BI_PERIODIC )
+    this%mesh_id = mesh_collection%add_new_mesh( unit_test_mesh )
 
   end subroutine setUp
 

@@ -57,7 +57,7 @@ contains
 
     use finite_element_config_mod, only: cellshape_quadrilateral
     use feign_config_mod,          only: feign_finite_element_config
-    use mesh_mod,                  only: PLANE_BI_PERIODIC
+    use mesh_mod,                  only: mesh_type, PLANE_BI_PERIODIC
 
     implicit none
 
@@ -70,6 +70,7 @@ contains
     integer :: ndf_w2, ndf_wt
     integer :: nqp_h, nqp_v
 
+    type(mesh_type) :: unit_test_mesh
     integer :: i
 
     ! Initialise YAXT
@@ -95,7 +96,8 @@ contains
     nqp_v=this%qr_proxy%np_z
 
     ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
-    this%mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+    unit_test_mesh = mesh_type( PLANE_BI_PERIODIC )
+    this%mesh_id = mesh_collection%add_new_mesh( unit_test_mesh )
 
     this%w0_fs => function_space_collection%get_fs( this%mesh_id, &
                                                     element_order, &

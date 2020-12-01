@@ -65,7 +65,7 @@ contains
                                           feign_initial_temperature_config, &
                                           feign_planet_config
     use idealised_config_mod,      only : test_gravity_wave
-    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use mesh_mod,                  only : mesh_type, PLANE_BI_PERIODIC
 
     implicit none
 
@@ -78,6 +78,7 @@ contains
     integer(i_def) :: ndf_buoyancy, &
                       ndf_chi, dim_chi
 
+    type(mesh_type) :: unit_test_mesh
     integer :: i
 
     ! Initialise YAXT
@@ -103,7 +104,8 @@ contains
     function_space_collection = function_space_collection_type()
 
     ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
-    this%mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+    unit_test_mesh = mesh_type( PLANE_BI_PERIODIC )
+    this%mesh_id = mesh_collection%add_new_mesh( unit_test_mesh )
 
     this%w0_fs => function_space_collection%get_fs( this%mesh_id, &
                                                     element_order, &

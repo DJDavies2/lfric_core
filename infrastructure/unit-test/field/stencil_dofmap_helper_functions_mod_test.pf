@@ -39,13 +39,17 @@ contains
 
     class(stencil_dofmap_helper_test_type), intent(inout) :: this
 
+    type(mesh_type) :: plane_mesh
+    type(mesh_type) :: biperiodic_mesh
+
     ! Create top level mesh collection
     mesh_collection = mesh_collection_type()
 
     ! Add canned meshes to the mesh collection
-    this%planar_mesh_id = mesh_collection%add_unit_test_mesh( PLANE )
-    this%biperiodic_mesh_id &
-        = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+    plane_mesh = mesh_type( PLANE )
+    this%planar_mesh_id = mesh_collection%add_new_mesh( plane_mesh )
+    biperiodic_mesh = mesh_type( PLANE_BI_PERIODIC )
+    this%biperiodic_mesh_id = mesh_collection%add_new_mesh( biperiodic_mesh )
 
   end subroutine setUp
 

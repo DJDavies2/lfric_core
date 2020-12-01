@@ -87,6 +87,7 @@ contains
     type( operator_type )       :: Op
     type( operator_proxy_type ) :: Op_p
 
+    type(mesh_type) :: unit_test_mesh
     type(mesh_type),pointer     :: mesh_out => null()
     type( function_space_type ), pointer :: fs1  => null()
     type( function_space_type ), pointer :: fs2  => null()
@@ -97,7 +98,8 @@ contains
     integer(i_def) :: mesh_id
 
     ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
-    mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+    unit_test_mesh = mesh_type( PLANE_BI_PERIODIC )
+    mesh_id = mesh_collection%add_new_mesh( unit_test_mesh )
 
     fs1 => function_space_collection%get_fs( mesh_id, element_order, W1 )
     fs2 => function_space_collection%get_fs( mesh_id, element_order, W2 )

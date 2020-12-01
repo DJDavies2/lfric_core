@@ -101,6 +101,7 @@ contains
 
     type(mesh_type), pointer :: mesh_ptr => null()
     type(mesh_type) :: mesh
+    type(mesh_type) :: unit_test_mesh
 
     integer(i_def) :: mesh_id, mesh_test_id
     integer(i_def) :: ncells_2d_with_ghost, num_layers
@@ -117,7 +118,8 @@ contains
     mesh = mesh_type( this%global_mesh, this%partition, this%extrusion )
     mesh_id = mesh_collection%add_new_mesh( mesh )
 
-    mesh_test_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+    unit_test_mesh = mesh_type( PLANE_BI_PERIODIC )
+    mesh_test_id = mesh_collection%add_new_mesh( unit_test_mesh )
 
     ! Two consecutively created meshes should have consecutive ids
     @assertTrue ( mesh_test_id /= mesh_id )

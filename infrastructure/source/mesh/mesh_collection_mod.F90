@@ -32,7 +32,6 @@ module mesh_collection_mod
   contains
     private
     procedure, public :: add_new_mesh
-    procedure, public :: add_unit_test_mesh
 
     procedure, public :: n_meshes
     procedure, public :: get_mesh_names
@@ -107,31 +106,6 @@ function add_new_mesh( self, mesh ) result( mesh_id )
 
   return
 end function add_new_mesh
-
-
-!===========================================================================
-!> @brief Creates a unit test version of the mesh object and adds it to the
-!>        mesh collection
-!> @param [in] mesh_cfg Sets the type of test mesh.
-!> @return              A unique identifier for the created mesh
-function add_unit_test_mesh( self, mesh_cfg ) result( mesh_id )
-  implicit none
-
-  class(mesh_collection_type), intent(inout) :: self
-  integer(i_def), intent(in) :: mesh_cfg
-
-  type(mesh_type)    :: mesh
-  integer(i_def)     :: mesh_id
-  character(str_def) :: name
-
-  mesh    = mesh_type( mesh_cfg )
-  mesh_id = mesh%get_id()
-  name    = mesh%get_mesh_name()
-
-  call self%mesh_list%insert_item( mesh )
-
-  return
-end function add_unit_test_mesh
 
 
 !===========================================================================
