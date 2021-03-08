@@ -39,11 +39,6 @@ class log_mod_error_serial_test( MpiTest ):
     elif returncode > 128:
         raise TestFailed('Execution fault such as segmentation fault')
 
-    if out != '':
-      message = 'Expected no output on standard out but found: {out}' \
-                + '\nStandard error: {err}'
-      raise TestFailed( message.format( out=out, err=err ) )
-
     try:
       timestampString, level, report = err.split( ':', 3 )
       timestampWithoutTimezone = timestampString[:-5]
