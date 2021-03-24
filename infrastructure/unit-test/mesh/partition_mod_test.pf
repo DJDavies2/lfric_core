@@ -123,7 +123,6 @@ contains
     integer :: num_cells_halo
     integer :: last_halo_cell
     integer(i_def) :: num_cells_ghost
-    integer :: cell_owner
 
     integer(i_def) :: npanels
     integer(i_def) :: global_mesh_id
@@ -200,9 +199,6 @@ contains
         num_cells_ghost = partition%get_num_cells_ghost()
         @assertEqual( 0, num_cells_ghost )
 
-        cell_owner = partition%get_cell_owner( 1 )
-        @assertEqual( 0, cell_owner )
-
       case (4)
         num_cells_in_layer = partition%get_num_cells_in_layer()
         @assertEqual( 64, num_cells_in_layer )
@@ -233,9 +229,6 @@ contains
 
         num_cells_ghost = partition%get_num_cells_ghost()
         @assertEqual( 0, num_cells_ghost )
-
-        cell_owner = partition%get_cell_owner(1)
-        @assertEqual( local_rank, cell_owner )
 
     end select
 
@@ -271,7 +264,6 @@ contains
     integer :: num_cells_halo
     integer :: last_halo_cell
     integer(i_def) :: num_cells_ghost
-    integer :: cell_owner
 
     integer(i_def) :: npanels
     integer(i_def) :: global_mesh_id
@@ -349,9 +341,6 @@ contains
         num_cells_ghost = partition%get_num_cells_ghost()
         @assertEqual( 0, num_cells_ghost )
 
-        cell_owner = partition%get_cell_owner( 1 )
-        @assertEqual( 0, cell_owner )
-
       case (4)
         num_cells_in_layer = partition%get_num_cells_in_layer()
         @assertEqual( 36, num_cells_in_layer )
@@ -382,9 +371,6 @@ contains
 
         num_cells_ghost = partition%get_num_cells_ghost()
         @assertEqual( 13, num_cells_ghost )
-
-        cell_owner = partition%get_cell_owner(1)
-        @assertEqual( local_rank, cell_owner )
 
     end select
 
@@ -420,7 +406,6 @@ contains
     integer :: num_cells_halo
     integer :: last_halo_cell
     integer(i_def) :: num_cells_ghost
-    integer :: cell_owner
 
     integer(i_def) :: npanels
     integer(i_def) :: global_mesh_id
@@ -498,9 +483,6 @@ contains
         num_cells_ghost = partition%get_num_cells_ghost()
         @assertEqual( 0, num_cells_ghost )
 
-        cell_owner = partition%get_cell_owner( 1 )
-        @assertEqual( 0, cell_owner )
-
       case (4)
         num_cells_in_layer = partition%get_num_cells_in_layer()
         @assertEqual( 48, num_cells_in_layer )
@@ -531,9 +513,6 @@ contains
 
         num_cells_ghost = partition%get_num_cells_ghost()
         @assertEqual( 8, num_cells_ghost )
-
-        cell_owner = partition%get_cell_owner(1)
-        @assertEqual( local_rank, cell_owner )
 
     end select
 
@@ -569,7 +548,6 @@ contains
     integer :: num_cells_halo
     integer :: last_halo_cell
     integer(i_def) :: num_cells_ghost
-    integer :: cell_owner
 
     integer(i_def) :: npanels
     integer(i_def) :: global_mesh_id
@@ -647,9 +625,6 @@ contains
         num_cells_ghost = partition%get_num_cells_ghost()
         @assertEqual( 0, num_cells_ghost )
 
-        cell_owner = partition%get_cell_owner( 1 )
-        @assertEqual( 0, cell_owner )
-
       case (4)
         num_cells_in_layer = partition%get_num_cells_in_layer()
         @assertEqual( 48, num_cells_in_layer )
@@ -680,9 +655,6 @@ contains
 
         num_cells_ghost = partition%get_num_cells_ghost()
         @assertEqual( 8, num_cells_ghost )
-
-        cell_owner = partition%get_cell_owner(1)
-        @assertEqual( local_rank, cell_owner )
 
     end select
 
@@ -721,7 +693,6 @@ contains
     integer :: num_cells_halo
     integer :: last_halo_cell
     integer(i_def) :: num_cells_ghost
-    integer :: cell_owner
 
     integer(i_def) :: npanels
     integer(i_def) :: global_mesh_id
@@ -784,9 +755,6 @@ contains
 
     num_cells_ghost = partition%get_num_cells_ghost()
     @assertEqual( 0, num_cells_ghost )
-
-    cell_owner = partition%get_cell_owner( 1 )
-    @assertEqual( 0, cell_owner )
 
 
     !> @todo Can't test a parallel cubed-sphere partition at this time, details

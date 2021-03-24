@@ -4,7 +4,6 @@
 
 class partition_mod::partition_type {
   -global_cell_id: integer[] <<allocatable>>
-  -cell_owner: integer[] <<allocatable>>
   -num_inner: integer[] <<allocatable>>
   -last_inner_cell: integer[] <<allocatable>>
   -inner_depth: integer
@@ -22,7 +21,6 @@ class partition_mod::partition_type {
   +<<destroy>> partition_destructor()
   +<<operator =>> partition_type_assign(<<out>>dest: partition, <<in>>source: partition )
 
-  +get_cell_owner( <<in>>cell_number: integer ) : integer
   +get_halo_depth() : integer
   +get_inner_depth() : integer
   +get_last_edge_cell() : integer

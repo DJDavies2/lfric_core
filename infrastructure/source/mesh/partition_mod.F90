@@ -24,10 +24,7 @@ module partition_mod
   use global_mesh_mod, only : global_mesh_type
   use log_mod,         only : log_event,         &
                               LOG_LEVEL_ERROR
-  use constants_mod,   only: i_def, i_halo_index, r_def, l_def, integer_type
-
-  use yaxt,            only: xt_redist, xt_redist_s_exchange
-  use mpi_mod,         only: generate_redistribution_map, get_mpi_datatype
+  use constants_mod,   only: i_def, r_def, l_def
 
   implicit none
 
@@ -44,9 +41,6 @@ module partition_mod
   ! first followed by the edge cells and finally the halo cells ordered by
   ! depth of halo
     integer(i_def), allocatable :: global_cell_id( : )
-  ! A list of the ranks that own all the cells known to this partition
-  ! held in the order of cells in the <code>global_cell_id</code> array
-    integer(i_def), allocatable :: cell_owner( : )
   ! The number of "inner" cells in the <code>global_cell_id</code> list -
   ! one entry for each depth of inner halo
     integer(i_def), allocatable :: num_inner( : )
@@ -88,7 +82,6 @@ module partition_mod
     procedure, public :: get_last_halo_cell
     procedure, public :: get_num_cells_ghost
     procedure, public :: get_num_panels_global_mesh
-    procedure, public :: get_cell_owner
     procedure, public :: partition_type_assign
     procedure, public :: clear
 
@@ -198,13 +191,8 @@ contains
 
   type(partition_type), target :: self
 
-  integer(i_def) :: cell
   integer(i_def) :: i
-  integer(i_def) :: total_inners
   integer(i_def) :: last
-  integer(i_def) :: halo_start, halo_finish
-
-  type(xt_redist) :: redist
 
   self%halo_depth = max_stencil_depth + 1
   allocate( self%num_halo(self%halo_depth) )
@@ -241,43 +229,6 @@ contains
     self%last_halo_cell(i)=last
   end do
 
-  ! Calculate ownership of cells known to the local partition
-  ! by filling the locally owned cells with the local rank and performing
-  ! a halo-swap to fill in the owners of all the halo cells.
-  !
-  ! Set up the YAXT structures required to perform a halo swap
-  !
-
-  total_inners=0
-  do i=1,self%inner_depth
-    total_inners=total_inners+self%num_inner(i)
-  end do
-
-  allocate(self%cell_owner(self%get_num_cells_in_layer()+ &
-                            self%get_num_cells_ghost()))
-
-  halo_start  = total_inners+self%num_edge+1
-  halo_finish = self%get_num_cells_in_layer()+self%get_num_cells_ghost()
-  !If this is a serial run (no halos), halo_start is out of bounds - so fix it
-  if(halo_start > self%get_num_cells_in_layer())then
-    halo_start  = self%get_num_cells_in_layer()
-    halo_finish = self%get_num_cells_in_layer() - 1
-  end if
-
-  !Get the redistribution map object for halo exchanging cell owners
-  redist = generate_redistribution_map( &
-     int(self%global_cell_id(1:total_inners+self%num_edge),kind=i_halo_index), &
-     int(self%global_cell_id( halo_start:halo_finish ),kind=i_halo_index), &
-     get_mpi_datatype( integer_type, i_def ) )
-
-  ! Set ownership of all inner and edge cells to the local rank id
-  ! - halo cells are unset
-  do cell = 1,total_inners+self%num_edge
-    self%cell_owner(cell)=local_rank
-  end do
-
-  call xt_redist_s_exchange(redist, self%cell_owner, self%cell_owner)
-
   end function partition_constructor
 
   !---------------------------------------------------------------------------
@@ -300,14 +251,12 @@ contains
     self%global_num_cells  = 9
 
     allocate( self%global_cell_id (self%global_num_cells) )
-    allocate( self%cell_owner     (self%global_num_cells) )
     allocate( self%num_inner      (self%inner_depth) )
     allocate( self%last_inner_cell(self%inner_depth) )
     allocate( self%num_halo       (self%halo_depth) )
     allocate( self%last_halo_cell (self%halo_depth) )
 
     self%global_cell_id    = [1,2,3,4,5,6,7,8,9]
-    self%cell_owner        = [0,0,0,0,0,0,0,0,0]
     self%num_inner(1)      = 9
     self%last_inner_cell(1)= 9
     self%num_edge          = 0
@@ -336,7 +285,6 @@ contains
 
     class (partition_type), intent(inout) :: self
 
-    if ( allocated( self%cell_owner ) )      deallocate( self%cell_owner )
     if ( allocated( self%global_cell_id ) )  deallocate( self%global_cell_id )
     if ( allocated( self%num_halo ) )        deallocate( self%num_halo )
     if ( allocated( self%last_halo_cell ) )  deallocate( self%last_halo_cell )
@@ -391,8 +339,6 @@ contains
     dest%last_halo_cell=source%last_halo_cell
 
     dest%npanels=source%npanels
-    allocate( dest%cell_owner(size(source%cell_owner)) )
-    dest%cell_owner=source%cell_owner
 
   end subroutine partition_type_assign
 
@@ -1402,27 +1348,6 @@ contains
     number_of_panels = self%npanels
 
   end function get_num_panels_global_mesh
-
-  !---------------------------------------------------------------------------
-  !> @brief Gets the owner of a cell on the local partition.
-  !>
-  !> @param[in] cell_number Local ID of of the cell being queried.
-  !>
-  !> @return Owner of the given cell.
-  !>
-  function get_cell_owner( self, cell_number ) result ( cell_owner )
-
-    implicit none
-
-    class(partition_type), intent(in) :: self
-
-    integer(i_def), intent(in) :: cell_number
-
-    integer(i_def) :: cell_owner
-
-    cell_owner=self%cell_owner(cell_number)
-
-  end function get_cell_owner
 
   !-------------------------------------------------------------------------------
   ! Performs a simple bubble sort on an array. PRIVATE function.

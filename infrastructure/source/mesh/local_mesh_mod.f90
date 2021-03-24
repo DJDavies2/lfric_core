@@ -10,7 +10,8 @@
 !>
 module local_mesh_mod
 
-  use constants_mod,                  only: r_def, i_def, l_def, str_def
+  use constants_mod,                  only: r_def, i_def, i_halo_index, &
+                                            l_def, str_def, integer_type
   use global_mesh_mod,                only: global_mesh_type
   use linked_list_data_mod,           only: linked_list_data_type
   use log_mod,                        only: log_event, log_scratch_space, &
@@ -65,29 +66,30 @@ module local_mesh_mod
   ! Number of panels in the global mesh
     integer(i_def)              :: npanels
   contains
-    procedure, public :: initialise_full
-    procedure, public :: initialise_unit_test
-    generic           :: initialise => initialise_full, &
-                                       initialise_unit_test
-    procedure, public :: clear
-    procedure, public :: get_mesh_name
-    procedure, public :: get_nverts_per_cell
-    procedure, public :: get_nverts_per_edge
-    procedure, public :: get_nedges_per_cell
-    procedure, public :: get_num_cells_in_layer
-    procedure, public :: get_inner_depth
-    procedure, public :: get_num_cells_inner
-    procedure, public :: get_last_inner_cell
-    procedure, public :: get_num_cells_edge
-    procedure, public :: get_last_edge_cell
-    procedure, public :: get_halo_depth
-    procedure, public :: get_num_cells_halo
-    procedure, public :: get_last_halo_cell
-    procedure, public :: get_num_cells_ghost
-    procedure, public :: get_cell_owner
-    procedure, public :: get_num_panels_global_mesh
-    procedure, public :: get_gid_from_lid
-    procedure, public :: get_lid_from_gid
+    procedure, public  :: initialise_full
+    procedure, public  :: initialise_unit_test
+    generic            :: initialise => initialise_full, &
+                                        initialise_unit_test
+    procedure, private :: init_cell_owner
+    procedure, public  :: clear
+    procedure, public  :: get_mesh_name
+    procedure, public  :: get_nverts_per_cell
+    procedure, public  :: get_nverts_per_edge
+    procedure, public  :: get_nedges_per_cell
+    procedure, public  :: get_num_cells_in_layer
+    procedure, public  :: get_inner_depth
+    procedure, public  :: get_num_cells_inner
+    procedure, public  :: get_last_inner_cell
+    procedure, public  :: get_num_cells_edge
+    procedure, public  :: get_last_edge_cell
+    procedure, public  :: get_halo_depth
+    procedure, public  :: get_num_cells_halo
+    procedure, public  :: get_last_halo_cell
+    procedure, public  :: get_num_cells_ghost
+    procedure, public  :: get_cell_owner
+    procedure, public  :: get_num_panels_global_mesh
+    procedure, public  :: get_gid_from_lid
+    procedure, public  :: get_lid_from_gid
     final :: local_mesh_destructor
   end type local_mesh_type
 
@@ -122,7 +124,6 @@ contains
     type(partition_type),   intent(in)           :: partition
     character(str_def),     intent(in), optional :: mesh_name
     integer(i_def) :: depth
-    integer(i_def) :: cell
 
     ! Set name from either the given name - or the name of the global mesh
     if (present(mesh_name)) then
@@ -164,10 +165,15 @@ contains
 
     self%num_ghost = partition%get_num_cells_ghost()
 
+    !> @todo Eventually, there will be two ways to initialise a local mesh.
+    !>  The first, from global mesh and partition (as here), will be done
+    !>  in the mesh tools. The second will be from a local mesh file and will
+    !>  be done in the model. Setting up the cell_owner array will only be done
+    !>  in the model (i.e. the "from file" initialiser) as it needs a halo swap
+    !>  and only the model will be run with the full processor decomp that
+    !>  would allow that. But for now, it needs to be done here.
     allocate( self%cell_owner(self%num_cells_in_layer+self%num_ghost) )
-    do cell = 1,self%num_cells_in_layer+self%num_ghost
-      self%cell_owner(cell) = partition%get_cell_owner(cell)
-    end do
+    call self%init_cell_owner()
 
     self%npanels = partition%get_num_panels_global_mesh()
 
@@ -223,6 +229,60 @@ contains
     self%npanels = 1
 
   end subroutine initialise_unit_test
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief Calculate ownership of all cells known to this local mesh
+  !>
+  !> An array representing all cells known to the local mesh has all the
+  !> owned cells filled with the local rank ID (on every processor in
+  !> parallel). When a halo swap is performed on this array, the array on
+  !> every processor has its halo cells filled with their owner.
+  !>
+  !> Private: should only be called by the local mesh initialiser
+  subroutine init_cell_owner(self)
+    use mpi_mod, only: generate_redistribution_map, get_mpi_datatype, &
+                       get_comm_rank
+    use yaxt,    only: xt_redist, xt_redist_s_exchange
+
+    implicit none
+    class (local_mesh_type), intent(inout) :: self
+    type(xt_redist) :: redist
+    integer(i_def) :: cell
+    integer(i_def) :: i
+    integer(i_def) :: total_inners
+    integer(i_def) :: halo_start, halo_finish
+    integer(i_def) :: local_rank
+
+    ! Work out the boundary between owned and halo cells
+    total_inners=0
+    do i=1,self%inner_depth
+      total_inners=total_inners+self%num_inner(i)
+    end do
+    halo_start  = total_inners+self%num_edge+1
+    halo_finish = self%get_num_cells_in_layer()+self%get_num_cells_ghost()
+    !If this is a serial run (no halos), halo_start is out of bounds - so fix it
+    if(halo_start > self%get_num_cells_in_layer())then
+      halo_start  = self%get_num_cells_in_layer()
+      halo_finish = self%get_num_cells_in_layer() - 1
+    end if
+
+    !Get the redistribution map object for halo exchanging the cell owners array
+    redist = generate_redistribution_map( &
+      int(self%global_cell_id(1:total_inners+self%num_edge),kind=i_halo_index),&
+      int(self%global_cell_id( halo_start:halo_finish ),kind=i_halo_index), &
+      get_mpi_datatype( integer_type, i_def ) )
+
+    ! Set ownership of all inner and edge cells to the local rank id
+    ! - halo cells are unset
+    local_rank = get_comm_rank()
+    do cell = 1,total_inners+self%num_edge
+      self%cell_owner(cell)=local_rank
+    end do
+
+    ! Perform the halo swap
+    call xt_redist_s_exchange(redist, self%cell_owner, self%cell_owner)
+
+  end subroutine init_cell_owner
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !> @brief Fortran destructor, called when object goes out of scope
