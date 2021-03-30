@@ -1778,8 +1778,8 @@ subroutine calc_global_mesh_maps(self)
 
   integer(i_def) :: source_id, source_cpp, source_ncells, &
                     target_edge_cells_x, target_edge_cells_y, target_cpp, &
-                    target_ncells, target_cells_per_source_cell,i
-  integer(i_def), allocatable :: cell_map(:,:)
+                    target_ncells, i
+  integer(i_def), allocatable :: cell_map(:,:,:)
 
   if (.not. allocated( self%global_mesh_maps )) then
     allocate( self%global_mesh_maps, source=global_mesh_map_collection_type() )
@@ -1795,8 +1795,7 @@ subroutine calc_global_mesh_maps(self)
     target_edge_cells_y = self%target_edge_cells_y(i)
     target_cpp          = target_edge_cells_x*target_edge_cells_y
     target_ncells       = target_cpp*self%npanels
-    target_cells_per_source_cell = max(1,target_ncells/source_ncells)
-    allocate(cell_map(target_cells_per_source_cell,source_ncells))
+    allocate(cell_map(target_edge_cells_x,target_edge_cells_y,source_ncells))
 
     call calc_global_cell_map( self,                &
                                target_edge_cells_x, &
@@ -1959,9 +1958,11 @@ subroutine write_mesh(self)
   type(global_mesh_map_type), pointer :: global_mesh_map => null()
 
   integer(i_def), allocatable :: cell_map (:,:)
-  integer(i_def), allocatable :: tmp_map (:,:)
+  integer(i_def), allocatable :: tmp_map (:,:,:)
   integer(i_def) :: nsource
   integer(i_def) :: ntarget_per_cell
+  integer(i_def) :: ntarget_cells_per_source_x
+  integer(i_def) :: ntarget_cells_per_source_y
 
   character(str_long) :: tmp_str
 
@@ -2053,13 +2054,15 @@ subroutine write_mesh(self)
     global_mesh_map  => self%global_mesh_maps%get_global_mesh_map(1,i+1)
     nsource          = global_mesh_map%get_nsource_cells()
     ntarget_per_cell = global_mesh_map%get_ntarget_cells_per_source_cell()
+    ntarget_cells_per_source_x = global_mesh_map%get_ntarget_cells_per_source_x()
+    ntarget_cells_per_source_y = global_mesh_map%get_ntarget_cells_per_source_y()
     if (allocated(cell_map)) deallocate(cell_map)
     if (allocated(tmp_map)) deallocate(tmp_map)
     allocate(cell_map(ntarget_per_cell, nsource))
-    allocate(tmp_map(ntarget_per_cell, 1))
+    allocate(tmp_map(ntarget_cells_per_source_x, ntarget_cells_per_source_y, 1))
     do j=1, nsource
       call global_mesh_map%get_cell_map([j], tmp_map)
-      cell_map(:, j) = tmp_map(:,1)
+      cell_map(:, j) = reshape(tmp_map(:,:,1), (/ ntarget_per_cell/) )
     end do
     write(stdout,'(4(A,I0),A)')                                                        &
         trim(self%mesh_name)//'(', self%edge_cells_x, ',', self%edge_cells_y,') => '// &

@@ -447,6 +447,8 @@ contains
     @assertEqual( 6,  global_mesh_map%get_ntarget_cells_per_source_cell() )
     @assertEqual( 1,  global_mesh_map%get_source_id() )
     @assertEqual( 2,  global_mesh_map%get_target_id() )
+    @assertEqual( 2, global_mesh_map%get_ntarget_cells_per_source_x() )
+    @assertEqual( 3, global_mesh_map%get_ntarget_cells_per_source_y() )
 
     call mesh_gen%clear()
     if ( allocated(test_target_mesh_names) ) deallocate( test_target_mesh_names )

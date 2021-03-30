@@ -31,9 +31,12 @@ module global_mesh_map_collection_mod_test
   integer(i_def), parameter :: source_id     = 1
   integer(i_def), parameter :: target_id     = 2
   integer(i_def), parameter :: ncells_source = 4
-  integer(i_def), parameter :: cell_factor_SourceToTarget = 4
+  integer(i_def), parameter :: cell_factor_x_SourceToTarget = 2
+  integer(i_def), parameter :: cell_factor_y_SourceToTarget = 2
+  integer(i_def), parameter :: cell_factor_SourceToTarget = &
+                  cell_factor_x_SourceToTarget * cell_factor_y_SourceToTarget
 
-  integer(i_def) :: SourceToTarget_gid_map( 4, 4  )
+  integer(i_def) :: SourceToTarget_gid_map( 2, 2, 4  )
 
 contains
 
@@ -49,7 +52,9 @@ contains
                  3,  4,  7,  8,   &! Map for Source Gid Cell 2
                  9, 10, 13, 14,   &! Map for Source Gid Cell 3
                 11, 12, 15, 16 ]  &! Map for Source Gid Cell 4
-              , [ cell_factor_SourceToTarget, ncells_source ] )
+              , [ cell_factor_x_SourceToTarget, &
+                  cell_factor_y_SourceToTarget, &
+                  ncells_source ] )
 
   end subroutine setUp
 
@@ -73,8 +78,8 @@ contains
     type(global_mesh_map_collection_type) :: global_mesh_map_collection
     type(global_mesh_map_type), pointer :: test_global_mesh_map => null()
 
-    integer(i_def) :: tmp_gid_map(cell_factor_SourceToTarget,1)
-    integer(i_def) :: data_gid_map(cell_factor_SourceToTarget,1)
+    integer(i_def) :: tmp_gid_map(cell_factor_x_SourceToTarget, cell_factor_y_SourceToTarget, 1)
+    integer(i_def) :: data_gid_map(cell_factor_x_SourceToTarget, cell_factor_y_SourceToTarget, 1)
     integer(i_def) :: tmp_int
     integer(i_def) :: i
 
@@ -107,7 +112,7 @@ contains
 
     do i=1, ncells_source
       call test_global_mesh_map%get_cell_map([i], tmp_gid_map)
-      data_gid_map(:,1) = SourceToTarget_gid_map(:,i)
+      data_gid_map(:,:,1) = SourceToTarget_gid_map(:,:,i)
       @assertEqual( tmp_gid_map, data_gid_map )
     end do
 

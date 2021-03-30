@@ -73,7 +73,7 @@ module mesh_map_mod_test
   real(r_def), parameter :: cp       = 1000.0_r_def
   real(r_def), parameter :: scaling  = 125.0_r_def
 
-  integer(i_def), parameter :: CoarseToFineMap(4,96) = reshape( &
+  integer(i_def), parameter :: CoarseToFineMap(2,2,96) = reshape( &
       [   1,    2,   9,    10,            3,    4,   11,   12,  &
           5,    6,   13,   14,            7,    8,   15,   16,  &
          17,   18,   25,   26,           19,   20,   27,   28,  &
@@ -121,9 +121,9 @@ module mesh_map_mod_test
         353,  354,  361,  362,          355,  356,  363,  364,  &
         357,  358,  365,  366,          359,  360,  367,  368,  &
         369,  370,  377,  378,          371,  372,  379,  380,  &
-        373,  374,  381,  382,          375,  376,  383,  384 ], (/4,96/))
+        373,  374,  381,  382,          375,  376,  383,  384 ], (/2,2,96/))
 
-  integer(i_def), parameter :: FineToCoarseMap(1,384) = reshape(              &
+  integer(i_def), parameter :: FineToCoarseMap(1,1,384) = reshape(              &
     [ 1,  1,  2,  2,  3,  3,  4,  4,  1,  1,  2,  2,  3,  3,  4,  4,  5,  5,  &
       6,  6,  7,  7,  8,  8,  5,  5,  6,  6,  7,  7,  8,  8,  9,  9,  10, 10, &
       11, 11, 12, 12, 9,  9,  10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, &
@@ -145,7 +145,7 @@ module mesh_map_mod_test
       83, 83, 84, 84, 81, 81, 82, 82, 83, 83, 84, 84, 85, 85, 86, 86, 87, 87, &
       88, 88, 85, 85, 86, 86, 87, 87, 88, 88, 89, 89, 90, 90, 91, 91, 92, 92, &
       89, 89, 90, 90, 91, 91, 92, 92, 93, 93, 94, 94, 95, 95, 96, 96, 93, 93, &
-      94, 94, 95, 95, 96, 96 ], (/1,384/) )
+      94, 94, 95, 95, 96, 96 ], (/1,1,384/) )
 
 contains
 
@@ -173,7 +173,7 @@ contains
     integer(i_def) :: i,j
     integer(i_def) :: npanels
 
-    integer(i_def),     allocatable :: cell_map(:,:)
+    integer(i_def),     allocatable :: cell_map(:,:,:)
     character(str_def), allocatable :: target_mesh_names(:)
 
     character(str_def)   :: mesh_name
@@ -277,11 +277,13 @@ contains
     type (mesh_map_type) :: mesh_map
 
     integer(i_def) :: test_integer
-    integer(i_def), allocatable :: map(:,:)
+    integer(i_def), allocatable :: map(:,:,:)
 
-    integer(i_def), pointer :: test_1d_array_ptr(:)   => null()
-    integer(i_def), pointer :: test_2d_array_ptr(:,:) => null()
+    integer(i_def), pointer :: test_1d_array_ptr(:,:)   => null()
+    integer(i_def), pointer :: test_2d_array_ptr(:,:,:) => null()
     integer(i_def) :: nsource_cells
+    integer(i_def) :: ntarget_cells_per_source_x
+    integer(i_def) :: ntarget_cells_per_source_y
     integer(i_def) :: ntarget_cells_per_source_cell
     integer(i_def) :: fine_global_mesh_id
     integer(i_def) :: coarse_global_mesh_id
@@ -299,14 +301,22 @@ contains
     ntarget_cells_per_source_cell = &
         CoarseToFine_global_mesh_map%get_ntarget_cells_per_source_cell()
 
+    ntarget_cells_per_source_x = &
+        CoarseToFine_global_mesh_map%get_ntarget_cells_per_source_x()
+
+    ntarget_cells_per_source_y = &
+        CoarseToFine_global_mesh_map%get_ntarget_cells_per_source_y()
+
     nsource_cells                 = &
         CoarseToFine_global_mesh_map%get_nsource_cells()
-    allocate(map(ntarget_cells_per_source_cell,nsource_cells))
+    allocate(map(ntarget_cells_per_source_x, &
+                 ntarget_cells_per_source_y, &
+                 nsource_cells))
 
     fine_mesh_id   = this%fine_mesh%get_id()
     coarse_mesh_id = this%coarse_mesh%get_id()
 
-    map(:,:) = CoarseToFineMap(:,:)
+    map(:,:,:) = CoarseToFineMap(:,:,:)
 
     mesh_map = mesh_map_type( coarse_mesh_id, &
                               fine_mesh_id,   &
@@ -336,7 +346,7 @@ contains
     !-------------------------------------------------------------------
     ! Test get_map_from_cell
     test_1d_array_ptr => mesh_map%get_cell_map(11)
-    @assertEqual ( [37,38,45,46], test_1d_array_ptr )
+    @assertEqual ( reshape([37,38,45,46], (/2,2/)), test_1d_array_ptr )
     nullify(test_1d_array_ptr)
 
 
@@ -365,12 +375,14 @@ contains
 
     integer(i_def) :: test_integer
 
-    integer(i_def), pointer :: test_1d_array_ptr(:)   => null()
-    integer(i_def), pointer :: test_2d_array_ptr(:,:) => null()
+    integer(i_def), pointer :: test_1d_array_ptr(:,:)   => null()
+    integer(i_def), pointer :: test_2d_array_ptr(:,:,:) => null()
     integer(i_def) :: coarse_global_mesh_id
-    integer(i_def), allocatable :: map(:,:)
+    integer(i_def), allocatable :: map(:,:,:)
     integer(i_def) :: nsource_cells
     integer(i_def) :: ntarget_cells_per_source_cell
+    integer(i_def) :: ntarget_cells_per_source_x
+    integer(i_def) :: ntarget_cells_per_source_y
 
     type(global_mesh_map_type), pointer :: FineToCoarse_global_mesh_map => null()
 
@@ -381,11 +393,19 @@ contains
 
     ntarget_cells_per_source_cell = &
         FineToCoarse_global_mesh_map%get_ntarget_cells_per_source_cell()
+
+    ntarget_cells_per_source_x = &
+        FineToCoarse_global_mesh_map%get_ntarget_cells_per_source_x()
+
+    ntarget_cells_per_source_y = &
+        FineToCoarse_global_mesh_map%get_ntarget_cells_per_source_y()
     nsource_cells                 = &
         FineToCoarse_global_mesh_map%get_nsource_cells()
-    allocate(map(ntarget_cells_per_source_cell,nsource_cells))
+    allocate(map(ntarget_cells_per_source_x, &
+                 ntarget_cells_per_source_y, &
+                 nsource_cells))
 
-    map(:,:) = FineToCoarseMap(:,:)
+    map(:,:,:) = FineToCoarseMap(:,:,:)
     mesh_map = mesh_map_type( this%fine_mesh%get_id(),   &
                               this%coarse_mesh%get_id(), &
                               map )
@@ -413,7 +433,7 @@ contains
     !-------------------------------------------------------------------
     ! Test get_map_from_cell
     test_1d_array_ptr => mesh_map%get_cell_map(11)
-    @assertEqual ( [2], test_1d_array_ptr )
+    @assertEqual ( reshape([2], (/1, 1/)), test_1d_array_ptr )
     nullify(test_1d_array_ptr)
 
 

@@ -31,10 +31,12 @@ module global_mesh_map_mod_test
   integer(i_def), parameter :: ncells_source = 4
   integer(i_def), parameter :: ncells_target = 16
   integer(i_def), parameter :: cell_ratio_SourceToTarget = 4
+  integer(i_def), parameter :: cell_ratio_x_SourceToTarget = 2
+  integer(i_def), parameter :: cell_ratio_y_SourceToTarget = 2
   integer(i_def), parameter :: cell_ratio_TargetToSource = 1
 
-  integer(i_def) :: SourceToTarget_gid_map( 4, 4  )
-  integer(i_def) :: TargetToSource_gid_map( 1, 16 )
+  integer(i_def) :: SourceToTarget_gid_map( 2, 2, 4  )
+  integer(i_def) :: TargetToSource_gid_map( 1, 1, 16 )
 
 
 contains
@@ -50,14 +52,18 @@ contains
                  3,  4,  7,  8,   &! Map for Source Gid Cell 2
                  9, 10, 13, 14,   &! Map for Source Gid Cell 3
                 11, 12, 15, 16 ]  &! Map for Source Gid Cell 4
-              , [ cell_ratio_SourceToTarget, ncells_source ] )
+              , [ cell_ratio_x_SourceToTarget, &
+                  cell_ratio_y_SourceToTarget, &
+                  ncells_source ] )
 
     TargetToSource_gid_map =      &
       reshape([ 1,   1,   2,  2,  &
                 1,   1,   2,  2,  &
                 3,   3,   4,  4,  &
                 3,   3,   4,  4 ] &
-              , [ cell_ratio_TargetToSource, ncells_target ] )
+              , [ cell_ratio_TargetToSource, &
+                  cell_ratio_TargetToSource, &
+                  ncells_target ] )
 
   end subroutine setup
 
@@ -83,7 +89,7 @@ contains
     type(global_mesh_map_type) :: CoarseToFine_map
     type(global_mesh_map_type) :: FineToCoarse_map
 
-    integer(i_def), allocatable :: tmp_cell_list(:), tmp_gid_map(:,:)
+    integer(i_def), allocatable :: tmp_cell_list(:), tmp_gid_map(:,:,:)
     integer(i_def) :: i
 
 
@@ -116,14 +122,14 @@ contains
 
     ! Check for gid_map
     allocate(tmp_cell_list(2))
-    allocate(tmp_gid_map(4,2))
+    allocate(tmp_gid_map(2,2,2))
 
     tmp_cell_list = [1,4]
-    tmp_gid_map(:,:) = imdi
+    tmp_gid_map(:,:,:) = imdi
 
     call CoarseToFine_map%get_cell_map(tmp_cell_list, tmp_gid_map)
     do i=1, 2
-      @assertEqual( tmp_gid_map(:,i), SourceToTarget_gid_map(:,tmp_cell_list(i) ) )
+      @assertEqual( tmp_gid_map(:,:,i), SourceToTarget_gid_map(:,:,tmp_cell_list(i) ) )
     end do
 
     deallocate (tmp_cell_list, tmp_gid_map)
@@ -136,14 +142,14 @@ contains
 
     ! Check for gid_map
     allocate(tmp_cell_list(6))
-    allocate(tmp_gid_map(1,6))
+    allocate(tmp_gid_map(1,1,6))
 
     tmp_cell_list = [1, 3, 4, 10, 9, 7]
-    tmp_gid_map(:,:) = imdi
+    tmp_gid_map(:,:,:) = imdi
 
     call FineToCoarse_map%get_cell_map(tmp_cell_list, tmp_gid_map)
     do i=1, 6
-      @assertEqual( tmp_gid_map(:,i), TargetToSource_gid_map(:,tmp_cell_list(i)) )
+      @assertEqual( tmp_gid_map(:,:,i), TargetToSource_gid_map(:,:,tmp_cell_list(i)) )
     end do
 
     deallocate (tmp_cell_list, tmp_gid_map)

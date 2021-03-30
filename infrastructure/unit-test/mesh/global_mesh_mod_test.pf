@@ -460,7 +460,7 @@ contains
     type(global_mesh_type),     pointer :: target_mesh_ptr => null()
     type(global_mesh_map_type), pointer :: global_mesh_map => null()
     type(global_mesh_type)              :: global_mesh
-    integer(i_def), allocatable         :: mesh_map(:,:)
+    integer(i_def), allocatable         :: mesh_map(:,:,:)
 
     !-------------------------------------------------
     ! Test construction of a cubed-sphere mesh is same

@@ -24,7 +24,7 @@ module global_mesh_map_mod
   type, extends(linked_list_data_type), public :: global_mesh_map_type
     private
 
-    integer(i_def), allocatable :: global_mesh_map(:,:)
+    integer(i_def), allocatable :: global_mesh_map(:,:,:)
 
   contains
 
@@ -47,15 +47,26 @@ module global_mesh_map_mod
     !> @return Number of target cells per source cell
     procedure, public :: get_ntarget_cells_per_source_cell
     !>
+    !> @brief  Returns the number of target cells for each source cell in
+    !>         the x-direction of this mapping object.
+    !> @return Number of target cells per source cell in x direction
+    procedure, public :: get_ntarget_cells_per_source_x
+    !>
+    !> @brief  Returns the number of target cells for each source cell in
+    !>         the y-direction of this mapping object.
+    !> @return Number of target cells per source cell in y-direction
+    procedure, public :: get_ntarget_cells_per_source_y
+
+    !>
     !> @brief  Gets the ids of target cells mapped to given source cells lids
-    !> @param [in]  cell_ids[:] Source cell global ids which
-    !>                          require mapped target cell global ids
-    !> @param [out] gid_map[::] Integer array of target cell global ids which
-    !>                          map to the requested cell_ids in the source
-    !>                          global mesh object.
+    !> @param [in]  cell_ids[:]  Source cell global ids which
+    !>                           require mapped target cell global ids
+    !> @param [out] gid_map[:::] Integer array of target cell global ids which
+    !>                           map to the requested cell_ids in the source
+    !>                           global mesh object.
     procedure, public :: get_cell_map
     !>
-    !> @brief Forced clear of this oject from memory.
+    !> @brief Forced clear of this object from memory.
     !>        This routine should not need to be called manually except
     !>        (possibly) in pfunit tests
     procedure, public :: clear
@@ -92,12 +103,13 @@ contains
 
     integer(i_def), intent(in) :: source_global_mesh_id
     integer(i_def), intent(in) :: target_global_mesh_id
-    integer(i_def), intent(in) :: map(:,:)
+    integer(i_def), intent(in) :: map(:,:,:)
 
     type(global_mesh_map_type) :: instance
 
     integer(i_def) :: global_mesh_map_id
-    integer(i_def) :: ntarget_cells_per_source_cell
+    integer(i_def) :: ntarget_cells_per_source_cell_x
+    integer(i_def) :: ntarget_cells_per_source_cell_y
     integer(i_def) :: nsource_cells
 
     if (source_global_mesh_id == target_global_mesh_id) then
@@ -114,12 +126,14 @@ contains
                                                       target_global_mesh_id )
     call instance%set_id(global_mesh_map_id)
 
-    ntarget_cells_per_source_cell = size(map,1)
-    nsource_cells                 = size(map,2)
+    ntarget_cells_per_source_cell_x = size(map,1)
+    ntarget_cells_per_source_cell_y = size(map,2)
+    nsource_cells        = size(map,3)
 
     ! Populate instance
     ! -----------------------------------------
-    allocate( instance%global_mesh_map( ntarget_cells_per_source_cell, &
+    allocate( instance%global_mesh_map( ntarget_cells_per_source_cell_x, &
+                                        ntarget_cells_per_source_cell_y, &
                                         nsource_cells ) )
 
     instance%global_mesh_map = map
@@ -136,7 +150,7 @@ contains
     class(global_mesh_map_type), intent(in) :: self
 
     integer(i_def), intent(in)  :: cell_ids(:)
-    integer(i_def), intent(out) :: gid_map(:,:)
+    integer(i_def), intent(out) :: gid_map(:,:,:)
 
     integer(i_def) :: i
     integer(i_def) :: ncells_request
@@ -144,17 +158,19 @@ contains
     ncells_request = size(cell_ids)
 
     if ((size(gid_map,1) /= size(self%global_mesh_map,1)) .or. &
-        (size(gid_map,2) /= ncells_request)) then
+        (size(gid_map,2) /= size(self%global_mesh_map,2)) .or. &
+        (size(gid_map,3) /= ncells_request)) then
        write(log_scratch_space, '(2(A,I0),A)')                      &
           'Output array dimensions are incorrect, dimensions of (', &
-           size(self%global_mesh_map,1), ',', ncells_request,       &
+           size(self%global_mesh_map,1), ',',                       &
+           size(self%global_mesh_map,2), ',', ncells_request,       &
            ') required.'
       call log_event(log_scratch_space, LOG_LEVEL_ERROR)
       return
     end if
 
     do i=1, ncells_request
-      gid_map(:,i) = self%global_mesh_map(:,cell_ids(i))
+      gid_map(:,:,i) = self%global_mesh_map(:,:,cell_ids(i))
     end do
 
     return
@@ -192,10 +208,38 @@ contains
 
     class(global_mesh_map_type), intent(in) :: self
     integer(i_def) :: ntarget_cells_per_source_cell
+    integer(i_def) :: ntarget_cells_per_source_x
+    integer(i_def) :: ntarget_cells_per_source_y
 
-    ntarget_cells_per_source_cell = size(self%global_mesh_map,1)
+    ntarget_cells_per_source_x = size(self%global_mesh_map,1)
+    ntarget_cells_per_source_y = size(self%global_mesh_map,2)
+    ntarget_cells_per_source_cell = ntarget_cells_per_source_x * ntarget_cells_per_source_y
 
   end function get_ntarget_cells_per_source_cell
+
+  function get_ntarget_cells_per_source_x(self) &
+                                       result (ntarget_cells_per_source_x)
+
+    implicit none
+
+    class(global_mesh_map_type), intent(in) :: self
+    integer(i_def) :: ntarget_cells_per_source_x
+
+    ntarget_cells_per_source_x = size(self%global_mesh_map,1)
+
+  end function get_ntarget_cells_per_source_x
+
+  function get_ntarget_cells_per_source_y(self) &
+                                       result (ntarget_cells_per_source_y)
+
+    implicit none
+
+    class(global_mesh_map_type), intent(in) :: self
+    integer(i_def) :: ntarget_cells_per_source_y
+
+    ntarget_cells_per_source_y = size(self%global_mesh_map,2)
+
+  end function get_ntarget_cells_per_source_y
 
   function get_nsource_cells(self) result (nsource_cells)
 
@@ -204,7 +248,7 @@ contains
     class(global_mesh_map_type), intent(in) :: self
     integer(i_def) :: nsource_cells
 
-    nsource_cells = size(self%global_mesh_map,2)
+    nsource_cells = size(self%global_mesh_map,3)
 
   end function get_nsource_cells
 

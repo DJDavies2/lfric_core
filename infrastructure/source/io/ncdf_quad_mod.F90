@@ -43,7 +43,7 @@ integer(i_def), parameter :: MESH_FACE_NODES_RANK = 2  !< Rank of face-node conn
 integer(i_def), parameter :: MESH_EDGE_NODES_RANK = 2  !< Rank of edge-node connectivity arrays
 integer(i_def), parameter :: MESH_FACE_EDGES_RANK = 2  !< Rank of face-edge connectivity arrays
 integer(i_def), parameter :: MESH_FACE_LINKS_RANK = 2  !< Rank of face-face connectivity arrays
-integer(i_def), parameter :: MESH_MESH_LINKS_RANK = 2  !< Rank of mesh-mesh connectivity arrays
+integer(i_def), parameter :: MESH_MESH_LINKS_RANK = 3  !< Rank of mesh-mesh connectivity arrays
 integer(i_def), parameter :: MESH_NODE_X_RANK     = 1  !< Rank of node x coordinate array
 integer(i_def), parameter :: MESH_NODE_Y_RANK     = 1  !< Rank of node y coordinate array
 integer(i_def), parameter :: MESH_FACE_X_RANK     = 1  !< Rank of face x coordinate array
@@ -91,6 +91,10 @@ type, extends(ugrid_file_type), public :: ncdf_quad_type
 
   integer(i_def), allocatable :: ntargets_per_source_dim_id(:)
                                          !< NetCDF-assigned ID for number of mesh targets
+  integer(i_def), allocatable :: ntargets_per_source_x_dim_id(:)
+                                         !< NetCDF-assigned ID for number of mesh targets in x-dir
+  integer(i_def), allocatable :: ntargets_per_source_y_dim_id(:)
+                                         !< NetCDF-assigned ID for number of mesh targets in y-dir
   integer(i_def) :: one_dim_id           !< NetCDF-assigned ID for constant one
   integer(i_def) :: two_dim_id           !< NetCDF-assigned ID for constant two
   integer(i_def) :: four_dim_id          !< NetCDF-assigned ID for constant four
@@ -294,10 +298,38 @@ subroutine define_dimensions(self)
     nullify(global_mesh_map)
     target_mesh_name = self%target_mesh_names(i)
     dim_name = 'n'//trim(target_mesh_name)// &
-               '_cells_per_'//trim(self%mesh_name)//'_cell'
+               '_cells_per_'//trim(self%mesh_name)//'_x'
 
 
     global_mesh_map => self%target_mesh_maps%get_global_mesh_map(source_id,i+1)
+
+    ierr = nf90_inq_dimid(self%ncid, trim(dim_name), self%ntargets_per_source_x_dim_id(i))
+
+    if (ierr /= nf90_noerr) then
+      ierr = nf90_def_dim( self%ncid, trim(dim_name),                            &
+                           global_mesh_map%get_ntarget_cells_per_source_x(),  &
+                           self%ntargets_per_source_x_dim_id(i) )
+
+      cmess = 'Defining '//trim(dim_name)
+      call check_err(ierr, routine, cmess)
+    end if
+
+    dim_name = 'n'//trim(target_mesh_name)// &
+               '_cells_per_'//trim(self%mesh_name)//'_y'
+
+    ierr = nf90_inq_dimid(self%ncid, trim(dim_name), self%ntargets_per_source_y_dim_id(i))
+
+    if (ierr /= nf90_noerr) then
+      ierr = nf90_def_dim( self%ncid, trim(dim_name),                            &
+                           global_mesh_map%get_ntarget_cells_per_source_y(),  &
+                           self%ntargets_per_source_y_dim_id(i) )
+
+      cmess = 'Defining '//trim(dim_name)
+      call check_err(ierr, routine, cmess)
+    end if
+
+    dim_name = 'n'//trim(target_mesh_name)// &
+               '_cells_per_'//trim(self%mesh_name)//'_cell'
 
     ierr = nf90_inq_dimid(self%ncid, trim(dim_name), self%ntargets_per_source_dim_id(i))
 
@@ -433,8 +465,9 @@ subroutine define_variables(self)
     var_name=trim(self%mesh_name)//'_'//trim(self%target_mesh_names(i))//'_map'
     cmess = 'Defining '//trim(var_name)
 
-    mesh_mesh_links_dims(1) = self%ntargets_per_source_dim_id(i)
-    mesh_mesh_links_dims(2) = self%nmesh_faces_dim_id
+    mesh_mesh_links_dims(1) = self%ntargets_per_source_x_dim_id(i)
+    mesh_mesh_links_dims(2) = self%ntargets_per_source_y_dim_id(i)
+    mesh_mesh_links_dims(3) = self%nmesh_faces_dim_id
 
     ierr = nf90_def_var( self%ncid, trim(var_name),      &
                          nf90_int, mesh_mesh_links_dims, &
@@ -1441,7 +1474,8 @@ end subroutine read_mesh
 !>                                      source mesh cells to target mesh
 !>                                      cells. Allocatable integer array,
 !>                                      returned as
-!>                                      [n target cells per source cell,
+!>                                      [n target cells per source x,
+!>                                       n target cells per source y,
 !>                                       n source cells]
 !-------------------------------------------------------------------------------
 subroutine read_map( self,             &
@@ -1456,16 +1490,20 @@ subroutine read_map( self,             &
 
   character(str_def), intent(in)  :: source_mesh_name
   character(str_def), intent(in)  :: target_mesh_name
-  integer(i_def),     intent(out), allocatable :: mesh_map(:,:)
+  integer(i_def),     intent(out), allocatable :: mesh_map(:,:,:)
 
   character(*), parameter :: routine = 'read_map'
 
   integer(i_native) :: mesh_map_id
   integer(i_native) :: source_cells_id
   integer(i_native) :: target_cells_per_source_cell_id
+  integer(i_native) :: target_cells_per_source_x_id
+  integer(i_native) :: target_cells_per_source_y_id
   integer(i_native) :: ierr
 
   integer(i_def) :: source_ncells
+  integer(i_def) :: target_cells_per_source_x
+  integer(i_def) :: target_cells_per_source_y
   integer(i_def) :: target_cells_per_source_cell
 
   character(nf90_max_name) :: var_name, dim_name
@@ -1492,6 +1530,38 @@ subroutine read_map( self,             &
   !=====================================================
   dim_name = 'n'//trim(target_mesh_name)//           &
              '_cells_per_'//trim(source_mesh_name)// &
+             '_x'
+
+  cmess = 'Getting '//trim(dim_name)//' id'
+  ierr = nf90_inq_dimid( self%ncid, &
+                         dim_name,  &
+                         target_cells_per_source_x_id )
+  call check_err(ierr, routine, cmess)
+
+  cmess = 'Getting '//trim(dim_name)//' value'
+  ierr = nf90_inquire_dimension( self%ncid,                    &
+                                 target_cells_per_source_x_id, &
+                                 len=target_cells_per_source_x )
+  call check_err(ierr, routine, cmess)
+
+  dim_name = 'n'//trim(target_mesh_name)//           &
+             '_cells_per_'//trim(source_mesh_name)// &
+             '_y'
+
+  cmess = 'Getting '//trim(dim_name)//' id'
+  ierr = nf90_inq_dimid( self%ncid, &
+                         dim_name,  &
+                         target_cells_per_source_y_id )
+  call check_err(ierr, routine, cmess)
+
+  cmess = 'Getting '//trim(dim_name)//' value'
+  ierr = nf90_inquire_dimension( self%ncid,                    &
+                                 target_cells_per_source_y_id, &
+                                 len=target_cells_per_source_y )
+  call check_err(ierr, routine, cmess)
+
+  dim_name = 'n'//trim(target_mesh_name)//           &
+             '_cells_per_'//trim(source_mesh_name)// &
              '_cell'
 
   cmess = 'Getting '//trim(dim_name)//' id'
@@ -1506,13 +1576,14 @@ subroutine read_map( self,             &
                                  len=target_cells_per_source_cell )
   call check_err(ierr, routine, cmess)
 
-
   ! 3.0 Allocate array and extract map
   !================================================
 
   ! 3.1 Allocate the mesh map array to be populated
   if (allocated(mesh_map)) deallocate(mesh_map)
-  allocate( mesh_map( target_cells_per_source_cell, source_ncells ))
+  allocate( mesh_map( target_cells_per_source_x, &
+                      target_cells_per_source_y, &
+                      source_ncells )            )
 
   ! 3.2 Extract map from the NetCDF file
   cmess = 'Getting '//trim(source_mesh_name)//'-'// &
@@ -1530,7 +1601,7 @@ subroutine read_map( self,             &
 
   ierr = nf90_get_var( self%ncid,   &
                        mesh_map_id, &
-                       mesh_map(:,:) )
+                       mesh_map(:,:,:) )
   call check_err(ierr, routine, cmess)
 
 end subroutine read_map
@@ -1598,11 +1669,11 @@ subroutine write_mesh( self, mesh_name, mesh_class,                       &
                        intent(in) :: target_mesh_maps
 
   ! Internal variables
-  integer(i_def)      :: ierr, i, ratio, cell
+  integer(i_def)      :: ierr, i, ratio_x, ratio_y, cell
   character(*), parameter :: routine = 'write_mesh'
   character(str_long) :: cmess
 
-  integer(i_def), allocatable :: cell_map(:,:), tmp_cell_map(:,:)
+  integer(i_def), allocatable :: cell_map(:,:,:), tmp_cell_map(:,:,:)
 
   type(global_mesh_map_type), pointer :: mesh_map => null()
 
@@ -1648,6 +1719,8 @@ subroutine write_mesh( self, mesh_name, mesh_class,                       &
   if ( self%nmesh_targets >0 ) then
 
     allocate(self%ntargets_per_source_dim_id(self%nmesh_targets))
+    allocate(self%ntargets_per_source_x_dim_id(self%nmesh_targets))
+    allocate(self%ntargets_per_source_y_dim_id(self%nmesh_targets))
     allocate(self%mesh_mesh_links_id(self%nmesh_targets))
 
     self%target_mesh_maps = target_mesh_maps
@@ -1717,17 +1790,18 @@ subroutine write_mesh( self, mesh_name, mesh_class,                       &
   do i=1, num_targets
     nullify(mesh_map)
     mesh_map => self%target_mesh_maps%get_global_mesh_map(1,i+1)
-    ratio = mesh_map%get_ntarget_cells_per_source_cell()
-    allocate(cell_map(ratio, self%nmesh_faces))
-    allocate(tmp_cell_map(ratio, 1))
+    ratio_x = mesh_map%get_ntarget_cells_per_source_x()
+    ratio_y = mesh_map%get_ntarget_cells_per_source_y()
+    allocate(cell_map(ratio_x, ratio_y, self%nmesh_faces))
+    allocate(tmp_cell_map(ratio_x, ratio_y, 1))
     do cell=1, self%nmesh_faces
       call mesh_map%get_cell_map([cell], tmp_cell_map)
-      cell_map(:,cell) = tmp_cell_map(:,1)
+      cell_map(:,:,cell) = tmp_cell_map(:,:,1)
     end do
     cmess = 'Writing mesh-mesh connectivity for meshes, "'// &
             trim(self%mesh_name)//'"->"'//                   &
             trim(self%target_mesh_names(i))//'"'
-    ierr = nf90_put_var( self%ncid, self%mesh_mesh_links_id(i), cell_map(:,:) )
+    ierr = nf90_put_var( self%ncid, self%mesh_mesh_links_id(i), cell_map(:,:,:) )
     deallocate(cell_map)
     deallocate(tmp_cell_map)
     call check_err(ierr, routine, cmess)

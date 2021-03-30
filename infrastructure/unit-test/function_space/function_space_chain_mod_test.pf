@@ -113,7 +113,7 @@ type(ncdf_quad_type) :: file_handler
 
 character(str_def), allocatable :: target_mesh_names(:)
 
-integer(i_def), allocatable :: cell_map(:,:)
+integer(i_def), allocatable :: cell_map(:,:,:)
 
 integer(i_def) :: mesh_id(4)
 integer(i_def) :: local_mesh_id
@@ -383,9 +383,9 @@ type(mesh_map_type), pointer :: mesh_map1to2 => null(), &
                                 mesh_map2to1 => null()
 
 integer(i_def), allocatable :: test_source_cells(:)
-integer(i_def), allocatable :: target_data(:,:)
+integer(i_def), allocatable :: target_data(:,:,:)
 
-integer(i_def), pointer :: target_test(:) => null()
+integer(i_def), pointer :: target_test(:,:) => null()
 
 integer(i_def) :: i
 
@@ -415,17 +415,17 @@ mesh_map2to1    => mesh2%get_mesh_map(mesh1)
 
 ! Now to check it's contents (mesh1-->mesh2)
 allocate(test_source_cells(5))
-allocate(target_data(4,5))
+allocate(target_data(2,2,5))
 test_source_cells = [1, 30, 45, 78, 90]
 target_data = reshape( [ 1,    2,    9,    10   &
                        , 115,  116,  123,  124  &
-                       , 177,  178,  185,  186  &
-                       , 307,  308,  315,  316  &
-                       , 355,  356,  363,  364  ], (/4,5/))
+                       , 185,  177,  186,  178  &
+                       , 308,  316,  307,  315  &
+                       , 355,  356,  363,  364  ], (/2,2,5/))
 
 do i=1, 5
   target_test => mesh_map1to2%get_cell_map( test_source_cells(i) )
-  @assertEqual ( target_data(:,i), target_test )
+  @assertEqual ( target_data(:,:,i), target_test(:,:) )
   nullify(target_test)
 end do
 deallocate( test_source_cells, target_data )
@@ -433,13 +433,13 @@ deallocate( test_source_cells, target_data )
 
 ! Now to check it's contents (mesh2-->mesh1)
 allocate(test_source_cells(5))
-allocate(target_data(1,5))
+allocate(target_data(1,1,5))
 test_source_cells = [1, 3, 8, 9, 15]
-target_data = reshape( [1, 2, 4, 1, 4], (/1,5/) )
+target_data = reshape( [1, 2, 4, 1, 4], (/1,1,5/) )
 
 do i=1, 5
   target_test => mesh_map2to1%get_cell_map( test_source_cells(i) )
-  @assertEqual ( target_data(:,i), target_test )
+  @assertEqual ( target_data(:,:,i), target_test(:,:) )
   nullify(target_test)
 end do
 deallocate( test_source_cells, target_data )

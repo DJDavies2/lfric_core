@@ -2140,14 +2140,15 @@ contains
     integer(i_def) :: mesh_map_id
 
     integer(i_def) :: ntarget_cells
-    integer(i_def) :: i, j, search
-    integer(i_def) :: ntarget_cells_per_source_cell
+    integer(i_def) :: i, j, k, search
+    integer(i_def) :: ntarget_cells_per_source_x
+    integer(i_def) :: ntarget_cells_per_source_y
     integer(i_def) :: nsource_cells
 
     logical(l_def) :: mesh_map_exists
 
     integer(i_def), allocatable :: target_lid_gid_map(:)
-    integer(i_def), allocatable :: map(:,:)
+    integer(i_def), allocatable :: map(:,:,:)
 
     target_mesh_id = target_mesh%get_id()
     source_mesh_id = self%get_id()
@@ -2189,13 +2190,17 @@ contains
         ! Error, no valid global mesh map
       end if
 
-      ntarget_cells_per_source_cell = &
-           global_mesh_map % get_ntarget_cells_per_source_cell()
+      ntarget_cells_per_source_x = &
+            global_mesh_map % get_ntarget_cells_per_source_x()
+      ntarget_cells_per_source_y = &
+            global_mesh_map % get_ntarget_cells_per_source_y()
 
       nsource_cells = size(self%cell_lid_gid_map)
 
       ! Get the get the source-target global mesh map GID-GID
-      allocate( map ( ntarget_cells_per_source_cell, nsource_cells) )
+      allocate( map ( ntarget_cells_per_source_x, &
+                      ntarget_cells_per_source_y, &
+                      nsource_cells) )
       call global_mesh_map%get_cell_map( self%cell_lid_gid_map, map )
 
       ! At this point, instance%mesh_map holds
@@ -2203,15 +2208,17 @@ contains
       ! we need to convert the target cells from Global to local ids by
       ! search through the target mesh local-global id map.
 
-      do j=1, nsource_cells
-        do i=1, ntarget_cells_per_source_cell
-          do search=1, ntarget_cells
+      do k=1, nsource_cells
+        do j=1, ntarget_cells_per_source_y
+          do i=1, ntarget_cells_per_source_x
+            do search=1, ntarget_cells
 
-            if (target_lid_gid_map(search) == map(i,j)) then
-              map(i,j) = search
-              exit
-            end if
+              if (target_lid_gid_map(search) == map(i,j,k)) then
+                map(i,j,k) = search
+                exit
+              end if
 
+            end do
           end do
         end do
       end do

@@ -1219,7 +1219,7 @@ subroutine calc_lbc_lam_map(self, lam_face_face)
   type(gen_lbc_type), intent(inout) :: self
   integer(i_def),     intent(in)    :: lam_face_face(:,:)
 
-  integer(i_def), allocatable :: cell_map(:,:)
+  integer(i_def), allocatable :: cell_map(:,:,:)
   integer(i_def), allocatable :: h_lbc_lam_map(:,:)
   integer(i_def), allocatable :: v_lbc_lam_map(:,:)
 
@@ -1232,7 +1232,8 @@ subroutine calc_lbc_lam_map(self, lam_face_face)
   integer(i_def) :: source_id
   integer(i_def) :: target_id
 
-  integer(i_def) :: ntargets_per_cell = 1
+  integer(i_def) :: target_edge_cells_x = 1
+  integer(i_def) :: target_edge_cells_y = 1
 
   integer(i_def), allocatable :: lam_cell_next(:,:)
 
@@ -1244,7 +1245,7 @@ subroutine calc_lbc_lam_map(self, lam_face_face)
   v_panel_lam_corners = [NE,SW]
 
   ! 1.0 Assign the LBC-LAM map to each LBC panel
-  !     Starting from the teh panel reference corner and
+  !     Starting from the panel reference corner and
   !     using tha LAM cell connectivity. The LAM connectivity
   !     is cyclically rotated to that it aligns with each base
   !     panel.
@@ -1279,17 +1280,17 @@ subroutine calc_lbc_lam_map(self, lam_face_face)
 
   ! 2.0 Construct the LBC-LAM cell map from the base panels
   !----------
-  allocate(cell_map(ntargets_per_cell, self%n_faces))
+  allocate(cell_map(target_edge_cells_x, target_edge_cells_y, self%n_faces))
 
   lbc_cell_id = 0
   do panel=1, 2
     do cell_id=1, self%base_h_panel%n_cells
       lbc_cell_id = lbc_cell_id + 1
-      cell_map(1,lbc_cell_id) = h_lbc_lam_map(cell_id,panel)
+      cell_map(1,1,lbc_cell_id) = h_lbc_lam_map(cell_id,panel)
     end do
     do cell_id=1, self%base_v_panel%n_cells
       lbc_cell_id = lbc_cell_id + 1
-      cell_map(1,lbc_cell_id) = v_lbc_lam_map(cell_id,panel)
+      cell_map(1,1,lbc_cell_id) = v_lbc_lam_map(cell_id,panel)
     end do
   end do
 
@@ -1333,7 +1334,7 @@ subroutine extract_coords(self, lam_node_coords, lam_cell_coords, lam_face_node 
   integer(i_def) :: lam_cell_id, lbc_node_id, lam_node_id
   integer(i_def) :: source_id=1
   integer(i_def) :: target_id=2
-  integer(i_def), allocatable :: cell_map(:,:)
+  integer(i_def), allocatable :: cell_map(:,:,:)
 
   type(global_mesh_map_type), pointer :: lbc_lam_map => null()
 
@@ -1348,7 +1349,7 @@ subroutine extract_coords(self, lam_node_coords, lam_cell_coords, lam_face_node 
   allocate(self%node_coords(2,n_nodes))
   allocate(self%cell_coords(2,n_cells))
 
-  allocate(cell_map(1,1))
+  allocate(cell_map(1,1,1))
 
   self%node_coords = imdi
   self%cell_coords = imdi
@@ -1359,7 +1360,7 @@ subroutine extract_coords(self, lam_node_coords, lam_cell_coords, lam_face_node 
   do cell_id=1, n_cells
     call lbc_lam_map%get_cell_map( [cell_id], cell_map)
 
-    lam_cell_id = cell_map(1, 1)
+    lam_cell_id = cell_map(1, 1, 1)
     self%cell_coords(:,cell_id) = lam_cell_coords(:, lam_cell_id)
 
     do i=1, self%nodes_per_face

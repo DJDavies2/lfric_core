@@ -114,7 +114,7 @@ contains
     character(str_def)     :: name
 
     character(str_def), allocatable :: target_mesh_names(:)
-    integer(i_def),     allocatable :: cell_map(:,:)
+    integer(i_def),     allocatable :: cell_map(:,:,:)
 
     integer(i_def)         :: ncells
     integer(i_def)         :: i, j
@@ -265,23 +265,27 @@ contains
 
     integer(i_def) :: i
     integer(i_def) :: ncells_2d
-    integer(i_def) :: ntarget_cells_per_source_cell, nsource_cells
+    integer(i_def) :: ntarget_cells_per_source_x
+    integer(i_def) :: ntarget_cells_per_source_y
+    integer(i_def) :: nsource_cells
 
-    integer(i_def), allocatable :: map(:,:)
+    integer(i_def), allocatable :: map(:,:,:)
 
     local_mesh => this%coarse_mesh % get_local_mesh()
     ncells_2d = local_mesh%get_num_cells_in_layer()
 
     mesh_maps = mesh_map_collection_type()
 
-    ntarget_cells_per_source_cell = &
-        this%CoarseTofine_global_mesh_map%get_ntarget_cells_per_source_cell()
+    ntarget_cells_per_source_x = &
+        this%CoarseTofine_global_mesh_map%get_ntarget_cells_per_source_x()
+    ntarget_cells_per_source_y = &
+        this%CoarseTofine_global_mesh_map%get_ntarget_cells_per_source_y()
     nsource_cells                 = &
         this%CoarseTofine_global_mesh_map%get_nsource_cells()
-    allocate(map(ntarget_cells_per_source_cell,nsource_cells))
+    allocate(map(ntarget_cells_per_source_x,ntarget_cells_per_source_y,nsource_cells))
 
     ! For this test we don't care what's in the map
-    map(:,:) = IMDI
+    map(:,:,:) = IMDI
 
     call mesh_maps % add_mesh_map( this%coarse_mesh%get_id(), &
                                    this%fine_mesh%get_id(),   &

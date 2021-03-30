@@ -71,7 +71,7 @@ abstract interface
     character(str_def),     intent(in)  :: source_mesh_name
     character(str_def),     intent(in)  :: target_mesh_name
 
-    integer(i_def),         intent(out), allocatable :: mesh_map(:,:)
+    integer(i_def),         intent(out), allocatable :: mesh_map(:,:,:)
 
   end subroutine read_map_interface
 

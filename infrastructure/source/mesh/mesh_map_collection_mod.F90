@@ -114,7 +114,7 @@ class(mesh_map_collection_type), intent(inout) :: self
 
 integer(i_def), intent(in) :: source_mesh_id
 integer(i_def), intent(in) :: target_mesh_id
-integer(i_def), intent(in) :: map(:,:)
+integer(i_def), intent(in) :: map(:,:,:)
 
 type(mesh_map_type) :: mesh_map
 

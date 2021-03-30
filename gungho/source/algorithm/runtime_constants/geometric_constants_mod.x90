@@ -53,8 +53,8 @@ module geometric_constants_mod
   use calc_dA_at_w2_kernel_mod,           only: calc_dA_at_w2_kernel_type
   use compute_latlon_kernel_mod,          only: compute_latlon_kernel_type
   use get_height_kernel_mod,              only: get_height_kernel_type
-  use psykal_lite_mod,                    only: invoke_mpi_calc_cell_orientation
-  use restrict_kernel_mod,                only: restrict_kernel_type
+  use psykal_lite_mod,                    only: invoke_mpi_calc_cell_orientation, &
+                                                invoke_restrict_kernel
 
   implicit none
 
@@ -245,8 +245,8 @@ contains
              function_space_collection%get_fs(                         &
              mg_mesh_id, surface_order, W3) )
           ! We use a simple restriction from fine to coarse levels
-          call invoke( restrict_kernel_type( surface_altitude_mg( level ),   &
-                                             surface_altitude_mg( level-1 ) ) )
+          call invoke_restrict_kernel( surface_altitude_mg( level ),   &
+                                       surface_altitude_mg( level-1 )  )
         end do
       end if
 

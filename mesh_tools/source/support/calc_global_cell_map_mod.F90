@@ -30,7 +30,8 @@ contains
 subroutine calc_global_cell_map( source_mesh,         &
                                  target_edge_cells_x, &
                                  target_edge_cells_y, &
-                                 cell_map )
+                                 cell_map,            &
+                                 panel_rotations      )
 
   use iso_fortran_env, only : stdout => output_unit
 
@@ -38,7 +39,8 @@ subroutine calc_global_cell_map( source_mesh,         &
 
   class(ugrid_generator_type), intent(in) :: source_mesh
 
-  integer(i_def), allocatable, intent(out) :: cell_map(:,:)
+  integer(i_def), allocatable, intent(out) :: cell_map(:,:,:)
+  integer(i_def), optional,    intent(in)  :: panel_rotations(:)
 
   integer(i_def) :: npanels
 
@@ -49,7 +51,7 @@ subroutine calc_global_cell_map( source_mesh,         &
   integer(i_def) :: fine_x
   integer(i_def) :: fine_y
   integer(i_def), allocatable :: fine_ids(:,:)
-  integer(i_def), allocatable :: fine_to_coarse_gid_map(:,:)
+  integer(i_def), allocatable :: fine_to_coarse_gid_map(:,:,:)
 
   integer(i_def) :: coarse_cpp
   integer(i_def) :: coarse_ncells
@@ -58,7 +60,7 @@ subroutine calc_global_cell_map( source_mesh,         &
   integer(i_def) :: coarse_x
   integer(i_def) :: coarse_y
   integer(i_def), allocatable :: coarse_ids(:,:)
-  integer(i_def), allocatable :: coarse_to_fine_gid_map(:,:)
+  integer(i_def), allocatable :: coarse_to_fine_gid_map(:,:,:)
 
   integer(i_def) :: source_edge_cells_x
   integer(i_def) :: source_edge_cells_y
@@ -77,7 +79,9 @@ subroutine calc_global_cell_map( source_mesh,         &
   logical(l_def) :: coarsen_y
 
   integer(i_def), allocatable :: tmp_panel_ids(:)
-  integer(i_def) :: n,i,j, count
+  integer(i_def), allocatable :: tmp_map(:,:)
+  integer(i_def) :: n,i,j,k, count
+  integer(i_def) :: ifine, jfine
 
 
 
@@ -154,10 +158,10 @@ subroutine calc_global_cell_map( source_mesh,         &
   allocate( coarse_ids ( coarse_x, coarse_y ))
   allocate( fine_ids   ( fine_x,   fine_y   ))
 
-  allocate( coarse_to_fine_gid_map( edge_factor_x*edge_factor_y, coarse_ncells ) )
+  allocate( coarse_to_fine_gid_map( edge_factor_x, edge_factor_y, coarse_ncells ) )
 
   if (.not. refining) then
-    allocate( fine_to_coarse_gid_map( 1, fine_ncells ) )
+    allocate( fine_to_coarse_gid_map( 1, 1, fine_ncells ) )
   end if
 
 
@@ -202,6 +206,9 @@ subroutine calc_global_cell_map( source_mesh,         &
     ! ===============================
     ! Populate Global Id maps
     ! ===============================
+
+    allocate(tmp_map(edge_factor_x, edge_factor_y))
+
     ! Coarse to Fine
     do j=1, coarse_y
       start_y = ((j-1)*edge_factor_y) + 1
@@ -210,17 +217,52 @@ subroutine calc_global_cell_map( source_mesh,         &
         start_x = ((i-1)*edge_factor_x) + 1
         end_x   = start_x + edge_factor_x - 1
 
-        coarse_to_fine_gid_map(:,coarse_ids(i,j)) =            &
-            reshape( fine_ids( start_x:end_x, start_y:end_y ), &
-                     (/edge_factor_x*edge_factor_y/) )
+        ! Rotation of map for LFRic cubed sphere panels
+        ! The global_mesh_map is a private object so must happen here
+        tmp_map(:,:) = reshape( fine_ids( start_x:end_x, start_y:end_y ),  &
+                                          (/edge_factor_x, edge_factor_y/) )
+
+        if ( ( edge_factor_x /= edge_factor_y ) .or. &
+             ( .not. present(panel_rotations) ) ) then
+
+          coarse_to_fine_gid_map(:, :,coarse_ids(i,j)) = tmp_map(:,:)
+
+        else if ( panel_rotations(n) == 0_i_def ) then
+          ! No rotation
+          coarse_to_fine_gid_map(:, :,coarse_ids(i,j)) = tmp_map(:,:)
+
+        else if ( panel_rotations(n) == 1_i_def ) then
+          ! Rotate left
+          do jfine = 1, edge_factor_y
+            do ifine = 1, edge_factor_x
+              coarse_to_fine_gid_map(ifine, jfine, coarse_ids(i,j)) = &
+                tmp_map(jfine, edge_factor_x+1-ifine)
+            end do
+          end do
+
+        else if ( panel_rotations(n) == -1_i_def ) then
+          ! Rotate right
+          do jfine = 1, edge_factor_y
+            do ifine = 1, edge_factor_x
+              coarse_to_fine_gid_map(ifine, jfine, coarse_ids(i,j)) = &
+                tmp_map(edge_factor_y+1-jfine, ifine)
+            end do
+          end do
+        else
+          call log_event('Unexpected panel rotation', LOG_LEVEL_ERROR)
+        end if
       end do
     end do
 
+    deallocate(tmp_map)
+
     if (.not. refining) then
       ! Fine to Coarse
-      do j=coarse_start_id, coarse_end_id
-        do i=1, edge_factor_x*edge_factor_y
-          fine_to_coarse_gid_map(1, coarse_to_fine_gid_map(i,j)) = j
+      do k=coarse_start_id, coarse_end_id
+        do j=1, edge_factor_y
+          do i=1, edge_factor_x
+            fine_to_coarse_gid_map(1, 1, coarse_to_fine_gid_map(i,j,k)) = k
+          end do
         end do
       end do
     end if
@@ -228,9 +270,9 @@ subroutine calc_global_cell_map( source_mesh,         &
   end do
 
   if (refining) then
-    cell_map = coarse_to_fine_gid_map(:,:)
+    cell_map = coarse_to_fine_gid_map(:,:,:)
   else
-    cell_map = fine_to_coarse_gid_map(:,:)
+    cell_map = fine_to_coarse_gid_map(:,:,:)
   end if
 
   if ( allocated( coarse_ids ) ) deallocate( coarse_ids )

@@ -23,40 +23,40 @@ module multigrid_preconditioner_alg_mod
   implicit none
 
   type, public, extends(abstract_preconditioner_type) :: multigrid_preconditioner_type
-     private
-     !> Number of multigrid levels
-     integer(kind=i_def) :: n_level
-     !> relaxation parameter
-     real(kind=r_def) :: rho_smooth
-     !> Function space ids
-     integer(kind=i_def), dimension(:), allocatable :: fs_id
-     !> Mesh ids
-     integer(kind=i_def), dimension(:), allocatable :: mesh_id
-     !> Solution on all levels
-     type(field_vector_type), dimension(:), allocatable :: u_mg
-     !> Right hand side on all levels
-     type(field_vector_type), dimension(:), allocatable :: b_mg
-     !> Residual on all levels
-     type(field_vector_type), dimension(:), allocatable :: r_mg
+    private
+    !> Number of multigrid levels
+    integer(kind=i_def) :: n_level
+    !> relaxation parameter
+    real(kind=r_def) :: rho_smooth
+    !> Function space ids
+    integer(kind=i_def), dimension(:), allocatable :: fs_id
+    !> Mesh ids
+    integer(kind=i_def), dimension(:), allocatable :: mesh_id
+    !> Solution on all levels
+    type(field_vector_type), dimension(:), allocatable :: u_mg
+    !> Right hand side on all levels
+    type(field_vector_type), dimension(:), allocatable :: b_mg
+    !> Residual on all levels
+    type(field_vector_type), dimension(:), allocatable :: r_mg
 
-     !> Jacobi smoothing parameter, before
-     integer(kind=i_def) :: n_presmooth
-     !> Jacobi smoothing parameter, after
-     integer(kind=i_def) :: n_postsmooth
-     !> Jacobi smoothing parameter, for coarsest mesh
-     integer(kind=i_def) :: n_coarsesmooth
-     !> Helmholtz operator on each multigrid level
-     type(pressure_operator_type), allocatable, dimension(:) :: H_operator
-   contains
-     !> Construct fields on all multigrid levels
-     procedure, private :: construct_multigrid_fields
-     !> Multigrid V-cycle
-     procedure, private :: vcycle
-     !> Apply smoother on one multigrid level
-     procedure, private :: smooth
-     procedure, public  :: apply => apply_multigrid_preconditioner
-     procedure, private :: apply_multigrid_preconditioner
-     final :: destroy_multigrid_preconditioner
+    !> Jacobi smoothing parameter, before
+    integer(kind=i_def) :: n_presmooth
+    !> Jacobi smoothing parameter, after
+    integer(kind=i_def) :: n_postsmooth
+    !> Jacobi smoothing parameter, for coarsest mesh
+    integer(kind=i_def) :: n_coarsesmooth
+    !> Helmholtz operator on each multigrid level
+    type(pressure_operator_type), allocatable, dimension(:) :: H_operator
+  contains
+    !> Construct fields on all multigrid levels
+    procedure, private :: construct_multigrid_fields
+    !> Multigrid V-cycle
+    procedure, private :: vcycle
+    !> Apply smoother on one multigrid level
+    procedure, private :: smooth
+    procedure, public  :: apply => apply_multigrid_preconditioner
+    procedure, private :: apply_multigrid_preconditioner
+    final :: destroy_multigrid_preconditioner
 
   end type multigrid_preconditioner_type
 
@@ -165,8 +165,8 @@ contains
   !>  solution is zero?
   recursive subroutine vcycle(self,level,initial_solution_is_zero)
 
-    use restrict_kernel_mod, only: restrict_kernel_type
-    use prolong_kernel_mod,  only: prolong_kernel_type
+    use psykal_lite_mod, only: invoke_restrict_kernel, &
+                               invoke_prolong_kernel
     implicit none
 
     class(multigrid_preconditioner_type), intent(inout)    :: self
@@ -175,30 +175,30 @@ contains
 
     ! Call smoother on coarsest level
     if (level == self%n_level) then
-       call self%smooth(self%n_coarsesmooth,level,.true.)
+      call self%smooth(self%n_coarsesmooth,level,.true.)
     else
-       ! Presmooth solution u^{(ell)}
+      ! Presmooth solution u^{(ell)}
 
-       call self%smooth(self%n_presmooth, level, initial_solution_is_zero)
+      call self%smooth(self%n_presmooth, level, initial_solution_is_zero)
 
-       ! Calculate residual r^{(ell)} = b^{(ell)} - H.u^{(ell)}
-       call self%H_operator(level)%apply(self%u_mg(level), &
-                                         self%r_mg(level) )
+      ! Calculate residual r^{(ell)} = b^{(ell)} - H.u^{(ell)}
+      call self%H_operator(level)%apply(self%u_mg(level), &
+                                        self%r_mg(level) )
 
-       call invoke( inc_aX_plus_y (-1.0_r_def, self%r_mg(level)%vector(1),   &
-                                               self%b_mg(level)%vector(1)),  &
-       ! Restrict b^{(ell+1)} = R r^{(ell)}
-                    restrict_kernel_type(self%b_mg(level+1)%vector(1),       &
-                                         self%r_mg(level)%vector(1) ))
+      call invoke( inc_aX_plus_y (-1.0_r_def, self%r_mg(level)%vector(1), &
+                                              self%b_mg(level)%vector(1)) )
+      ! Restrict b^{(ell+1)} = R r^{(ell)}
+      call invoke_restrict_kernel(self%b_mg(level+1)%vector(1), &
+                                  self%r_mg(level)%vector(1) )
 
-       ! Recursive call to V-cycle
-       call self%vcycle(level+1,.true.)
-       ! Prolong and add solution from coarser level
-       ! u^{(ell)} = u^{(ell)} + P u^{(ell+1)}
-       call invoke( prolong_kernel_type(self%u_mg(level)%vector(1), &
-                                        self%u_mg(level+1)%vector(1) ))
-       ! Postsmooth u^{(ell)}
-       call self%smooth(self%n_postsmooth, level, .false.)
+      ! Recursive call to V-cycle
+      call self%vcycle(level+1,.true.)
+      ! Prolong and add solution from coarser level
+      ! u^{(ell)} = u^{(ell)} + P u^{(ell+1)}
+      call invoke_prolong_kernel(self%u_mg(level)%vector(1), &
+                                 self%u_mg(level+1)%vector(1) )
+      ! Postsmooth u^{(ell)}
+      call self%smooth(self%n_postsmooth, level, .false.)
 
     end if
 

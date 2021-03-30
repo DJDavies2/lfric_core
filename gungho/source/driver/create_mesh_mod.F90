@@ -306,7 +306,7 @@ subroutine assign_global_intergrid_maps()
 
   character(str_def), allocatable :: global_mesh_names(:)
   character(str_def), allocatable :: target_mesh_names(:)
-  integer(i_def),     allocatable :: mesh_map(:,:)
+  integer(i_def),     allocatable :: mesh_map(:,:,:)
 
   integer(i_def) :: i, j
   integer(i_def) :: n_meshes

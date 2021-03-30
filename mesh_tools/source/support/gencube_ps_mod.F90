@@ -55,6 +55,8 @@ module gencube_ps_mod
 
   integer(i_def), parameter :: NPANELS = 6
 
+  integer(i_def), parameter :: PANEL_ROTATIONS(NPANELS) = (/ 0, 0, 1, 1, -1, 0 /)
+
   ! Prefix for error messages
   character(*),       parameter :: PREFIX = "[Cubed-Sphere Mesh] "
   character(str_def), parameter :: MESH_CLASS = "sphere"
@@ -1351,14 +1353,14 @@ subroutine generate(self)
   call calc_face_to_vert(self, self%verts_on_cell)
   call calc_edges(self, self%edges_on_cell, self%verts_on_edge)
 
-  if (self%nmaps > 0_i_def) call calc_global_mesh_maps(self)
+  if (self%nmaps > 0_i_def) call calc_global_mesh_maps(self, PANEL_ROTATIONS)
 
   ! Co-ord output from calc_coords in radians
   call calc_coords(self, self%vert_coords,   &
                          self%coord_units_x, &
                          self%coord_units_y)
 
-  call orient_lfric(self)
+  call orient_lfric(self, PANEL_ROTATIONS)
 
   if (self%nsmooth > 0_i_def)           call smooth(self)
   if (self%do_rotate)                   call rotate_mesh(self)
@@ -1392,16 +1394,17 @@ end subroutine generate
 !>
 !> @param[in,out]  self  The gencube_ps_type instance reference.
 !-------------------------------------------------------------------------------
-subroutine calc_global_mesh_maps(self)
+subroutine calc_global_mesh_maps(self, panel_rotation_array)
 
   implicit none
 
   class(gencube_ps_type), intent(inout) :: self
+  integer(i_def),         intent(in)    :: panel_rotation_array(:)
 
   integer(i_def) :: source_id, source_cpp, source_ncells, &
                     target_edge_cells_x, target_edge_cells_y, target_cpp, &
-                    target_ncells, target_cells_per_source_cell,i
-  integer(i_def), allocatable :: cell_map(:,:)
+                    target_ncells, i
+  integer(i_def), allocatable :: cell_map(:,:,:)
 
 
 
@@ -1417,9 +1420,9 @@ subroutine calc_global_mesh_maps(self)
     target_edge_cells_y = target_edge_cells_x
     target_cpp          = target_edge_cells_x*target_edge_cells_y
     target_ncells       = target_cpp*self%npanels
-    target_cells_per_source_cell = max(1,target_ncells/source_ncells)
-    allocate(cell_map(target_cells_per_source_cell,source_ncells))
-    call calc_global_cell_map(self, target_edge_cells_x, target_edge_cells_y, cell_map )
+    allocate(cell_map(target_edge_cells_x,target_edge_cells_y,source_ncells))
+    call calc_global_cell_map(self, target_edge_cells_x, target_edge_cells_y, &
+                              cell_map, panel_rotation_array )
     call self%global_mesh_maps%add_global_mesh_map( source_id, i+1, cell_map )
 
     deallocate(cell_map)
@@ -1451,9 +1454,11 @@ subroutine write_mesh(self)
   type(global_mesh_map_type), pointer :: global_mesh_map => null()
 
   integer(i_def), allocatable :: cell_map (:,:)
-  integer(i_def), allocatable :: tmp_map (:,:)
+  integer(i_def), allocatable :: tmp_map (:,:,:)
   integer(i_def) :: nsource
   integer(i_def) :: ntarget_per_cell
+  integer(i_def) :: ntarget_cells_per_source_x
+  integer(i_def) :: ntarget_cells_per_source_y
 
   character(str_long) :: tmp_str
 
@@ -1554,13 +1559,15 @@ subroutine write_mesh(self)
     global_mesh_map  => self%global_mesh_maps%get_global_mesh_map(1,i+1)
     nsource          = global_mesh_map%get_nsource_cells()
     ntarget_per_cell = global_mesh_map%get_ntarget_cells_per_source_cell()
+    ntarget_cells_per_source_x = global_mesh_map%get_ntarget_cells_per_source_x()
+    ntarget_cells_per_source_y = global_mesh_map%get_ntarget_cells_per_source_y()
     if (allocated(cell_map)) deallocate(cell_map)
     if (allocated(tmp_map)) deallocate(tmp_map)
     allocate(cell_map(ntarget_per_cell, nsource))
-    allocate(tmp_map(ntarget_per_cell, 1))
+    allocate(tmp_map(ntarget_cells_per_source_x, ntarget_cells_per_source_y, 1))
     do j=1, nsource
       call global_mesh_map%get_cell_map([j], tmp_map)
-      cell_map(:, j) = tmp_map(:,1)
+      cell_map(:, j) = reshape(tmp_map(:,:,1), (/ ntarget_per_cell/) )
     end do
     write(stdout,'(2(A,I0),A)')                               &
         trim(self%mesh_name)//'(', self%edge_cells, ') => '// &
@@ -1581,45 +1588,45 @@ end subroutine write_mesh
 !>
 !> @param[in,out]  self  The gencube_ps_type instance reference.
 !-------------------------------------------------------------------------------
-subroutine orient_lfric(self)
+subroutine orient_lfric(self, panel_rotation_array)
 
   implicit none
 
   class(gencube_ps_type), intent(inout) :: self
+  integer(i_def),         intent(in)    :: panel_rotation_array(:)
 
-  integer(i_def) :: cpp, p0, p1
+  integer(i_def) :: cpp, p0, p1, i
 
   cpp = self%edge_cells*self%edge_cells
 
-  ! Panel III - rotate left 1
-  p0 = 2*cpp+1
-  p1 = 3*cpp
-  ! verts
-  self%verts_on_cell(:, p0:p1) = cshift(self%verts_on_cell(:, p0:p1), 1, 1)
-  ! adj
-  self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), 1, 1)
-  ! edges
-  self%edges_on_cell(:, p0:p1) = cshift(self%edges_on_cell(:, p0:p1), 1, 1)
+  ! Loop through panels
+  do i = 1, SIZE(panel_rotation_array)
 
-  ! Panel IV - rotate left 1
-  p0 = 3*cpp+1
-  p1 = 4*cpp
-  ! verts
-  self%verts_on_cell(:, p0:p1) = cshift(self%verts_on_cell(:, p0:p1), 1, 1)
-  ! adj
-  self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), 1, 1)
-  ! edges
-  self%edges_on_cell(:, p0:p1) = cshift(self%edges_on_cell(:, p0:p1), 1, 1)
+    ! Get indices of first and last cells of panel
+    p0 = (i-1)*cpp + 1
+    p1 = i*cpp
 
-  ! Panel V - rotate right 1
-  p0 = 4*cpp+1
-  p1 = 5*cpp
-  ! verts
-  self%verts_on_cell(:, p0:p1) = cshift(self%verts_on_cell(:, p0:p1), -1, 1)
-  ! adj
-  self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), -1, 1)
-  ! edges
-  self%edges_on_cell(:, p0:p1) = cshift(self%edges_on_cell(:, p0:p1), -1, 1)
+    ! Rotate left if panel rotation is 1
+    if (panel_rotation_array(i) == 1_i_def) then
+      ! verts
+      self%verts_on_cell(:, p0:p1) = cshift(self%verts_on_cell(:, p0:p1), 1, 1)
+      ! adj
+      self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), 1, 1)
+      ! edges
+      self%edges_on_cell(:, p0:p1) = cshift(self%edges_on_cell(:, p0:p1), 1, 1)
+
+      ! Rotate right if panel rotation is -1
+    else if (panel_rotation_array(i) == -1_i_def) then
+      ! verts
+      self%verts_on_cell(:, p0:p1) = cshift(self%verts_on_cell(:, p0:p1), -1, 1)
+      ! adj
+      self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), -1, 1)
+      ! edges
+      self%edges_on_cell(:, p0:p1) = cshift(self%edges_on_cell(:, p0:p1), -1, 1)
+
+    end if
+
+  end do
 
   return
 end subroutine orient_lfric

@@ -100,7 +100,7 @@ subroutine add_global_mesh_map( self,                  &
   class(global_mesh_map_collection_type), intent(inout) :: self
   integer(i_def), intent(in) :: source_global_mesh_id
   integer(i_def), intent(in) :: target_global_mesh_id
-  integer(i_def), intent(in) :: map(:,:)
+  integer(i_def), intent(in) :: map(:,:,:)
 
   type(global_mesh_map_type) :: global_mesh_map
 

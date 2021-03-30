@@ -61,12 +61,12 @@ module gen_lbc_mod_test
         141, 146, 151, 147, 144, 149, 154,  39 ], &
       [4,16] )
 
-  integer(i_def), target :: rim3_9x8_lbc_lam(1,16) = reshape( &
+  integer(i_def), target :: rim3_9x8_lbc_lam(1,1,16) = reshape( &
       [  1, 10, 20, 24,   &
          9,  8, 16, 43,   &
         72, 63, 53, 49,   &
         64, 65, 57, 30 ], &
-      [1,16] )
+      [1,1,16] )
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -96,8 +96,8 @@ module gen_lbc_mod_test
         69, 47, 51, 55, 56, 59, 62, 60, 62, 65, 68, 66, 64, 67, 70, 18 ],&
       [4,12] )
 
-  integer(i_def), target :: rim2_6x5_lbc_lam(1,12) = reshape( &
-      [ 1, 7, 10, 6, 5, 17, 30, 24, 21, 25, 26, 14 ], [1,12] )
+  integer(i_def), target :: rim2_6x5_lbc_lam(1,1,12) = reshape( &
+      [ 1, 7, 10, 6, 5, 17, 30, 24, 21, 25, 26, 14 ], [1,1,12] )
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -123,8 +123,8 @@ module gen_lbc_mod_test
         23, 26, 29, 27, 24, 27, 30,  5 ],                               &
       [4,10] )
 
-  integer(i_def), target :: rim1_3x4_lbc_lam(1,10) = reshape( &
-      [ 1, 2, 3, 6, 9, 12, 11, 10, 7, 4 ], [1,10] )
+  integer(i_def), target :: rim1_3x4_lbc_lam(1,1,10) = reshape( &
+      [ 1, 2, 3, 6, 9, 12, 11, 10, 7, 4 ], [1,1,10] )
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -197,7 +197,7 @@ contains
    integer(i_def) :: n_verts
    integer(i_def) :: n_edges
    integer(i_def) :: n_faces
-   integer(i_def) :: cell_map(1,1)
+   integer(i_def) :: cell_map(1,1,1)
 
    integer(i_def) :: nodes_per_face
    integer(i_def) :: edges_per_face
@@ -205,12 +205,12 @@ contains
    integer(i_def) :: max_faces_per_node
    integer(i_def) :: i
 
-   integer(i_def), pointer :: cells(:)             => null()
-   integer(i_def), pointer :: kgo_cell_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_vert_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_edge_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_vert_edge(:,:)   => null()
-   integer(i_def), pointer :: kgo_lbc_lam_map(:,:) => null()
+   integer(i_def), pointer :: cells(:)               => null()
+   integer(i_def), pointer :: kgo_cell_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_vert_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_edge_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_vert_edge(:,:)     => null()
+   integer(i_def), pointer :: kgo_lbc_lam_map(:,:,:) => null()
 
    character(str_def) :: name = 'rim3_9x8'
    logical(l_def)     :: periodic_x   = .false.
@@ -285,7 +285,7 @@ contains
       @assertEqual( kgo_vert_cell(:,i),   vert_cell(:,cells(i)) )
       @assertEqual( kgo_edge_cell(:,i),   edge_cell(:,cells(i)) )
       call LBC_LAM_global_mesh_map%get_cell_map([cells(i)], cell_map)
-      @assertEqual( kgo_lbc_lam_map(:,i), cell_map(:,1) )
+      @assertEqual( kgo_lbc_lam_map(:,:,i), cell_map(:,:,1) )
     end do
 
 
@@ -333,7 +333,7 @@ contains
    integer(i_def) :: n_verts
    integer(i_def) :: n_edges
    integer(i_def) :: n_faces
-   integer(i_def) :: cell_map(1,1)
+   integer(i_def) :: cell_map(1,1,1)
 
    integer(i_def) :: nodes_per_face
    integer(i_def) :: edges_per_face
@@ -341,12 +341,12 @@ contains
    integer(i_def) :: max_faces_per_node
    integer(i_def) :: i
 
-   integer(i_def), pointer :: cells(:)             => null()
-   integer(i_def), pointer :: kgo_cell_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_vert_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_edge_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_vert_edge(:,:)   => null()
-   integer(i_def), pointer :: kgo_lbc_lam_map(:,:) => null()
+   integer(i_def), pointer :: cells(:)               => null()
+   integer(i_def), pointer :: kgo_cell_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_vert_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_edge_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_vert_edge(:,:)     => null()
+   integer(i_def), pointer :: kgo_lbc_lam_map(:,:,:) => null()
 
    character(str_def) :: name = 'rim2_6x5'
    logical(l_def)     :: periodic_x   = .false.
@@ -423,7 +423,7 @@ contains
       @assertEqual( kgo_vert_cell(:,i),   vert_cell(:,cells(i)) )
       @assertEqual( kgo_edge_cell(:,i),   edge_cell(:,cells(i)) )
       call LBC_LAM_global_mesh_map%get_cell_map([cells(i)], cell_map)
-      @assertEqual( kgo_lbc_lam_map(:,i), cell_map(:,1) )
+      @assertEqual( kgo_lbc_lam_map(:,:,i), cell_map(:,:,1) )
     end do
 
    ! Tidy up
@@ -469,7 +469,7 @@ contains
    integer(i_def) :: n_verts
    integer(i_def) :: n_edges
    integer(i_def) :: n_faces
-   integer(i_def) :: cell_map(1,1)
+   integer(i_def) :: cell_map(1,1,1)
 
    integer(i_def) :: nodes_per_face
    integer(i_def) :: edges_per_face
@@ -477,12 +477,12 @@ contains
    integer(i_def) :: max_faces_per_node
    integer(i_def) :: i
 
-   integer(i_def), pointer :: cells(:)             => null()
-   integer(i_def), pointer :: kgo_cell_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_vert_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_edge_cell(:,:)   => null()
-   integer(i_def), pointer :: kgo_vert_edge(:,:)   => null()
-   integer(i_def), pointer :: kgo_lbc_lam_map(:,:) => null()
+   integer(i_def), pointer :: cells(:)               => null()
+   integer(i_def), pointer :: kgo_cell_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_vert_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_edge_cell(:,:)     => null()
+   integer(i_def), pointer :: kgo_vert_edge(:,:)     => null()
+   integer(i_def), pointer :: kgo_lbc_lam_map(:,:,:) => null()
 
    character(str_def) :: name = 'rim1_3x4'
    logical(l_def)     :: periodic_x   = .false.
@@ -558,7 +558,7 @@ contains
       @assertEqual( kgo_vert_cell(:,i),   vert_cell(:,cells(i)) )
       @assertEqual( kgo_edge_cell(:,i),   edge_cell(:,cells(i)) )
       call LBC_LAM_global_mesh_map%get_cell_map([cells(i)], cell_map)
-      @assertEqual( kgo_lbc_lam_map(:,i), cell_map(:,1) )
+      @assertEqual( kgo_lbc_lam_map(:,:,i), cell_map(:,:,1) )
     end do
 
    ! Tidy up

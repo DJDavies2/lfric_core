@@ -213,8 +213,8 @@ contains
 
     type(global_mesh_map_type), pointer :: global_mesh_map => null()
 
-    integer(i_def), allocatable :: mesh_map(:,:)
-    integer(i_def), allocatable :: test_global_id_map(:,:)
+    integer(i_def), allocatable :: mesh_map(:,:,:)
+    integer(i_def), allocatable :: test_global_id_map(:,:,:)
     integer(i_def) :: multigrid_ids(4)
     integer(i_def) :: another_chain_ids(2)
     integer(i_def) :: test_integer_A
@@ -423,19 +423,20 @@ contains
     @assertEqual( kgo_integer, test_integer )
 
     ! Check global ID map
-    allocate(test_global_id_map(global_mesh_map % get_ntarget_cells_per_source_cell(),1))
+    allocate(test_global_id_map(global_mesh_map % get_ntarget_cells_per_source_x(), &
+                                global_mesh_map % get_ntarget_cells_per_source_y(), 1))
 
     call global_mesh_map % get_cell_map([1], test_global_id_map )  ! On panel 1
-    @assertEqual( [1,2,9,10], test_global_id_map(:,1) )
+    @assertEqual( reshape( [ 1,2,9,10 ], (/2,2/) ), test_global_id_map(:,:,1) )
 
     call global_mesh_map % get_cell_map([16], test_global_id_map ) ! On panel 1
-    @assertEqual( [55,56,63,64], test_global_id_map(:,1)  )
+    @assertEqual( reshape( [ 55,56,63,64 ], (/2,2/) ), test_global_id_map(:,:,1)  )
 
     call global_mesh_map % get_cell_map([40], test_global_id_map ) ! On panel 3
-    @assertEqual( [151,152,159,160], test_global_id_map(:,1)  )
+    @assertEqual( reshape( [ 159,151,160,152 ], (/2,2/) ), test_global_id_map(:,:,1)  )
 
     call global_mesh_map % get_cell_map([70], test_global_id_map ) ! On panel 5
-    @assertEqual( [275,276,283,284], test_global_id_map(:,1)  )
+    @assertEqual( reshape( [ 276,284,275,283 ] , (/2,2/) ), test_global_id_map(:,:,1)  )
 
     deallocate(test_global_id_map)
 
@@ -462,19 +463,20 @@ contains
     @assertEqual( kgo_integer, test_integer )
 
     ! Check global ID map
-    allocate(test_global_id_map(global_mesh_map % get_ntarget_cells_per_source_cell(),1))
+    allocate(test_global_id_map(global_mesh_map % get_ntarget_cells_per_source_x(), &
+                                global_mesh_map % get_ntarget_cells_per_source_y(), 1))
 
     call global_mesh_map % get_cell_map([1], test_global_id_map )  ! On panel 1
-    @assertEqual( [1,2,3,13,14,15,25,26,27], test_global_id_map(:,1) )
+    @assertEqual( reshape([1,2,3,13,14,15,25,26,27], (/3,3/)), test_global_id_map(:,:,1) )
 
     call global_mesh_map % get_cell_map([16], test_global_id_map ) ! On panel 1
-    @assertEqual( [118,119,120,130,131,132,142,143,144], test_global_id_map(:,1) )
+    @assertEqual( reshape([118,119,120,130,131,132,142,143,144], (/3,3/)), test_global_id_map(:,:,1) )
 
     call global_mesh_map % get_cell_map([40], test_global_id_map ) ! On panel 3
-    @assertEqual( [334,335,336,346,347,348,358,359,360], test_global_id_map(:,1) )
+    @assertEqual( reshape([358,346,334,359,347,335,360,348,336], (/3,3/)), test_global_id_map(:,:,1) )
 
     call global_mesh_map % get_cell_map([70], test_global_id_map ) ! On panel 5
-    @assertEqual( [616,617,618,628,629,630,640,641,642], test_global_id_map(:,1)  )
+    @assertEqual( reshape([618,630,642,617,629,641,616,628,640], (/3,3/)), test_global_id_map(:,:,1)  )
 
     deallocate(test_global_id_map)
 
@@ -503,19 +505,20 @@ contains
     @assertEqual( kgo_integer, test_integer )
 
     ! Check global ID map
-    allocate(test_global_id_map(global_mesh_map%get_ntarget_cells_per_source_cell(),1))
+    allocate(test_global_id_map(global_mesh_map%get_ntarget_cells_per_source_x(), &
+                                global_mesh_map%get_ntarget_cells_per_source_y(), 1))
 
     call global_mesh_map%get_cell_map([1], test_global_id_map )   ! On panel 1
-    @assertEqual( [1], test_global_id_map(:,1) )
+    @assertEqual( reshape([1], (/1,1/)), test_global_id_map(:,:,1) )
 
     call global_mesh_map%get_cell_map([55], test_global_id_map )  ! On panel 1
-    @assertEqual( [16], test_global_id_map(:,1)  )
+    @assertEqual( reshape([16], (/1,1/)), test_global_id_map(:,:,1)  )
 
     call global_mesh_map%get_cell_map([160], test_global_id_map ) ! On panel 3
-    @assertEqual( [40], test_global_id_map(:,1)  )
+    @assertEqual( reshape([40], (/1,1/)), test_global_id_map(:,:,1)  )
 
     call global_mesh_map%get_cell_map([283], test_global_id_map ) ! On panel 5
-    @assertEqual( [70], test_global_id_map(:,1)  )
+    @assertEqual( reshape([70], (/1,1/)), test_global_id_map(:,:,1)  )
 
     deallocate(test_global_id_map)
 
@@ -544,19 +547,20 @@ contains
     @assertEqual( kgo_integer, test_integer )
 
     ! Check global ID map
-    allocate(test_global_id_map(global_mesh_map%get_ntarget_cells_per_source_cell(),1))
+    allocate(test_global_id_map(global_mesh_map%get_ntarget_cells_per_source_x(), &
+                                global_mesh_map%get_ntarget_cells_per_source_y(), 1))
 
     call global_mesh_map%get_cell_map([1], test_global_id_map )    ! On panel 1
-    @assertEqual( [1,2,17,18], test_global_id_map(:,1) )
+    @assertEqual( reshape([1,2,17,18], (/2,2/)), test_global_id_map(:,:,1) )
 
     call global_mesh_map%get_cell_map([120], test_global_id_map )  ! On panel 2
-    @assertEqual( [463,464,479,480], test_global_id_map(:,1)  )
+    @assertEqual( reshape([463,464,479,480], (/2,2/)), test_global_id_map(:,:,1)  )
 
     call global_mesh_map%get_cell_map([170], test_global_id_map )  ! On panel 3
-    @assertEqual( [675,676,691,692], test_global_id_map(:,1)  )
+    @assertEqual( reshape([691,675,692,676], (/2,2/)), test_global_id_map(:,:,1)  )
 
     call global_mesh_map%get_cell_map([287], test_global_id_map )  ! On panel 5
-    @assertEqual( [1133,1134,1149,1150], test_global_id_map(:,1)  )
+    @assertEqual( reshape([1134,1150,1133,1149], (/2,2/)), test_global_id_map(:,:,1)  )
 
     deallocate(test_global_id_map)
 

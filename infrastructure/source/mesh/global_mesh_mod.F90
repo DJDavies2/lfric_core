@@ -1012,7 +1012,7 @@ contains
 
     class(global_mesh_type), intent(inout)       :: self
     type(global_mesh_type),  intent(in), pointer :: target_global_mesh
-    integer,                 intent(in)          :: map(:,:)
+    integer,                 intent(in)          :: map(:,:,:)
 
     integer(i_def) :: source_global_mesh_id
     integer(i_def) :: target_global_mesh_id
@@ -1029,10 +1029,10 @@ contains
       return
     end if
 
-    if (size(map,2) /= self%ncells) then
+    if (size(map,3) /= self%ncells) then
       write(log_scratch_space, '(A,I0,A,I0,A)')                      &
           'Invalid global mesh mapping: Number of source cells '   //&
-          'in global mesh map (', size(map,2), ') does not match ' //&
+          'in global mesh map (', size(map,3), ') does not match ' //&
           'number of source global mesh cells (', self%ncells, ')'
       call log_event(log_scratch_space, LOG_LEVEL_ERROR)
       return
