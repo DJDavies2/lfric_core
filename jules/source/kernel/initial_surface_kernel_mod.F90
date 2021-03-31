@@ -71,11 +71,11 @@ contains
     integer(kind=i_def), intent(in) :: ndf_pft, undf_pft
     integer(kind=i_def), intent(in) :: map_pft(ndf_pft)
 
-    real(kind=r_def), intent(out) :: tile_fraction(undf_tile)
-    real(kind=r_def), intent(out) :: tile_temperature(undf_tile)
+    real(kind=r_def), intent(inout) :: tile_fraction(undf_tile)
+    real(kind=r_def), intent(inout) :: tile_temperature(undf_tile)
 
-    real(kind=r_def), intent(out) :: leaf_area_index(undf_pft)
-    real(kind=r_def), intent(out) :: canopy_height(undf_pft)
+    real(kind=r_def), intent(inout) :: leaf_area_index(undf_pft)
+    real(kind=r_def), intent(inout) :: canopy_height(undf_pft)
 
     !Internal variables
     integer(kind=i_def) :: i

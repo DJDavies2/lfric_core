@@ -43,6 +43,19 @@ def do_plot(datapath, plotfield, plotpath='.'):
     plt.savefig(plotpath+'/'+plotfield+'.png', bbox_inches='tight')
 
 
+def do_time_plot(datapath, plotfield, plotpath='.'):
+    ''' Do the plotting using data from datapath. Send output to plotpath '''
+
+    lfric = load_cube_by_varname(datapath, plotfield)
+    lfric = lfric[:, 0]
+
+    plt.figure(figsize=(15, 10))
+    plt.plot(lfric.coord('time').points[:]/3600.0, lfric.data[:], linewidth=2)
+    plt.xlabel('Time (hours)')
+    plt.ylabel(plotfield)
+    plt.savefig(plotpath+'/'+plotfield+'.png', bbox_inches='tight')
+
+
 if __name__ == "__main__":
 
     import sys
@@ -57,3 +70,5 @@ if __name__ == "__main__":
     do_plot(datapath, 'm_ci',  plotpath)
     do_plot(datapath, 'u1',    plotpath)
     do_plot(datapath, 'cloud_fraction_rts', plotpath)
+    do_time_plot(datapath, 'sw_down_surf', plotpath)
+    do_time_plot(datapath, 'trop_level', plotpath)

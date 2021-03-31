@@ -62,10 +62,10 @@ contains
     integer(kind=i_def), intent(in) :: ndf_soil, undf_soil
     integer(kind=i_def), intent(in) :: map_soil(ndf_soil)
 
-    real(kind=r_def), intent(out) :: soil_temperature(undf_soil)
-    real(kind=r_def), intent(out) :: soil_moisture(undf_soil)
-    real(kind=r_def), intent(out) :: unfrozen_soil_moisture(undf_soil)
-    real(kind=r_def), intent(out) :: frozen_soil_moisture(undf_soil)
+    real(kind=r_def), intent(inout) :: soil_temperature(undf_soil)
+    real(kind=r_def), intent(inout) :: soil_moisture(undf_soil)
+    real(kind=r_def), intent(inout) :: unfrozen_soil_moisture(undf_soil)
+    real(kind=r_def), intent(inout) :: frozen_soil_moisture(undf_soil)
 
     ! Prognostics set to fixed value for SCM testing or when no values are
     ! provided by um2lfric dump

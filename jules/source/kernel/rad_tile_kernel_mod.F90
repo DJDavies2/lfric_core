@@ -207,9 +207,9 @@ subroutine rad_tile_code(nlayers,                                &
   integer(i_def), intent(in) :: ndf_wth, undf_wth
   integer(i_def), intent(in) :: map_wth(ndf_wth)
 
-  real(r_def), intent(out) :: tile_sw_direct_albedo(undf_sw_tile)
-  real(r_def), intent(out) :: tile_sw_diffuse_albedo(undf_sw_tile)
-  real(r_def), intent(out) :: tile_lw_albedo(undf_lw_tile)
+  real(r_def), intent(inout) :: tile_sw_direct_albedo(undf_sw_tile)
+  real(r_def), intent(inout) :: tile_sw_diffuse_albedo(undf_sw_tile)
+  real(r_def), intent(inout) :: tile_lw_albedo(undf_lw_tile)
 
   real(r_def), intent(in) :: tile_fraction(undf_tile)
   real(r_def), intent(in) :: tile_temperature(undf_tile)
@@ -226,7 +226,9 @@ subroutine rad_tile_code(nlayers,                                &
   real(r_def), intent(in) :: soil_roughness(undf_2d)
   real(r_def), intent(in) :: albedo_obs_vis(undf_2d)
   real(r_def), intent(in) :: albedo_obs_nir(undf_2d)
-  real(r_def), intent(out):: albedo_obs_scaling(undf_scal)
+
+  real(r_def), intent(inout) :: albedo_obs_scaling(undf_scal)
+
   real(r_def), intent(in) :: snow_soot(undf_2d)
   real(r_def), intent(in) :: chloro_sea(undf_2d)
   real(r_def), intent(in) :: z0msea(undf_2d)

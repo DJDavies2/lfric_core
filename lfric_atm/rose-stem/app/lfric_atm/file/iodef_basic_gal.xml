@@ -225,6 +225,7 @@
 	<field id="divergence" name="divergence" long_name="divergence_of_wind" standard_name="divergence_of_wind" unit="s-1" grid_ref="half_level_face_grid" />
 	<field id="exner" name="exner" long_name="exner_pressure" unit="1" grid_ref="half_level_face_grid" />
 	<field id="dmv_methox" name="dmv_methox" long_name="Methane oxidation vapour increment" unit="kg/kg" grid_ref="full_level_face_grid" />
+	<field id="trop_level" name="trop_level" long_name="Tropopause level" unit="1" domain_ref="face" />
 	<!-- aerosol fields -->
 	<field id="nd_nuc_sol" name="nd_nuc_sol" long_name="NUCLEATION_MODE_SOL_NUMBER" unit="1" grid_ref="full_level_face_grid" />
 	<field id="nuc_sol_su" name="nuc_sol_su" long_name="NUCLEATION_MODE_SOL_H2SO4_MMR" unit="kg kg-1" grid_ref="full_level_face_grid" />

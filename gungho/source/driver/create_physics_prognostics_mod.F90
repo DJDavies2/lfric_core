@@ -27,8 +27,8 @@ module create_physics_prognostics_mod
                                              cloud_representation_conv_strat_liq_ice, &
                                              cloud_representation_split,       &
                                              l_trans_zen_correction
-  use aerosol_config_mod,             only : c_aerosol,                        &
-                                             c_aerosol_glomap_mode_climatology
+  use aerosol_config_mod,             only : glomap_mode,                      &
+                                             glomap_mode_climatology
   use section_choice_config_mod,      only : cloud, cloud_um,                  &
                                              aerosol, aerosol_um,              &
                                              radiation, radiation_socrates,    &
@@ -760,7 +760,7 @@ contains
 
     ! 3D fields, might need checkpointing
     if ( ( aerosol == aerosol_um ) .and.                                       &
-         ( c_aerosol == c_aerosol_glomap_mode_climatology ) ) then
+         ( glomap_mode == glomap_mode_climatology ) ) then
       checkpoint_flag = .true.
     else
       checkpoint_flag = .false.

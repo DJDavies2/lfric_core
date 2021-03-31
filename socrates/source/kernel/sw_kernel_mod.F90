@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------------
-! (c) Crown copyright 2018 Met Office. All rights reserved.
+! (c) Crown copyright 2021 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
@@ -95,13 +95,13 @@ end type
 contains
 
 ! @param[in]    nlayers                 Number of layers
-! @param[out]   sw_heating_rate         SW heating rate
-! @param[out]   sw_down_surf            SW downward surface flux
-! @param[out]   sw_direct_surf          SW unscattered surface flux
-! @param[out]   sw_down_blue_surf       SW blue downward surface flux
-! @param[out]   sw_direct_blue_surf     SW blue unscattered surface flux
-! @param[out]   sw_up_tile              SW upward tiled surface flux
-! @param[out]   sw_up_blue_tile         SW blue upward tiled surface flux
+! @param[inout] sw_heating_rate         SW heating rate
+! @param[inout] sw_down_surf            SW downward surface flux
+! @param[inout] sw_direct_surf          SW unscattered surface flux
+! @param[inout] sw_down_blue_surf       SW blue downward surface flux
+! @param[inout] sw_direct_blue_surf     SW blue unscattered surface flux
+! @param[inout] sw_up_tile              SW upward tiled surface flux
+! @param[inout] sw_up_blue_tile         SW blue upward tiled surface flux
 ! @param[inout] sw_heating_rate_rts     SW heating rate
 ! @param[inout] sw_down_surf_rts        SW downward surface flux
 ! @param[inout] sw_direct_surf_rts      SW unscattered surface flux
@@ -221,15 +221,15 @@ subroutine sw_code(nlayers,                          &
 
   use well_mixed_gases_config_mod, only: &
     co2_mix_ratio, n2o_mix_ratio, ch4_mix_ratio, o2_mix_ratio
-  use radiation_config_mod, only: n_radstep,                  &
-    l_planet_grey_surface, planet_albedo, l_rayleigh_sw,      &
-    i_cloud_ice_type_sw, i_cloud_liq_type_sw,                 &
-    cloud_vertical_decorr,                                    &
-    l_trans_zen_correction
+  use radiation_config_mod, only: n_radstep,  &
+    l_rayleigh_sw, l_trans_zen_correction,    &
+    i_cloud_ice_type_sw, i_cloud_liq_type_sw, &
+    cloud_vertical_decorr
+  use aerosol_config_mod, only: sulphuric_strat_climatology
   use set_thermodynamic_mod, only: set_thermodynamic
   use set_cloud_field_mod, only: set_cloud_field
   use jules_control_init_mod, only: n_surf_tile, sw_band_tile
-  use init_aerosol_fields_alg_mod, only: l_radaer, l_sulphuric, &
+  use init_aerosol_fields_alg_mod, only: l_radaer, &
     n_aer_mode, mode_dimen, sw_band_mode
   use socrates_runes, only: runes, ip_source_illuminate
   use socrates_bones, only: bones
@@ -251,10 +251,11 @@ subroutine sw_code(nlayers,                          &
   integer(i_def), dimension(ndf_mode),  intent(in) :: map_mode
   integer(i_def), dimension(ndf_rmode), intent(in) :: map_rmode
 
-  real(r_def), dimension(undf_wth),  intent(out) :: sw_heating_rate
-  real(r_def), dimension(undf_2d),   intent(out) :: sw_down_surf, &
+  real(r_def), dimension(undf_wth),  intent(inout) :: sw_heating_rate
+  real(r_def), dimension(undf_2d),   intent(inout) :: sw_down_surf, &
     sw_direct_surf, sw_down_blue_surf, sw_direct_blue_surf
-  real(r_def), dimension(undf_tile), intent(out) :: sw_up_tile, sw_up_blue_tile
+  real(r_def), dimension(undf_tile), intent(inout) :: sw_up_tile, &
+    sw_up_blue_tile
 
   real(r_def), dimension(undf_wth),  intent(inout) :: sw_heating_rate_rts
   real(r_def), dimension(undf_2d),   intent(inout) :: sw_down_surf_rts, &
@@ -285,8 +286,9 @@ subroutine sw_code(nlayers,                          &
   integer(i_def) :: i_cloud_representation, i_overlap, i_inhom, i_drop_re
   integer(i_def) :: rand_seed(n_profile)
   integer(i_def) :: n_cloud_layer
-  integer(i_def) :: i_tile, rtile_1, rtile_last
-  integer(i_def) :: wth_1, wth_nlayers, mode_1, mode_last, rmode_1, rmode_last
+  integer(i_def) :: wth_0, wth_1, wth_nlayers, w3_1, w3_nlayers
+  integer(i_def) :: tile_1, tile_last, rtile_1, rtile_last
+  integer(i_def) :: mode_1, mode_last, rmode_1, rmode_last
   real(r_def), dimension(nlayers) :: layer_heat_capacity
     ! Heat capacity for each layer
   real(r_def), dimension(nlayers) :: p_layer, t_layer
@@ -300,15 +302,15 @@ subroutine sw_code(nlayers,                          &
     ! Convective cloud fields
   real(r_def), dimension(0:nlayers) :: sw_direct, sw_down, sw_up
 
-  ! Tiled surface fields
-  real(r_def), dimension(n_surf_tile) :: frac_tile, &
-    flux_up_tile_rts, flux_up_blue_tile_rts, &
-    flux_up_tile, flux_up_blue_tile
-
 
   ! Set indexing
+  wth_0 = map_wth(1)
   wth_1 = map_wth(1)+1
   wth_nlayers = map_wth(1)+nlayers
+  w3_1 = map_w3(1)
+  w3_nlayers = map_w3(1)+nlayers-1
+  tile_1 = map_tile(1)
+  tile_last = map_tile(1)+n_surf_tile-1
   rtile_1 = map_rtile(1)
   rtile_last = map_rtile(1)+sw_band_tile-1
   mode_1 = map_mode(1)+1
@@ -320,13 +322,10 @@ subroutine sw_code(nlayers,                          &
     ! Radiation time-step: full calculation of radiative fluxes
 
     ! Set up pressures, temperatures, masses and heat capacities
-    call set_thermodynamic(nlayers,                &
-      exner(map_w3(1):map_w3(1)+nlayers-1),        &
-      exner_in_wth(map_wth(1):map_wth(1)+nlayers), &
-      theta(map_wth(1):map_wth(1)+nlayers),        &
-      rho_in_wth(map_wth(1):map_wth(1)+nlayers),   &
-      height_w3(map_w3(1):map_w3(1)+nlayers-1),    &
-      height_wth(map_wth(1):map_wth(1)+nlayers),   &
+    call set_thermodynamic(nlayers, &
+      exner(w3_1:w3_nlayers), exner_in_wth(wth_0:wth_nlayers), &
+      theta(wth_0:wth_nlayers), rho_in_wth(wth_0:wth_nlayers), &
+      height_w3(w3_1:w3_nlayers), height_wth(wth_0:wth_nlayers), &
       p_layer, t_layer, d_mass, layer_heat_capacity)
 
     ! Set up cloud fields for radiation
@@ -337,11 +336,6 @@ subroutine sw_code(nlayers,                          &
       i_cloud_representation, i_overlap, i_inhom, i_drop_re, &
       rand_seed, n_cloud_layer, cloud_frac, liq_dim, conv_frac, &
       liq_conv_frac, ice_conv_frac, liq_conv_mmr, ice_conv_mmr, liq_conv_dim)
-
-    ! Tile fractions
-    do i_tile = 1, n_surf_tile
-      frac_tile(i_tile) = tile_fraction(map_tile(1)+i_tile-1)
-    end do
 
     ! Calculate the SW fluxes (RUN the Edwards-Slingo two-stream solver)
     call runes(n_profile, nlayers,                                             &
@@ -360,11 +354,9 @@ subroutine sw_code(nlayers,                          &
       o2_mix_ratio           = o2_mix_ratio,                                   &
       cos_zenith_angle       = cos_zenith_angle_rts(map_2d(1):map_2d(1)),      &
       solar_irrad            = stellar_irradiance_rts(map_2d(1):map_2d(1)),    &
-      l_grey_albedo          = l_planet_grey_surface,                          &
-      grey_albedo            = planet_albedo,                                  &
-      l_tile                 = .not.l_planet_grey_surface,                     &
+      l_tile                 = .true.,                                         &
       n_tile                 = n_surf_tile,                                    &
-      frac_tile_1d           = frac_tile,                                      &
+      frac_tile_1d           = tile_fraction(tile_1:tile_last),                &
       albedo_diff_tile_1d    = tile_sw_diffuse_albedo(rtile_1:rtile_last),     &
       albedo_dir_tile_1d     = tile_sw_direct_albedo(rtile_1:rtile_last),      &
       cloud_frac_1d          = cloud_frac,                                     &
@@ -397,7 +389,7 @@ subroutine sw_code(nlayers,                          &
       i_st_ice               = i_cloud_ice_type_sw,                            &
       i_cnv_water            = i_cloud_liq_type_sw,                            &
       i_cnv_ice              = i_cloud_ice_type_sw,                            &
-      l_sulphuric            = l_sulphuric,                                    &
+      l_sulphuric            = sulphuric_strat_climatology,                    &
       sulphuric_1d           = sulphuric(wth_1:wth_nlayers),                   &
       l_aerosol_mode         = l_radaer,                                       &
       n_aer_mode             = n_aer_mode,                                     &
@@ -410,51 +402,32 @@ subroutine sw_code(nlayers,                          &
       flux_direct_1d         = sw_direct,                                      &
       flux_down_1d           = sw_down,                                        &
       flux_up_1d             = sw_up,                                          &
-      flux_up_tile_1d        = flux_up_tile_rts,                               &
-      flux_up_blue_tile_1d   = flux_up_blue_tile_rts,                          &
+      flux_up_tile_1d        = sw_up_tile_rts(tile_1:tile_last),               &
+      flux_up_blue_tile_1d   = sw_up_blue_tile_rts(tile_1:tile_last),          &
       flux_direct_blue_surf  = sw_direct_blue_surf_rts(map_2d(1):map_2d(1)),   &
       flux_down_blue_surf    = sw_down_blue_surf_rts(map_2d(1):map_2d(1)),     &
       heating_rate_1d        = sw_heating_rate_rts(wth_1:wth_nlayers))
 
     ! Set level 0 increment such that theta increment will equal level 1
-    sw_heating_rate_rts(map_wth(1)) = sw_heating_rate_rts(map_wth(1) + 1) &
-                                    * exner_in_wth(map_wth(1))            &
-                                    / exner_in_wth(map_wth(1) + 1)
+    sw_heating_rate_rts(wth_0) = sw_heating_rate_rts(wth_1) &
+                               * exner_in_wth(wth_0) / exner_in_wth(wth_1)
 
     ! Set surface and top-of-atmosphere fluxes
-    sw_down_surf_rts(map_2d(1)) = sw_down(0)
+    sw_down_surf_rts(map_2d(1))   = sw_down(0)
     sw_direct_surf_rts(map_2d(1)) = sw_direct(0)
-    sw_direct_toa_rts(map_2d(1)) = sw_direct(nlayers)
+    sw_direct_toa_rts(map_2d(1))  = sw_direct(nlayers)
 
-    ! Set tiled fluxes
-    do i_tile = 1, n_surf_tile
-      sw_up_tile_rts(map_tile(1)+i_tile-1) = flux_up_tile_rts(i_tile)
-      sw_up_blue_tile_rts(map_tile(1)+i_tile-1) = flux_up_blue_tile_rts(i_tile)
-    end do
-  else
-    ! Not a radiation time-step
-
-    ! Set tiled fluxes
-    do i_tile = 1, n_surf_tile
-      flux_up_tile_rts(i_tile) = sw_up_tile_rts(map_tile(1)+i_tile-1)
-      flux_up_blue_tile_rts(i_tile) = sw_up_blue_tile_rts(map_tile(1)+i_tile-1)
-    end do
   end if
 
   if (n_radstep == 1) then
     ! Radiation timestep = model timestep
-    sw_heating_rate(map_wth(1):wth_nlayers) &
-      = sw_heating_rate_rts(map_wth(1):wth_nlayers)
-
-    sw_down_surf(map_2d(1))        = sw_down_surf_rts(map_2d(1))
-    sw_direct_surf(map_2d(1))      = sw_direct_surf_rts(map_2d(1))
-    sw_down_blue_surf(map_2d(1))   = sw_down_blue_surf_rts(map_2d(1))
-    sw_direct_blue_surf(map_2d(1)) = sw_direct_blue_surf_rts(map_2d(1))
-
-    do i_tile = 1, n_surf_tile
-      sw_up_tile(map_tile(1)+i_tile-1)      = sw_up_tile_rts(map_tile(1)+i_tile-1)
-      sw_up_blue_tile(map_tile(1)+i_tile-1) = sw_up_blue_tile_rts(map_tile(1)+i_tile-1)
-    end do
+    sw_heating_rate(wth_0:wth_nlayers) = sw_heating_rate_rts(wth_0:wth_nlayers)
+    sw_down_surf(map_2d(1))            = sw_down_surf_rts(map_2d(1))
+    sw_direct_surf(map_2d(1))          = sw_direct_surf_rts(map_2d(1))
+    sw_down_blue_surf(map_2d(1))       = sw_down_blue_surf_rts(map_2d(1))
+    sw_direct_blue_surf(map_2d(1))     = sw_direct_blue_surf_rts(map_2d(1))
+    sw_up_tile(tile_1:tile_last)       = sw_up_tile_rts(tile_1:tile_last)
+    sw_up_blue_tile(tile_1:tile_last)  = sw_up_blue_tile_rts(tile_1:tile_last)
   else
     ! Corrections to model timestep. The radiative fluxes have been calculated
     ! for a mean sun angle over the radiation timestep and must be converted
@@ -473,32 +446,24 @@ subroutine sw_code(nlayers,                          &
       l_trans_zen_correction    = l_trans_zen_correction,                      &
       flux_direct_toa_rts       = sw_direct_toa_rts(map_2d(1):map_2d(1)),      &
       heating_rate_1d_rts       = sw_heating_rate_rts(wth_1:wth_nlayers),      &
-      flux_up_tile_1d_rts       = flux_up_tile_rts,                            &
-      flux_up_blue_tile_1d_rts  = flux_up_blue_tile_rts,                       &
+      flux_up_tile_1d_rts       = sw_up_tile_rts(tile_1:tile_last),            &
+      flux_up_blue_tile_1d_rts  = sw_up_blue_tile_rts(tile_1:tile_last),       &
       flux_direct_surf_rts      = sw_direct_surf_rts(map_2d(1):map_2d(1)),     &
       flux_down_surf_rts        = sw_down_surf_rts(map_2d(1):map_2d(1)),       &
       flux_direct_blue_surf_rts = sw_direct_blue_surf_rts(map_2d(1):map_2d(1)),&
       flux_down_blue_surf_rts   = sw_down_blue_surf_rts(map_2d(1):map_2d(1)),  &
       heating_rate_1d_mts       = sw_heating_rate(wth_1:wth_nlayers),          &
-      flux_up_tile_1d_mts       = flux_up_tile,                                &
-      flux_up_blue_tile_1d_mts  = flux_up_blue_tile,                           &
+      flux_up_tile_1d_mts       = sw_up_tile(tile_1:tile_last),                &
+      flux_up_blue_tile_1d_mts  = sw_up_blue_tile(tile_1:tile_last),           &
       flux_direct_surf_mts      = sw_direct_surf(map_2d(1):map_2d(1)),         &
       flux_down_surf_mts        = sw_down_surf(map_2d(1):map_2d(1)),           &
       flux_direct_blue_surf_mts = sw_direct_blue_surf(map_2d(1):map_2d(1)),    &
       flux_down_blue_surf_mts   = sw_down_blue_surf(map_2d(1):map_2d(1)))
 
     ! Set level 0 increment such that theta increment will equal level 1
-    sw_heating_rate(map_wth(1)) = sw_heating_rate(map_wth(1) + 1) &
-                                * exner_in_wth(map_wth(1))        &
-                                / exner_in_wth(map_wth(1) + 1)
-
-    ! Set tiled fluxes
-    do i_tile = 1, n_surf_tile
-      sw_up_tile(map_tile(1)+i_tile-1) = flux_up_tile(i_tile)
-      sw_up_blue_tile(map_tile(1)+i_tile-1) = flux_up_blue_tile(i_tile)
-    end do
+    sw_heating_rate(wth_0) = sw_heating_rate(wth_1) &
+                           * exner_in_wth(wth_0) / exner_in_wth(wth_1)
   end if
 
 end subroutine sw_code
-
 end module sw_kernel_mod

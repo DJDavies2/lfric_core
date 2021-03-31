@@ -14,7 +14,6 @@ module init_aerosol_fields_alg_mod
 
   implicit none
 
-  logical :: l_sulphuric
   logical :: l_radaer
   integer(i_def) :: n_aer_mode
   integer(i_def) :: mode_dimen
@@ -23,7 +22,6 @@ module init_aerosol_fields_alg_mod
 
   private
   public :: init_aerosol_fields_alg, &
-    l_sulphuric, &
     l_radaer, n_aer_mode, mode_dimen, sw_band_mode, lw_band_mode
 
 contains
@@ -124,9 +122,6 @@ contains
     mode_dimen = max(n_aer_mode, 1_i_def)
     sw_band_mode = max(n_aer_mode * n_sw_band, 1_i_def)
     lw_band_mode = max(n_aer_mode * n_lw_band, 1_i_def)
-
-    ! Initialisation of CLASSIC aerosol fields
-    l_sulphuric = .false. ! To be configured in #2506
 
   end subroutine init_aerosol_fields_alg
 

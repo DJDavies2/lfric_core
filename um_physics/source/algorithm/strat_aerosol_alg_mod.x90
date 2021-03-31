@@ -1,0 +1,40 @@
+!------------------------------------------------------------------------------
+! (c) Crown copyright 2021 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!------------------------------------------------------------------------------
+! @brief Stratospheric aerosol climatology
+
+module strat_aerosol_alg_mod
+
+use field_mod,                only: field_type
+use field_collection_mod,     only: field_collection_type
+use strat_aerosol_kernel_mod, only: strat_aerosol_kernel_type
+
+implicit none
+private
+public :: strat_aerosol_alg
+
+contains
+
+! @param[in,out] aerosol_fields         Fields for aerosol scheme
+! @param[in]     trop_level             Level of tropopause
+! @param[in]     exner                  Exner pressure on w3 space
+
+subroutine strat_aerosol_alg( aerosol_fields, trop_level, exner )
+
+  implicit none
+
+  type( field_collection_type ), intent(inout) :: aerosol_fields
+  type( field_type ),            intent(in)    :: trop_level
+  type( field_type ),            intent(in)    :: exner
+
+  ! Unpacked fields from collections
+  type( field_type ), pointer :: sulphuric => null()
+
+
+  sulphuric => aerosol_fields%get_field('sulphuric')
+  call invoke( strat_aerosol_kernel_type( sulphuric, trop_level, exner ) )
+
+end subroutine strat_aerosol_alg
+end module strat_aerosol_alg_mod

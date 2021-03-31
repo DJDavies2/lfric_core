@@ -51,8 +51,8 @@ end type
 contains
 
 ! @param[in]     nlayers                     Number of layers
-! @param[out]    cos_zenith_angle            Cosine of the stellar zenith angle
-! @param[out]    lit_fraction                Lit fraction of the timestep
+! @param[in,out] cos_zenith_angle            Cosine of the stellar zenith angle
+! @param[in,out] lit_fraction                Lit fraction of the timestep
 ! @param[in,out] cos_zenith_angle_rts        Cosine of the stellar zenith angle
 ! @param[in,out] lit_fraction_rts            Lit fraction of the timestep
 ! @param[in,out] stellar_irradiance_rts      Stellar irradiance at the planet
@@ -101,7 +101,7 @@ subroutine illuminate_code(nlayers,                     &
   integer(i_def), intent(in) :: ndf_2d, undf_2d
   integer(i_def), intent(in) :: map_2d(ndf_2d)
 
-  real(r_def), dimension(undf_2d), intent(out):: &
+  real(r_def), dimension(undf_2d), intent(inout):: &
     cos_zenith_angle, lit_fraction
   real(r_def), dimension(undf_2d), intent(inout):: &
     cos_zenith_angle_rts, lit_fraction_rts, stellar_irradiance_rts, &

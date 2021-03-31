@@ -9,8 +9,7 @@
 module um_physics_init_mod
 
   ! LFRic namelists which have been read
-  use aerosol_config_mod,        only : c_aerosol,                        &
-                                        c_aerosol_glomap_mode_climatology
+  use aerosol_config_mod,        only : glomap_mode, glomap_mode_climatology
 
   use blayer_config_mod,         only : a_ent_shr, cbl_opt,                   &
                                         cbl_opt_conventional,                 &
@@ -219,9 +218,9 @@ contains
     if ( aerosol == aerosol_um ) then
 
       ! Options which are bespoke to the aerosol scheme chosen
-      select case (c_aerosol)
+      select case (glomap_mode)
 
-      case(c_aerosol_glomap_mode_climatology)
+      case (glomap_mode_climatology)
         ! l_glomap_clim_aie1 is not used in LFRic. The 1st indirect effect is
         ! controlled through the radiation namelist: droplet_effective_radius
         l_glomap_clim_aie2 = .true.
@@ -230,12 +229,8 @@ contains
         i_glomap_clim_setup = i_gc_sussocbc_5mode
         call ukca_mode_sussbcoc_5mode()
 
-      case default
-        write( log_scratch_space, '(A,I0)' )                                   &
-             'Invalid aerosol option, stopping', c_aerosol
-        call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-
       end select
+
     end if
 
     ! ----------------------------------------------------------------

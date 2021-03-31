@@ -60,9 +60,9 @@ contains
     integer(kind=i_def), intent(in) :: ndf_snow, undf_snow
     integer(kind=i_def), intent(in) :: map_snow(ndf_snow)
 
-    real(kind=r_def), intent(out) :: snow_layer_thickness(undf_snow)
-    real(kind=r_def), intent(out) :: snow_layer_ice_mass(undf_snow)
-    real(kind=r_def), intent(out) :: snow_layer_temp(undf_snow)
+    real(kind=r_def), intent(inout) :: snow_layer_thickness(undf_snow)
+    real(kind=r_def), intent(inout) :: snow_layer_ice_mass(undf_snow)
+    real(kind=r_def), intent(inout) :: snow_layer_temp(undf_snow)
 
     !Internal variables
     integer(kind=i_def) :: i, j, i_snow, indexes(nsmax)

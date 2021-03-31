@@ -26,7 +26,6 @@ module slow_physics_alg_mod
                                        orographic_drag, orographic_drag_um, &
                                        radiation, radiation_socrates,       &
                                        spectral_gwd, spectral_gwd_um,       &
-                                       surface, surface_jules,              &
                                        methane_oxidation
   ! Derived Types
   use field_mod,                 only: field_type
@@ -46,7 +45,9 @@ module slow_physics_alg_mod
   use held_suarez_alg_mod,       only: held_suarez_alg
   ! Physics schemes called
 #ifdef UM_PHYSICS
+  use locate_tropopause_alg_mod, only: locate_tropopause_alg
   use glomap_aerosol_alg_mod,    only: glomap_aerosol_alg
+  use strat_aerosol_alg_mod,     only: strat_aerosol_alg
   use mphys_alg_mod,             only: mphys_alg
   use illuminate_alg_mod,        only: illuminate_alg
   use rad_tile_alg_mod,          only: rad_tile_alg
@@ -57,11 +58,10 @@ module slow_physics_alg_mod
   use bl_exp_alg_mod,            only: bl_exp_alg
   use pc2_checks_alg_mod,        only: pc2_checks_alg
   use methox_alg_mod,            only: methox_alg
-  use aerosol_config_mod,        only: c_aerosol,                            &
-                                       c_aerosol_glomap_mode_climatology
-  use radiation_config_mod,      only: l_planet_grey_surface
+  use aerosol_config_mod,        only: glomap_mode, glomap_mode_climatology, &
+                                       sulphuric_strat_climatology
   use ancil_info,                only: rad_nband
-  use jules_control_init_mod,    only: sw_band_tile, lw_band_tile, n_land_tile
+  use jules_control_init_mod,    only: n_land_tile
   use fsd_condensate_alg_mod,    only: fsd_condensate_alg
   use init_aerosol_fields_alg_mod, only: sw_band_mode, lw_band_mode, mode_dimen
 #endif
@@ -143,6 +143,7 @@ contains
     type( field_type ) :: dqv_pc2_rad, dqcl_pc2_rad
     type( field_type ) :: dcfl_pc2_rad, dbcf_pc2_rad
 #ifdef UM_PHYSICS
+    type( field_type ) :: trop_level
     type( field_type ) :: aer_mix_ratio
     type( field_type ) :: aer_sw_absorption, aer_sw_scattering, aer_sw_asymmetry
     type( field_type ) :: aer_lw_absorption, aer_lw_scattering, aer_lw_asymmetry
@@ -224,7 +225,14 @@ contains
     end if
 
     !--------------------------------------------------------------------
-    ! Glomap mode aerosol climatologies
+    ! Tropopause level
+    !--------------------------------------------------------------------
+    if ( sulphuric_strat_climatology ) then
+      call locate_tropopause_alg(trop_level, theta, exner_in_wth, twod_mesh_id)
+    end if
+
+    !--------------------------------------------------------------------
+    ! Aerosol climatologies
     !--------------------------------------------------------------------
     vector_space=>function_space_collection%get_fs(mesh_id,0,Wtheta,mode_dimen)
     call aer_mix_ratio%initialise(vector_space)
@@ -239,10 +247,13 @@ contains
     if ( ( aerosol == aerosol_um ) .and.                                  &
          ( microphysics == microphysics_um .or.                           &
            radiation == radiation_socrates ) ) then
-      if ( c_aerosol == c_aerosol_glomap_mode_climatology ) then
+      if ( glomap_mode == glomap_mode_climatology ) then
         call glomap_aerosol_alg ( aerosol_fields,                         &
                                   theta,                                  &
                                   exner_in_wth )
+      end if
+      if ( sulphuric_strat_climatology ) then
+        call strat_aerosol_alg ( aerosol_fields, trop_level, exner )
       end if
     end if
 
@@ -267,20 +278,14 @@ contains
 
     if (radiation == radiation_socrates .and. &
         radiation_placement == radiation_placement_slow) then
-       call illuminate_alg( radiation_fields, clock%get_step() )
 
-      vector_space=>function_space_collection%get_fs(twod_mesh_id,0,W3,sw_band_tile)
-      call tile_sw_direct_albedo%initialise(vector_space)
-      call tile_sw_diffuse_albedo%initialise(vector_space)
-      vector_space=>function_space_collection%get_fs(twod_mesh_id,0,W3,lw_band_tile)
-      call tile_lw_albedo%initialise(vector_space)
-      if (surface == surface_jules .and. .not.l_planet_grey_surface) then
-        call rad_tile_alg(tile_sw_direct_albedo, tile_sw_diffuse_albedo,  &
-                          tile_lw_albedo, derived_fields,                 &
-                          radiation_fields, orography_fields,             &
-                          surface_fields, soil_fields, snow_fields,       &
-                          albedo_obs_scaling)
-      end if
+      call illuminate_alg( radiation_fields, clock%get_step() )
+
+      call rad_tile_alg(tile_sw_direct_albedo, tile_sw_diffuse_albedo,  &
+                        tile_lw_albedo, derived_fields,                 &
+                        radiation_fields, orography_fields,             &
+                        surface_fields, soil_fields, snow_fields,       &
+                        albedo_obs_scaling, twod_mesh_id)
 
       call radiation_alg( dtheta_rad, theta, exner, mr_n,                    &
                           derived_fields, radiation_fields, cloud_fields,    &

@@ -101,17 +101,17 @@ contains
     real(kind=r_def), intent(in)    :: soil_moist_sat(undf_2d)
     real(kind=r_def), intent(in)    :: mean_topog_index(undf_2d)
     real(kind=r_def), intent(in)    :: stdev_topog_index(undf_2d)
-    real(kind=r_def), intent(out)   :: a_sat_frac(undf_2d)
-    real(kind=r_def), intent(out)   :: c_sat_frac(undf_2d)
-    real(kind=r_def), intent(out)   :: a_wet_frac(undf_2d)
-    real(kind=r_def), intent(out)   :: c_wet_frac(undf_2d)
+    real(kind=r_def), intent(inout) :: a_sat_frac(undf_2d)
+    real(kind=r_def), intent(inout) :: c_sat_frac(undf_2d)
+    real(kind=r_def), intent(inout) :: a_wet_frac(undf_2d)
+    real(kind=r_def), intent(inout) :: c_wet_frac(undf_2d)
 
-    real(kind=r_def), intent(in)  :: soil_suction_sat(undf_2d)
-    real(kind=r_def), intent(in)  :: clapp_horn_b(undf_2d)
-    real(kind=r_def), intent(in)  :: soil_temperature(undf_soil)
-    real(kind=r_def), intent(in)  :: soil_moisture(undf_soil)
-    real(kind=r_def), intent(out) :: unfrozen_soil_moisture(undf_soil)
-    real(kind=r_def), intent(out) :: frozen_soil_moisture(undf_soil)
+    real(kind=r_def), intent(in)    :: soil_suction_sat(undf_2d)
+    real(kind=r_def), intent(in)    :: clapp_horn_b(undf_2d)
+    real(kind=r_def), intent(in)    :: soil_temperature(undf_soil)
+    real(kind=r_def), intent(in)    :: soil_moisture(undf_soil)
+    real(kind=r_def), intent(inout) :: unfrozen_soil_moisture(undf_soil)
+    real(kind=r_def), intent(inout) :: frozen_soil_moisture(undf_soil)
 
     real(r_um), dimension(1) :: fexp, ti_mean, ti_sig,  &
          gamtot, a_fsat, c_fsat, a_fwet, c_fwet, dummy

@@ -83,7 +83,7 @@ contains
     real(kind=r_def), intent(inout)  :: land_area_fraction(undf_2d)
     real(kind=r_def), intent(in)     :: land_tile_fraction(undf_land)
     real(kind=r_def), intent(in)     :: sea_ice_fraction(undf_sice)
-    real(kind=r_def), intent(out)    :: tile_fraction(undf_tile)
+    real(kind=r_def), intent(inout)  :: tile_fraction(undf_tile)
 
     !Internal variables
     integer(kind=i_def) :: i, i_sice

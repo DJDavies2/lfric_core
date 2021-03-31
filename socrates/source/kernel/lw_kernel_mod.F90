@@ -1,9 +1,9 @@
 !-----------------------------------------------------------------------------
-! (c) Crown copyright 2018 Met Office. All rights reserved.
+! (c) Crown copyright 2021 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-!> @brief Interface to Socrates for longwave (thermal) fluxes
+! @brief Interface to Socrates for longwave (thermal) fluxes
 
 module lw_kernel_mod
 
@@ -85,15 +85,15 @@ end type
 contains
 
 ! @param[in]     nlayers                 Number of layers
-! @param[out]    lw_heating_rate         LW heating rate
-! @param[out]    lw_down_surf            LW downward flux at the surface
-! @param[out]    lw_up_tile              LW upward tiled surface flux
+! @param[in,out] lw_heating_rate         LW heating rate
+! @param[in,out] lw_down_surf            LW downward flux at the surface
+! @param[in,out] lw_up_tile              LW upward tiled surface flux
 ! @param[in,out] lw_heating_rate_rts     LW heating rate
 ! @param[in,out] lw_down_surf_rts        LW downward flux at the surface
 ! @param[in,out] lw_up_tile_rts          LW upward tiled surface flux
-! @param[out]    cloud_cover_rts         Total cloud cover 2D field
-! @param[out]    cloud_fraction_rts      Total cloud fraction 3D field
-! @param[out]    cloud_droplet_re_rts    Cloud droplet effective radius 3D field
+! @param[in,out] cloud_cover_rts         Total cloud cover 2D field
+! @param[in,out] cloud_fraction_rts      Total cloud fraction 3D field
+! @param[in,out] cloud_droplet_re_rts    Cloud droplet effective radius 3D field
 ! @param[in]     theta                   Potential temperature
 ! @param[in]     theta_in_w3             Potential temperature in density space
 ! @param[in]     exner                   Exner pressure in density space
@@ -194,13 +194,13 @@ subroutine lw_code(nlayers,                          &
     cfc11_mix_ratio, cfc12_mix_ratio,            &
     cfc113_mix_ratio, hcfc22_mix_ratio, hfc134a_mix_ratio
   use radiation_config_mod, only: n_radstep,  &
-    l_planet_grey_surface, planet_emissivity, &
     i_cloud_ice_type_lw, i_cloud_liq_type_lw, &
     cloud_vertical_decorr
+  use aerosol_config_mod, only: sulphuric_strat_climatology
   use set_thermodynamic_mod, only: set_thermodynamic
   use set_cloud_field_mod, only: set_cloud_field
   use jules_control_init_mod, only: n_surf_tile, lw_band_tile, first_sea_tile
-  use init_aerosol_fields_alg_mod, only: l_radaer, l_sulphuric, &
+  use init_aerosol_fields_alg_mod, only: l_radaer, &
     n_aer_mode, mode_dimen, lw_band_mode
   use socrates_runes, only: runes, ip_source_thermal
   use socrates_bones, only: bones
@@ -222,17 +222,17 @@ subroutine lw_code(nlayers,                          &
   integer(i_def), dimension(ndf_mode),  intent(in) :: map_mode
   integer(i_def), dimension(ndf_rmode), intent(in) :: map_rmode
 
-  real(r_def), dimension(undf_wth),  intent(out) :: lw_heating_rate
-  real(r_def), dimension(undf_2d),   intent(out) :: lw_down_surf
-  real(r_def), dimension(undf_tile), intent(out) :: lw_up_tile
+  real(r_def), dimension(undf_wth),  intent(inout) :: lw_heating_rate
+  real(r_def), dimension(undf_2d),   intent(inout) :: lw_down_surf
+  real(r_def), dimension(undf_tile), intent(inout) :: lw_up_tile
 
   real(r_def), dimension(undf_wth),  intent(inout) :: lw_heating_rate_rts
   real(r_def), dimension(undf_2d),   intent(inout) :: lw_down_surf_rts
   real(r_def), dimension(undf_tile), intent(inout) :: lw_up_tile_rts
 
-  real(r_def), dimension(undf_2d),  intent(out) :: cloud_cover_rts
-  real(r_def), dimension(undf_wth), intent(out) :: cloud_fraction_rts
-  real(r_def), dimension(undf_wth), intent(out) :: cloud_droplet_re_rts
+  real(r_def), dimension(undf_2d),  intent(inout) :: cloud_cover_rts
+  real(r_def), dimension(undf_wth), intent(inout) :: cloud_fraction_rts
+  real(r_def), dimension(undf_wth), intent(inout) :: cloud_droplet_re_rts
 
   real(r_def), dimension(undf_w3),  intent(in) :: theta_in_w3, exner, height_w3
   real(r_def), dimension(undf_wth), intent(in) :: theta, exner_in_wth, &
@@ -253,8 +253,9 @@ subroutine lw_code(nlayers,                          &
   integer(i_def) :: i_cloud_representation, i_overlap, i_inhom, i_drop_re
   integer(i_def) :: rand_seed(n_profile)
   integer(i_def) :: k, n_cloud_layer
-  integer(i_def) :: i_tile, rtile_1, rtile_ntile, rtile_last
-  integer(i_def) :: wth_1, wth_nlayers, mode_1, mode_last, rmode_1, rmode_last
+  integer(i_def) :: wth_0, wth_1, wth_nlayers, w3_1, w3_nlayers
+  integer(i_def) :: tile_1, tile_last, rtile_1, rtile_ntile, rtile_last
+  integer(i_def) :: mode_1, mode_last, rmode_1, rmode_last
   real(r_def), dimension(nlayers) :: layer_heat_capacity
     ! Heat capacity for each layer
   real(r_def), dimension(nlayers) :: p_layer, t_layer
@@ -269,14 +270,15 @@ subroutine lw_code(nlayers,                          &
   real(r_def), dimension(0:nlayers) :: t_layer_boundaries
   real(r_def), dimension(0:nlayers) :: lw_down, lw_up
 
-  ! Tiled surface fields
-  real(r_def), dimension(n_surf_tile) :: frac_tile, t_tile, &
-    flux_up_tile_rts, flux_up_tile
-
 
   ! Set indexing
+  wth_0 = map_wth(1)
   wth_1 = map_wth(1)+1
   wth_nlayers = map_wth(1)+nlayers
+  w3_1 = map_w3(1)
+  w3_nlayers = map_w3(1)+nlayers-1
+  tile_1 = map_tile(1)
+  tile_last = map_tile(1)+n_surf_tile-1
   rtile_1 = map_rtile(1)
   rtile_ntile = map_rtile(1)+n_surf_tile-1
   rtile_last = map_rtile(1)+lw_band_tile-1
@@ -285,27 +287,18 @@ subroutine lw_code(nlayers,                          &
   rmode_1 = map_rmode(1)+1
   rmode_last = map_rmode(1)+(nlayers+1)*lw_band_mode-1
 
-  ! Tile fractions & temperatures
-  do i_tile = 1, n_surf_tile
-    frac_tile(i_tile) = tile_fraction(map_tile(1)+i_tile-1)
-    t_tile(i_tile) = tile_temperature(map_tile(1)+i_tile-1)
-  end do
-
   if (mod(timestep-1_i_def, n_radstep) == 0) then
     ! Radiation time-step: full calculation of radiative fluxes
 
     ! Set up pressures, temperatures, masses and heat capacities
-    call set_thermodynamic(nlayers,                &
-      exner(map_w3(1):map_w3(1)+nlayers-1),        &
-      exner_in_wth(map_wth(1):map_wth(1)+nlayers), &
-      theta(map_wth(1):map_wth(1)+nlayers),        &
-      rho_in_wth(map_wth(1):map_wth(1)+nlayers),   &
-      height_w3(map_w3(1):map_w3(1)+nlayers-1),    &
-      height_wth(map_wth(1):map_wth(1)+nlayers),   &
+    call set_thermodynamic(nlayers, &
+      exner(w3_1:w3_nlayers), exner_in_wth(wth_0:wth_nlayers), &
+      theta(wth_0:wth_nlayers), rho_in_wth(wth_0:wth_nlayers), &
+      height_w3(w3_1:w3_nlayers), height_wth(wth_0:wth_nlayers), &
       p_layer, t_layer, d_mass, layer_heat_capacity)
 
     ! Calculate temperature at layer boundaries
-    t_layer_boundaries(0) = theta(map_wth(1)) * exner_in_wth(map_wth(1))
+    t_layer_boundaries(0) = theta(wth_0) * exner_in_wth(wth_0)
     do k=1,nlayers-1
       t_layer_boundaries(k) = theta_in_w3(map_w3(1)+k) * exner(map_w3(1)+k)
     end do
@@ -340,13 +333,10 @@ subroutine lw_code(nlayers,                          &
       cfc113_mix_ratio        = cfc113_mix_ratio,                              &
       hcfc22_mix_ratio        = hcfc22_mix_ratio,                              &
       hfc134a_mix_ratio       = hfc134a_mix_ratio,                             &
-      t_ground                = t_tile(first_sea_tile),                        &
-      l_grey_albedo           = l_planet_grey_surface,                         &
-      grey_albedo             = 1.0_r_def - planet_emissivity,                 &
-      l_tile                  = .not.l_planet_grey_surface,                    &
+      l_tile                  = .true.,                                        &
       n_tile                  = n_surf_tile,                                   &
-      frac_tile_1d            = frac_tile,                                     &
-      t_tile_1d               = t_tile,                                        &
+      frac_tile_1d            = tile_fraction(tile_1:tile_last),               &
+      t_tile_1d               = tile_temperature(tile_1:tile_last),            &
       albedo_diff_tile_1d     = tile_lw_albedo(rtile_1:rtile_last),            &
       cloud_frac_1d           = cloud_frac,                                    &
       liq_frac_1d             = liquid_fraction(wth_1:wth_nlayers),            &
@@ -377,7 +367,7 @@ subroutine lw_code(nlayers,                          &
       i_st_ice                = i_cloud_ice_type_lw,                           &
       i_cnv_water             = i_cloud_liq_type_lw,                           &
       i_cnv_ice               = i_cloud_ice_type_lw,                           &
-      l_sulphuric             = l_sulphuric,                                   &
+      l_sulphuric             = sulphuric_strat_climatology,                   &
       sulphuric_1d            = sulphuric(wth_1:wth_nlayers),                  &
       l_aerosol_mode          = l_radaer,                                      &
       n_aer_mode              = n_aer_mode,                                    &
@@ -392,31 +382,20 @@ subroutine lw_code(nlayers,                          &
       liq_dim_diag_1d         = cloud_droplet_re_rts(wth_1:wth_nlayers),       &
       flux_down_1d            = lw_down,                                       &
       flux_up_1d              = lw_up,                                         &
-      flux_up_tile_1d         = flux_up_tile_rts,                              &
+      flux_up_tile_1d         = lw_up_tile_rts(tile_1:tile_last),              &
       heating_rate_1d         = lw_heating_rate_rts(wth_1:wth_nlayers))
 
     ! Set level 0 increment such that theta increment will equal level 1
-    lw_heating_rate_rts(map_wth(1)) = lw_heating_rate_rts(map_wth(1) + 1) &
-                                    * exner_in_wth(map_wth(1))            &
-                                    / exner_in_wth(map_wth(1) + 1)
+    lw_heating_rate_rts(wth_0) = lw_heating_rate_rts(wth_1) &
+                               * exner_in_wth(wth_0) / exner_in_wth(wth_1)
 
     ! Set surface flux
     lw_down_surf_rts(map_2d(1)) = lw_down(0)
 
-    ! Set tiled fluxes
-    do i_tile = 1, n_surf_tile
-      lw_up_tile_rts(map_tile(1)+i_tile-1) = flux_up_tile_rts(i_tile)
-    end do
-
     ! No corrections needed for model timestep
-    lw_heating_rate(map_wth(1):wth_nlayers) &
-      = lw_heating_rate_rts(map_wth(1):wth_nlayers)
-
-    lw_down_surf(map_2d(1)) = lw_down_surf_rts(map_2d(1))
-
-    do i_tile = 1, n_surf_tile
-      lw_up_tile(map_tile(1)+i_tile-1) = lw_up_tile_rts(map_tile(1)+i_tile-1)
-    end do
+    lw_heating_rate(wth_0:wth_nlayers) = lw_heating_rate_rts(wth_0:wth_nlayers)
+    lw_down_surf(map_2d(1))            = lw_down_surf_rts(map_2d(1))
+    lw_up_tile(tile_1:tile_last)       = lw_up_tile_rts(tile_1:tile_last)
 
   else
     ! Not a radiation time-step: apply corrections to the model timestep
@@ -427,25 +406,18 @@ subroutine lw_code(nlayers,                          &
       n_tile                 = n_surf_tile,                                    &
       l_grey_emis_correction = .true.,                                         &
       grey_albedo_tile_1d    = tile_lw_albedo(rtile_1:rtile_ntile),            &
-      t_tile_1d              = t_tile,                                         &
+      t_tile_1d              = tile_temperature(tile_1:tile_last),             &
       heating_rate_1d_rts    = lw_heating_rate_rts(wth_1:wth_nlayers),         &
       flux_down_surf_rts     = lw_down_surf_rts(map_2d(1):map_2d(1)),          &
       heating_rate_1d_mts    = lw_heating_rate(wth_1:wth_nlayers),             &
-      flux_up_tile_1d_mts    = flux_up_tile,                                   &
+      flux_up_tile_1d_mts    = lw_up_tile(tile_1:tile_last),                   &
       flux_down_surf_mts     = lw_down_surf(map_2d(1):map_2d(1)))
 
     ! Set level 0 increment such that theta increment will equal level 1
-    lw_heating_rate(map_wth(1)) = lw_heating_rate(map_wth(1) + 1) &
-                                * exner_in_wth(map_wth(1))        &
-                                / exner_in_wth(map_wth(1) + 1)
-
-    ! Set tiled fluxes
-    do i_tile = 1, n_surf_tile
-      lw_up_tile(map_tile(1)+i_tile-1) = flux_up_tile(i_tile)
-    end do
+    lw_heating_rate(wth_0) = lw_heating_rate(wth_1) &
+                           * exner_in_wth(wth_0) / exner_in_wth(wth_1)
 
   end if
 
 end subroutine lw_code
-
 end module lw_kernel_mod

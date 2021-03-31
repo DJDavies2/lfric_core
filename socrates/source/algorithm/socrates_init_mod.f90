@@ -33,6 +33,7 @@ subroutine socrates_init()
     spectral_file_sw, spectral_file_lw, mcica_data_file,               &
     l_h2o_sw, l_co2_sw, l_o3_sw, l_n2o_sw, l_ch4_sw, l_o2_sw,          &
     l_h2o_lw, l_co2_lw, l_o3_lw, l_n2o_lw, l_ch4_lw,                   &
+    l_cfc11_lw, l_cfc12_lw, l_cfc113_lw, l_hcfc22_lw, l_hfc134a_lw,    &
     cloud_representation, cloud_representation_no_cloud,               &
     cloud_inhomogeneity, cloud_inhomogeneity_mcica
   use rad_ccf, only: set_socrates_constants
@@ -80,7 +81,12 @@ subroutine socrates_init()
     l_co2         = l_co2_lw,         &
     l_o3          = l_o3_lw,          &
     l_n2o         = l_n2o_lw,         &
-    l_ch4         = l_ch4_lw )
+    l_ch4         = l_ch4_lw,         &
+    l_cfc11       = l_cfc11_lw,       &
+    l_cfc12       = l_cfc12_lw,       &
+    l_cfc113      = l_cfc113_lw,      &
+    l_hcfc22      = l_hcfc22_lw,      &
+    l_hfc134a     = l_hfc134a_lw )
 
   call get_spectrum(                        &
     spectrum_name    = 'lw',                &
