@@ -165,8 +165,9 @@ contains
   !>  solution is zero?
   recursive subroutine vcycle(self,level,initial_solution_is_zero)
 
-    use psykal_lite_mod, only: invoke_restrict_kernel, &
-                               invoke_prolong_kernel
+    use restrict_kernel_mod, only: restrict_kernel_type
+    use prolong_kernel_mod,  only: prolong_kernel_type
+
     implicit none
 
     class(multigrid_preconditioner_type), intent(inout)    :: self
@@ -185,18 +186,18 @@ contains
       call self%H_operator(level)%apply(self%u_mg(level), &
                                         self%r_mg(level) )
 
-      call invoke( inc_aX_plus_y (-1.0_r_def, self%r_mg(level)%vector(1), &
-                                              self%b_mg(level)%vector(1)) )
+      call invoke( inc_aX_plus_y (-1.0_r_def, self%r_mg(level)%vector(1),  &
+                                              self%b_mg(level)%vector(1)), &
       ! Restrict b^{(ell+1)} = R r^{(ell)}
-      call invoke_restrict_kernel(self%b_mg(level+1)%vector(1), &
-                                  self%r_mg(level)%vector(1) )
+                   restrict_kernel_type(self%b_mg(level+1)%vector(1),      &
+                                        self%r_mg(level)%vector(1)) )
 
       ! Recursive call to V-cycle
       call self%vcycle(level+1,.true.)
       ! Prolong and add solution from coarser level
       ! u^{(ell)} = u^{(ell)} + P u^{(ell+1)}
-      call invoke_prolong_kernel(self%u_mg(level)%vector(1), &
-                                 self%u_mg(level+1)%vector(1) )
+      call invoke( prolong_kernel_type(self%u_mg(level)%vector(1),    &
+                                       self%u_mg(level+1)%vector(1) ) )
       ! Postsmooth u^{(ell)}
       call self%smooth(self%n_postsmooth, level, .false.)
 

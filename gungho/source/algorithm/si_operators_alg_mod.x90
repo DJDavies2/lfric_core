@@ -326,7 +326,7 @@ contains
     use reference_element_mod,           only: reference_element_type
     use mesh_mod,                        only: mesh_type
     use matrix_vector_kernel_mod,        only: matrix_vector_kernel_type
-    use psykal_lite_mod,                 only: invoke_restrict_kernel
+    use restrict_kernel_mod,             only: restrict_kernel_type
     use formulation_config_mod,          only: dlayer_on,       &
                                                dry_static_adjust
     use sort_ref_kernel_mod,             only: sort_ref_kernel_type
@@ -545,7 +545,7 @@ contains
              wt_fs=>wtheta_multigrid_function_space_chain%get_next()
              call theta%initialise(vector_space = wt_fs)
              ! call restrict
-             call invoke_restrict_kernel(theta, coarse_field)
+             call invoke( restrict_kernel_type(theta, coarse_field) )
 
              ! copy current field to coarse field
              call rho%copy_field(coarse_field)
@@ -553,14 +553,14 @@ contains
              w3_fs=>multigrid_function_space_chain%get_next()
              call rho%initialise(vector_space = w3_fs )
              ! call restrict
-             call invoke_restrict_kernel(rho, coarse_field)
+             call invoke( restrict_kernel_type(rho, coarse_field) )
 
              ! copy current field to coarse field
              call exner%copy_field(coarse_field)
              ! fs already set fine
              call exner%initialise(vector_space = w3_fs )
              ! call restrict
-             call invoke_restrict_kernel(exner, coarse_field)
+             call invoke( restrict_kernel_type(exner, coarse_field) )
              ! set w2_fs to next in chain
              w2_fs=>w2_multigrid_function_space_chain%get_next()
           end if
