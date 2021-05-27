@@ -41,7 +41,7 @@ SUBROUTINE dependency_analyser()
 USE dependency_graph_list_mod, ONLY: dependency_graph_list,                    &
                                      no_dependency_graphs,                     &
                                      generation_order
-USE constants_def_mod,         ONLY: field_name_len
+USE constants_mod,             ONLY: str_def
 
 IMPLICIT NONE
 
@@ -55,13 +55,13 @@ INTEGER :: i, j, l, n
 INTEGER :: no_output_fields
 
 ! Array of output field names in all dependency graphs
-CHARACTER(LEN=field_name_len), ALLOCATABLE :: out_field_ids(:)
+CHARACTER(LEN=str_def), ALLOCATABLE :: out_field_ids(:)
 
 ! Dependency graph matrix
 INTEGER :: dep_graph_matrix(no_dependency_graphs, no_dependency_graphs)
 
 ! Dummy field name variables
-CHARACTER(LEN=field_name_len) :: fid, ofid, ifid
+CHARACTER(LEN=str_def) :: fid, ofid, ifid
 
 ! Logical flag to check dependency between two dependency graphs
 LOGICAL :: dependency

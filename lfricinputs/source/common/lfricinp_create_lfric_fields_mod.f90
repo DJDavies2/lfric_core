@@ -67,6 +67,8 @@ PROCEDURE(write_interface), POINTER  :: tmp_write_ptr => NULL()
 TYPE( field_type ) :: field
 INTEGER(KIND=int64) :: stashcode, level_code, i
 INTEGER(KIND=i_def) :: ndata
+! A temporary variable to hold the 64bit output
+INTEGER(KIND=int64) :: ndata_64
 
 CALL log_event( 'Creating lfric fields...', LOG_LEVEL_INFO )
 
@@ -106,10 +108,11 @@ DO i=1, SIZE(stash_list)
 
     IF ( get_stashmaster_item(stashcode, pseudt) == 0 ) THEN
       ! Field has no pseudo levels
-      ndata = 1
+      ndata = 1_i_def
     ELSE
       ! Get number of pseudo levels/ndata
-      ndata = lfricinp_get_num_pseudo_levels(um_grid, stashcode)
+      ndata_64 = lfricinp_get_num_pseudo_levels(um_grid, stashcode)
+      ndata = INT(ndata_64, KIND=i_def)
     END IF
 
     CALL field % initialise( vector_space =                                 &
@@ -121,7 +124,8 @@ DO i=1, SIZE(stash_list)
 
   CASE(soil_levels) ! Soil fields
     ! Get number of soil levels and set using the multidata argument
-    ndata = lfricinp_get_num_levels(um_file, stashcode)
+    ndata_64 = lfricinp_get_num_levels(um_file, stashcode)
+    ndata = INT(ndata_64, KIND=i_def)
     CALL field % initialise( vector_space =                                 &
          function_space_collection%get_fs(twod_mesh_id, element_order, W3,  &
          ndata), name=TRIM(get_field_name(stashcode)), ndata_first=.true.)

@@ -201,7 +201,6 @@ INTEGER(KIND=int64), INTENT(IN) :: stashcode
 INTEGER(KIND=int64) :: last_pseudo_level_num
 ! Local variables
 INTEGER(KIND=int64) :: last_pseudo_level_code
-INTEGER(KIND=int64) :: model_levels
 CHARACTER(LEN=*), PARAMETER :: routinename = &
      'lfricinp_get_last_pseudo_level_num'
 

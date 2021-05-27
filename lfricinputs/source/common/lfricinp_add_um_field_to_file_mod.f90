@@ -82,7 +82,6 @@ INTEGER(KIND=int64) :: level_number, i_field
 
 INTEGER(KIND=int64) :: lookup_int(len_int_lookup) = um_imdi
 REAL(KIND=real64)   :: lookup_real_tmp(len_real_lookup+len_int_lookup) = um_rmdi
-REAL(KIND=real64)   :: lookup_real(len_real_lookup) = um_rmdi
 TYPE(shum_field_type) :: temp_field
 
 ! Access file headers

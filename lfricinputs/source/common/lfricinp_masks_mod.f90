@@ -46,8 +46,10 @@ TYPE(lfric_proxy_type) :: ancil_field_proxy
 TYPE(shum_field_type), ALLOCATABLE  :: um_input_fields(:)
 
 ! Local variables
-INTEGER(KIND=int64)  :: stashcode_land_mask, dim_1d, dim_2dx, dim_2dy
-INTEGER(KIND=int32)  :: err, i
+INTEGER(KIND=int64)  :: stashcode_land_mask
+! Results of SIZE() are the default integer kind
+INTEGER :: dim_1d, dim_2dx, dim_2dy, i
+INTEGER(KIND=int32)  :: err
 LOGICAL(KIND=C_BOOL) :: true_cbool
 
 ! Set C BOOLEAN true

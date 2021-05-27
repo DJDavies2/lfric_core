@@ -23,8 +23,8 @@ USE um2lfric_init_masked_field_adjustments_mod, ONLY: &
              um2lfric_init_masked_field_adjustments
 USE um2lfric_main_loop_mod, ONLY: um2lfric_main_loop
 ! LFRic modules
-USE log_mod,         ONLY: log_event, LOG_LEVEL_INFO, LOG_LEVEL_ERROR,      &
-                           log_scratch_space
+USE log_mod,         ONLY: log_event, LOG_LEVEL_INFO
+
 ! External libraries
 USE xios, ONLY: xios_context_finalize
 

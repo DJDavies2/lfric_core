@@ -44,7 +44,6 @@ CLASS(linked_list_type), INTENT(INOUT) :: files_list
 CLASS(clock_type),       INTENT(IN)    :: clock
 
 TYPE(xios_file_type)            :: tmp_file
-INTEGER(i_def)                  :: tmp_freq
 CHARACTER(LEN=str_max_filename) :: checkpoint_write_fname,                     &
                                    checkpoint_read_fname,                      &
                                    dump_fname,                                 &

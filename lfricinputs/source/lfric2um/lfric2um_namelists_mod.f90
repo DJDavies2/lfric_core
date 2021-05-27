@@ -87,7 +87,7 @@ CHARACTER(LEN=fnamelen), INTENT(IN) :: fname
 
 
 ! Local variables
-INTEGER :: i_stash, icode
+INTEGER :: i_stash
 
 ! Namelist variables
 CHARACTER(LEN=fnamelen) :: output_filename = 'unset'

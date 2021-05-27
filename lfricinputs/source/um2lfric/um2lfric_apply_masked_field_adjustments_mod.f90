@@ -19,7 +19,7 @@ CONTAINS
 
 SUBROUTINE um2lfric_apply_masked_field_adjustments(stashcode, src, dst)
 
-USE lfricinp_stashmaster_mod, ONLY: stashmaster, land_compressed, grid,        &
+USE lfricinp_stashmaster_mod, ONLY: land_compressed, grid,                     &
   get_stashmaster_item, p_points_values_over_sea
 USE um2lfric_masked_field_adjustments_mod, ONLY: land_field_adjustments,       &
                                                  maritime_field_adjustments

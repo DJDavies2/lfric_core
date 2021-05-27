@@ -18,8 +18,6 @@ CONTAINS
 
 SUBROUTINE um2lfric_init_masked_field_adjustments()
 
-USE log_mod, ONLY: log_event, log_scratch_space, LOG_LEVEL_INFO
-
 USE lfricinp_nearest_neighbour_mod,    ONLY: find_nn_on_um_grid
 USE lfricinp_get_latlon_mod,           ONLY: get_lfric_mesh_coords
 USE lfricinp_masks_mod,                ONLY: lfricinp_init_masks,              &

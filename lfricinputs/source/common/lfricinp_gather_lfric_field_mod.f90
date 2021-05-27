@@ -49,13 +49,13 @@ INTEGER(KIND=i_def), INTENT(IN) :: twod_mesh_id
 TYPE(mesh_type), POINTER :: mesh
 TYPE(mesh_type), POINTER :: twod_mesh
 TYPE(field_proxy_type) :: field_proxy
-TYPE(function_space_type), POINTER :: fs
 INTEGER(KIND=int32), ALLOCATABLE :: rank_sizes(:)
 INTEGER(KIND=int32), ALLOCATABLE :: displacements(:)
-INTEGER(KIND=int32) :: nlayers, global_ncells_2d, local_rank, total_ranks
+INTEGER(KIND=int32) :: local_rank, total_ranks
 INTEGER(KIND=int32) :: local_size_2d, global_size_2d
 INTEGER(KIND=int32), PARAMETER   :: rank_0 = 0
-INTEGER(KIND=int32) :: err, i, index_3d
+INTEGER(KIND=int32) :: err, i
+INTEGER(KIND=int64) :: index_3d
 !, unit_num
 
 REAL(KIND=real64), ALLOCATABLE :: local_data(:)

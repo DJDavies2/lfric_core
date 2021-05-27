@@ -34,14 +34,14 @@ USE constants_mod,           ONLY: PI, degrees_to_radians
 !
 LOGICAL,             INTENT(IN)  :: um_mask(:,:)
 CHARACTER(LEN=*),    INTENT(IN)  :: um_mask_grid_type
-REAL(KIND=int64),    INTENT(IN)  :: lat_ref, lon_ref
+REAL(KIND=real64),   INTENT(IN)  :: lat_ref, lon_ref
 INTEGER(KIND=int32), INTENT(OUT) :: idx_lon_nn, idx_lat_nn
 
 !
 ! Local variables
 !
-REAL(KIND=int64)    :: phi_min, phi, lat, lon
-REAL(KIND=int64)    :: circle_ang_rad_o, circle_ang_rad, delta_ang_rad
+REAL(KIND=real64)   :: phi_min, phi, lat, lon
+REAL(KIND=real64)   :: circle_ang_rad_o, circle_ang_rad, delta_ang_rad
 INTEGER(KIND=int64) :: ix, iy, ix_w, i
 INTEGER(KIND=int64) :: ix_start, iy_start, ix_end, iy_end
 INTEGER(KIND=int64) :: ix_start_o, iy_start_o, ix_end_o, iy_end_o
@@ -116,8 +116,8 @@ DO
     ! If the current point distance is less than the current on mask nearest
     ! neighbour found, update the nearest neighbour with current point
     IF (phi < phi_min) THEN
-      idx_lon_nn = ix
-      idx_lat_nn = iy
+      idx_lon_nn = INT(ix, KIND=int32)
+      idx_lat_nn = INT(iy, KIND=int32)
       phi_min = phi
     END IF
   END DO
@@ -227,9 +227,9 @@ INTEGER(KIND=int64), INTENT(OUT) :: iy_start, iy_end, ix_start, ix_end
 
 !
 ! Local variables
-REAL(KIND=real64)   :: lat_deg, lon_deg, lat_min, lat_max, lon_min, lon_max
+REAL(KIND=real64)   :: lat_deg, lon_deg
 REAL(KIND=real64)   :: origin_x, origin_y, phi_x, phi_y
-INTEGER(KIND=int64) :: nx, ny, nspaces
+INTEGER(KIND=int64) :: nx, ny
 
 
 !
