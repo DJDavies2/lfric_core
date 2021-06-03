@@ -225,7 +225,7 @@ contains
         sediment_loc, i_mcr_iter_tstep, all_sed_start,                       &
         check_run_precip, graupel_option, no_graupel, a_ratio_exp,           &
         a_ratio_fac, l_droplet_tpr, qclrime, l_shape_rime, ndrop_surf,       &
-        z_surf, l_fsd_generator, mp_dz_scal, l_subgrid_qcl_mp
+        z_surf, l_fsd_generator, mp_dz_scal, l_subgrid_qcl_mp, aut_qc
     use pc2_constants_mod, only: i_cld_off, i_cld_smith, i_cld_pc2,        &
          i_cld_bimodal, rhcpt_off, acf_off, real_shear, rhcpt_tke_based,   &
          pc2eros_exp_rh,pc2eros_hybrid_allfaces,pc2eros_hybrid_sidesonly,  &
@@ -747,6 +747,7 @@ contains
       x1r            = 2.2000e-1_r_um
       x2r            = 2.2000_r_um
       z_surf         = real(z_surf_in, r_um)
+      aut_qc         = 2.47_r_um
 
       ! Domain top used in microphysics - contained in mphys_bypass_mod
       mphys_mod_top  = real(domain_top, r_um)
