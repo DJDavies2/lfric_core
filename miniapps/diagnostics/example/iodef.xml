@@ -8,8 +8,12 @@
    <axis_definition>
     <axis id="vert_axis_half_levels" name="half_levels"/>
     <axis id="vert_axis_full_levels" name="full_levels"/>
-    <axis id="model_vert_axis_1" n_glo="3" name="half_levels_copy"
+    <axis id="model_vert_axis_1_half_levels" n_glo="3" name="half_levels_copy"
           positive="up" unit="m" value="(0, 2) [0.5 1.5 2.5]"/>
+    <axis id="fixed_vert_axis_1" n_glo="3" name="fixed_axis"
+          positive="up" unit="m" value="(0, 2) [10.5 11.5 12.5]"/>
+    <axis id="fixed_vert_axis_2" n_glo="3" name="fixed_label"
+          positive="up" unit="m" label="(0, 2) [a b c]"/>
    </axis_definition>
 
    <domain_definition>
@@ -47,9 +51,17 @@
       <domain domain_ref="edge"/>
       <axis axis_ref="vert_axis_half_levels"/>
     </grid>
-    <grid id="model_vert_axis_1_face_grid">
+    <grid id="model_vert_axis_1_half_levels_face_grid">
       <domain domain_ref="face" />
-      <axis axis_ref="model_vert_axis_1" />
+      <axis axis_ref="model_vert_axis_1_half_levels" />
+    </grid>
+     <grid id="fixed_vert_axis_1_face_grid">
+      <domain domain_ref="face" />
+      <axis axis_ref="fixed_vert_axis_1" />
+    </grid>
+     <grid id="fixed_vert_axis_2_face_grid">
+      <domain domain_ref="face" />
+      <axis axis_ref="fixed_vert_axis_2" />
     </grid>
    </grid_definition>
 
@@ -57,7 +69,7 @@
       <field_group enabled=".TRUE." freq_op="1ts"
                    id="colours__diagnostics"
                    operation="instant">
-        <field grid_ref="model_vert_axis_1_face_grid" id="colours__hex"
+        <field grid_ref="model_vert_axis_1_half_levels_face_grid" id="colours__hex"
                standard_name="hex" unit="1">
           <variable name="checksum" type="bool">false</variable>
           <variable name="element_order" type="int">0</variable>
@@ -70,7 +82,7 @@
       <field_group enabled=".TRUE." freq_op="1ts"
                    id="colours__prognostics"
                    operation="instant">
-        <field grid_ref="model_vert_axis_1_face_grid" id="colours__blue"
+        <field grid_ref="model_vert_axis_1_half_levels_face_grid" id="colours__blue"
                standard_name="blue" unit="1">
           <variable name="checksum" type="bool">false</variable>
           <variable name="element_order" type="int">0</variable>
@@ -79,7 +91,7 @@
           <variable name="io_driver" type="string">WRITE_FIELD_FACE</variable>
           <variable name="mesh_id" type="int">1</variable>
         </field>
-        <field grid_ref="model_vert_axis_1_face_grid" id="colours__green"
+        <field grid_ref="fixed_vert_axis_1_face_grid" id="colours__green"
                standard_name="green" unit="1">
           <variable name="checksum" type="bool">false</variable>
           <variable name="element_order" type="int">0</variable>
@@ -88,7 +100,7 @@
           <variable name="io_driver" type="string">WRITE_FIELD_FACE</variable>
           <variable name="mesh_id" type="int">1</variable>
         </field>
-        <field grid_ref="model_vert_axis_1_face_grid" id="colours__red"
+        <field grid_ref="fixed_vert_axis_2_face_grid" id="colours__red"
                standard_name="red" unit="1">
           <variable name="checksum" type="bool">false</variable>
           <variable name="element_order" type="int">0</variable>

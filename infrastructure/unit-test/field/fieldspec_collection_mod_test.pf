@@ -8,12 +8,15 @@
 !>
 module fieldspec_collection_mod_test
 
-  use constants_mod,              only: i_def
-  use fieldspec_mod,              only: fieldspec_type
-  use fieldspec_collection_mod,   only: fieldspec_collection_type, &
-                                        fieldspec_collection_iterator_type
-  use fs_continuity_mod,          only: W3
-  use io_driver_enum_mod,         only: WRITE_FIELD_FACE
+  use constants_mod,                only: i_def, r_def
+  use fieldspec_mod,                only: fieldspec_type
+  use fieldspec_collection_mod,     only: fieldspec_collection_type, &
+                                          fieldspec_collection_iterator_type
+  use fs_continuity_mod,            only: W3
+  use io_driver_enum_mod,           only: WRITE_FIELD_FACE
+  use axisspec_mod,                 only: axisspec_type
+  use axisspec_collection_mod,      only: axisspec_collection_type
+  use non_spatial_dimension_mod,    only: NUMERICAL
   use pFUnit_Mod
 
   implicit none
@@ -64,22 +67,43 @@ contains
     type(fieldspec_type),                  pointer       :: returned_fieldspec => null()
     type(fieldspec_collection_type)                      :: f_collection
 
+    type(axisspec_type), target  :: vertical_axis
+    type(axisspec_type), pointer :: vert_axis_ptr => null()
+    type(axisspec_type), pointer :: returned_vert_axis => null()
+
     f_collection = fieldspec_collection_type()
+
+    vertical_axis = axisspec_type( &
+            "vertical_axis", &
+            NUMERICAL, &
+            numeric_axis_def=[real(r_def) :: 1,2,3])
+    vert_axis_ptr => vertical_axis
 
     call f_collection%generate_and_add_fieldspec( "foo", "field_group_id", &
                                        1_i_def, W3, 0_i_def, &
-                                       0_i_def, 0_i_def, WRITE_FIELD_FACE, .false. )
+                                       0_i_def, 0_i_def, WRITE_FIELD_FACE, &
+                                       .false., vert_axis_ptr )
     call f_collection%generate_and_add_fieldspec("bar", "field_group_id", &
                                        1_i_def, W3, 0_i_def, &
-                                       0_i_def, 0_i_def, WRITE_FIELD_FACE, .false. )
+                                       0_i_def, 0_i_def, WRITE_FIELD_FACE, &
+                                       .false., vert_axis_ptr )
 
     returned_fieldspec => f_collection%get_fieldspec("absent")
     @assertNotAssociated(returned_fieldspec)
+
     returned_fieldspec => f_collection%get_fieldspec("foo")
+    returned_vert_axis => returned_fieldspec%get_vertical_axis()
     @assertAssociated(returned_fieldspec)
     @assertEqual("foo", returned_fieldspec%get_unique_id())
+    @assertEqual("vertical_axis", returned_vert_axis%get_unique_id())
+    @assertEqual([real(r_def) :: 1,2,3], returned_vert_axis%get_numeric_axis_def())
+
     returned_fieldspec => f_collection%get_fieldspec("bar")
+    returned_vert_axis => null()
+    returned_vert_axis => returned_fieldspec%get_vertical_axis()
     @assertEqual("bar", returned_fieldspec%get_unique_id())
+    @assertEqual("vertical_axis", returned_vert_axis%get_unique_id())
+    @assertEqual([real(r_def) :: 1,2,3], returned_vert_axis%get_numeric_axis_def())
 
   end subroutine test_assignment
 
@@ -93,19 +117,44 @@ contains
 
     class(fieldspec_collection_test_type), intent(inout) :: self
     type(fieldspec_type),                  pointer       :: fieldspec => null()
-    type(fieldspec_collection_type)                      :: f_collection
+    type(fieldspec_collection_type),       pointer       :: f_collection => null()
     type(fieldspec_collection_iterator_type)             :: iterator
     integer(i_def)                                       :: i
 
-    f_collection = fieldspec_collection_type()
+    type(axisspec_type), pointer :: vert_axis_ptr => null()
+    type(axisspec_type), pointer :: returned_vert_axis => null()
 
-    ! Add two fieldspecs to the collection
+    type(axisspec_collection_type), pointer :: d_collection => null()
+
+    f_collection => fieldspec_collection_type()
+    d_collection => axisspec_collection_type()
+
+    call d_collection%generate_and_add_axisspec( &
+            "vertical_axis_1", &
+            NUMERICAL, &
+            numeric_axis_def=[real(r_def) :: 1,2,3])
+    call d_collection%generate_and_add_axisspec( &
+            "vertical_axis_2", &
+            NUMERICAL, &
+            numeric_axis_def=[real(r_def) :: 2,4,6])
+
+    vert_axis_ptr => d_collection%get_axisspec("vertical_axis_1")
+    @assertEqual("vertical_axis_1", vert_axis_ptr%get_unique_id())
+    @assertEqual(NUMERICAL, vert_axis_ptr%get_axis_category())
+    @assertEqual([real(r_def) :: 1,2,3], vert_axis_ptr%get_numeric_axis_def())
     call f_collection%generate_and_add_fieldspec("fieldspec1", "field_group_name", &
                                        1_i_def, W3, 0_i_def, &
-                                       0_i_def, 0_i_def, WRITE_FIELD_FACE, .false.)
+                                       0_i_def, 0_i_def, WRITE_FIELD_FACE, &
+                                       .false., vert_axis_ptr)
+
+    vert_axis_ptr => d_collection%get_axisspec("vertical_axis_2")
+    @assertEqual("vertical_axis_2", vert_axis_ptr%get_unique_id())
+    @assertEqual(NUMERICAL, vert_axis_ptr%get_axis_category())
+    @assertEqual([real(r_def) :: 2,4,6], vert_axis_ptr%get_numeric_axis_def())
     call f_collection%generate_and_add_fieldspec("fieldspec2", "field_group_name", &
                                        1_i_def, W3, 0_i_def, &
-                                       0_i_def, 0_i_def, WRITE_FIELD_FACE, .false.)
+                                       0_i_def, 0_i_def, WRITE_FIELD_FACE, &
+                                       .false., vert_axis_ptr)
 
     iterator = f_collection%get_iterator()
 
@@ -113,12 +162,20 @@ contains
     do i=1,10
       if (.not. iterator%has_next()) exit
       fieldspec => iterator%next()
+      returned_vert_axis => fieldspec%get_vertical_axis()
+
       if (i == 1) then
         ! The 1st fieldspec should have the unique_id "fieldspec1"
         @assertEqual("fieldspec1", fieldspec%get_unique_id())
+        @assertEqual("vertical_axis_1", returned_vert_axis%get_unique_id())
+        @assertEqual(NUMERICAL, returned_vert_axis%get_axis_category())
+        @assertEqual([real(r_def) :: 1,2,3], returned_vert_axis%get_numeric_axis_def())
       else if (i ==2) then
         ! The 2nd fieldspec should have the unique_id "fieldspec2"
         @assertEqual("fieldspec2", fieldspec%get_unique_id())
+        @assertEqual("vertical_axis_2", returned_vert_axis%get_unique_id())
+        @assertEqual(NUMERICAL, returned_vert_axis%get_axis_category())
+        @assertEqual([real(r_def) :: 2,4,6], returned_vert_axis%get_numeric_axis_def())
       end if
     end do
 

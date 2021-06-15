@@ -13,6 +13,7 @@ module fieldspec_mod
 
   use constants_mod,        only: i_def, str_def, l_def
   use linked_list_data_mod, only: linked_list_data_type
+  use axisspec_mod,         only: axisspec_type
 
   implicit none
 
@@ -23,16 +24,17 @@ module fieldspec_mod
     private
 
     !> Unique id used by the diagnostic system to identify the field
-    character(str_def) :: unique_id
+    character(str_def)                :: unique_id
     !> Other information used to create a field
-    character(str_def) :: field_group_id
-    integer(i_def)     :: mesh_id
-    integer(i_def)     :: function_space
-    integer(i_def)     :: order
-    integer(i_def)     :: field_kind
-    integer(i_def)     :: field_type
-    integer(i_def)     :: io_driver
-    logical(l_def)     :: checksum
+    character(str_def)                :: field_group_id
+    integer(i_def)                    :: mesh_id
+    integer(i_def)                    :: function_space
+    integer(i_def)                    :: order
+    integer(i_def)                    :: field_kind
+    integer(i_def)                    :: field_type
+    integer(i_def)                    :: io_driver
+    logical(l_def)                    :: checksum
+    type(axisspec_type), pointer      :: vertical_axis => null()
 
   contains
 
@@ -63,6 +65,9 @@ module fieldspec_mod
     !> Getter to return checksum
      procedure, public :: get_checksum
 
+    !> Getter to return specification for vertical axis
+     procedure, public :: get_vertical_axis
+
   end type fieldspec_type
 
   interface fieldspec_type
@@ -84,39 +89,44 @@ contains
   !> @param [in] io_driver The name of the io_driver used to write this field
   !> @param [in] checksum Logical showing if a checksum should be written for &
   !>                      this field
+  !> @param [in] vertical_axis Pointer to an axisspec object describing
+  !>                           vertical axis
   !> @return self the fieldspec object
   !>
   function fieldspec_constructor( unique_id, field_group_id, &
                                   mesh_id, function_space, &
                                   order, field_kind, &
-                                  field_type, io_driver, checksum ) &
+                                  field_type, io_driver, checksum, &
+                                  vertical_axis ) &
                                  result(self)
 
     use log_mod,         only : log_event, &
                                 LOG_LEVEL_ERROR
     implicit none
 
-    character(*),               intent(in)    :: unique_id
-    character(*),               intent(in)    :: field_group_id
-    integer(i_def),             intent(in)    :: mesh_id
-    integer(i_def),             intent(in)    :: function_space
-    integer(i_def),             intent(in)    :: order
-    integer(i_def),             intent(in)    :: field_kind
-    integer(i_def),             intent(in)    :: field_type
-    integer(i_def),             intent(in)    :: io_driver
-    logical(l_def),             intent(in)    :: checksum
+    character(*),                      intent(in) :: unique_id
+    character(*),                      intent(in) :: field_group_id
+    integer(i_def),                    intent(in) :: mesh_id
+    integer(i_def),                    intent(in) :: function_space
+    integer(i_def),                    intent(in) :: order
+    integer(i_def),                    intent(in) :: field_kind
+    integer(i_def),                    intent(in) :: field_type
+    integer(i_def),                    intent(in) :: io_driver
+    logical(l_def),                    intent(in) :: checksum
+    type(axisspec_type),      pointer, intent(in) :: vertical_axis
 
     type(fieldspec_type), target :: self
 
-    self%unique_id      = trim(unique_id)
-    self%field_group_id = trim(field_group_id)
-    self%mesh_id        = mesh_id
-    self%function_space = function_space
-    self%order          = order
-    self%field_kind     = field_kind
-    self%field_type     = field_type
-    self%io_driver      = io_driver
-    self%checksum       = checksum
+    self%unique_id           = trim(unique_id)
+    self%field_group_id      = trim(field_group_id)
+    self%mesh_id             = mesh_id
+    self%function_space      = function_space
+    self%order               = order
+    self%field_kind          = field_kind
+    self%field_type          = field_type
+    self%io_driver           = io_driver
+    self%checksum            = checksum
+    self%vertical_axis => vertical_axis
 
   end function fieldspec_constructor
 
@@ -124,7 +134,6 @@ contains
   !> Getter for unique_id
   !> @param[in]  self  fieldspec_type
   !> @return unique_id
-
   function get_unique_id(self) result(unique_id)
 
     implicit none
@@ -247,6 +256,22 @@ contains
     checksum = self%checksum
 
   end function get_checksum
+
+  !> Getter for vertical_axis
+  !> @param[in]  self  fieldspec_type
+  !> @return vertical_axis
+  function get_vertical_axis(self) result(vertical_axis)
+
+    implicit none
+
+    class(fieldspec_type), intent(in) :: self
+    type(axisspec_type),      pointer :: vertical_axis
+
+    vertical_axis => null()
+
+    vertical_axis => self%vertical_axis
+
+  end function get_vertical_axis
 
 
 end module fieldspec_mod

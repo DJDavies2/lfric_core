@@ -8,10 +8,13 @@
 !>
 module fieldspec_mod_test
 
-    use fieldspec_mod,       only : fieldspec_type
-    use fs_continuity_mod,   only : W3
-    use field_type_enum_mod, only : integer_type
-    use io_driver_enum_mod,  only : WRITE_FIELD_FACE
+    use constants_mod,             only : r_def
+    use fieldspec_mod,             only : fieldspec_type
+    use fs_continuity_mod,         only : W3
+    use field_type_enum_mod,       only : integer_type
+    use io_driver_enum_mod,        only : WRITE_FIELD_FACE
+    use axisspec_mod,              only : axisspec_type
+    use non_spatial_dimension_mod, only : NUMERICAL
     use pFUnit_Mod
 
     implicit none
@@ -19,7 +22,7 @@ module fieldspec_mod_test
     private
     public :: test_assignment
 
-    !@TestCase
+    @TestCase
     type, extends(TestCase), public :: fieldspec_test_type
         private
     contains
@@ -51,13 +54,22 @@ contains
 
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !@test
+    @test
     subroutine test_assignment(self)
 
         implicit none
 
         class(fieldspec_test_type), intent(inout) :: self
-        type(fieldspec_type) :: test_fieldspec1
+        type(fieldspec_type)                      :: test_fieldspec1
+        type(axisspec_type),        target        :: vertical_axis
+        type(axisspec_type),        pointer       :: vert_axis_ptr => null()
+        type(axisspec_type)                       :: returned_vert_axis
+
+        vertical_axis = axisspec_type( &
+                "vertical_axis", &
+                NUMERICAL, &
+                numeric_axis_def = [real(r_def) :: 1,2,3])
+        vert_axis_ptr => vertical_axis
 
         test_fieldspec1 = fieldspec_type( "foo", & ! unique_id
                                           "field_group_id", & ! field_group_id
@@ -67,18 +79,24 @@ contains
                                           1, & ! field_kind
                                           integer_type, & ! field_type
                                           WRITE_FIELD_FACE, & ! io_driver
-                                          .true. & ! checksum
+                                          .true., & ! checksum
+                                          vert_axis_ptr &
                                         )
+
+        returned_vert_axis = test_fieldspec1%get_vertical_axis()
 
         @assertEqual("foo",test_fieldspec1%get_unique_id())
         @assertEqual("field_group_id",test_fieldspec1%get_field_group_id())
         @assertEqual(11,test_fieldspec1%get_mesh_id())
-        @assertEqual(2,test_fieldspec1%get_function_space())
-        @assertEqual(W3,test_fieldspec1%get_order())
+        @assertEqual(W3,test_fieldspec1%get_function_space())
+        @assertEqual(2,test_fieldspec1%get_order())
         @assertEqual(1,test_fieldspec1%get_kind())
         @assertEqual(1,test_fieldspec1%get_type())
         @assertEqual(WRITE_FIELD_FACE,test_fieldspec1%get_io_driver())
         @assertEqual(.true.,test_fieldspec1%get_checksum())
+        @assertEqual("vertical_axis", returned_vert_axis%get_unique_id())
+        @assertEqual(NUMERICAL, returned_vert_axis%get_axis_category())
+        @assertEqual([real(r_def) :: 1,2,3], returned_vert_axis%get_numeric_axis_def())
 
     end subroutine test_assignment
 

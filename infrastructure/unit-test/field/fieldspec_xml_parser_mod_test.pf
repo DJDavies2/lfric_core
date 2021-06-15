@@ -8,13 +8,15 @@
 !>
 module fieldspec_xml_parser_mod_test
 
-  use constants_mod,              only: i_def
-  use field_type_enum_mod,        only: integer_type, real_type
-  use fieldspec_mod,              only: fieldspec_type
-  use fieldspec_collection_mod,   only: fieldspec_collection_type
-  use fieldspec_xml_parser_mod,   only: populate_fieldspec_collection
-  use fs_continuity_mod,          only: W0, W1, W2, W3, Wtheta
-  use io_driver_enum_mod,         only: WRITE_FIELD_FACE
+  use constants_mod,                only: i_def, r_def, str_def
+  use field_type_enum_mod,          only: integer_type, real_type
+  use fieldspec_mod,                only: fieldspec_type
+  use axisspec_mod,                 only: axisspec_type
+  use fieldspec_collection_mod,     only: fieldspec_collection_type
+  use axisspec_collection_mod,      only: axisspec_collection_type
+  use fieldspec_xml_parser_mod,     only: populate_fieldspec_collection
+  use fs_continuity_mod,            only: W0, W1, W2, W3, Wtheta
+  use io_driver_enum_mod,           only: WRITE_FIELD_FACE
   use pFUnit_Mod
 
   implicit none
@@ -61,7 +63,8 @@ contains
     implicit none
 
     class(fieldspec_collection_test_type), intent(inout)    :: self
-    type(fieldspec_collection_type),       pointer          :: f_collection
+    type(fieldspec_collection_type),       pointer          :: f_collection => null()
+    type(axisspec_collection_type),        pointer          :: d_collection => null()
     type(fieldspec_type)                                    :: current_fieldspec
     integer,                               parameter        :: no_of_fields = 6
     integer                                                 :: field_index
@@ -73,6 +76,7 @@ contains
             "dmv_conv", "area_fraction", "divergence", "gamma", "beta", "raidillon"]   ! IDs from test_iodef3.xml IDs
 
     f_collection => fieldspec_collection_type()
+    d_collection => axisspec_collection_type()
 
     call populate_fieldspec_collection('data/test_iodef1.xml')
     ! check the collection wasn't populated with fewer/more objects than there should be
@@ -103,6 +107,7 @@ contains
     ! if referencing the fieldspec_collection with a pointer instead of
     ! creating an object of it, must clear it afterwards for next usage/test
     call f_collection%clear()
+    call d_collection%clear()
 
   end subroutine test_populate_multiple_files
 
@@ -115,8 +120,10 @@ contains
     implicit none
 
     class(fieldspec_collection_test_type), intent(inout) :: self
-    type(fieldspec_collection_type),       pointer       :: f_collection
+    type(fieldspec_collection_type),       pointer       :: f_collection => null()
+    type(axisspec_collection_type),        pointer       :: d_collection => null()
     type(fieldspec_type)                                 :: current_fieldspec
+    type(axisspec_type)                                  :: current_axisspec
     integer, parameter                                   :: no_of_fields = 6
     integer                                              :: field_index
     character(len = 11), dimension(no_of_fields)         :: test_IDs = &
@@ -140,12 +147,25 @@ contains
                                                           .true., .false., &
                                                           .false., .false.]
 
+    ! Properties of vertical axiss of fields in test_iodef1.xml to test
+    character(str_def) :: test_vert_axis_ids(no_of_fields) = ["model_vert_axis_1_full_levels", &
+                                                              "model_vert_axis_1_half_levels", &
+                                                              "model_vert_axis_1_half_levels", &
+                                                              "model_vert_axis_1_full_levels", &
+                                                              "model_vert_axis_1_full_levels", &
+                                                              "fixed_vert_axis_1            "]
+    real(r_def) :: half_levels(3) = [0.5, 1.5, 2.5]
+    real(r_def) :: full_levels(3) = [1, 2, 3]
+    real(r_def) :: fixed_axis(3) = [10.5, 11.5, 12.5]
+
     f_collection => fieldspec_collection_type()
+    d_collection => axisspec_collection_type()
 
     call populate_fieldspec_collection('data/test_iodef1.xml')
 
     do field_index = 1, no_of_fields
       current_fieldspec = f_collection%get_fieldspec( test_IDs(field_index) )
+      current_axisspec = current_fieldspec%get_vertical_axis()
 
       @assertEqual(test_IDs(field_index), current_fieldspec%get_unique_id())
       @assertEqual(test_groups(field_index), current_fieldspec%get_field_group_id())
@@ -156,9 +176,18 @@ contains
       @assertEqual(test_field_types(field_index), current_fieldspec%get_type())
       @assertEqual(test_io_drivers(field_index), current_fieldspec%get_io_driver())
       @assertEqual(test_checksums(field_index), current_fieldspec%get_checksum())
+      @assertEqual(test_vert_axis_ids(field_index), current_axisspec%get_unique_id())
+      if (current_axisspec%get_unique_id() == 'model_vert_axis_1_half_levels') then
+        @assertEqual(half_levels, current_axisspec%get_numeric_axis_def())
+      else if (current_axisspec%get_unique_id() == 'model_vert_axis_1_full_levels') then
+        @assertEqual(full_levels, current_axisspec%get_numeric_axis_def())
+      else if (current_axisspec%get_unique_id() == 'fixed_vert_axis_1') then
+        @assertEqual(fixed_axis, current_axisspec%get_numeric_axis_def())
+      end if
     end do
 
     call f_collection%clear()
+    call d_collection%clear()
 
   end subroutine test_populate_fieldspec_properties
 

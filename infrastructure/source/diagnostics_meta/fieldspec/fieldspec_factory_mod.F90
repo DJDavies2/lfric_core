@@ -14,6 +14,7 @@ module fieldspec_factory_mod
   use constants_mod,        only: i_def, str_def, l_def
   use fieldspec_mod,        only: fieldspec_type
   use io_driver_enum_mod,   only: WRITE_FIELD_FACE
+  use axisspec_mod,         only: axisspec_type
 
   implicit none
 
@@ -26,16 +27,18 @@ module fieldspec_factory_mod
     private
 
     !> Unique id used by the diagnostic system to identify the field
-    character(str_def) :: unique_id
+    character(str_def)                :: unique_id
     !> Other information used to create a field
-    character(str_def) :: field_group_id
-    integer(i_def)     :: mesh_id
-    integer(i_def)     :: function_space
-    integer(i_def)     :: order
-    integer(i_def)     :: field_kind
-    integer(i_def)     :: field_type
-    integer(i_def)     :: io_driver
-    logical(l_def)     :: checksum
+    character(str_def)                :: field_group_id
+    integer(i_def)                    :: mesh_id
+    integer(i_def)                    :: function_space
+    integer(i_def)                    :: order
+    integer(i_def)                    :: field_kind
+    integer(i_def)                    :: field_type
+    integer(i_def)                    :: io_driver
+    logical(l_def)                    :: checksum
+    type(axisspec_type),      pointer :: vertical_axis => null()
+
   contains
 
     !> clear field properties
@@ -71,6 +74,9 @@ module fieldspec_factory_mod
     !> setter to return checksum
     procedure, public :: set_checksum
 
+    !> setter to return vertical_axis
+    procedure, public :: set_vertical_axis
+
   end type fieldspec_factory_type
 
   interface fieldspec_factory_type
@@ -103,15 +109,16 @@ contains
 
     class(fieldspec_factory_type), intent(inout) :: self
 
-    self%unique_id      = ""
-    self%field_group_id = ""
-    self%mesh_id        = 0_i_def
-    self%function_space = 0_i_def
-    self%order          = 0_i_def
-    self%field_kind     = 0_i_def
-    self%field_type     = 0_i_def
-    self%io_driver      = WRITE_FIELD_FACE  ! default to write_field_face
-    self%checksum       = .false.
+    self%unique_id           = ""
+    self%field_group_id      = ""
+    self%mesh_id             = 0_i_def
+    self%function_space      = 0_i_def
+    self%order               = 0_i_def
+    self%field_kind          = 0_i_def
+    self%field_type          = 0_i_def
+    self%io_driver           = WRITE_FIELD_FACE  ! default to write_field_face
+    self%checksum            = .false.
+    self%vertical_axis      => null()
 
     return
   end subroutine initialise
@@ -126,15 +133,16 @@ contains
     class(fieldspec_factory_type),    intent(in)    :: self
     type(fieldspec_type)                            :: new_fieldspec
 
-    new_fieldspec = fieldspec_type( self%unique_id, &
+    new_fieldspec = fieldspec_type( self%unique_id,      &
                                     self%field_group_id, &
-                                    self%mesh_id, &
+                                    self%mesh_id,        &
                                     self%function_space, &
-                                    self%order, &
-                                    self%field_kind, &
-                                    self%field_type, &
-                                    self%io_driver, &
-                                    self%checksum )
+                                    self%order,          &
+                                    self%field_kind,     &
+                                    self%field_type,     &
+                                    self%io_driver,      &
+                                    self%checksum,       &
+                                    self%vertical_axis )
   end function finalise
 
 
@@ -263,6 +271,20 @@ contains
 
     return
   end subroutine set_checksum
+
+  !> Setter for vertical_axis
+  !> @param[in] vertical_axis
+  subroutine set_vertical_axis( self, vertical_axis )
+
+    implicit none
+
+    class(fieldspec_factory_type),     intent(inout)   :: self
+    type(axisspec_type),      pointer, intent(in)      :: vertical_axis
+
+    self%vertical_axis => vertical_axis
+
+    return
+  end subroutine set_vertical_axis
 
 
 end module fieldspec_factory_mod

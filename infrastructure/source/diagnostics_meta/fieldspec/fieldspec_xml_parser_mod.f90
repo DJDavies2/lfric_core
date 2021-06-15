@@ -25,23 +25,26 @@
 
 module fieldspec_xml_parser_mod
 
-  use constants_mod,             only: i_def, str_def, l_def
-  use field_type_enum_mod,       only: field_type_from_name
-  use fieldspec_collection_mod,  only: fieldspec_collection_type
-  use fieldspec_factory_mod,     only: fieldspec_factory_type
-  use fs_continuity_mod,         only: functionspace_from_name
-  use fox_sax,                   only: XML_T, dictionary_t, getValue, hasKey, &
-                                       parse, open_xml_file, close_xml_t
-  use io_driver_enum_mod,        only: io_driver_from_name
-  use log_mod,                   only: log_event, log_scratch_space, &
-                                       LOG_LEVEL_ERROR
+  use constants_mod,                only: i_def, str_def, l_def, r_def
+  use axisspec_collection_mod,      only: axisspec_collection_type
+  use field_type_enum_mod,          only: field_type_from_name
+  use fieldspec_collection_mod,     only: fieldspec_collection_type
+  use fieldspec_factory_mod,        only: fieldspec_factory_type
+  use fs_continuity_mod,            only: functionspace_from_name
+  use fox_sax,                      only: XML_T, dictionary_t, getValue, hasKey, &
+                                          parse, open_xml_file, close_xml_t
+  use io_driver_enum_mod,           only: io_driver_from_name
+  use non_spatial_dimension_mod,    only: NUMERICAL, CATEGORICAL
+  use log_mod,                      only: log_event, log_scratch_space, &
+                                          LOG_LEVEL_ERROR, LOG_LEVEL_INFO
 
   implicit none
 
   private
   public :: populate_fieldspec_collection
 
-  type(fieldspec_collection_type), pointer :: fieldspec_collection
+  type(fieldspec_collection_type),     pointer :: fieldspec_collection => null()
+  type(axisspec_collection_type),      pointer :: axisspec_collection => null()
 
   !> @brief Factory used to build up fieldspec objects while reading XML
   !>        before adding them to the collection
@@ -55,6 +58,7 @@ module fieldspec_xml_parser_mod
   logical :: ignore_element = .false.
 
   ! Flags used to check which element the XML parser is currently within
+  logical :: in_axis_def = .false.
   logical :: in_field_def = .false.
   logical :: in_field_group = .false.
   logical :: in_field = .false.
@@ -80,6 +84,7 @@ contains
     integer                                            :: iostatus
 
     fieldspec_collection => fieldspec_collection_type()
+    axisspec_collection => axisspec_collection_type()
 
     call open_xml_file(parser, iodef_filepath, iostatus)
     if (iostatus /= 0) then
@@ -121,6 +126,9 @@ contains
 
     select case (element_name)
 
+      case ("axis_definition")
+        in_axis_def = new_value
+
       case ("field_definition")
         in_field_def = new_value
 
@@ -160,6 +168,18 @@ contains
     character(len = *), intent(in)    :: name
     type(dictionary_t), intent(in)    :: attributes
 
+    ! Strings parsed from xml
+    character(str_def)                :: axis_size_str
+    character(str_def)                :: numeric_axis_def_str
+    character(str_def)                :: label_axis_def_str
+    character(str_def)                :: grid_id
+
+    ! Attributes for axisspec objects
+    character(str_def)                :: axis_id
+    integer(i_def)                    :: axis_size
+    real(r_def),        allocatable   :: numeric_axis_def(:)
+    character(str_def), allocatable   :: label_axis_def(:)
+
     ! Ignore element if parser is still in a field group that is not enabled
     if (ignore_element) then
       return
@@ -169,8 +189,34 @@ contains
     ! inside it
     call switch_xml_element_flag(name, .true.)
 
+    ! If in axis node, then create axisspec object for it
+    if (in_axis_def .and. name == 'axis') then
 
-    if (in_field_def) then
+      axis_id = getValue(attributes, 'id')
+      axis_size_str = getValue(attributes, 'n_glo')
+      numeric_axis_def_str = getValue(attributes, 'value')
+      label_axis_def_str = getValue(attributes, 'label')
+
+      read(axis_size_str, '(i3)') axis_size
+
+      ! Create an axis definiton for numerical axes
+      if (numeric_axis_def_str /= "") then
+        numeric_axis_def = numeric_axis_from_string(numeric_axis_def_str, axis_size)
+        call axisspec_collection%generate_and_add_axisspec( &
+              axis_id, &
+              NUMERICAL, &
+              numeric_axis_def=numeric_axis_def)
+
+      ! Create a label definition for categorical axes
+      else if (label_axis_def_str /= "") then
+        label_axis_def = label_axis_from_string(label_axis_def_str, axis_size)
+        call axisspec_collection%generate_and_add_axisspec( &
+              axis_id, &
+              CATEGORICAL, &
+              label_axis_def=label_axis_def)
+      end if
+
+    else if (in_field_def) then
 
       ! Set parser to ignore current group of fields if they are not enabled
       if (name == "field_group") then
@@ -191,6 +237,13 @@ contains
           call fieldspec_factory%set_unique_id( getValue(attributes, "id") )
           call fieldspec_factory%set_field_group_id( field_group_id )
 
+          ! Set vertical axis
+          grid_id = getValue(attributes, "grid_ref")
+          axis_id = vert_axis_id_from_grid_id(grid_id)
+          if (axis_id /= '') then
+            call fieldspec_factory%set_vertical_axis( &
+                    axisspec_collection%get_axisspec( axis_id ) )
+          end if
         end if
 
         ! Store name of variable while it is processed by text_handler
@@ -303,5 +356,153 @@ contains
 
     return
   end subroutine endElement_handler
+
+
+  !===========================================================================
+  !> Get an array of the level values from the string in the iodef.xml file
+  !> @param[in] axis_string The XIOS string defining the axis
+  !> @param[in] array_size The integer size of the array
+  !> @return The axis definition array
+  function numeric_axis_from_string(axis_string, array_size) result(axis_array)
+
+    implicit none
+
+    real(r_def), allocatable          :: axis_array(:)
+
+    character(str_def)                :: axis_string
+    integer(i_def)                    :: array_size
+
+    logical(l_def)                    :: in_array = .false.
+    character(str_def)                :: current_value = ''
+    integer(i_def)                    :: char_index
+    integer(i_def)                    :: array_index
+    real(r_def)                       :: array_value
+
+    allocate(axis_array(array_size))
+    array_index = 1
+    current_value = ''
+
+    ! Loop through string representing axis
+    do char_index = 1, len(trim(axis_string))
+
+      ! Entering array of axis definition
+      if (axis_string(char_index:char_index) == '[') then
+        in_array = .true.
+
+      ! Exiting arrray of axis definition, add last value to axis_array
+      else if (axis_string(char_index:char_index) == ']') then
+        in_array = .false.
+        read(current_value, '(f10.0)') array_value
+        axis_array(array_index) = array_value
+
+      else if (in_array) then
+
+        ! Append character to current value of array element
+        if (axis_string(char_index:char_index) /= ' ') then
+          current_value = trim(current_value) // axis_string(char_index:char_index)
+
+        ! Spaces separate array elements so add current value to axis_array
+        else
+          read(current_value, '(f10.0)') array_value
+          axis_array(array_index) = array_value
+          array_index =  array_index + 1
+          current_value = ''
+
+        end if
+      end if
+    end do
+
+  end function numeric_axis_from_string
+
+
+  !===========================================================================
+  !> Get an array of the labels from the string in the iodef.xml file
+  !> @param[in] label_string The XIOS string defining the axis labels
+  !> @param[in] array_size The integer size of the array
+  !> @return The label definition array
+  function label_axis_from_string(label_string, array_size) result(label_array)
+
+    implicit none
+
+    character(str_def), allocatable   :: label_array(:)
+
+    character(str_def)                :: label_string
+    integer(i_def)                    :: array_size
+
+    logical(l_def)                    :: in_array = .false.
+    character(str_def)                :: current_value = ''
+    integer(i_def)                    :: char_index
+    integer(i_def)                    :: array_index
+
+    allocate(label_array(array_size))
+    array_index = 1
+    current_value = ''
+
+    ! Loop through string representing axis
+    do char_index = 1, len(trim(label_string))
+
+      ! Entering array of label definition
+      if (label_string(char_index:char_index) == '[') then
+        in_array = .true.
+
+      ! Exiting arrray of label definition, add last value to label_array
+      else if (label_string(char_index:char_index) == ']') then
+        in_array = .false.
+        label_array(array_index) = current_value
+
+      else if (in_array) then
+
+        ! Append character to current value of array element
+        if (label_string(char_index:char_index) /= ' ') then
+          current_value = trim(current_value) // label_string(char_index:char_index)
+
+        ! Spaces separate array elements so add current value to label_array
+        else
+          label_array(array_index) = current_value
+          array_index =  array_index + 1
+          current_value = ''
+
+        end if
+      end if
+    end do
+
+  end function label_axis_from_string
+
+
+  !===========================================================================
+  !> Determine vertical axis id from grid id
+  !> @param[in] grid_id The XIOS id for the grid
+  !> @return The vertical axis id
+  function vert_axis_id_from_grid_id(grid_id) result(vert_axis_id)
+
+    implicit none
+
+    character(str_def)   :: vert_axis_id
+    character(str_def)   :: grid_id
+    integer(i_def)       :: char_index
+
+    ! Grid id matches model_vert_axis_x_full_levels_... or
+    !                 model_vert_axis_x_half_levels_...
+    if (grid_id(1:16) == "model_vert_axis_") then
+      do char_index = 16, 100
+        if (grid_id(char_index+1: char_index+1) == '_') exit
+      end do
+      ! Add length of "_half_levels" or "_full_levels"
+      char_index = char_index + 12
+      vert_axis_id = grid_id(1:char_index)
+
+    ! Grid id matches fixed_vert_axis_x...
+    else if (grid_id(1:16) == "fixed_vert_axis_") then
+      do char_index = 16, 100
+        if (grid_id(char_index+1: char_index+1) == '_') exit
+      end do
+      vert_axis_id = grid_id(1:char_index)
+
+    ! Grid id does not contain vertical axis
+    else
+      vert_axis_id = ''
+    end if
+
+  end function vert_axis_id_from_grid_id
 
 end module fieldspec_xml_parser_mod
