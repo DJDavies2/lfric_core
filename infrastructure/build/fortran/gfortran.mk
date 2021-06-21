@@ -38,3 +38,11 @@ FFLAGS_FORTRAN_STANDARD   = -std=f2008
 LDFLAGS_COMPILER =
 
 FPPFLAGS = -P
+
+# TODO - Remove the -fallow-arguments-mismatch flag when MPICH no longer fails
+#        to build as a result of its mismatched arguments (see ticket summary 
+#        for #2549 for reasoning).
+ifeq ($(shell test $(GFORTRAN_VERSION) -ge 100000; echo $$?), 0)
+	FFLAGS_COMPILER += -fallow-argument-mismatch
+endif
+
