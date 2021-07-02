@@ -50,6 +50,17 @@ use_multires_coupling=.true.
 smagorinsky=.false.
 /
 
+&initial_wind
+nl_constant=0.0
+profile='vortex'
+sbr_angle_lat=0.0
+sbr_angle_lon=0.0
+smp_init_wind=.false.
+u0=0.0
+v0=0.0
+wind_time_period=0.0
+/
+
 &io
   use_xios_io               = .true.
   write_conservation_diag   = .false.
@@ -117,4 +128,12 @@ cloud='none',
 convection='none',
 microphysics='none',
 radiation='none'
+/
+
+&solver
+gcrk=18
+maximum_iterations=399
+method='cg'
+preconditioner='diagonal'
+tolerance=1.0e-6
 /

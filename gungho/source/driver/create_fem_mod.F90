@@ -285,39 +285,29 @@ module create_fem_mod
       allocate(chi_multires_coupling_xyz(3,size(multires_coupling_mesh_ids)))
       allocate(panel_id_multires_coupling(size(multires_coupling_mesh_ids)))
 
-      do i = 1, 3
-         call chi_sph(i)%copy_field(chi_multires_coupling_sph(i,1))
-      end do
-      do i = 1, 3
-         call chi_xyz(i)%copy_field(chi_multires_coupling_xyz(i,1))
-      end do
-      call panel_id%copy_field(panel_id_multires_coupling(1))
-
       do mesh_ctr = 1, size(multires_coupling_mesh_ids)
         ! Set up the coordinate fields for non-primary multires_coupling meshes
-        if (mesh_ctr > 1) then
-          do i = 1, 3
-            call chi_multires_coupling_sph( i, mesh_ctr )%initialise( vector_space =    &
-              function_space_collection%get_fs( multires_coupling_mesh_ids(mesh_ctr),   &
-                                                spherical_coord_order, chi_sph_space) )
-            call chi_multires_coupling_xyz( i, mesh_ctr )%initialise( vector_space =    &
-              function_space_collection%get_fs( multires_coupling_mesh_ids(mesh_ctr),   &
-                                                coordinate_order, chi_xyz_space) )
-          end do
+        do i = 1, 3
+          call chi_multires_coupling_sph( i, mesh_ctr )%initialise( vector_space =    &
+            function_space_collection%get_fs( multires_coupling_mesh_ids(mesh_ctr),   &
+                                              spherical_coord_order, chi_sph_space) )
+          call chi_multires_coupling_xyz( i, mesh_ctr )%initialise( vector_space =    &
+            function_space_collection%get_fs( multires_coupling_mesh_ids(mesh_ctr),   &
+                                              coordinate_order, chi_xyz_space) )
+        end do
 
-          call panel_id_multires_coupling(mesh_ctr)%initialise(vector_space =  &
-            function_space_collection%get_fs( multires_coupling_mesh_ids(mesh_ctr), 0, W3) )
+        call panel_id_multires_coupling(mesh_ctr)%initialise(vector_space =  &
+          function_space_collection%get_fs( multires_coupling_mesh_ids(mesh_ctr), 0, W3) )
 
-          call assign_coordinate_field( chi_multires_coupling_sph(:,mesh_ctr), &
-                                        panel_id_multires_coupling(mesh_ctr),  &
-                                        multires_coupling_mesh_ids(mesh_ctr),  &
-                                        spherical_coords=.true.)
+        call assign_coordinate_field( chi_multires_coupling_sph(:,mesh_ctr), &
+                                      panel_id_multires_coupling(mesh_ctr),  &
+                                      multires_coupling_mesh_ids(mesh_ctr),  &
+                                      spherical_coords=.true.)
 
-          call assign_coordinate_field( chi_multires_coupling_xyz(:,mesh_ctr), &
-                                        panel_id_multires_coupling(mesh_ctr),  &
-                                        multires_coupling_mesh_ids(mesh_ctr),  &
-                                        spherical_coords=.false.)
-        end if
+        call assign_coordinate_field( chi_multires_coupling_xyz(:,mesh_ctr), &
+                                      panel_id_multires_coupling(mesh_ctr),  &
+                                      multires_coupling_mesh_ids(mesh_ctr),  &
+                                      spherical_coords=.false.)
 
       end do
 

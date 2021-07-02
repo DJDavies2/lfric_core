@@ -59,7 +59,7 @@ contains
   !> @param[in,out]   u         3D wind field
   !> @param[in]       mesh_id   Mesh id of mesh on which the model runs
   !> @param[in]       timestep  Timestep
-  !> @param[in]       dt        The model imestep length
+  !> @param[in]       dt        The model timestep length
 subroutine set_winds(u, mesh_id, timestep, dt)
 
     implicit none

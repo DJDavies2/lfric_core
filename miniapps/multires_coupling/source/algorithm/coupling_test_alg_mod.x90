@@ -7,20 +7,27 @@
 !>@brief Coupling algorithm which tests the mapping capability for the multires_coupling miniapp
 module coupling_test_alg_mod
 
+  use compute_div_operator_kernel_mod,    only : compute_div_operator_kernel_type
   use constants_mod,                      only : i_def, r_def
-  use log_mod,                            only : log_event,         &
-                                                 LOG_LEVEL_INFO,    &
-                                                 LOG_LEVEL_ERROR
+  use fem_constants_mod,                  only : get_div
   use field_mod,                          only : field_type
   use finite_element_config_mod,          only : element_order
   use fs_continuity_mod,                  only : W2, W3
   use function_space_collection_mod,      only : function_space_collection
-  use operator_mod,                       only : operator_type
+  use function_space_mod,                 only : function_space_type
+  use log_mod,                            only : log_event,         &
+                                                 LOG_LEVEL_INFO,    &
+                                                 LOG_LEVEL_ERROR,   &
+                                                 log_scratch_space
   use matrix_vector_kernel_mod,           only : matrix_vector_kernel_type
-  use fem_constants_mod,                  only : get_div
-  use multires_coupling_config_mod,       only : multires_coupling_mesh_tags
-  use multires_coupling_mappings_alg_mod, only : map_scalars_alg
   use mesh_collection_mod,                only : mesh_collection
+  use mesh_mod,                           only : mesh_type
+  use multires_coupling_config_mod,       only : multires_coupling_mesh_tags
+  use multires_coupling_mappings_alg_mod, only : map_scalars_alg, &
+                                                 map_w2_vectors_alg
+  use operator_mod,                       only : operator_type
+  use restrict_mass_kernel_mod,           only : restrict_mass_kernel_type
+  use timestepping_config_mod,            only : dt
 
   implicit none
 
@@ -34,25 +41,35 @@ contains
   !> multires_coupling miniapp
   subroutine coupling_test_alg()
 
+    use cusph_cosmic_transport_alg_mod, only: set_winds
+
     implicit none
 
-    ! Divergence fields
-    type( field_type ) :: field_A_divergence
-    type( field_type ) :: field_B_divergence
+    ! Fields
+    type( field_type ) :: field_W2_A1
+    type( field_type ) :: field_W2_A2
+    type( field_type ) :: field_W3_A1
+    type( field_type ) :: field_W3_A2
+    type( field_type ) :: field_W2_B1
+    type( field_type ) :: field_W3_B1
+    type( field_type ) :: field_W3_B2
+    type( field_type ) :: field_diff
 
     ! Prognostic fields
-    type( field_type ) :: field_A
-    type( field_type ) :: field_B
+    type( function_space_type ), pointer :: W2_A => null()
+    type( function_space_type ), pointer :: W3_A => null()
+    type( function_space_type ), pointer :: W2_B => null()
+    type( function_space_type ), pointer :: W3_B => null()
 
-    real(kind=r_def)               :: s
-    integer(kind=i_def)            :: mesh_A_id
-    integer(kind=i_def)            :: mesh_B_id
-    type( operator_type ), pointer :: divergence_A => null()
+    type( operator_type ), pointer :: div_A
+    type( operator_type ), pointer :: div_B
+    type( mesh_type ),     pointer :: mesh_A => null()
+    type( mesh_type ),     pointer :: mesh_B => null()
 
-    ! Tolerance
-    real(kind=r_def) :: tol = 1-0e-12_r_def
-
-    real(kind=r_def) :: div_min, div_max
+    integer(kind=i_def) :: mesh_A_id
+    integer(kind=i_def) :: mesh_B_id
+    real(kind=r_def)    :: tol = 1.0
+    real(kind=r_def)    :: errornorm_sq, norm_sq
 
     call log_event( "multires_coupling: Running test algorithm", LOG_LEVEL_INFO )
 
@@ -65,34 +82,163 @@ contains
       mesh_B_id = mesh_collection%get_mesh_id(multires_coupling_mesh_tags(1))
     end if
 
-    ! Initialise fields
-    call field_A%initialise( function_space_collection%get_fs(mesh_A_id, element_order, W2) )
-    call field_B%initialise( function_space_collection%get_fs(mesh_B_id, element_order, W2) )
-    call field_A_divergence%initialise( function_space_collection%get_fs(mesh_A_id, element_order, W3) )
-    call field_B_divergence%initialise( function_space_collection%get_fs(mesh_B_id, element_order, W3) )
+    ! Initialise meshes, function spaces and common fields
+    W2_A => function_space_collection%get_fs(mesh_A_id, element_order, W2)
+    W3_A => function_space_collection%get_fs(mesh_A_id, element_order, W3)
+    W2_B => function_space_collection%get_fs(mesh_B_id, element_order, W2)
+    W3_B => function_space_collection%get_fs(mesh_B_id, element_order, W3)
 
-    ! Set the new field to a constant value and compute the divergence of it
-    divergence_A => get_div(mesh_A_id)
-    s = 2.0_r_def
+    call field_W2_A1%initialise( vector_space = W2_A )
+    call field_W2_B1%initialise( vector_space = W2_B )
+    call field_W3_A1%initialise( vector_space = W3_A )
+    call field_W3_B1%initialise( vector_space = W3_B )
 
-    call invoke ( name = "Compute_divergence",             &
-                  setval_c(field_A, s),                    &
-                  setval_c(field_B, s),                    &
-                  setval_c(field_A_divergence, 0.0_r_def), &
-                  setval_c(field_B_divergence, 0.0_r_def), &
-                  matrix_vector_kernel_type(field_A_divergence, field_A, divergence_A) )
-    call map_scalars_alg( field_A_divergence, field_B_divergence )
+    mesh_A => field_W2_A1%get_mesh()
+    mesh_B => field_W2_B1%get_mesh()
 
-    ! The divergence of a constant field should be zero. We check this is the case for the mapped field
-    ! and the non-mapped field
-    call field_A_divergence%log_minmax(LOG_LEVEL_INFO,'Source field divergence')
-    call field_B_divergence%log_minmax(LOG_LEVEL_INFO,'Mapped field divergence')
+    ! Get div operators
+    div_A => get_div(mesh_A_id)
+    div_B => get_div(mesh_B_id)
 
-    call field_B_divergence%field_minmax(div_min, div_max)
+    ! Initialise field A on W2
+    ! Initial field A on W3 is divergence of the W2 field
+    ! Note that this field is a 3-form, so represents a mass-like variable
+    call set_winds(field_W2_A1, mesh_A_id, 0_i_def, dt)
+    call invoke( setval_c(field_W3_A1, 0.0_r_def), &
+                 matrix_vector_kernel_type(field_W3_A1, field_W2_A1, div_A) )
 
-    if ( abs(div_min) > tol .or. div_max > tol ) then
-      call log_event( "Error: The divergence of the mapped field is incorrect ", LOG_LEVEL_ERROR )
-    end if
+    !--------------------------------------------------------------------------!
+    ! Coarse to fine
+    ! Check reversibility of mappings
+    !--------------------------------------------------------------------------!
+    if ( mesh_A%get_ncells() < mesh_B%get_ncells() ) then
+
+      ! We are checking that for fields in W2 and W3,
+      ! coarse field 1 == coarse field 2 where we have mapped:
+      !
+      !                 prolong              restrict
+      ! coarse field 1 ---------> fine field ---------> coarse field 2
+
+      call field_W2_A2%initialise( vector_space = W2_A )
+      call field_W3_A2%initialise( vector_space = W3_A )
+
+      ! Do mappings from mesh A to B and back
+      call map_w2_vectors_alg( field_W2_A1, field_W2_B1 )
+      call map_w2_vectors_alg( field_W2_B1, field_W2_A2 )
+      call map_scalars_alg( field_W3_A1, field_W3_B1 )
+      call map_scalars_alg( field_W3_B1, field_W3_A2 )
+
+      ! Check whether W2 fields on mesh A are comparable
+      call field_diff%initialise( vector_space = W2_A )
+      call invoke( X_minus_Y(field_diff, field_W2_A1, field_W2_A2), &
+                   X_innerproduct_X(errornorm_sq, field_diff),      &
+                   X_innerproduct_X(norm_sq, field_W2_A1)           )
+
+      tol = 1.0e-10_r_def
+      if ( sqrt(errornorm_sq / norm_sq) > tol ) then
+        call log_event("Error: The W2 fields on mesh A are inconsistent ", LOG_LEVEL_INFO)
+        write(log_scratch_space, '(A, E16.8)') 'Error: ', sqrt(errornorm_sq / norm_sq)
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+      end if
+
+      ! Check whether W3 fields on mesh A are comparable
+      call field_diff%initialise( vector_space = W3_A )
+      call invoke( X_minus_Y(field_diff, field_W3_A1, field_W3_A2), &
+                   X_innerproduct_X(errornorm_sq, field_diff),      &
+                   X_innerproduct_X(norm_sq, field_W3_A1)           )
+
+      tol = 1.0e-16_r_def
+      if ( sqrt(errornorm_sq / norm_sq) > tol ) then
+        call log_event("Error: The W3 fields on mesh A are inconsistent ", LOG_LEVEL_INFO)
+        write(log_scratch_space, '(A, E16.8)') 'Error: ', sqrt(errornorm_sq / norm_sq)
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+      end if
+
+    !--------------------------------------------------------------------------!
+    ! Fine to coarse
+    ! Check that mappings are consistent
+    !--------------------------------------------------------------------------!
+    else if ( mesh_B%get_ncells() < mesh_A%get_ncells() ) then
+
+      ! We are checking whether we get the same results taking both paths of:
+      !
+      ! fine W2 ----------------> coarse W2
+      !   |         restrict         |
+      !   | d                      d |
+      !   | i                      i |
+      !   | v                      v |
+      !   v      restrict (mass)     v
+      ! fine W3 ----------------> coarse W3
+
+      call field_W3_B2%initialise( vector_space = W3_B )
+
+      ! Do mappings
+      call map_w2_vectors_alg( field_W2_A1, field_W2_B1 )
+      ! Use mass restriction kernel
+      call invoke( setval_c(field_W3_B1, 0.0_r_def), &
+                   restrict_mass_kernel_type( field_W3_B1, field_W3_A1 ) )
+      ! Take divergence of W2 field on mesh B
+      call invoke( setval_c(field_W3_B2, 0.0_r_def), &
+                   matrix_vector_kernel_type( field_W3_B2, field_W2_B1, div_B) )
+
+      ! Check whether W3 fields on mesh B are comparable
+      call field_diff%initialise( vector_space = W3_B )
+      call invoke( X_minus_Y(field_diff, field_W3_B1, field_W3_B2), &
+                   X_innerproduct_X(errornorm_sq, field_diff),      &
+                   X_innerproduct_X(norm_sq, field_W3_B1)           )
+
+      tol = 1.0e-13_r_def
+      if ( sqrt(errornorm_sq / norm_sq) > tol ) then
+        call log_event("Error: The W3 fields on mesh B are inconsistent ", LOG_LEVEL_INFO)
+        write(log_scratch_space, '(A, E16.8)') 'Error: ', sqrt(errornorm_sq / norm_sq)
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+      end if
+
+    !--------------------------------------------------------------------------!
+    ! Meshes are the same
+    ! Check that fields are equal
+    !--------------------------------------------------------------------------!
+    else
+      ! Apply the mapping algorithms and check that answers are the same
+      call map_w2_vectors_alg( field_W2_A1, field_W2_B1 )
+      call map_scalars_alg( field_W3_A1, field_W3_B1 )
+
+      ! Check whether W2 fields are the same
+      call field_diff%initialise( vector_space = W2_A )
+      call invoke( X_minus_Y(field_diff, field_W2_A1, field_W2_B1), &
+                   X_innerproduct_X(errornorm_sq, field_diff),      &
+                   X_innerproduct_X(norm_sq, field_W2_A1)           )
+
+      tol = 1.0e-16_r_def
+      if ( sqrt(errornorm_sq / norm_sq) > tol ) then
+        call log_event("Error: The W2 fields are not equal ", LOG_LEVEL_INFO)
+        write(log_scratch_space, '(A, E16.8)') 'Error: ', sqrt(errornorm_sq / norm_sq)
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+      end if
+
+      ! Check whether W3 fields are the same
+      call field_diff%initialise( vector_space = W3_A )
+      call invoke( X_minus_Y(field_diff, field_W3_A1, field_W3_B1), &
+                   X_innerproduct_X(errornorm_sq, field_diff),      &
+                   X_innerproduct_X(norm_sq, field_W3_A1)           )
+
+      tol = 1.0e-16_r_def
+      if ( sqrt(errornorm_sq / norm_sq) > tol ) then
+        call log_event("Error: The W3 fields are not equal ", LOG_LEVEL_INFO)
+        write(log_scratch_space, '(A, E16.8)') 'Error: ', sqrt(errornorm_sq / norm_sq)
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+      end if
+
+    end if ! Different mesh combinations
+
+    nullify(mesh_A)
+    nullify(mesh_B)
+    nullify(W2_A)
+    nullify(W3_A)
+    nullify(W2_B)
+    nullify(W3_B)
+    nullify(div_A)
+    nullify(div_B)
 
     call log_event( "multires_coupling: finished test algorithm", LOG_LEVEL_INFO )
 

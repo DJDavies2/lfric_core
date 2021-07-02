@@ -41,7 +41,8 @@ module fem_constants_mod
                                                 shifted_mesh_label,      &
                                                 double_level_mesh_label, &
                                                 twod_mesh_label,         &
-                                                multigrid_mesh_label
+                                                multigrid_mesh_label,    &
+                                                extra_mesh_label
 
   ! Kernels
   use calc_detj_at_w2_kernel_mod,         only: calc_detj_at_w2_kernel_type
@@ -368,7 +369,8 @@ contains
       !======================== Diagonal mass matrices ========================!
 
       if ( label_list(i) == primary_mesh_label .or. &
-           label_list(i) == shifted_mesh_label ) then
+           label_list(i) == shifted_mesh_label .or. &
+           label_list(i) == extra_mesh_label ) then
         ! Initialise fields
         call mm2_diag(i)%initialise( vector_space = w2_fs )
         call mm3_diag(i)%initialise( vector_space = w3_fs )
