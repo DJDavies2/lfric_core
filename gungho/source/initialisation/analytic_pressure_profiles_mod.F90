@@ -44,7 +44,8 @@ use idealised_config_mod,       only : test_cold_bubble_x,           &
                                        test_curl_free_reversible,    &
                                        test_rotational,              &
                                        test_translational,           &
-                                       test_vertical_cylinder
+                                       test_vertical_cylinder,       &
+                                       test_specified_profiles
 use initial_density_config_mod, only : r1, x1, y1, z1, r2, x2, y2, z2, &
                                        tracer_max, tracer_background
 use base_mesh_config_mod,       only : geometry, &
@@ -155,7 +156,7 @@ contains
     select case( choice )
     case (test_gravity_wave, test_isentropic, &
           test_isot_atm, test_isot_cold_atm,  &
-          test_const_lapse_rate)
+          test_const_lapse_rate, test_specified_profiles)
       call reference_profile(pressure, density, temperature, chi, choice)
 
     case (test_cold_bubble_x, test_cold_bubble_y )

@@ -96,7 +96,7 @@
                                                     'schar_cart_8s', 'schar_cart_8s_inconsistent', 'schar_cart_40s', 'bell_3d_cart',
                                                     'baroclinic-split','sbr-split','sbr_80km-split',
                                                     'straka_200m-cosmic', 'robert-cosmic',
-                                                    'baroclinic48', 'baroclinic96', 'default' ] } %}
+                                                    'baroclinic48', 'baroclinic96', 'profile_init', 'default' ] } %}
 
 {%- set canned_configurations = ['gungho'] %}
 
@@ -213,6 +213,11 @@
                                                    "threads":1, "use_xios":"False",
                                                    "wallclock":"02:00:00"}}},
                      plotstr="straka_plot_x.py ' + appDiagStemName + ' $NODAL_DATA_DIR 128 16 theta T000090 $PLOT_DIR" )',
+    'run_application("gungho", "profile_init",
+                     resolutions=[("BiP4x4-600x400",10.0)],
+                     env={"nrun":10,
+                          "directives":{"default":{"use_xios":"True"} } },
+                     plotstr="profile_plot.py $NODAL_DATA_DIR theta:m_v geometric 38 40 $PLOT_DIR")',
     'run_application("gungho", "robert",
                      resolutions=[("BiP50x4-20x20",2.5)],
                      env={"crun":3, "nrun":144,

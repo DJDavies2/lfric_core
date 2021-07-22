@@ -55,6 +55,17 @@ module set_rho_kernel_mod_test
   real(r_def), parameter :: theta_surf = 300.0_r_def
   real(r_def), parameter :: pert_width_scaling = 1.0_r_def
 
+  integer(i_def),                                                  &
+               parameter :: profile_size       = 4
+  real(r_def), parameter :: profile_data(4)    = (/ 280.0_r_def,   &
+                                                    300.0_r_def,   &
+                                                    305.0_r_def,   &
+                                                    400.0_r_def /)
+  real(r_def), parameter :: profile_heights(4) = (/ 500.0_r_def,   &
+                                                    4.0e3_r_def,   &
+                                                    4.0e3_r_def,   &
+                                                    40.0e3_r_def /)
+
   real(r_def), parameter :: surface_pressure = 1000.0e2_r_def
 
 contains
@@ -115,9 +126,12 @@ contains
                                        r2=0.0_r_def, x2=0.0_r_def,            &
                                        y2=y2,        z2=0.0_r_def)
 
-    call feign_initial_temperature_config( bvf_square=bvf_square, &
-                                           theta_surf=theta_surf, &
-                                           pert_width_scaling=pert_width_scaling )
+    call feign_initial_temperature_config( bvf_square=bvf_square,                 &
+                                           theta_surf=theta_surf,                 &
+                                           pert_width_scaling=pert_width_scaling, &
+                                           profile_size=profile_size,             &
+                                           profile_data=profile_data,             &
+                                           profile_heights=profile_heights )
 
     call feign_initial_pressure_config( method = method_balanced,             &
                                         surface_pressure = surface_pressure )

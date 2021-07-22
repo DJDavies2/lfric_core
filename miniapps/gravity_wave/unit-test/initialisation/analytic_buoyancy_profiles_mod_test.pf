@@ -8,7 +8,7 @@
 
 module analytic_buoyancy_profiles_mod_test
 
-  use constants_mod, only : r_def
+  use constants_mod, only : r_def, i_def
   use yaxt, only : xt_initialize, xt_finalize
   use mpi_mod, only : store_comm, clear_comm
   use pFUnit_Mod
@@ -34,9 +34,13 @@ module analytic_buoyancy_profiles_mod_test
   real(r_def), parameter :: rd      = 300.0_r_def
   real(r_def), parameter :: cp      = 1000.0_r_def
   real(r_def), parameter :: scaling = 1.0_r_def
-  real(r_def), parameter :: bvf_square = 0.0001_r_def
-  real(r_def), parameter :: theta_surf = 300.0_r_def
-  real(r_def), parameter :: pert_width_scaling = 1.0_r_def
+
+  real(r_def),    parameter :: bvf_square         = 0.0001_r_def
+  real(r_def),    parameter :: profile_data(1)    = (/ 300.0_r_def /)
+  real(r_def),    parameter :: profile_heights(1) = (/ 0.0_r_def /)
+  real(r_def),    parameter :: theta_surf         = 300.0_r_def
+  real(r_def),    parameter :: pert_width_scaling = 1.0_r_def
+  integer(i_def), parameter :: profile_size       = 1_i_def
 
   real(r_def), parameter :: surface_pressure = 1000.0e2_r_def
 
@@ -69,8 +73,11 @@ contains
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
-    call feign_initial_temperature_config( bvf_square=bvf_square, &
-                                           theta_surf=theta_surf, &
+    call feign_initial_temperature_config( bvf_square=bvf_square,           &
+                                           profile_data=profile_data,       &
+                                           profile_heights=profile_heights, &
+                                           profile_size=profile_size,       &
+                                           theta_surf=theta_surf,           &
                                            pert_width_scaling=pert_width_scaling )
 
     call feign_initial_pressure_config( method=method_balanced,             &

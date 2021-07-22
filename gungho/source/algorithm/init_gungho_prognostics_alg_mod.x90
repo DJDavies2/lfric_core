@@ -16,6 +16,7 @@ module init_gungho_prognostics_alg_mod
   use constants_mod,                   only: r_def, i_def,      &
                                              str_short
   use mass_matrix_solver_alg_mod,      only: mass_matrix_solver_alg
+  use init_thermo_profile_alg_mod,     only: init_thermo_profile_alg
   use dg_matrix_vector_kernel_mod,     only: dg_matrix_vector_kernel_type
   use geometric_constants_mod,         only: get_coordinates, &
                                              get_panel_id,    &
@@ -32,6 +33,7 @@ module init_gungho_prognostics_alg_mod
                                              eos_method,           &
                                              eos_method_sampled,   &
                                              eos_method_projected
+  use idealised_config_mod,            only: test, test_specified_profiles
   use initial_pressure_config_mod,     only: method,           &
                                              method_sampled,   &
                                              method_projected, &
@@ -79,7 +81,7 @@ module init_gungho_prognostics_alg_mod
 
   ! Handles
   use fs_continuity_mod,               only: W1, W3, Wtheta
-  use mr_indices_mod,                  only: nummr, mr_names
+  use mr_indices_mod,                  only: nummr, mr_names, imr_v
   use moist_dyn_mod,                   only: num_moist_factors, gas_law
   implicit none
 
@@ -137,17 +139,10 @@ contains
     panel_id => get_panel_id(mesh_id)
     m3_inv => get_inverse_w3_mass_matrix(mesh_id)
 
-    ! Default is dry dynamics - set moist dynamics factors to one
-    do i = 1, num_moist_factors
-      call invoke( setval_c( moist_dyn(i), 1.0_r_def) )
-    end do
-
     !=== Initialise global prognostic fields ==================================!
 
     call log_event( "Gungho: Initialising prognostic fields", LOG_LEVEL_INFO )
 
-    ! Initialise theta
-    call invoke( initial_theta_kernel_type( theta, chi_sph, panel_id ) )
 
     initial_time = 0.0_r_def
 
@@ -200,6 +195,15 @@ contains
         call mass_matrix_solver_alg(u, r_u)
       end if
     end if
+
+    ! Initialise potential temperature and water vapour
+    call set_bundle_scalar(0.0_r_def, mr, nummr)
+    if ( test == test_specified_profiles ) then
+      call init_thermo_profile_alg( theta, mr(imr_v) )
+    else
+      call invoke( initial_theta_kernel_type( theta, chi_sph, panel_id ) )
+    end if
+    call invoke( moist_dyn_factors_kernel_type( moist_dyn, mr, recip_epsilon ) )
 
     ! Initialise Exner pressure according to formulation
     select case(method)
@@ -263,7 +267,7 @@ contains
           call invoke( setval_X(mr(i), theta) )
         end do
         call invoke( moist_dyn_factors_kernel_type( moist_dyn, mr, recip_epsilon ) )
-      else
+      else if (test /= test_specified_profiles) then
         ! Initialise moisture and update factors for moist dynamics
         call invoke( initial_mr_kernel_type( theta, exner, rho, mr, &
                                              p_zero, rd, kappa ),   &

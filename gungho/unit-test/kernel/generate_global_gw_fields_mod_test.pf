@@ -6,7 +6,7 @@
 
 module generate_global_gw_fields_mod_test
 
-  use constants_mod, only: r_def
+  use constants_mod, only: r_def, i_def
   use yaxt, only : xt_initialize, xt_finalize
   use mpi_mod, only : store_comm, clear_comm
   use pFUnit_Mod
@@ -28,6 +28,16 @@ module generate_global_gw_fields_mod_test
   real(r_def), parameter :: bvf_square = 0.0001_r_def
   real(r_def), parameter :: theta_surf = 300.0_r_def
   real(r_def), parameter :: pert_width_scaling = 1.0_r_def
+
+  integer(kind=i_def), parameter :: profile_size       = 4
+  real(kind=r_def),    parameter :: profile_data(4)    = (/ 280.0_r_def,   &
+                                                            300.0_r_def,   &
+                                                            305.0_r_def,   &
+                                                            400.0_r_def /)
+  real(kind=r_def),    parameter :: profile_heights(4) = (/ 500.0_r_def,   &
+                                                            4.0e3_r_def,   &
+                                                            4.0e3_r_def,   &
+                                                            40.0e3_r_def /)
 
   real(r_def), parameter :: gravity  = 10.0_r_def
   real(r_def), parameter :: radius   = 6000000_r_def
@@ -65,9 +75,12 @@ contains
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
-    call feign_initial_temperature_config( bvf_square=bvf_square, &
-                                           theta_surf=theta_surf, &
-                                           pert_width_scaling=pert_width_scaling )
+    call feign_initial_temperature_config( bvf_square=bvf_square,                 &
+                                           theta_surf=theta_surf,                 &
+                                           pert_width_scaling=pert_width_scaling, &
+                                           profile_size=profile_size,             &
+                                           profile_data=profile_data,             &
+                                           profile_heights=profile_heights )
 
     call feign_initial_pressure_config( method = method_balanced,             &
                                         surface_pressure = surface_pressure )
