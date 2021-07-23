@@ -54,7 +54,8 @@
             ROSE_APP_OPT_CONF_KEYS = {{um2lfric_configs[um2lfric_config]["opt_config"]}}
             NUMBER_OF_LAYERS = {{um2lfric_configs[um2lfric_config]["target_grid_levs"]}}
             SOURCE_DUMP = {{um2lfric_configs[um2lfric_config]["source_dump"]}}
-            LFRIC_MESH_FILE = {{um2lfric_configs[um2lfric_config]["lfric_mesh"]}}
+            LFRIC_MESH_FILE = {{um2lfric_configs[um2lfric_config]["lfric_mesh"]["file"]}}
+            LFRIC_MESH_NAME = {{um2lfric_configs[um2lfric_config]["lfric_mesh"]["name"]}}
             WEIGHT_LOC = $ROSE_SUITE_DIR_REL/work/1/generate_weights-um2lfric-{{um2lfric_config}}
 
   {% set util_name = "lfric2um" %}
@@ -73,7 +74,8 @@
             ROSE_APP_OPT_CONF_KEYS = {{lfric2um_configs[lfric2um_config]["opt_config"]}}
             NUMBER_OF_LAYERS = {{lfric2um_configs[lfric2um_config]["source_grid_levs"]}}
             SOURCE_DUMP = $ROSE_SUITE_DIR/work/1/um2lfric-{{build}}-{{um2lfric_config}}_um2um/checkpoint_um2lfric_000001.nc
-            LFRIC_MESH_FILE = {{lfric2um_configs[lfric2um_config]["lfric_mesh"]}}
+            LFRIC_MESH_FILE = {{lfric2um_configs[lfric2um_config]["lfric_mesh"]["file"]}}
+            LFRIC_MESH_NAME = {{lfric2um_configs[lfric2um_config]["lfric_mesh"]["name"]}}
             WEIGHT_LOC = $ROSE_SUITE_DIR_REL/work/1/generate_weights-lfric2um-{{lfric2um_config}}
 
     {% set task_name = "integration-" + build + "-um2um" %}

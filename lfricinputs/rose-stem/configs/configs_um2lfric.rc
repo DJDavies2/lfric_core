@@ -10,10 +10,12 @@
                                "opt_config"         : "aquaplanet",
                                "source_grid_res"    : "N48",
                                "source_grid_levs"   : "38",
+                               "source_grid_type"   : "global",
                                "target_grid_res"    : C_NUM,
                                "target_grid_levs"   : "38",
+                               "target_grid_type"   : "global",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/aquaplanet_llama.n48",
-                               "lfric_mesh"         : "$BIG_DATA_DIR/meshes/pre-Nyala/mesh_"~C_NUM~".nc",
+                               "lfric_mesh"         : {"file":"$BIG_DATA_DIR/meshes/pre-Nyala/mesh_"~C_NUM~".nc", "name":"dynamics"},
                              },
 
 
@@ -22,11 +24,30 @@
                                "opt_config"         : "basicgagl",
                                "source_grid_res"    : "N96",
                                "source_grid_levs"   : "38",
+                               "source_grid_type"   : "global",
                                "target_grid_res"    : C_NUM,
                                "target_grid_levs"   : "38",
+                               "target_grid_type"   : "global",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/basic_gagl_noorog.astart",
-                               "lfric_mesh"         : "$BIG_DATA_DIR/meshes/pre-Nyala/mesh_"~C_NUM~".nc",
+                               "lfric_mesh"         : {"file":"$BIG_DATA_DIR/meshes/pre-Nyala/mesh_"~C_NUM~".nc", "name":"dynamics"},
                              },
 
 }) %}
 {% endfor %}
+
+{% do um2lfric_configs.update({
+
+"aquaplanet_lam"           : {
+                               "app"                : "um2lfric",
+                               "opt_config"         : "aquaplanet_lam",
+                               "source_grid_res"    : "",
+                               "source_grid_levs"   : "70",
+                               "source_grid_type"   : "regional",
+                               "target_grid_res"    : "",
+                               "target_grid_levs"   : "70",
+                               "target_grid_type"   : "regional",
+                               "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/RA2M_astart",
+                               "lfric_mesh"         : {"file":"$BIG_DATA_DIR/meshes/Quagga/aquaplanet_lam.nc", "name":"dynamics"},
+                             },
+
+}) %}

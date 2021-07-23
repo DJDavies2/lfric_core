@@ -89,7 +89,7 @@ TYPE(lfricinp_grid_type) :: self
 ! Local variables
 ! Parameters for accessing UM header information
 ! Horizontal grid indicator values
-INTEGER(KIND=int64), PARAMETER :: global_grid = 0
+INTEGER(KIND=int64), PARAMETER :: global_grid = 0, lam_no_wrap = 3
 ! Grid sizes - integer header
 INTEGER(KIND=int64), PARAMETER :: ih_num_p_points_x = 6
 INTEGER(KIND=int64), PARAMETER :: ih_num_p_points_y = 7
@@ -122,11 +122,13 @@ CALL shumlib(routinename//'::get_integer_constants', &
 CALL shumlib(routinename//'::get_real_constants', &
       um_input_file % get_real_constants(um_file_real_constants))
 
-! Check that we have a global grid
-IF(um_file_fixed_length_header(horiz_grid_type) /= global_grid) THEN
-   WRITE(log_scratch_space, '(A,I0)') "Unsupported horiz grid type. Fixed header(4) = ", &
-       um_file_fixed_length_header(horiz_grid_type)
-  CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
+! Check that we have a global grid or a LAM with no wrapping
+IF(um_file_fixed_length_header(horiz_grid_type) /= global_grid .AND.           &
+   um_file_fixed_length_header(horiz_grid_type) /= lam_no_wrap      ) THEN
+   WRITE(log_scratch_space, '(A,I0)') "Unsupported horiz grid type. " //       &
+                                      " Fixed header(4) = ",                   &
+                            um_file_fixed_length_header(horiz_grid_type)
+   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END IF
 
 CALL self%set_grid_coords(                                              &

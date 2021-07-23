@@ -8,10 +8,13 @@
         [[[environment]]]
             MPIRUN_N_JOBS = 8
             INTERPOLATION_DIRECTION = um2lfric
-            WEIGHT_GEN_OPTION = specified-resolution
-            UM_START_DUMP =
-            UM_GRID_RESOLUTION = {{um2lfric_configs[config]["source_grid_res"] | replace("N", "")}}
-            LFRIC_MESH_FILE = {{um2lfric_configs[config]["lfric_mesh"]}}
+            WEIGHT_GEN_OPTION = dump-file
+            UM_START_DUMP = {{um2lfric_configs[config]["source_dump"]}}
+            UM_GRID_RESOLUTION =
+            LFRIC_MESH_FILE = {{um2lfric_configs[config]["lfric_mesh"]["file"]}}
+            LFRIC_MESH_NAME = {{um2lfric_configs[config]["lfric_mesh"]["name"]}}
+            GRID_TYPE_UM = {{um2lfric_configs[config]["source_grid_type"]}}
+            GRID_TYPE_LFRIC = {{um2lfric_configs[config]["target_grid_type"]}}
         [[[directives]]]
             --mem=16384
             --ntasks=8
@@ -29,7 +32,10 @@
             WEIGHT_GEN_OPTION = specified-resolution
             UM_START_DUMP =
             UM_GRID_RESOLUTION = {{lfric2um_configs[config]["target_grid_res"] | replace("N", "")}}
-            LFRIC_MESH_FILE = {{lfric2um_configs[config]["lfric_mesh"]}}
+            LFRIC_MESH_FILE = {{lfric2um_configs[config]["lfric_mesh"]["file"]}}
+            LFRIC_MESH_NAME = {{lfric2um_configs[config]["lfric_mesh"]["name"]}}
+            GRID_TYPE_UM = {{lfric2um_configs[config]["target_grid_type"]}}
+            GRID_TYPE_LFRIC = {{lfric2um_configs[config]["source_grid_type"]}}
         [[[directives]]]
             --mem=16384
             --ntasks=8
@@ -47,7 +53,10 @@
             WEIGHT_GEN_OPTION = specified-resolution
             UM_START_DUMP =
             UM_GRID_RESOLUTION = {{skeleton_configs[config]["source_grid_res"] | replace("N", "")}}
-            LFRIC_MESH_FILE = {{skeleton_configs[config]["lfric_mesh"]}}
+            LFRIC_MESH_FILE = {{skeleton_configs[config]["lfric_mesh"]["file"]}}
+            LFRIC_MESH_NAME = {{skeleton_configs[config]["lfric_mesh"]["name"]}}
+            GRID_TYPE_UM = {{skeleton_configs[config]["source_grid_type"]}}
+            GRID_TYPE_LFRIC = {{skeleton_configs[config]["target_grid_type"]}}
         [[[directives]]]
             --mem=16384
             --ntasks=8

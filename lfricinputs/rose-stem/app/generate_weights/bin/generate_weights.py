@@ -26,8 +26,8 @@ class INTER:
         self.um_grid_type = None
         self.um_grid_path = None
 
-    def get_environment_info(self):
-        """get information from environment variables"""
+    def set_regrid_info(self):
+        """Set information from environment variables"""
         self.method = os.environ.get('INT_METHOD')
         self.pole = os.environ.get('INT_POLE')
         self.unmapped = os.environ.get('INT_UNMAPPED')
@@ -35,18 +35,19 @@ class INTER:
         self.area = os.environ.get('INT_AREA')
         self.line = os.environ.get('INT_LANE')
         self.norm = os.environ.get('INT_NORM')
-        self.lfric_grid_type = os.environ.get('GRID_TYPE_LFRIC')
-        self.lfric_grid_path = os.environ.get('GRID_PATH_LFRIC')
+        self.interpolation_direction = os.environ.get('INT_DIRECT')
         self.um_grid_type = os.environ.get('GRID_TYPE_UM')
         self.um_grid_path = os.environ.get('GRID_PATH_UM')
-        self.interpolation_direction = os.environ.get('INT_DIRECT')
-
+        self.lfric_grid_type = os.environ.get('GRID_TYPE_LFRIC')
+        self.lfric_grid_path = os.environ.get('GRID_PATH_LFRIC')
+        
     def set_arguments_um2lfric(self):
         """Set ESMF regrid command line options"""
         options = ' -s ' + self.um_grid_path
         options = options + ' -d ' + self.lfric_grid_path
         options = options + ' --dst_loc center'
         options = options + ' --64bit_offset --check -m ' + self.method
+        options = options + ' --extrap_method neareststod'
         if self.um_grid_type == 'regional':
             options = options + ' --src_regional '
         if self.lfric_grid_type == 'regional':
@@ -156,7 +157,7 @@ def run_exe(arg, outfile, style):
 
 if __name__ == "__main__":
     MY_INTER = INTER()
-    MY_INTER.get_environment_info()
+    MY_INTER.set_regrid_info()
     MY_INTER.print_info()
     style = os.environ.get('FORMAT')
     direct = os.environ.get('INT_DIRECT')

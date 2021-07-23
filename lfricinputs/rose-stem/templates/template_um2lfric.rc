@@ -38,7 +38,8 @@
             NUMBER_OF_LAYERS = {{um2lfric_configs[config]["target_grid_levs"]}}
             SOURCE_DUMP = {{um2lfric_configs[config]["source_dump"]}}
 	    TARGET_GRID_RES={{um2lfric_configs[config]["target_grid_res"]}}
-            LFRIC_MESH_FILE = {{um2lfric_configs[config]["lfric_mesh"]}}
+            LFRIC_MESH_FILE = {{um2lfric_configs[config]["lfric_mesh"]["file"]}}
+            LFRIC_MESH_NAME = {{um2lfric_configs[config]["lfric_mesh"]["name"]}}
             WEIGHT_LOC = $ROSE_SUITE_DIR_REL/work/1/generate_weights-um2lfric-{{config}}
 
     {% set task_name = "um2lfric-" + build + "-" + config %}

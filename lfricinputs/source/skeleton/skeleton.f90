@@ -12,6 +12,7 @@ USE lfricinp_lfric_driver_mod, ONLY: lfricinp_initialise_lfric, mesh_id, &
      twod_mesh_id, lfric_fields
 USE lfricinp_initialise_um_mod, ONLY: lfricinp_initialise_um, um_input_file
 USE lfricinp_um_grid_mod, ONLY: um_grid
+USE lfricinp_regrid_options_mod, ONLY: lfricinp_init_regrid_options
 
 ! skeleton modules
 USE skeleton_namelists_mod, ONLY: skeleton_nl_fname, lfric_nl_fname, &
@@ -23,6 +24,9 @@ IMPLICIT NONE
 
 ! Read command line args
 CALL lfricinp_read_command_line_args(skeleton_nl_fname, lfric_nl_fname)
+
+! Read in global regrid options
+CALL lfricinp_init_regrid_options(skeleton_nl_fname)
 
 ! Initialise LFRic Infrastructure
 CALL lfricinp_initialise_lfric("skeleton", lfric_nl_fname, required_lfric_namelists)

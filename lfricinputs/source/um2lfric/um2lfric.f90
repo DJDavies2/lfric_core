@@ -15,15 +15,16 @@ USE lfricinp_create_lfric_fields_mod, ONLY: lfricinp_create_lfric_fields
 USE lfricinp_um_grid_mod, ONLY: um_grid
 USE lfricinp_initialise_um_mod, ONLY: lfricinp_initialise_um, &
     lfricinp_finalise_um, um_input_file
+USE lfricinp_regrid_options_mod, ONLY: lfricinp_init_regrid_options
 ! um2lfric modules
 USE um2lfric_namelist_mod, ONLY: um2lfric_config, required_lfric_namelists
-USE um2lfric_partition_weights_mod, ONLY: um2lfric_partition_weights
 USE um2lfric_initialise_um2lfric_mod, ONLY: um2lfric_initialise_um2lfric
-USE um2lfric_init_masked_field_adjustments_mod, ONLY: &
-             um2lfric_init_masked_field_adjustments
-USE um2lfric_main_loop_mod, ONLY: um2lfric_main_loop
+USE um2lfric_regrid_fields_mod, ONLY: um2lfric_regrid_fields
+
 ! LFRic modules
 USE log_mod,         ONLY: log_event, LOG_LEVEL_INFO
+
+USE lfric_xios_write_mod, ONLY: write_state
 
 ! External libraries
 USE xios, ONLY: xios_context_finalize
@@ -35,8 +36,11 @@ CHARACTER(LEN=fnamelen) :: um2lfric_fname
 
 CALL lfricinp_read_command_line_args(um2lfric_fname, lfric_fname)
 
-! Read um2lfric namelist
+! Read um2lfric configuration namelist
 CALL um2lfric_config%load_namelist(um2lfric_fname)
+
+! Read in global regrid options
+CALL lfricinp_init_regrid_options(um2lfric_fname)
 
 ! Initialise LFRic Infrastructure
 CALL lfricinp_initialise_lfric(program_name_arg="um2lfric", &
@@ -58,15 +62,11 @@ CALL lfricinp_create_lfric_fields(mesh_id, twod_mesh_id,  &
 ! Initialise LFRic ancils field collection
 CALL lfricinp_create_ancil_fields(ancil_fields, mesh_id, twod_mesh_id)
 
-! If running in parallel then partition the weights files
-CALL um2lfric_partition_weights()
+! Regrid from UM fields to lfric fields
+CALL um2lfric_regrid_fields()
 
-! Now initialise masked points that requires post regridding addjustments
-CALL um2lfric_init_masked_field_adjustments()
-
-! Loop over all the stashcodes and regrid from UM field to
-! lfric field
-CALL um2lfric_main_loop()
+! Write lfric fields to output
+CALL write_state(lfric_fields)
 
 ! Unloads data from memory and closes UM input file
 CALL lfricinp_finalise_um()

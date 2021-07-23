@@ -24,14 +24,15 @@ def run_command(command):
         raise Exception(' '.join(command) + ' failed.')
 
 
-def weight_gen(um_ptype):
+def weight_gen(um_ptype, int_method):
     os.environ["GRID"] = um_ptype
+    os.environ["INT_METHOD"] = int_method
     os.environ["GRID_PATH_UM"] = "UM_grid_" + um_ptype + ".nc"
     direct = os.environ.get('INT_DIRECT')
     if direct == 'um2lfric':
-        outfilename = um_ptype + "_to_FACE_CENTRE.nc"
+        outfilename = um_ptype + "_to_FACE_CENTRE_" + int_method + ".nc"
     elif direct == 'lfric2um':
-        outfilename = "FACE_CENTRE_to_" + um_ptype + ".nc"
+        outfilename = "FACE_CENTRE_to_" + um_ptype + "_" + int_method + ".nc"
     else:
         print('Interpolation direction not supported')
 
@@ -52,4 +53,5 @@ if __name__ == "__main__":
     else:
         raise Exception('UM grid generation input option invalid')
     for um_ptype in ["P", "U", "V"]:
-        weight_gen(um_ptype)
+        for int_method in ["bilinear", "neareststod"]:
+            weight_gen(um_ptype, int_method)

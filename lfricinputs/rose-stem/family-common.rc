@@ -15,17 +15,17 @@
             BIG_DATA_DIR = /data/users/lfric/data
 {% if SPICE %}
         [[[directives]]]
-            --mem=16384
+            --mem=40960
             --gres=tmp:2048
             --partition=rhel7
         [[[job]]]
             batch system = slurm
-            execution time limit = PT15M
+            execution time limit = PT45M
 {% else %}
         [[[remote]]]
             host = {{ ROSE_ORIG_HOST }}
         [[[job]]]
-            execution time limit = PT15M
+            execution time limit = PT45M
 {% endif %}
 
 {% for tasks in [1, 2, 6, 12, 18, 24] %}
@@ -79,7 +79,7 @@
             -S = /bin/bash
         [[[job]]]
             batch system = pbs
-            execution time limit = PT20M
+            execution time limit = PT45M
 
 {% for tasks in [1, 2, 6] %}
     [[METO_XC40_{{tasks}}_TASKS]]

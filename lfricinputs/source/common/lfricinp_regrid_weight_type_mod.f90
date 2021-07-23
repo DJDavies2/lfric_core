@@ -55,7 +55,7 @@ CONTAINS
 
 SUBROUTINE regrid_src_2d_dst_1d(self, src, dst)
 
-! Apply weights to perform copy between source and destination
+! Apply weights to perform regrid between source and destination
 ! Uses real arrays, could be overloaded for different types,
 ! precision and shapes
 REAL(KIND=real64), INTENT(IN) :: src(:,:)

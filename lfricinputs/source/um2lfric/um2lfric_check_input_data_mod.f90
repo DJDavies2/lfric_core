@@ -38,7 +38,7 @@ TYPE(shum_file_type), INTENT(INOUT) :: um_input_file
 ! Dataset type indicator values - fixed header
 INTEGER(KIND=int64), PARAMETER :: inst_dump = 1
 ! Horizontal grid indicator values- fixed header
-INTEGER(KIND=int64), PARAMETER :: global_grid = 0
+INTEGER(KIND=int64), PARAMETER :: global_grid = 0, lam_no_wrap = 3
 ! Grid staggering indicator values - fixed header
 INTEGER(KIND=int64), PARAMETER :: arakawa_C_endgame = 6
 INTEGER(KIND=int64), PARAMETER :: arakawa_C_nd = 3
@@ -104,8 +104,8 @@ END IF
 CALL shumlib(routinename//'::get_fixed_length_header_by_index',                &
      um_input_file % get_fixed_length_header_by_index(                         &
      horiz_grid_type, dump_grid_type))
-! Check that we have a global grid
-IF (dump_grid_type /= global_grid) THEN
+! Check that we have a global grid or LAM with no wrapping
+IF (dump_grid_type /= global_grid .AND. dump_grid_type /= lam_no_wrap ) THEN
    WRITE(log_scratch_space, '(A,I0)')                                          &
      "Unsupported horiz grid type. Fixed header(4) = ", dump_grid_type
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)

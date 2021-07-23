@@ -10,6 +10,11 @@
   "um2lfric-spice_ifort_gcc_safe-aquaplanet_N48L38_C48L38"           : BASE~"_t2441",
   "um2lfric-spice_ifort_gcc_rigorous-aquaplanet_N48L38_C48L38"       : BASE~"_t2441",
 
+  "um2lfric-spice_gfortran_gcc_safe-aquaplanet_lam"                  : BASE~"_t2270",
+  "um2lfric-spice_gfortran_gcc_rigorous-aquaplanet_lam"              : BASE~"_t2270",
+  "um2lfric-spice_ifort_gcc_safe-aquaplanet_lam"                     : BASE~"_t2270",
+  "um2lfric-spice_ifort_gcc_rigorous-aquaplanet_lam"                 : BASE~"_t2270",
+
   "um2lfric-spice_gfortran_gcc_safe-basicgagl_N96L38_C12L38"         : BASE~"_t2081",
   "um2lfric-spice_gfortran_gcc_rigorous-basicgagl_N96L38_C12L38"     : BASE~"_t2081",
   "um2lfric-spice_ifort_gcc_safe-basicgagl_N96L38_C12L38"            : BASE~"_t2081",
@@ -39,6 +44,11 @@
   "um2lfric-xc40_crayftn_craycc_rigorous-aquaplanet_N48L38_C48L38"   : BASE,
   "um2lfric-xc40_ifort_icc_safe-aquaplanet_N48L38_C48L38"            : BASE~"_t2441",
   "um2lfric-xc40_ifort_icc_rigorous-aquaplanet_N48L38_C48L38"        : BASE~"_t2441",
+
+  "um2lfric-xc40_crayftn_craycc_safe-aquaplanet_lam"                 : BASE,
+  "um2lfric-xc40_crayftn_craycc_rigorous-aquaplanet_lam"             : BASE,
+  "um2lfric-xc40_ifort_icc_safe-aquaplanet_lam"                      : BASE~"_t2270",
+  "um2lfric-xc40_ifort_icc_rigorous-aquaplanet_lam"                  : BASE~"_t2270",
 
   "um2lfric-xc40_crayftn_craycc_safe-basicgagl_N96L38_C12L38"        : BASE,
   "um2lfric-xc40_crayftn_craycc_rigorous-basicgagl_N96L38_C12L38"    : BASE,

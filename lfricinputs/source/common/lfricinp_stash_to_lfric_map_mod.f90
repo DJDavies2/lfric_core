@@ -10,11 +10,14 @@ USE, INTRINSIC :: iso_fortran_env, ONLY : int64
 ! lfric modules
 USE constants_mod, ONLY: str_def, imdi
 USE log_mod,  ONLY : log_event, log_scratch_space, LOG_LEVEL_ERROR
+
 IMPLICIT NONE
 
 PRIVATE
 
-PUBLIC :: lfricinp_init_stash_to_lfric_map, get_field_name
+PUBLIC :: lfricinp_init_stash_to_lfric_map, get_field_name,                    &
+          get_lfric_field_kind, w2h_field, w3_field, w3_field_2d,              &
+          w3_soil_field, wtheta_field
 
 INTEGER(KIND=int64), PARAMETER :: max_lfric_field_names = 500
 CHARACTER(LEN=str_def) :: field_name(max_lfric_field_names)
@@ -29,6 +32,12 @@ INTEGER(KIND=int64), SAVE :: field_counter = 0
 ! field names. This intermediate step is used to avoid having a hugely
 ! oversized character array
 INTEGER(KIND=int64) :: get_index(99999) = int(imdi, int64)
+
+INTEGER(KIND=int64), PARAMETER :: w2h_field     = 1
+INTEGER(KIND=int64), PARAMETER :: w3_field      = 2
+INTEGER(KIND=int64), PARAMETER :: w3_field_2d   = 3
+INTEGER(KIND=int64), PARAMETER :: w3_soil_field = 4
+INTEGER(KIND=int64), PARAMETER :: wtheta_field  = 5
 
 CONTAINS
 
@@ -53,6 +62,7 @@ USE lfricinp_stashmaster_mod, ONLY: &
     stashcode_mcl, stashcode_mcf, stashcode_mr, stashcode_ddmfx,              &
     stashcode_tstar_sea, stashcode_tstar_sice, stashcode_sea_ice_temp,        &
     stashcode_z0
+USE lfricinp_regrid_options_mod, ONLY: winds_on_w3
 
 IMPLICIT NONE
 
@@ -60,8 +70,13 @@ field_name(:) = TRIM('unset')
 field_counter = 0
 
 ! PLEASE KEEP THIS LIST OF SUPPORTED STASHCODES IN NUMERICAL ORDER
-CALL map_field_name(stashcode_u, 'ew_wind')                              ! stash 2
-CALL map_field_name(stashcode_v, 'ns_wind')                              ! stash 3
+IF (winds_on_w3) THEN
+  CALL map_field_name(stashcode_u, 'ew_wind')                            ! stash 2
+  CALL map_field_name(stashcode_v, 'ns_wind')                            ! stash 3
+ELSE
+  CALL map_field_name(stashcode_u, 'h_wind')                             ! stash 2 and 3 combined into single W2H field
+  CALL map_field_name(stashcode_v, 'h_wind')
+ENDIF
 CALL map_field_name(stashcode_theta, 'theta')                            ! stash 4
 CALL map_field_name(stashcode_soil_moist, 'soil_moisture')               ! stash 9
 CALL map_field_name(stashcode_soil_temp, 'soil_temperature')             ! stash 20
@@ -113,9 +128,12 @@ END SUBROUTINE lfricinp_init_stash_to_lfric_map
 
 
 SUBROUTINE map_field_name(stashcode, lfric_field_name)
+
 IMPLICIT NONE
+
 INTEGER(KIND=int64), INTENT(IN) :: stashcode
 CHARACTER(LEN=*), INTENT(IN) :: lfric_field_name
+
 field_counter = field_counter + 1
 
 IF (field_counter >  max_lfric_field_names) THEN
@@ -126,13 +144,17 @@ ELSE
   field_name(field_counter) = lfric_field_name
   get_index(stashcode) = field_counter
 END IF
+
 END SUBROUTINE map_field_name
 
 
 FUNCTION get_field_name(stashcode) RESULT(name)
+
 IMPLICIT NONE
+
 INTEGER(KIND=int64), INTENT(IN) :: stashcode
 CHARACTER(LEN=str_def) :: name ! Result
+
 IF (get_index(stashcode) == imdi) THEN
   WRITE(log_scratch_space, '(A,I0,A)') "Stashcode ", stashcode, &
        " has not been mapped to lfric field name"
@@ -140,6 +162,48 @@ IF (get_index(stashcode) == imdi) THEN
 ELSE
   name = TRIM(field_name(get_index(stashcode)))
 END IF
+
 END FUNCTION get_field_name
+
+
+FUNCTION get_lfric_field_kind(stashcode) RESULT(lfric_field_kind)
+
+USE lfricinp_regrid_options_mod, ONLY: winds_on_w3
+USE lfricinp_stashmaster_mod,    ONLY: get_stashmaster_item, levelt,       &
+                                       rho_levels, theta_levels,           &
+                                       single_level, soil_levels,          &
+                                       stashcode_u, stashcode_v
+IMPLICIT NONE
+
+INTEGER(KIND=int64), INTENT(IN) :: stashcode
+INTEGER(KIND=int64) :: lfric_field_kind, level_code
+
+level_code = get_stashmaster_item(stashcode, levelt)
+
+IF ((stashcode == stashcode_u .OR. stashcode == stashcode_v) .AND.     &
+    (.NOT. winds_on_w3)) THEN
+  lfric_field_kind = w2h_field
+
+ELSE IF (level_code == rho_levels) THEN
+  lfric_field_kind = w3_field 
+
+ELSE IF (level_code == theta_levels) THEN
+  lfric_field_kind = wtheta_field 
+
+ELSE IF (level_code == single_level) THEN
+  lfric_field_kind = w3_field_2d 
+
+ELSE IF (level_code == soil_levels) THEN
+  lfric_field_kind = w3_soil_field 
+
+ELSE
+
+  WRITE(log_scratch_space, '(A,I0,A)') "Stashcode ", stashcode, & 
+       " is not mapped to a lfric field type" 
+  CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
+
+END IF
+
+END FUNCTION get_lfric_field_kind
 
 END MODULE lfricinp_stash_to_lfric_map_mod

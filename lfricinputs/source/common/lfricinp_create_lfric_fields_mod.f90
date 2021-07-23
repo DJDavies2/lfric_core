@@ -9,30 +9,30 @@ MODULE lfricinp_create_lfric_fields_mod
 USE, INTRINSIC :: iso_fortran_env, ONLY : int64
 
 ! lfric modules
-USE constants_mod,                 ONLY : i_def
+USE constants_mod,                 ONLY : i_def, str_def
 USE field_mod,                     ONLY : field_type
 USE field_parent_mod,              ONLY:  read_interface, write_interface,     &
                                           field_parent_proxy_type
-use lfric_xios_read_mod,           ONLY : read_field_single_face,              &
-                                          read_field_face
-use lfric_xios_write_mod,          ONLY : write_field_single_face,             &
-                                          write_field_face
+USE lfric_xios_read_mod,           ONLY : read_field_single_face,              &
+                                          read_field_face, read_field_edge
+USE lfric_xios_write_mod,          ONLY : write_field_single_face,             &
+                                          write_field_face, write_field_edge
 USE finite_element_config_mod,     ONLY : element_order
 USE function_space_collection_mod, ONLY : function_space_collection
 USE field_collection_mod,          ONLY : field_collection_type
-USE fs_continuity_mod,             ONLY : W3, Wtheta
+USE fs_continuity_mod,             ONLY : W3, Wtheta, W2H
 USE log_mod,                       ONLY : LOG_LEVEL_INFO, LOG_LEVEL_ERROR,     &
                                           log_event, log_scratch_space
 
 ! lfricinp modules
-USE lfricinp_stashmaster_mod,   ONLY: get_stashmaster_item, levelt,       &
-                                           rho_levels, theta_levels,           &
-                                           single_level, soil_levels,          &
-                                           pseudt
-USE lfricinp_stash_to_lfric_map_mod, ONLY: get_field_name
+USE lfricinp_stashmaster_mod,        ONLY: get_stashmaster_item, pseudt
+USE lfricinp_stash_to_lfric_map_mod, ONLY: w2h_field, w3_field, w3_field_2d,   &
+                                           w3_soil_field, wtheta_field,        &
+                                           get_field_name, get_lfric_field_kind
 USE lfricinp_grid_type_mod,          ONLY: lfricinp_grid_type
 USE lfricinp_um_level_codes_mod,     ONLY: lfricinp_get_num_levels,            &
                                            lfricinp_get_num_pseudo_levels
+USE lfricinp_regrid_options_mod,     ONLY: winds_on_w3
 
 ! shumlib modules
 USE f_shum_file_mod, ONLY: shum_file_type
@@ -50,11 +50,13 @@ SUBROUTINE lfricinp_create_lfric_fields(mesh_id, twod_mesh_id,  &
 !  When given list of stashcodes create lfric field. Use stashcode to determine
 !  which vertical level set the field is on and create appropiate function
 !  space. Set read and write procedure for each field.
+
+
 IMPLICIT NONE
 
 INTEGER(KIND=i_def), INTENT(IN)                 :: mesh_id
 INTEGER(KIND=i_def), INTENT(IN)                 :: twod_mesh_id
-TYPE(field_collection_type), INTENT(IN OUT) :: field_collection
+TYPE(field_collection_type), INTENT(IN OUT)     :: field_collection
 
 INTEGER(KIND=int64), INTENT(IN)  :: stash_list(:)
 
@@ -64,92 +66,106 @@ TYPE(shum_file_type), INTENT(IN) :: um_file
 PROCEDURE(read_interface), POINTER  :: tmp_read_ptr => NULL()
 PROCEDURE(write_interface), POINTER  :: tmp_write_ptr => NULL()
 
-TYPE( field_type ) :: field
-INTEGER(KIND=int64) :: stashcode, level_code, i
-INTEGER(KIND=i_def) :: ndata
+TYPE( field_type )     :: field
+INTEGER(KIND=int64)    :: stashcode, lfric_field_kind, i
+INTEGER(KIND=i_def)    :: ndata
 ! A temporary variable to hold the 64bit output
 INTEGER(KIND=int64) :: ndata_64
+CHARACTER(LEN=:), ALLOCATABLE :: field_name
 
 CALL log_event( 'Creating lfric fields...', LOG_LEVEL_INFO )
 
 IF (element_order > 0) THEN
   CALL log_event( 'Finite diff fields: requires lowest order elements', &
-         LOG_LEVEL_ERROR )
+                  LOG_LEVEL_ERROR )
 END IF
 
 ! Create the field collection
 field_collection  =  field_collection_type(name="lfric_fields")
 
 DO i=1, SIZE(stash_list)
+
   stashcode = stash_list(i)
-  level_code = get_stashmaster_item(stashcode, levelt)
-
-
+  lfric_field_kind = get_lfric_field_kind(stashcode)
+  field_name = TRIM(get_field_name(stashcode))
+ 
   ! TODO - It would be good to move this case statement into its own routine
   ! it could be used elsewhere to add fields to the collection without the
   ! do loop over stash list
-  SELECT CASE (level_code)
+  IF ( .NOT. field_collection%field_exists(field_name) ) THEN
+ 
+    SELECT CASE (lfric_field_kind)
 
-  CASE(rho_levels) ! Stashcodes that map to W3/rho
-    CALL field % initialise( vector_space =                                 &
-         function_space_collection%get_fs(mesh_id, element_order, W3),      &
-         name=TRIM(get_field_name(stashcode)))
-    tmp_read_ptr => read_field_face
-    tmp_write_ptr => write_field_face
+      CASE(w2h_field) ! Stashcodes that would map to W2h, i.e. winds
+        CALL field % initialise( vector_space =                               &
+             function_space_collection%get_fs(mesh_id, element_order, W2H),   &
+             name=field_name )
+        tmp_read_ptr => read_field_edge
+        tmp_write_ptr => write_field_edge
+   
+      CASE(w3_field) ! Stashcodes that map to W3/rho
+        CALL field % initialise( vector_space =                               & 
+             function_space_collection%get_fs(mesh_id, element_order, W3),    &
+             name=field_name )
+        tmp_read_ptr => read_field_face
+        tmp_write_ptr => write_field_face
+     
+      CASE(wtheta_field) ! Stashcodes that maps to Wtheta
+        CALL field % initialise( vector_space =                                 & 
+             function_space_collection%get_fs(mesh_id, element_order, Wtheta),  &
+             name=field_name )
+        tmp_read_ptr => read_field_face
+        tmp_write_ptr => write_field_face
+     
+      CASE(w3_field_2d) ! Stash that needs 2D mesh
+  
+        IF ( get_stashmaster_item(stashcode, pseudt) == 0 ) THEN
+          ! Field has no pseudo levels
+          ndata = 1_i_def
+        ELSE
+          ! Get number of pseudo levels/ndata
+          ndata_64 = lfricinp_get_num_pseudo_levels(um_grid, stashcode)
+          ndata = INT(ndata_64, KIND=i_def)
+        END IF
+     
+        CALL field % initialise( vector_space =                                 &
+             function_space_collection%get_fs(twod_mesh_id, element_order, W3,  &
+             ndata), name=field_name )
+        ! 2D fields require a different interface
+        tmp_write_ptr => write_field_single_face
+        tmp_read_ptr => read_field_single_face
+     
+      CASE(w3_soil_field) ! Soil fields
+        ! Get number of soil levels and set using the multidata argument
+        ndata_64 = lfricinp_get_num_levels(um_file, stashcode)
+        ndata = INT(ndata_64, KIND=i_def)
+        CALL field % initialise( vector_space =                                 &
+             function_space_collection%get_fs(twod_mesh_id, element_order, W3,  &
+             ndata), name=field_name, ndata_first=.true. )
+        ! 2D fields require a different interface
+        tmp_write_ptr => write_field_single_face
+        tmp_read_ptr => read_field_single_face
+     
+      CASE DEFAULT
+        WRITE(log_scratch_space, '(A,I0,A)')                                    &
+           "LFRic field kind code ", lfric_field_kind, " not recognised" 
+        CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 
-  CASE(theta_levels) ! Stashcodes that maps to Wtheta
-    CALL field % initialise( vector_space =                                 &
-         function_space_collection%get_fs(mesh_id, element_order, Wtheta),  &
-         name=TRIM(get_field_name(stashcode)))
-    tmp_read_ptr => read_field_face
-    tmp_write_ptr => write_field_face
+    END SELECT
+    
+    CALL field%set_read_behaviour(tmp_read_ptr)
+    CALL field%set_write_behaviour(tmp_write_ptr)
 
-  CASE(single_level) ! Stash that needs 2D mesh
-
-    IF ( get_stashmaster_item(stashcode, pseudt) == 0 ) THEN
-      ! Field has no pseudo levels
-      ndata = 1_i_def
-    ELSE
-      ! Get number of pseudo levels/ndata
-      ndata_64 = lfricinp_get_num_pseudo_levels(um_grid, stashcode)
-      ndata = INT(ndata_64, KIND=i_def)
-    END IF
-
-    CALL field % initialise( vector_space =                                 &
-         function_space_collection%get_fs(twod_mesh_id, element_order, W3,  &
-         ndata), name=TRIM(get_field_name(stashcode)))
-    ! 2D fields require a different interface
-    tmp_write_ptr => write_field_single_face
-    tmp_read_ptr => read_field_single_face
-
-  CASE(soil_levels) ! Soil fields
-    ! Get number of soil levels and set using the multidata argument
-    ndata_64 = lfricinp_get_num_levels(um_file, stashcode)
-    ndata = INT(ndata_64, KIND=i_def)
-    CALL field % initialise( vector_space =                                 &
-         function_space_collection%get_fs(twod_mesh_id, element_order, W3,  &
-         ndata), name=TRIM(get_field_name(stashcode)), ndata_first=.true.)
-    ! 2D fields require a different interface
-    tmp_write_ptr => write_field_single_face
-    tmp_read_ptr => read_field_single_face
-
-  CASE DEFAULT
-    WRITE(log_scratch_space, '(A,I0,A)')                                    &
-       "Level code ", level_code, " not supported"
-    CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
-  END SELECT
-
-  CALL field%set_read_behaviour(tmp_read_ptr)
-  CALL field%set_write_behaviour(tmp_write_ptr)
-  CALL log_event("Adding " // TRIM(get_field_name(stashcode)) // &
-       " to field collection", LOG_LEVEL_INFO)
-  CALL field_collection%add_field(field)
+    CALL log_event("Adding " // field_name // " to field collection",    &
+                   LOG_LEVEL_INFO)
+    CALL field_collection%add_field(field)
+   
+  END IF
 
 END DO
 
 CALL log_event( 'Finite diff fields created', LOG_LEVEL_INFO )
 
 END SUBROUTINE lfricinp_create_lfric_fields
-
 
 END MODULE lfricinp_create_lfric_fields_mod

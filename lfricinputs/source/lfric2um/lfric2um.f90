@@ -19,11 +19,15 @@ USE lfric2um_initialise_um_mod, ONLY: lfric2um_initialise_um, um_output_file
 USE lfric2um_initialise_lfric2um_mod, ONLY: lfric2um_initialise_lfric2um
 USE lfric2um_main_loop_mod, ONLY: lfric2um_main_loop
 USE lfricinp_um_grid_mod, ONLY: um_grid
+USE lfricinp_regrid_options_mod, ONLY: lfricinp_init_regrid_options
 
 IMPLICIT NONE
 
 ! Read command line args
 CALL lfricinp_read_command_line_args(lfric2um_nl_fname, lfric_nl_fname)
+
+! Read in global regrid options
+CALL lfricinp_init_regrid_options(lfric2um_nl_fname)
 
 ! Initialise LFRic Infrastructure
 CALL lfricinp_initialise_lfric("lfric2um", lfric_nl_fname, required_lfric_namelists)

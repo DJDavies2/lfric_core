@@ -20,7 +20,6 @@ SUBROUTINE um2lfric_initialise_um2lfric()
 USE um2lfric_namelist_mod,             ONLY: um2lfric_config
 USE lfricinp_initialise_um_mod,        ONLY: um_input_file
 USE um2lfric_check_input_data_mod,     ONLY: um2lfric_check_input_data
-USE um2lfric_regrid_weights_mod,       ONLY: um2lfric_regrid_weightsfile_ctl
 
 ! lfricinputs modules
 USE lfricinp_stashmaster_mod, ONLY: lfricinp_read_stashmaster
@@ -41,9 +40,6 @@ CALL um2lfric_check_input_data(um_input_file)
 CALL lfricinp_set_grid_from_file(um_input_file,                     &
                                  um2lfric_config%num_snow_layers,   &
                                  um2lfric_config%num_surface_types)
-
-! Read in and process weights files
-CALL um2lfric_regrid_weightsfile_ctl()
 
 END SUBROUTINE um2lfric_initialise_um2lfric
 

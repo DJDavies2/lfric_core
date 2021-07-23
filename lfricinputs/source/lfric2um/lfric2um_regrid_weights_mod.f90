@@ -15,10 +15,10 @@ IMPLICIT NONE
 PRIVATE
 
 ! Regridding Weights
-TYPE(lfricinp_regrid_weights_type), PUBLIC, TARGET :: mesh_face_centre_to_grid_p
-TYPE(lfricinp_regrid_weights_type), PUBLIC, TARGET :: mesh_face_centre_to_grid_u
-TYPE(lfricinp_regrid_weights_type), PUBLIC, TARGET :: mesh_face_centre_to_grid_v
-
+TYPE(lfricinp_regrid_weights_type), PUBLIC, TARGET ::                          &
+                                    mesh_face_centre_to_grid_p_bilinear,       &
+                                    mesh_face_centre_to_grid_u_bilinear,       &
+                                    mesh_face_centre_to_grid_v_bilinear
 
 PUBLIC ::  lfric2um_regrid_weightsfile_ctl, get_weights
 
@@ -34,22 +34,22 @@ USE lfric2um_namelists_mod, ONLY: lfric2um_config
 USE lfricinp_um_grid_mod, ONLY: um_grid
 IMPLICIT NONE
 
-! P points
-CALL mesh_face_centre_to_grid_p % load(                    &
-     lfric2um_config%weights_file_face_centre_to_p)
-CALL mesh_face_centre_to_grid_p % populate_dst_address_2D( &
+! P points to face centre interpolation
+CALL mesh_face_centre_to_grid_p_bilinear % load(                               &
+     lfric2um_config%weights_file_face_centre_to_p_bilinear)
+CALL mesh_face_centre_to_grid_p_bilinear % populate_dst_address_2D(            &
      INT(um_grid % num_p_points_x, KIND=int32))
 
-! U points
-CALL mesh_face_centre_to_grid_u % load(                    &
-     lfric2um_config%weights_file_face_centre_to_u)
-CALL mesh_face_centre_to_grid_u % populate_dst_address_2D( &
+! U points to face centre interpolation
+CALL mesh_face_centre_to_grid_u_bilinear % load(                               &
+     lfric2um_config%weights_file_face_centre_to_u_bilinear)
+CALL mesh_face_centre_to_grid_u_bilinear % populate_dst_address_2D(            &
      INT(um_grid % num_u_points_x, KIND=int32))
 
-! V points
-CALL mesh_face_centre_to_grid_v % load(                    &
-     lfric2um_config%weights_file_face_centre_to_v)
-CALL mesh_face_centre_to_grid_v % populate_dst_address_2D( &
+! V points to face centre interpolation
+CALL mesh_face_centre_to_grid_v_bilinear % load(                               &
+     lfric2um_config%weights_file_face_centre_to_v_bilinear)
+CALL mesh_face_centre_to_grid_v_bilinear % populate_dst_address_2D(            &
      INT(um_grid % num_v_points_x, KIND=int32))
 
 END SUBROUTINE lfric2um_regrid_weightsfile_ctl
@@ -68,6 +68,8 @@ USE, INTRINSIC :: iso_fortran_env, ONLY : int64
 ! lfricinputs modules
 USE lfricinp_stashmaster_mod, ONLY: get_stashmaster_item, p_points, &
    u_points, v_points, ozone_points, grid
+USE lfricinp_regrid_options_mod, ONLY: interp_method
+
 ! LFRic modules
 USE log_mod, ONLY: log_event, log_scratch_space, LOG_LEVEL_ERROR
 
@@ -81,16 +83,23 @@ TYPE(lfricinp_regrid_weights_type), POINTER :: weights
 ! Local variables
 INTEGER(KIND=int64) :: horiz_grid_code = 0
 
+! Check if interpolation method is supported.
+IF (TRIM(interp_method) /= 'bilinear') THEN
+  WRITE(log_scratch_space, '(A)') 'Unsupported interpolation method: '  &
+                                // TRIM(interp_method)
+  CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
+ENDIF
+
 ! Get grid type code from STASHmaster entry
 horiz_grid_code = get_stashmaster_item(stashcode, grid)
 
 SELECT CASE(horiz_grid_code)
-CASE( u_points )
-  weights => mesh_face_centre_to_grid_u
+CASE( u_points ) 
+  weights => mesh_face_centre_to_grid_u_bilinear 
 CASE( v_points )
-  weights => mesh_face_centre_to_grid_v
-CASE( p_points, ozone_points )
-   weights => mesh_face_centre_to_grid_p
+  weights => mesh_face_centre_to_grid_v_bilinear 
+CASE( p_points, ozone_points ) 
+   weights => mesh_face_centre_to_grid_p_bilinear 
 CASE DEFAULT
   WRITE(log_scratch_space, '(2(A,I0))') "Unsupported horizontal grid type code: ", &
        horiz_grid_code, " encountered during regrid of stashcode", stashcode

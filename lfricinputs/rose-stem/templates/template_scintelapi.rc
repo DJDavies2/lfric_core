@@ -33,7 +33,8 @@
             ROSE_APP_OPT_CONF_KEYS = {{scintelapi_configs[config]["opt_config"]}}
             NUMBER_OF_LAYERS = {{scintelapi_configs[config]["source_grid_levs"]}}
             SOURCE_DUMP = {{scintelapi_configs[config]["source_dump"]}}
-            LFRIC_MESH_FILE = {{scintelapi_configs[config]["lfric_mesh"]}}
+            LFRIC_MESH_FILE = {{scintelapi_configs[config]["lfric_mesh"]["file"]}}
+            LFRIC_MESH_NAME = {{scintelapi_configs[config]["lfric_mesh"]["name"]}}
 
     {% set task_name = "scintelapi-" + build + "-" + config %}
     [[rose_ana-scintelapi-{{build}}-{{config}}]]

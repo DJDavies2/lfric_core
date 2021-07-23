@@ -31,7 +31,8 @@
             ROSE_APP_OPT_CONF_KEYS = {{skeleton_configs[config]["opt_config"]}}
             NUMBER_OF_LAYERS = {{skeleton_configs[config]["source_grid_levs"]}}
             SOURCE_DUMP = {{skeleton_configs[config]["source_dump"]}}
-            LFRIC_MESH_FILE = {{skeleton_configs[config]["lfric_mesh"]}}
+            LFRIC_MESH_FILE = {{skeleton_configs[config]["lfric_mesh"]["file"]}}
+            LFRIC_MESH_NAME = {{skeleton_configs[config]["lfric_mesh"]["name"]}}
             WEIGHT_LOC = $ROSE_SUITE_DIR_REL/work/1/generate_weights-skeleton-{{config}}
 
     {% set task_name = "skeleton-" + build + "-" + config %}

@@ -7,6 +7,7 @@
 """
 Script to generate um_grid namelist file
 """
+import sys
 import os
 
 
@@ -30,6 +31,7 @@ def write_nml_file(igrid_targ, rotated, lambda_pole, phi_pole, lambda_points,
     f.close
 
 if __name__ == "__main__":
+
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", "--resolution", help="resolution of UM grid",
@@ -37,38 +39,64 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--dump", help="path to UM dump file to use")
     args = parser.parse_args()
     igrid_targ = 6
-    rotated = 'F'
+
     if args.resolution:
+
         res = args.resolution
-        print('Creating UM grid namelist file from given resolution: ', res)
+        print('Creating GLOBAL UM NON-ROTATED grid namelist file from given resolution: ', res)
+
         lambda_pole = 0.0
-        phi_pole = -90.0
+        phi_pole = 90.0
+        rotated = 'F'
+
+        start_lon = 0.0
+        start_lat = -90.0
+
         lambda_points = int(2 * res)
         phi_points = int(3 * res / 2)
         delta_lambda = 360.0 / lambda_points
         delta_phi = 180.0 / phi_points
-        lambda_origin = lambda_pole + (delta_lambda / 2)
-        phi_origin = phi_pole + (delta_phi / 2)
+        lambda_origin = start_lon + (delta_lambda / 2)
+        phi_origin = start_lat + (delta_phi / 2)
+
         write_nml_file(igrid_targ, rotated, lambda_pole, phi_pole,
                        lambda_points, phi_points, delta_lambda, delta_phi,
                        lambda_origin, phi_origin)
+
     elif args.dump:
+
         import mule
         df_path = args.dump
         print('Creating UM grid namelist file from dump: ', df_path)
         df = mule.DumpFile.from_file(df_path)
-        lambda_pole = df.real_constants.start_lon
-        phi_pole = df.real_constants.start_lat
+ 
+        if df.fixed_length_header.grid_staggering != 6:
+            print('ERROR: Only ENDGAME grids are currently valid input')
+            sys.exit(1)
+
+        lambda_pole = df.real_constants.north_pole_lon
+        phi_pole = df.real_constants.north_pole_lat
+        if lambda_pole != 0.0 or phi_pole != 90.0:
+            rotated = 'T'
+        else:
+            rotated = 'F'
+
+        start_lon = df.real_constants.start_lon
+        start_lat = df.real_constants.start_lat
+
+        lambda_points = df.integer_constants.num_cols
+        phi_points = df.integer_constants.num_rows
         delta_lambda = df.real_constants.col_spacing
         delta_phi = df.real_constants.row_spacing
-        lambda_points = int(360.0 / delta_lambda)
-        phi_points = int(180.0 / delta_phi)
-        lambda_origin = lambda_pole + (delta_lambda / 2)
-        phi_origin = phi_pole + (delta_phi / 2)
+        lambda_origin = start_lon + (delta_lambda / 2)
+        phi_origin = start_lat + (delta_phi / 2)
+
         write_nml_file(igrid_targ, rotated, lambda_pole, phi_pole,
                        lambda_points, phi_points, delta_lambda, delta_phi,
                        lambda_origin, phi_origin)
+
     else:
+
         print('')
         print('Use the --help or -h flags to see commandline options')
         print('')

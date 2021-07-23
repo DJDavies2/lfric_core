@@ -93,6 +93,16 @@ def load_data_and_extract_field(datapath, field_name, level):
     return level_lon, level_lat, level_data, num_points, field
 
 
+def export_plot_data(file_name, lon, lat, data, num_points):
+    """
+    Used to export raw plotting data to file
+    """
+    f = open(file_name, mode='w')
+    for (latitude, longitude, datum) in zip(lat, lon, data):
+        f.write("{0},{1},{2}\n".format(latitude, longitude, datum))
+    f.close()
+
+
 def interpolate_to_regular_grid(level_lon, level_lat, level_data, num_points):
     """
     To smooth over the points near the poles when viewed in a more
@@ -217,6 +227,11 @@ def make_single_figure(datapath, field_name, level, interp=False,
                                  .format(file_name, level, interp_fname))
     fig.savefig(out_file_name, bbox_inches='tight')
 
+    data_file_name = os.path.join(plot_path,
+                                 "{0}_{1}{2}.dat"
+                                 .format(file_name, level, interp_fname))
+    export_plot_data(data_file_name, level_lon, level_lat, level_data, num_points)
+
 
 def make_double_figure(datapath, field_name,  level, plot_path=None):
     """
@@ -300,6 +315,11 @@ def make_double_figure(datapath, field_name,  level, plot_path=None):
                                  "{0}_{1}.png"
                                  .format(file_name, level))
     fig.savefig(out_file_name, bbox_inches='tight')
+
+    data_file_name = os.path.join(plot_path,
+                                 "{0}_{1}{2}.dat"
+                                 .format(file_name, level, interp_fname))
+    export_plot_data(data_file_name, level_lon, level_lat, level_data, num_points)
 
 
 if __name__ == "__main__":

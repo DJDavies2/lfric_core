@@ -132,7 +132,7 @@ def UM_create_cube(def_name, grid):
         print('lowest latitude less than -90 or greater than 90')
 
     mlong = iris.coords.DimCoord(xcoord, standard_name='longitude',
-                                 circular=True, units='degrees',
+                                 circular=False, units='degrees',
                                  coord_system=iris.coord_systems.GeogCS(
                                      iris.fileformats.pp.EARTH_RADIUS))
 
@@ -153,8 +153,6 @@ def UM_create_cube(def_name, grid):
 
 def UM_lat_corners(cube):
     """Define UM latitude corners"""
-    # must be a cleaner way than this, but
-    # I could not get broadcast or resize to work
     lat_bounds = numpy.zeros((cube.shape))
     corners = numpy.zeros((cube.shape[0], cube.shape[1], 4))
     for i in range(cube.shape[1]):
@@ -170,13 +168,14 @@ def UM_lat_corners(cube):
 
 def UM_lon_corners(cube):
     """Define UM longitude corners"""
+    lon_bounds = numpy.zeros((cube.shape))
     corners = numpy.zeros((cube.shape[0], cube.shape[1], 4))
-    lon_bounds = numpy.resize(cube.coord('longitude').bounds[:, 0],
-                              (cube.shape))
+    for i in range(cube.shape[0]):
+        lon_bounds[i, :] = cube.coord('longitude').bounds[:, 0]    
     corners[:, :, 0] = lon_bounds
     corners[:, :, 3] = lon_bounds
-    lon_bounds = numpy.resize(cube.coord('longitude').bounds[:, 1],
-                              (cube.shape))
+    for i in range(cube.shape[0]):
+        lon_bounds[i, :] = cube.coord('longitude').bounds[:, 1]
     corners[:, :, 1] = lon_bounds
     corners[:, :, 2] = lon_bounds
     return corners
@@ -281,8 +280,8 @@ def transform_and_write(filename, my_grid):
 
 def get_env_info(my_grid, src):
     """Get information set in suite"""
-    my_grid.vname = 'UM_grid'
-    my_grid.model = 'UM'
+    my_grid.vname = src + '_grid'
+    my_grid.model = src
     my_grid.grid = os.environ.get('GRID')
     my_grid.l_area = os.environ.get('LAREA')
     my_grid.nlist = os.environ.get('NLIST_FILE')

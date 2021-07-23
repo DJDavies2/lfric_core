@@ -18,9 +18,10 @@ PUBLIC :: um2lfric_config, required_lfric_namelists
 TYPE :: config
   CHARACTER(LEN=fnamelen) :: um_file = 'unset'
   CHARACTER(LEN=fnamelen) :: stashmaster_file = 'unset'
-  CHARACTER(LEN=fnamelen) :: weights_file_p_to_face_centre = 'unset'
-  CHARACTER(LEN=fnamelen) :: weights_file_u_to_face_centre = 'unset'
-  CHARACTER(LEN=fnamelen) :: weights_file_v_to_face_centre = 'unset'
+  CHARACTER(LEN=fnamelen) :: weights_file_p_to_face_centre_bilinear = 'unset'
+  CHARACTER(LEN=fnamelen) :: weights_file_p_to_face_centre_neareststod = 'unset'
+  CHARACTER(LEN=fnamelen) :: weights_file_u_to_face_centre_bilinear = 'unset'
+  CHARACTER(LEN=fnamelen) :: weights_file_v_to_face_centre_bilinear = 'unset'
   INTEGER(KIND=int64), ALLOCATABLE ::  stash_list(:)
   INTEGER(KIND=int64) :: num_snow_layers = um_imdi
   INTEGER(KIND=int64) :: num_surface_types = um_imdi
@@ -30,6 +31,7 @@ TYPE :: config
   INTEGER :: status = -1
   CHARACTER(LEN=512) :: message = 'No namelist read'
   INTEGER :: unit_number
+
 CONTAINS
 
   PROCEDURE :: load_namelist
@@ -74,22 +76,23 @@ SUBROUTINE load_namelist(self, fname)
   ! Namelist variables
   CHARACTER(LEN=fnamelen) :: um_file = 'unset'
   CHARACTER(LEN=fnamelen) :: stashmaster_file = 'unset'
-  CHARACTER(LEN=fnamelen) :: weights_file_p_to_face_centre = 'unset'
-  CHARACTER(LEN=fnamelen) :: weights_file_u_to_face_centre = 'unset'
-  CHARACTER(LEN=fnamelen) :: weights_file_v_to_face_centre = 'unset'
+  CHARACTER(LEN=fnamelen) :: weights_file_p_to_face_centre_bilinear = 'unset'
+  CHARACTER(LEN=fnamelen) :: weights_file_p_to_face_centre_neareststod = 'unset'
+  CHARACTER(LEN=fnamelen) :: weights_file_u_to_face_centre_bilinear = 'unset'
+  CHARACTER(LEN=fnamelen) :: weights_file_v_to_face_centre_bilinear = 'unset'
   INTEGER(KIND=int64)     ::  stash_list(max_stash_list)
   INTEGER(KIND=int64) :: num_snow_layers = um_imdi
   INTEGER(KIND=int64) :: num_surface_types = um_imdi
   LOGICAL :: l_land_area_fraction = .FALSE.
 
-
-  NAMELIST /configure_um2lfric/ um_file,            &
-                                stashmaster_file,   &
-                                weights_file_p_to_face_centre, &
-                                weights_file_u_to_face_centre, &
-                                weights_file_v_to_face_centre, &
-                                stash_list, num_snow_layers,   &
-                                num_surface_types,             &
+  NAMELIST /configure_um2lfric/ um_file,                                       &
+                                stashmaster_file,                              &
+                                weights_file_p_to_face_centre_bilinear,        &
+                                weights_file_p_to_face_centre_neareststod,     &
+                                weights_file_u_to_face_centre_bilinear,        &
+                                weights_file_v_to_face_centre_bilinear,        &
+                                stash_list, num_snow_layers,                   &
+                                num_surface_types,                             &
                                 l_land_area_fraction
 
   stash_list(:) = um_imdi
@@ -99,11 +102,11 @@ SUBROUTINE load_namelist(self, fname)
 
   CALL get_free_unit(self%unit_number)
 
-  OPEN(UNIT=self%unit_number, FILE=fname, IOSTAT=self%status,                 &
+  OPEN(UNIT=self%unit_number, FILE=fname, IOSTAT=self%status,                  &
                               IOMSG=self%message)
   IF (self%status /= 0) CALL log_event(self%message, LOG_LEVEL_ERROR)
 
-  READ(self%unit_number, NML=configure_um2lfric, IOSTAT=self%status,          &
+  READ(self%unit_number, NML=configure_um2lfric, IOSTAT=self%status,           &
                          IOMSG=self%message)
   IF (self%status /= 0) CALL log_event(self%message, LOG_LEVEL_ERROR)
 
@@ -113,14 +116,19 @@ SUBROUTINE load_namelist(self, fname)
     CALL log_event(self%message, LOG_LEVEL_ERROR)
   END IF
 
-  ! Further error checking goes here
+ ! Further error checking goes here
 
   ! Load namelist variables into object
   self%um_file = um_file
   self%stashmaster_file = stashmaster_file
-  self%weights_file_p_to_face_centre = weights_file_p_to_face_centre
-  self%weights_file_u_to_face_centre = weights_file_u_to_face_centre
-  self%weights_file_v_to_face_centre = weights_file_v_to_face_centre
+  self%weights_file_p_to_face_centre_bilinear =                                &
+                                    weights_file_p_to_face_centre_bilinear
+  self%weights_file_p_to_face_centre_neareststod =                             &
+                                    weights_file_p_to_face_centre_neareststod
+  self%weights_file_u_to_face_centre_bilinear =                                &
+                                    weights_file_u_to_face_centre_bilinear
+  self%weights_file_v_to_face_centre_bilinear =                                &
+                                    weights_file_v_to_face_centre_bilinear
   self%num_snow_layers = num_snow_layers
   self%num_surface_types = num_surface_types
   ! Pass the um2lfric namelist variable to the lfricinputs module variable
