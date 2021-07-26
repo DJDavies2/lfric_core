@@ -133,6 +133,12 @@ module gungho_model_data_mod
     !> Linked list of time axis objects used to update time-varying ancils
     type( linked_list_type ),      public   :: ancil_times_list
 
+    !> Fields for the tangent linear linearisation state
+    type( field_collection_type ), public   :: ls_fields
+    !> Array of linearisation fields containing the moisture mixing ratios
+    type( field_type ), allocatable, public :: ls_mr(:)
+    !> Array of linearisation fields containing the moist dynamics
+    type( field_type ), allocatable, public :: ls_moist_dyn(:)
     contains
 
     procedure, private :: add_field_collection
@@ -346,6 +352,8 @@ contains
     ! Field bundles - allocate the fields so thay can be cleared
     allocate(model_data%moist_dyn(num_moist_factors))
     allocate(model_data%mr(nummr))
+    allocate(model_data%ls_moist_dyn(num_moist_factors))
+    allocate(model_data%ls_mr(nummr))
 
     ! Create gungho prognostics and auxilliary (diagnostic) fields
     call create_gungho_prognostics( mesh_id,                        &
@@ -604,8 +612,11 @@ contains
       call model_data%aerosol_fields%clear()
       call model_data%fd_fields%clear()
       call model_data%lbc_fields%clear()
+      call model_data%ls_fields%clear()
       if (allocated(model_data%mr)) deallocate(model_data%mr)
       if (allocated(model_data%moist_dyn)) deallocate(model_data%moist_dyn)
+      if (allocated(model_data%ls_mr)) deallocate(model_data%ls_mr)
+      if (allocated(model_data%ls_moist_dyn)) deallocate(model_data%ls_moist_dyn)
 
       call log_event( 'finalise_model_data: all fields have been cleared', &
                        LOG_LEVEL_INFO )

@@ -36,6 +36,7 @@ default_project_names=( infrastructure  \
                         gungho          \
                         lfric_atm       \
                         mesh_tools      \
+                        linear          \
                         skeleton        \
                         diagnostics     \
                         gravity_wave    \
@@ -49,6 +50,7 @@ default_app_names=( infrastructure:none            \
                     gungho:mesh                    \
                     lfric_atm:lfric_atm            \
                     mesh_tools:mesh                \
+                    linear:linear                  \
                     skeleton:skeleton              \
                     diagnostics:diagnostics        \
                     gravity_wave:gravity_wave      \
@@ -92,6 +94,7 @@ project_folder_location=(                  \
   [gungho]=gungho                          \
   [lfric_atm]=lfric_atm                    \
   [mesh_tools]=mesh_tools                  \
+  [linear]=linear                          \
   [skeleton]=miniapps/skeleton             \
   [diagnostics]=miniapps/diagnostics       \
   [gravity_wave]=miniapps/gravity_wave     \
@@ -107,6 +110,7 @@ project_primary_app=(             \
   [gungho]=gungho                 \
   [lfric_atm]=lfric_atm           \
   [mesh_tools]=mesh               \
+  [linear]=linear                 \
   [skeleton]=skeleton             \
   [diagnostics]=diagnostics       \
   [gravity_wave]=gravity_wave     \
