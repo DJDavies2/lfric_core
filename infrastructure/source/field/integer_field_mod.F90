@@ -333,9 +333,13 @@ contains
     function_space => self%get_function_space()
 
     if (present(name)) then
-      call dest%initialise(function_space, name, self%is_advected())
+      call dest%initialise(vector_space = function_space,      &
+                           name = name,                        &
+                           advection_flag = self%is_advected())
     else
-      call dest%initialise(function_space, self%get_name(), self%is_advected())
+      call dest%initialise(vector_space = function_space,      &
+                           name = self%get_name(),             &
+                           advection_flag = self%is_advected())
     end if
 
     dest%write_method => self%write_method
