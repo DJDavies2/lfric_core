@@ -306,7 +306,8 @@ contains
 
       !============ Compute vertical and horizontal only operators ============!
 
-      if ( label_list(i) == primary_mesh_label ) then
+      if ( label_list(i) == primary_mesh_label .or. &
+           label_list(i) == multigrid_mesh_label ) then
         ! Construct vertical- and horizontal-only weak divergence operator
         div_v(i)  = operator_type( w3_fs, w2v_fs )
         div_h(i)  = operator_type( w3_fs, w2h_fs )

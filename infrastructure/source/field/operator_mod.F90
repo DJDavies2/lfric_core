@@ -323,7 +323,6 @@ contains
   !> @return self the operator
   !>
   function operator_constructor( fs_to,fs_from ) result(self)
-
     implicit none
 
     class(function_space_type), target, intent(in) :: fs_to

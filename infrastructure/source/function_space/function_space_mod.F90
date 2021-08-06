@@ -396,7 +396,7 @@ contains
 
     type(function_space_type) :: instance
 
-    integer(i_def) :: ndata_sz
+    integer(i_def) :: ndata_sz, id
 
   if (present(ndata)) then
     ndata_sz = ndata
@@ -408,6 +408,9 @@ contains
     instance%fs = lfric_fs
     instance%element_order = element_order
     instance%ndata = ndata_sz
+
+    id=ndata_sz + 1000_i_def*element_order + 100000*i_def*lfric_fs + 10000000*i_def*mesh_id
+    call instance%set_id(id)
 
     if (lfric_fs == W0) then
       instance%fs_order = element_order + 1

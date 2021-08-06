@@ -22,7 +22,7 @@ module create_fem_mod
   use halo_routing_collection_mod,    only : halo_routing_collection_type, &
                                              halo_routing_collection
   use field_mod,                      only : field_type
-  use fs_continuity_mod,              only : W0, W1, W2, W3, Wtheta, Wchi
+  use fs_continuity_mod,              only : W0, W1, W2, W3, Wtheta, Wchi, W2v, W2h
   use function_space_mod,             only : function_space_type
   use function_space_collection_mod,  only : function_space_collection_type, &
                                              function_space_collection
@@ -30,6 +30,8 @@ module create_fem_mod
                                              single_layer_function_space_chain, &
                                              multigrid_function_space_chain,    &
                                              W2_multigrid_function_space_chain, &
+                                             W2v_multigrid_function_space_chain, &
+                                             W2h_multigrid_function_space_chain, &
                                              wtheta_multigrid_function_space_chain
   use assign_coordinate_field_mod,    only : assign_coordinate_field
   use log_mod,                        only : log_event,         &
@@ -262,6 +264,8 @@ module create_fem_mod
 
       multigrid_function_space_chain        = function_space_chain_type()
       w2_multigrid_function_space_chain     = function_space_chain_type()
+      w2v_multigrid_function_space_chain    = function_space_chain_type()
+      w2h_multigrid_function_space_chain    = function_space_chain_type()
       wtheta_multigrid_function_space_chain = function_space_chain_type()
 
       if (allocated(chi_mg)) deallocate(chi_mg)
@@ -282,12 +286,20 @@ module create_fem_mod
       do mesh_ctr = 1, size(multigrid_mesh_ids)
         ! Make sure this function_space is in the collection
         fs => function_space_collection%get_fs( multigrid_mesh_ids(mesh_ctr), &
-                                                0, W3 )
+             0, W3 )
         call multigrid_function_space_chain%add( fs )
 
         fs => function_space_collection%get_fs( multigrid_mesh_ids(mesh_ctr), &
                                                 0, W2 )
         call w2_multigrid_function_space_chain%add( fs )
+
+        fs => function_space_collection%get_fs( multigrid_mesh_ids(mesh_ctr), &
+                                                0, W2v )
+        call w2v_multigrid_function_space_chain%add( fs )
+
+        fs => function_space_collection%get_fs( multigrid_mesh_ids(mesh_ctr), &
+                                                0, W2h )
+        call w2h_multigrid_function_space_chain%add( fs )
 
         fs => function_space_collection%get_fs( multigrid_mesh_ids(mesh_ctr), &
                                                 0, Wtheta )

@@ -12,7 +12,6 @@ module gravity_wave_driver_mod
   use constants_mod,                  only: i_def, i_native
   use gravity_wave_infrastructure_mod,only: initialise_infrastructure, &
                                             finalise_infrastructure
-  use gravity_wave_grid_mod,          only: initialise_grid
   use gravity_wave_io_mod,            only: initialise_io, &
                                             finalise_io
   use create_gravity_wave_prognostics_mod, &
@@ -27,10 +26,6 @@ module gravity_wave_driver_mod
                                             b_space_wtheta
   use gravity_wave_diagnostics_driver_mod, &
                                       only: gravity_wave_diagnostics_driver
-  use gravity_wave_grid_mod,          only: initialise_grid
-  use gravity_wave_infrastructure_mod, &
-                                      only: initialise_infrastructure, &
-                                            finalise_infrastructure
   use gw_init_fields_alg_mod,         only: gw_init_fields_alg
   use gravity_wave_alg_mod,           only: gravity_wave_alg_init, &
                                             gravity_wave_alg_step, &
@@ -63,12 +58,6 @@ module gravity_wave_driver_mod
 
   public initialise, run, finalise
 
-  character(*), public, parameter   :: xios_ctx = 'gravity_wave'
-
-  ! Coordinate field
-  type(field_type), target, dimension(3) :: chi
-  type(field_type), target               :: panel_id
-
   ! The prognostic fields
   type( field_type ), target             :: wind
   type( field_type ), target             :: pressure
@@ -76,9 +65,6 @@ module gravity_wave_driver_mod
 
   integer(i_def) :: mesh_id
   integer(i_def) :: twod_mesh_id
-
-  ! Function space chains
-  type(function_space_chain_type) :: multigrid_function_space_chain
 
   class(io_context_type), allocatable :: io_context
 
@@ -99,7 +85,10 @@ contains
   ! Initialise aspects of the infrastructure
   call initialise_infrastructure( model_communicator, &
                                   filename,           &
-                                  program_name )
+                                  program_name,       &
+                                  io_context,           &
+                                  mesh_id,              &
+                                  twod_mesh_id)
 
   call log_event( 'Initialising '//program_name//' ...', LOG_LEVEL_ALWAYS )
 
@@ -125,30 +114,10 @@ contains
     call timer(program_name)
   end if
 
-  multigrid_function_space_chain = function_space_chain_type()
-
-  ! Initialise aspects of the grid
-  call initialise_grid(mesh_id, twod_mesh_id, chi, &
-                       panel_id, multigrid_function_space_chain)
-
-  ! Initialise aspects of output
-  call initialise_io( model_communicator, &
-                      mesh_id,            &
-                      twod_mesh_id,       &
-                      chi,                &
-                      panel_id,           &
-                      xios_ctx,           &
-                      io_context )
-
-  clock => io_context%get_clock()
-
-  ! Create runtime_constants object. This in turn creates various things
-  ! needed by the timestepping algorithms such as mass matrix operators, mass
-  ! matrix diagonal fields and the geopotential field and limited area masks.
-  call create_runtime_constants(mesh_id, twod_mesh_id, chi, panel_id)
-
   ! Create the prognostic fields
   call create_gravity_wave_prognostics(mesh_id, wind, pressure, buoyancy)
+
+  clock => io_context%get_clock()
 
   ! Initialise prognostic fields
   if (checkpoint_read) then                 ! R ecorded check point to start from

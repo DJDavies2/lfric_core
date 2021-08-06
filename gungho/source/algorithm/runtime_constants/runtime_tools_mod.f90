@@ -27,6 +27,7 @@ module runtime_tools_mod
 
   ! Mesh IDs
   integer(kind=i_def), allocatable :: global_mesh_id_list(:)
+  integer(kind=i_def), allocatable :: hierarchical_mesh_id_list(:)
 
   ! Enumerated types to label what type the mesh is (randomly selected integers)
   integer(kind=i_def), parameter, public :: primary_mesh_label = 19
@@ -40,6 +41,9 @@ module runtime_tools_mod
   public :: init_mesh_id_list
   public :: final_mesh_id_list
   public :: find_mesh_index
+  public :: init_hierarchical_mesh_id_list
+  public :: final_hierarchical_mesh_id_list
+  public :: get_hierarchical_mesh_id
 
 contains
   !> @brief Subroutine to initialise mesh ID list
@@ -94,5 +98,44 @@ contains
       call log_event( "mesh_id cannot be found in mesh_id_list", LOG_LEVEL_ERROR )
     end if
   end function find_mesh_index
+
+  !> @brief Subroutine to initialise hierarchical mesh ID list
+  !> @param[in] mesh_id_list          List of mesh IDs
+  subroutine init_hierarchical_mesh_id_list(mesh_id_list)
+
+    implicit none
+
+    integer(kind=i_def), intent(in) :: mesh_id_list(:)
+
+    ! Internal variables
+    integer(kind=i_def)             :: num_meshes, i
+
+    num_meshes = size(mesh_id_list)
+
+    allocate(hierarchical_mesh_id_list(num_meshes))
+
+    do i = 1, num_meshes
+      hierarchical_mesh_id_list(i) = mesh_id_list(i)
+    end do
+
+  end subroutine init_hierarchical_mesh_id_list
+
+  !> @brief Deallocates the mesh ID list
+  subroutine final_hierarchical_mesh_id_list()
+    implicit none
+
+    if (allocated(hierarchical_mesh_id_list)) deallocate(hierarchical_mesh_id_list)
+
+  end subroutine final_hierarchical_mesh_id_list
+
+  !> @breif Gets the mesh id of a given hierarchical level
+  function get_hierarchical_mesh_id(level) result(mesh_id)
+    implicit none
+    integer(kind=i_def), intent(in) :: level
+    integer(kind=i_def)             :: mesh_id
+
+    mesh_id = hierarchical_mesh_id_list(level)
+
+  end function get_hierarchical_mesh_id
 
 end module runtime_tools_mod

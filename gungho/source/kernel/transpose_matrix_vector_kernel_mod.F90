@@ -75,6 +75,7 @@ subroutine transpose_matrix_vector_code(cell,              &
   real(kind=r_def),    dimension(undf2),              intent(in)    :: x
   real(kind=r_def),    dimension(undf1),              intent(inout) :: lhs
   real(kind=r_def),    dimension(ndf2,ndf1,ncell_3d), intent(in)    :: matrix
+  real(kind=r_def),    dimension(ndf1,ndf2)           :: transposed_matrix
 
   ! Internal variables
   integer(kind=i_def)               :: df, k, ik
@@ -86,7 +87,12 @@ subroutine transpose_matrix_vector_code(cell,              &
       x_e(df) = x(map2(df)+k)
     end do
     ik = (cell-1)*nlayers + k + 1
-    lhs_e = matmul(transpose(matrix(:,:,ik)),x_e)
+    ! NB: Later versions of the GNU compiler (>= 9.0) appear to have problems
+    ! with lhs_e = matmul(transposed(matrix(:,:,ik)),x_e), so to avoid these
+    ! issues the local transpose matrix multiplication is performed in two
+    ! stages.
+    transposed_matrix(:,:) = transpose(matrix(:,:,ik))
+    lhs_e = matmul(transposed_matrix,x_e)
     do df = 1,ndf1
        lhs(map1(df)+k) = lhs(map1(df)+k) + lhs_e(df)
     end do

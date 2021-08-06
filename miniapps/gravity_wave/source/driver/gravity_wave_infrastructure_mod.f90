@@ -8,31 +8,43 @@
 
 module gravity_wave_infrastructure_mod
 
-  use configuration_mod,    only : final_configuration
-  use constants_mod,        only : i_def, i_native, PRECISION_REAL
-  use convert_to_upper_mod, only : convert_to_upper
-  use derived_config_mod,   only : set_derived_config
-  use gravity_wave_mod,     only : load_configuration
-  use log_mod,              only : log_event,          &
-                                   log_set_level,      &
-                                   log_scratch_space,  &
-                                   initialise_logging, &
-                                   finalise_logging,   &
-                                   LOG_LEVEL_ALWAYS,   &
-                                   LOG_LEVEL_ERROR,    &
-                                   LOG_LEVEL_WARNING,  &
-                                   LOG_LEVEL_INFO,     &
-                                   LOG_LEVEL_DEBUG,    &
-                                   LOG_LEVEL_TRACE
-  use mpi_mod,              only : store_comm, &
-                                   get_comm_size, get_comm_rank
-  use yaxt,                 only : xt_initialize, xt_finalize
-
+  use configuration_mod,          only : final_configuration
+  use constants_mod,              only : i_def, i_native, PRECISION_REAL
+  use convert_to_upper_mod,       only : convert_to_upper
+  use derived_config_mod,         only : set_derived_config
+  use gravity_wave_mod,           only : load_configuration
+  use log_mod,                    only : log_event,          &
+                                         log_set_level,      &
+                                         log_scratch_space,  &
+                                         initialise_logging, &
+                                         finalise_logging,   &
+                                         LOG_LEVEL_ALWAYS,   &
+                                         LOG_LEVEL_ERROR,    &
+                                         LOG_LEVEL_WARNING,  &
+                                         LOG_LEVEL_INFO,     &
+                                         LOG_LEVEL_DEBUG,    &
+                                         LOG_LEVEL_TRACE
+  use mpi_mod,                    only : store_comm, &
+                                         get_comm_size, get_comm_rank
+  use yaxt,                       only : xt_initialize, xt_finalize
+  use io_context_mod,             only : io_context_type
+  use field_mod,                  only : field_type
+  use mesh_collection_mod,        only : mesh_collection, &
+                                         mesh_collection_type
+  use local_mesh_collection_mod,  only : local_mesh_collection, &
+                                         local_mesh_collection_type
+  use create_fem_mod,             only : init_fem
+  use create_mesh_mod,            only : init_mesh
+  use runtime_constants_mod,      only : create_runtime_constants
+  use gravity_wave_io_mod,        only : initialise_io
+  use formulation_config_mod,     only : l_multigrid
 
   implicit none
 
   private
   public initialise_infrastructure, finalise_infrastructure
+
+  character(*), public, parameter   :: xios_ctx = 'gravity_wave'
 
 contains
 
@@ -44,7 +56,10 @@ contains
   !> @param [in] xios_id XIOS client identifier
   subroutine initialise_infrastructure(comm, &
                                        filename, &
-                                       program_name)
+                                       program_name,         &
+                                       io_context,           &
+                                       mesh_id,              &
+                                       twod_mesh_id)
 
     use logging_config_mod, only: run_log_level,          &
                                   key_from_run_log_level, &
@@ -58,6 +73,17 @@ contains
     integer(i_native), intent(in) :: comm
     character(*),      intent(in) :: filename
     character(*),      intent(in) :: program_name
+    class(io_context_type), intent(out), allocatable :: io_context
+    integer(i_def),         intent(inout)            :: mesh_id
+    integer(i_def),         intent(inout)            :: twod_mesh_id
+
+    type(field_type), target :: chi(3)
+    type(field_type), target :: panel_id
+
+    integer(i_def),   allocatable :: multigrid_mesh_ids(:)
+    integer(i_def),   allocatable :: multigrid_2d_mesh_ids(:)
+    type(field_type), allocatable :: chi_mg(:,:)
+    type(field_type), allocatable :: panel_id_mg(:)
 
     integer(i_def) :: total_ranks, local_rank
 
@@ -103,6 +129,60 @@ contains
     call log_event( log_scratch_space, LOG_LEVEL_ALWAYS )
 
     call set_derived_config( .false. )
+
+
+    !-------------------------------------------------------------------------
+    ! Initialise aspects of the grid
+    !-------------------------------------------------------------------------
+    allocate( mesh_collection, &
+              source=mesh_collection_type() )
+    allocate( local_mesh_collection, &
+              source = local_mesh_collection_type() )
+
+    ! Get the rank information from the virtual machine
+    total_ranks = get_comm_size()
+    local_rank  = get_comm_rank()
+
+    ! Create the mesh
+    call init_mesh( local_rank, total_ranks, mesh_id,              &
+                    twod_mesh_id          = twod_mesh_id,          &
+                    multigrid_mesh_ids    = multigrid_mesh_ids,    &
+                    multigrid_2D_mesh_ids = multigrid_2D_mesh_ids, &
+                    use_multigrid         = l_multigrid )
+
+    ! Create FEM specifics (function spaces and chi field)
+    call init_fem(mesh_id, chi, panel_id,                        &
+                  multigrid_mesh_ids    = multigrid_mesh_ids,    &
+                  multigrid_2D_mesh_ids = multigrid_2D_mesh_ids, &
+                  chi_mg                = chi_mg,                &
+                  panel_id_mg           = panel_id_mg,           &
+                  use_multigrid         = l_multigrid )
+
+    !-------------------------------------------------------------------------
+    ! Initialise aspects of output
+    !-------------------------------------------------------------------------
+
+    call initialise_io( comm, &
+                        mesh_id,            &
+                        twod_mesh_id,       &
+                        chi,                &
+                        panel_id,           &
+                        xios_ctx,           &
+                        io_context )
+
+    !-------------------------------------------------------------------------
+    ! Setup constants
+    !-------------------------------------------------------------------------
+
+    ! Create runtime_constants object. This in turn creates various things
+    ! needed by the timestepping algorithms such as mass matrix operators, mass
+    ! matrix diagonal fields and the geopotential field and limited area masks.
+    call create_runtime_constants(mesh_id, twod_mesh_id, chi, panel_id,  &
+                                  mg_mesh_ids    = multigrid_mesh_ids,                &
+                                  mg_2D_mesh_ids = multigrid_2D_mesh_ids,             &
+                                  chi_mg         = chi_mg,                            &
+                                  panel_id_mg    = panel_id_mg )
+
 
   end subroutine initialise_infrastructure
 

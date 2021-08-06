@@ -83,7 +83,8 @@ contains
     use rk_transport_rho_mod,        only: rk_transport_rho_set_num_meshes
     use rk_transport_theta_mod,      only: rk_transport_theta_set_num_meshes
     use runge_kutta_init_mod,        only: runge_kutta_init
-    use runtime_tools_mod,           only: init_mesh_id_list
+    use runtime_tools_mod,           only: init_mesh_id_list, &
+                                           init_hierarchical_mesh_id_list
 
     implicit none
 
@@ -225,6 +226,15 @@ contains
 
     call init_mesh_id_list(mesh_id_list)
 
+    if ( present(mg_mesh_ids) ) then
+      ! mg_mesh_ids contains all mesh ids used in the multigrid chain
+      ! including the primary mesh
+      call init_hierarchical_mesh_id_list(mg_mesh_ids)
+    else
+      ! Just create a list with the primary mesh id in it
+      call init_hierarchical_mesh_id_list( (/ mesh_id /) )
+    end if
+
     call create_geometric_constants(mesh_id_list,      &
                                     chi_list,          &
                                     panel_id_list,     &
@@ -307,7 +317,8 @@ contains
     use rk_transport_rho_mod,        only: rk_transport_rho_final
     use rk_transport_theta_mod,      only: rk_transport_theta_final
     use runge_kutta_init_mod,        only: runge_kutta_final
-    use runtime_tools_mod,           only: final_mesh_id_list
+    use runtime_tools_mod,           only: final_mesh_id_list, &
+                                           final_hierarchical_mesh_id_list
 
     implicit none
 
@@ -321,6 +332,7 @@ contains
     call flux_alg_final()
     call advective_update_alg_final()
     call runge_kutta_final()
+    call final_hierarchical_mesh_id_list()
     call final_mesh_id_list()
 
 

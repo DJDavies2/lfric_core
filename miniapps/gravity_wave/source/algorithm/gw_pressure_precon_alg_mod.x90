@@ -22,7 +22,7 @@
 module gw_pressure_precon_alg_mod
   use vector_mod,                      only : abstract_vector_type
   use field_vector_mod,                only : field_vector_type
-  use preconditioner_mod,              only : abstract_preconditioner_type
+  use hierarchical_preconditioner_mod, only : abstract_hierarchical_preconditioner_type
   use log_mod,                         only : log_event, &
                                               LOG_LEVEL_INFO, &
                                               LOG_LEVEL_ERROR, &
@@ -37,8 +37,9 @@ module gw_pressure_precon_alg_mod
 
   implicit none
 
-  type, public, extends(abstract_preconditioner_type) :: gw_pressure_preconditioner_type
+  type, public, extends(abstract_hierarchical_preconditioner_type) :: gw_pressure_preconditioner_type
 
+     integer(kind=i_def) :: level
      integer(kind=i_def) :: mesh_id
      !> Constant \f$\omega_c^2 = (\alpha\Delta t c)^2\f$
      real(kind=r_def) :: omega2_c
@@ -54,8 +55,14 @@ module gw_pressure_precon_alg_mod
      ! \f$y = P.x\f$
      procedure, public :: apply => apply_gw_pressure_preconditioner
      procedure, private :: apply_gw_pressure_preconditioner
+     procedure, public  :: gw_pressure_preconditioner_assign
+     procedure, public  :: coarsen => coarsen_gw_pressure_preconditioner
+     procedure, private :: coarsen_gw_pressure_preconditioner
 
-     final :: destroy_gw_pressure_preconditioner
+     final              :: destroy_gw_pressure_preconditioner
+
+     !> Override default assignment for gw_pressure_preconditioner_type pairs.
+     generic            :: assignment(=) => gw_pressure_preconditioner_assign
 
   end type gw_pressure_preconditioner_type
 
@@ -68,18 +75,20 @@ contains
 
   !> @brief Construct a <code> gw_pressure_preconditioner_type</code> object
   !>
+  !> @param[in] level Multigrid level
+  !>
   !> @return self the constructed preconditioner object
-  function gw_pressure_preconditioner_constructor(mesh_id) result(self)
+  function gw_pressure_preconditioner_constructor(level) result(self)
 
     use log_mod,                           only: log_event, LOG_LEVEL_INFO
     use timestepping_config_mod,           only: dt, alpha
     use gravity_wave_constants_config_mod, only: cs_square
     use initial_temperature_config_mod,    only: bvf_square
+    use runtime_tools_mod,                 only: get_hierarchical_mesh_id
     implicit none
 
-    integer(kind=i_def), intent(in) :: mesh_id
-
     type(gw_pressure_preconditioner_type)  :: self
+    integer(kind=i_def), intent(in)        :: level
 
     call log_event( 'Constructing pressure preconditioner...', &
          LOG_LEVEL_INFO )
@@ -87,7 +96,8 @@ contains
     ! set scaling constants
     self%omega2_c = alpha**2*dt**2*cs_square
     self%omega2_N = alpha**2*dt**2*bvf_square
-    self%mesh_id = mesh_id
+    self%level = level
+    self%mesh_id = get_hierarchical_mesh_id(level)
 
     call self%build_Hz()
 
@@ -263,6 +273,8 @@ contains
     type is(field_vector_type)
        select type(y)
        type is(field_vector_type)
+          ! Set field to zero
+          call y%set_scalar(0.0_r_def)
           ! Multiply by inverse of vertical operator \f$ H_z \f$
           call invoke( columnwise_op_appinv_kernel_type( y%vector(1), &
                                                          x%vector(1), &
@@ -278,6 +290,38 @@ contains
     end select
 
   end subroutine apply_gw_pressure_preconditioner
+
+  !> Performs a deep copy between gw_pressure_preconditioner_type pairs.
+  !> (for overriding the "=" operator)
+  !>
+  !> @param[out] dest   gw_pressure_preconditioner_type lhs
+  !> @param[in]  source gw_pressure_preconditioner_type rhs
+  subroutine gw_pressure_preconditioner_assign(dest, source)
+
+    implicit none
+    class(gw_pressure_preconditioner_type), intent(in)  :: source
+    class(gw_pressure_preconditioner_type), intent(out) :: dest
+
+    ! Deep copy of the contents of the pressure_operator_type
+    dest%level = source%level
+    dest%omega2_c = source%omega2_c
+    dest%omega2_N = source%omega2_N
+    dest%Hz_cma = source%Hz_cma
+
+  end subroutine gw_pressure_preconditioner_assign
+
+  !> Construct a coarsened version of the preconditioner on the next
+  !> level of the multigrid hierarchy
+  !>
+  !>@param[inout] self instance of type gw_pressure_preconditioner_type
+  !>@param[inout] other coarsed version on next multigrid level
+  subroutine coarsen_gw_pressure_preconditioner(self, other)
+    implicit none
+    class(gw_pressure_preconditioner_type), intent(inout) :: self
+    class(abstract_hierarchical_preconditioner_type), allocatable, intent(inout) :: other
+    allocate(other, &
+             source=gw_pressure_preconditioner_type(self%level+1))
+  end subroutine coarsen_gw_pressure_preconditioner
 
   !>@brief Destructor
   !>

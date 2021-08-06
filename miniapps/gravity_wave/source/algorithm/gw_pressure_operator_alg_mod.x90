@@ -17,7 +17,7 @@
 !> allows application of this Helmholtz operator.
 
 module gw_pressure_operator_alg_mod
-  use linear_operator_mod,                only: abstract_linear_operator_type
+  use hierarchical_linear_operator_mod,   only: abstract_hierarchical_linear_operator_type
   use vector_mod,                         only: abstract_vector_type
   use field_mod,                          only: field_type
   use field_vector_mod,                   only: field_vector_type
@@ -41,10 +41,11 @@ module gw_pressure_operator_alg_mod
                                                 b_space_w0, &
                                                 b_space_w3, &
                                                 b_space_wtheta
+  use function_space_chain_mod,           only: multigrid_function_space_chain
 
   implicit none
 
-  type, public, extends(abstract_linear_operator_type) :: &
+  type, public, extends(abstract_hierarchical_linear_operator_type) :: &
                         gw_pressure_operator_type
   private
      !> Off-centering parameter in SI timestepping
@@ -53,7 +54,10 @@ module gw_pressure_operator_alg_mod
      type(field_type) :: grad_p, div_grad_p
      !> Lumped inverse \f$\tilde{H}_B^{-1}\f$
      type(field_type) :: Hb_lumped_inv
-
+     !> Multigrid level
+     integer(kind=i_def) :: level
+     !> Id of pressure function space
+     integer(kind=i_def) :: fs_id
      contains
      !> Return the lumped inverse \f$\tilde{H}_B^{-1}\f$
      procedure, public  :: get_Hb_lumped_inv
@@ -67,6 +71,8 @@ module gw_pressure_operator_alg_mod
      !> @param[out] dest   gw_pressure_operator_type lhs
      !> @param[in]  source gw_pressure_operator_type rhs
      procedure, public  :: gw_pressure_operator_assign
+     procedure, public  :: coarsen => coarsen_gw_pressure_operator
+     procedure, private :: coarsen_gw_pressure_operator
 
      final              :: destroy_gw_pressure_operator
 
@@ -87,29 +93,29 @@ contains
   !>         inverse \f$ \tilde{H}_b^{-1} \f$ as well as other operators
   !>         such as div and grad for the Helmholtz operator application.
   !>
-  !>@param[in] state Field vector \f$(\textbf{U},P,B)\f$ representing
-  !>                 current state. This is required for extracting the
-  !>                 relevant function spaces required for operator
-  !>                 construction
+  !>@param[in] wp Function space for the pressure on this level
+  !>@param[in] level Multigrid level
   !>@return instance of the Helmholtz operator
-  function gw_pressure_operator_constructor(state) result(self)
+  function gw_pressure_operator_constructor(wp, level) result(self)
     use function_space_mod,            only: function_space_type
+    use fs_continuity_mod,             only: W2, W0, W3, Wtheta
     use finite_element_config_mod,     only: element_order
     use quadrature_xyoz_mod,           only: quadrature_xyoz_type
     use quadrature_rule_gaussian_mod,  only: quadrature_rule_gaussian_type
     use compute_q_operator_kernel_mod, only: compute_q_operator_type
     use matrix_vector_kernel_mod,      only: matrix_vector_kernel_type
     use transpose_matrix_vector_kernel_mod, only: transpose_matrix_vector_kernel_type
+    use function_space_collection_mod, only: function_space_collection
 
     implicit none
 
     type(gw_pressure_operator_type)     :: self
-    type(field_vector_type), intent(in) :: state
-    type(function_space_type), pointer  :: wp => null(), &
-                                           wu => null(), &
+    type(function_space_type), pointer, intent(in) :: wp
+    integer(kind=i_def), intent(in)     :: level
+    type(function_space_type), pointer  :: wu => null(), &
                                            wb => null()
+    integer(i_def)                      :: order, mesh_id
     real(kind=r_def)                    :: const1
-    integer(kind=i_def)                 :: mesh_id
     type(field_type)                    :: ones, M_lumped, &
                                            ones_u, M_lumped_u, &
                                            Mb_lumped_inv, QT1
@@ -122,12 +128,23 @@ contains
     call log_event( 'Constructing pressure operator...', LOG_LEVEL_INFO )
 
     self%alpha = 0.5_r_def
+    self%level = level
+
+    ! Id of pressure function space
+    self%fs_id = wp%get_id()
 
     ! Get needed function spaces
-    mesh_id = state%vector(igw_u)%get_mesh_id()
-    wu => state%vector(igw_u)%get_function_space()
-    wp => state%vector(igw_p)%get_function_space()
-    wb => state%vector(igw_b)%get_function_space()
+    order = wp%get_element_order()
+    mesh_id = wp%get_mesh_id()
+    wu => function_space_collection%get_fs( mesh_id, order, W2 )
+    select case(b_space)
+      case(b_space_w0)
+         wb => function_space_collection%get_fs( mesh_id, order, W0 )
+      case(b_space_w3)
+         wb => function_space_collection%get_fs( mesh_id, order, W3 )
+      case(b_space_wtheta)
+         wb => function_space_collection%get_fs( mesh_id, order, Wtheta )
+    end select
 
     ! Temporaries required in operator application
     call self%grad_p%initialise( vector_space = wu )
@@ -191,6 +208,8 @@ contains
 
     ! Deep copy of the contents of the pressure_operator_type
     dest%alpha = source%alpha
+    dest%level = source%level
+    dest%fs_id = source%fs_id
     call source%grad_p%copy_field(dest%grad_p)
     call source%div_grad_p%copy_field(dest%div_grad_p)
     call source%Hb_lumped_inv%copy_field(dest%Hb_lumped_inv)
@@ -266,6 +285,22 @@ contains
     end select
 
   end subroutine apply_gw_pressure_operator
+
+  !> Return a coarsened version of the operator on the
+  !> next level of the multigrid hierarchy.
+  !>
+  !>@param[in] self instance of gw_pressure_operator_type
+  !>@param[in] fs_coarse coarse level function space
+  !>@param[inout] coarse_operator coarsened version of the operator on the next multigrid level
+  subroutine coarsen_gw_pressure_operator(self,fs_coarse,coarse_operator)
+    use function_space_mod,            only: function_space_type
+    implicit none
+    class(gw_pressure_operator_type), intent(in) :: self
+    type(function_space_type), pointer, intent(in) :: fs_coarse
+    class(abstract_hierarchical_linear_operator_type), allocatable, intent(inout) :: coarse_operator
+    allocate(coarse_operator, &
+             source=gw_pressure_operator_type(fs_coarse,self%level+1))
+  end subroutine coarsen_gw_pressure_operator
 
   !> Finalizer for the Helmholtz operator
   !> @param [inout] self the pressure operator

@@ -256,7 +256,8 @@ contains
                                            mass_matrix_preconditioner, &
                                            tolerance,                  &
                                            solver_a_tol,               &
-                                           maximum_iterations)
+                                           maximum_iterations,         &
+                                           rho_relax = 0.5_r_def )
       type is ( chebyshev_type )
          call get_minmax_eigenvalues(lmin, lmax, fs)
          mass_matrix_solver = chebyshev_type( mass_matrix_operator,       &

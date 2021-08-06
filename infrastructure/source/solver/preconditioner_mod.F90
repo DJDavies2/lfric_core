@@ -1,4 +1,3 @@
-
 !-------------------------------------------------------------------------------
 ! Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
 ! For further details please refer to the file LICENCE.original which you
@@ -37,6 +36,5 @@ module preconditioner_mod
        class(abstract_vector_type),         intent(inout) :: y
      end subroutine apply_interface
   end interface
-
 
 end module preconditioner_mod

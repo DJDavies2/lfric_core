@@ -102,6 +102,10 @@ module function_space_chain_mod
   W2_multigrid_function_space_chain
   type(function_space_chain_type), public, allocatable :: &
   Wtheta_multigrid_function_space_chain
+  type(function_space_chain_type), public, allocatable :: &
+  W2h_multigrid_function_space_chain
+  type(function_space_chain_type), public, allocatable :: &
+  W2v_multigrid_function_space_chain
 
   !=============================================================================
 contains ! Module procedures
@@ -222,7 +226,6 @@ contains ! Module procedures
 
   end function get_next
 
-
   !=============================================================================
   function get_previous(self) result (previous_function_space)
 
@@ -310,7 +313,6 @@ contains ! Module procedures
     end if
 
   end subroutine set_current
-
 
   !==============================================================================
   !  @brief Subroutine to clear up objects - called by destructor

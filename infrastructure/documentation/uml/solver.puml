@@ -10,4 +10,6 @@
 !include solver/preconditioner_mod.iuml
 !include solver/cg_mod.iuml
 !include solver/bicgstab_mod.iuml
+!include solver/hierarchical_linear_operator_mod.iuml
+!include solver/hierarchical_preconditioner_mod.iuml
 @enduml

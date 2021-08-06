@@ -23,7 +23,7 @@
 module pressure_precon_alg_mod
   use vector_mod,                      only : abstract_vector_type
   use field_vector_mod,                only : field_vector_type
-  use preconditioner_mod,              only : abstract_preconditioner_type
+  use hierarchical_preconditioner_mod, only : abstract_hierarchical_preconditioner_type
   use log_mod,                         only : log_event, &
                                               LOG_LEVEL_INFO, &
                                               LOG_LEVEL_ERROR, &
@@ -32,15 +32,21 @@ module pressure_precon_alg_mod
 
   implicit none
 
-  type, public, extends(abstract_preconditioner_type) :: pressure_preconditioner_type
+  type, public, extends(abstract_hierarchical_preconditioner_type) :: pressure_preconditioner_type
 
-   integer(kind=i_def) :: useless
+   integer(kind=i_def) :: level
 
    contains
      procedure, public :: apply => apply_pressure_preconditioner
      procedure, private :: apply_pressure_preconditioner
+     procedure, public  :: pressure_preconditioner_assign
+     !> Returns a version of the preconditioner on the next-coarser level
+     procedure, public  :: coarsen => coarsen_pressure_preconditioner
+     procedure, private :: coarsen_pressure_preconditioner
 
      final :: destroy_pressure_preconditioner
+     !> Override default assignment for pressure_preconditioner_type pairs.
+     generic            :: assignment(=) => pressure_preconditioner_assign
 
   end type pressure_preconditioner_type
 
@@ -54,20 +60,35 @@ contains
   !> @brief Construct a <code> pressure_preconditioner_type</code> object
   !>
   !> @return self the constructed preconditioner object
-  function pressure_preconditioner_constructor() result(self)
+  function pressure_preconditioner_constructor(level) result(self)
 
     use log_mod, only: log_event, LOG_LEVEL_INFO
     implicit none
+    integer(kind=i_def) :: level
 
     type(pressure_preconditioner_type)  :: self
 
     call log_event( 'Constructing pressure preconditioner...', &
          LOG_LEVEL_INFO )
-    ! Make it do something (this is needed to work with intel on cray)
-    self%useless = 1
+    self%level = level
     call log_event( 'done', LOG_LEVEL_INFO )
 
   end function pressure_preconditioner_constructor
+
+  !> Performs a deep copy between pressure_preconditioner_type pairs.
+  !> (for overriding the "=" operator)
+  !>
+  !> @param[out] dest   pressure_preconditioner_type lhs
+  !> @param[in]  source pressure_preconditioner_type rhs
+  subroutine pressure_preconditioner_assign(dest, source)
+
+    implicit none
+    class(pressure_preconditioner_type), intent(in)  :: source
+    class(pressure_preconditioner_type), intent(out) :: dest
+
+    ! Deep copy of the contents of the pressure_preconditioner_type
+    dest%level = source%level
+  end subroutine pressure_preconditioner_assign
 
   !>@brief Apply the preconditioner to calculate \f$y = P.x = x\f$
   !>
@@ -91,7 +112,7 @@ contains
        select type(y)
        type is(field_vector_type)
           ! Multiply by inverse of vertical operator \f$ H_z \f$
-          tri => get_tri_precon()
+          tri => get_tri_precon(self%level)
           call invoke( tri_solve_kernel_type(y%vector(1), x%vector(1), tri) )
        class default
           write(log_scratch_space, '(A)') &
@@ -107,6 +128,19 @@ contains
 
   end subroutine apply_pressure_preconditioner
 
+  !> Construct a coarsened version of the preconditioner on the next
+  !> level of the multigrid hierarchy
+  !>
+  !>@param[inout] self instance of type pressure_preconditioner_type
+  !>@param[inout] other coarsed version on next multigrid level
+  subroutine coarsen_pressure_preconditioner(self,other)
+    implicit none
+    class(pressure_preconditioner_type), intent(inout) :: self
+    class(abstract_hierarchical_preconditioner_type), allocatable, intent(inout) :: other
+    allocate(other, &
+             source = pressure_preconditioner_type(self%level+1) )
+  end subroutine coarsen_pressure_preconditioner
+
   !>@brief Destructor
   !>
   !>@param[inout] self Instance of type to be destroyed
@@ -117,4 +151,3 @@ contains
   end subroutine destroy_pressure_preconditioner
 
 end module pressure_precon_alg_mod
-

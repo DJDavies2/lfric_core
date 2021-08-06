@@ -43,6 +43,7 @@ module gravity_wave_alg_mod
   use gw_pressure_operator_alg_mod,   only: gw_pressure_operator_type
   use gw_pressure_precon_alg_mod,     only: gw_pressure_preconditioner_type
   use null_preconditioner_alg_mod,    only: null_preconditioner_type
+  use multigrid_preconditioner_alg_mod, only: multigrid_preconditioner_type
 
   ! Preconditioner and solver
   use preconditioner_mod,             only: abstract_preconditioner_type
@@ -51,6 +52,7 @@ module gravity_wave_alg_mod
                                             gmres_type,                     &
                                             fgmres_type,                    &
                                             gcr_type,                       &
+                                            jacobi_type,                    &
                                             conjugate_gradient_type,        &
                                             precondition_only_type
 
@@ -134,9 +136,11 @@ contains
                                              method_fgmres,                              &
                                              method_gcr,                                 &
                                              method_prec_only,                           &
+                                             method_jacobi,                              &
                                              helmholtz_preconditioner => preconditioner, &
                                              preconditioner_none,                        &
                                              preconditioner_tridiagonal,                 &
+                                             preconditioner_multigrid,                   &
                                              diagnostic_norm
     implicit none
 
@@ -155,6 +159,8 @@ contains
     real(kind=r_def), allocatable       :: dz(:)
     type(mesh_type),           pointer  :: mesh => null()
     integer(kind=i_def)                 :: nlayers
+
+    type(gw_pressure_preconditioner_type) :: gw_Hz_preconditioner
 
     !=== Create internal state field arrays ================================!
     state   = field_vector_type(bundle_size)
@@ -187,6 +193,9 @@ contains
     call compute_q_operator_init(dz, nlayers)
     call invoke( compute_q_operator_type(Q, qr) )
 
+    ! *** Construct Helmholtz operator
+    gw_pressure_operator = gw_pressure_operator_type(p_fs, level=1_i_def)
+
     ! *** Allocate polymorphic solver- and preconditioner objects ***
 
     ! Allocate pressure solver of correct type
@@ -200,6 +209,8 @@ contains
        allocate ( fgmres_type :: gw_pressure_solver )
     else if (helmholtz_method == METHOD_GCR) then
        allocate ( gcr_type :: gw_pressure_solver )
+    else if (helmholtz_method == METHOD_JACOBI) then
+       allocate ( jacobi_type :: gw_pressure_solver )
     else if (helmholtz_method == METHOD_PREC_ONLY) then
        allocate ( precondition_only_type :: gw_pressure_solver )
     else
@@ -210,7 +221,14 @@ contains
     if (helmholtz_preconditioner == PRECONDITIONER_NONE) then
        allocate ( null_preconditioner_type :: gw_pressure_preconditioner)
     else if (helmholtz_preconditioner == PRECONDITIONER_TRIDIAGONAL) then
-       allocate ( gw_pressure_preconditioner_type :: gw_pressure_preconditioner)
+       allocate (gw_pressure_preconditioner, &
+                 source = gw_pressure_preconditioner_type(level=1_i_def))
+    else if (helmholtz_preconditioner == PRECONDITIONER_MULTIGRID) then
+       gw_Hz_preconditioner = gw_pressure_preconditioner_type(level=1_i_def)
+       allocate ( gw_pressure_preconditioner, &
+                  source = multigrid_preconditioner_type(rhs_p, &
+                                                         gw_pressure_operator, &
+                                                         gw_Hz_preconditioner) )
     else
        call log_event( "Unknown pressure preconditioner specified", &
                        LOG_LEVEL_ERROR)
@@ -244,23 +262,7 @@ contains
        call log_event("Unknown mixed solver specified",LOG_LEVEL_ERROR)
     end if
 
-    ! *** Construct solver-, preconditioner- and operator-objects
-
-    ! Construct Helmholtz operator and preconditioner
-    gw_pressure_operator = gw_pressure_operator_type(state)
-
-    ! Construct pressure preconditioner
-    select type(gw_pressure_preconditioner)
-    type is ( null_preconditioner_type )
-       ! Null preconditioner
-       gw_pressure_preconditioner = null_preconditioner_type()
-    type is ( gw_pressure_preconditioner_type )
-       ! Vertical preconditioner
-       gw_pressure_preconditioner = gw_pressure_preconditioner_type(mesh_id)
-    class default
-       call log_event( "Can not initialise pressure preconditioner", &
-                       LOG_LEVEL_ERROR )
-    end select
+    ! *** Construct solver and preconditioner objects
 
     ! Construct pressure solver
     select type(gw_pressure_solver)
@@ -304,6 +306,14 @@ contains
                                       si_pressure_tolerance,          &
                                       gw_pressure_solver_a_tol,       &
                                       si_pressure_maximum_iterations)
+    type is ( jacobi_type )
+       ! Jacobi solver
+       gw_pressure_solver = jacobi_type( gw_pressure_operator,           &
+                                         gw_pressure_preconditioner,     &
+                                         si_pressure_tolerance,          &
+                                         gw_pressure_solver_a_tol,       &
+                                         si_pressure_maximum_iterations, &
+                                         rho_relax = 1.0_r_def)
 
     type is ( precondition_only_type )
        ! Precondition only solver

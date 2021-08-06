@@ -35,7 +35,7 @@ ny, nx = 360, 720
 
 
 def make_figures(filein, plotpath, fields, vertical_spacing, lid, n_full,
-                 figname):
+                 figname, idx_list):
 
     if vertical_spacing == 'um38':
         # um L38 set
@@ -105,13 +105,32 @@ def make_figures(filein, plotpath, fields, vertical_spacing, lid, n_full,
 
     zi_h = 0.5*(zi_f[1:] + zi_f[0:n_full-1])
 
-    directions = ['xy', 'yz']
+    directions = ['xy', 'yz', 'xz']
 
     for t in [-1]:
-        interp_fig = plt.figure(figsize=(20, 10))
         if fields is None:
+            fields_name = 'winds'
             fields = ['u1', 'u2', 'u3']
+            separate_plots = False
+        elif len(fields) == 1:
+            fields_name = fields[0]
+            separate_plots = False
+        else:
+            fields_name = 'fields'
+            separate_plots = True
+
+        nxplots = len(fields)
+        nyplots = len(directions)
+
+        if separate_plots:
+            nxplots = 1
+        else:
+            interp_fig = plt.figure(figsize=(20, 10))
+        nplots = nxplots*nyplots
         for f, field in enumerate(fields):
+            if separate_plots:
+                interp_fig = plt.figure(figsize=(20, 10))
+                fields_name = field
             cube = read_ugrid_data(filein, field)
             # Vertical levels will be last entry in dimension coords
             levels_name = cube.dim_coords[-1].name()
@@ -159,6 +178,17 @@ def make_figures(filein, plotpath, fields, vertical_spacing, lid, n_full,
             else:
                 zi = zi_h
 
+            if idx_list is None:
+                plot_long = int(nx/2)
+                plot_lat = int(ny/2)
+                plot_level = n_levs-2
+            else:
+                # idx_list contains degrees/level to plot
+                plot_long = (int(idx_list[0])+180)*int(nx/360)
+                plot_lat = (int(idx_list[1])+90)*int(ny/180)
+                plot_level = int(idx_list[2])
+
+
             # Interpolate using delaunay triangularization
             for p, l in enumerate(range(n_levs)):
                 data = cube.data[t, l]
@@ -177,43 +207,44 @@ def make_figures(filein, plotpath, fields, vertical_spacing, lid, n_full,
 
             for d, direction in enumerate(directions):
 
-                nxplots = len(fields)
-                nyplots = len(directions)
-                nplots = nxplots*nyplots
+                if separate_plots:
+                    plotnum = d + 1
+                else:
+                    plotnum = d*nxplots + f + 1
 
-                plot_long = int(nx/2)
-                plot_lat = int(ny/2)
-                plot_level = n_levs-2
-
-                plotnum = d*nxplots + f + 1
                 ax = interp_fig.add_subplot(nyplots, nxplots, plotnum)
 
                 if direction == 'xz':
                     x1, x2 = np.meshgrid(xi, zi)
                     x3 = plot_data[plot_lat, :, :].T
-                    plt.title([field, ', lat = ',
+                    plt.title([field, direction, ' lat = ',
                                yi[plot_lat]*360./np.real(nx)])
                 if direction == 'yz':
                     x1, x2 = np.meshgrid(yi, zi)
                     x3 = plot_data[:, plot_long, :].T
-                    plt.title([field, ', long = ',
+                    plt.title([field, direction, 'long = ',
                                xi[plot_long]*360./np.real(nx)])
                 if direction == 'xy':
                     x2, x1 = np.meshgrid(yi, xi)
                     x3 = plot_data[:, :, plot_level].T
-                    plt.title([field, ', Height = ', zi[plot_level]])
+                    plt.title([field, direction, 'Height = ', zi[plot_level]])
 
                 CS = plt.contourf(x1, x2, x3, levels=levels, cmap=magma)
                 plt.colorbar(cmap=magma)
                 CL = plt.contour(x1, x2, x3,
                                  levels=levels, linewidths=0.5, colors='k')
 
-        plt.tight_layout()
+            pngfile = '%s/%s-%s-time%s.png' % (plotpath, figname, fields_name, time[t])
 
-        pngfile = '%s/%s-winds-time%s.png' % (plotpath, figname, time[t])
-        plt.savefig(pngfile)
+            if separate_plots:
+                plt.tight_layout()        
+                plt.savefig(pngfile)
+
+        if ~separate_plots:
+            plt.tight_layout()       
+            plt.savefig(pngfile)
+
         plt.close()
-
 
 if __name__ == "__main__":
 
@@ -223,6 +254,9 @@ if __name__ == "__main__":
         field_list = None
         if len(args[:]) > 7:
             field_list = args[7].split(':')
+        idx_list = None
+        if len(args[:]) > 8:
+            idx_list = args[8].split(':')
     except ValueError:
         print("Usage: {0} <filein> <plotpath> <vertical_grid> <lid>"
               " <n_full> <figname> [<fields_list>]"
@@ -232,4 +266,4 @@ if __name__ == "__main__":
     file_list = files.split(':')
     for filein in file_list:
         make_figures(filein, plotpath, field_list, vertical_grid,
-                     int(lid), int(n_full), figname)
+                     int(lid), int(n_full), figname, idx_list)

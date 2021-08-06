@@ -21,7 +21,7 @@
 !> allows application of this Helmholtz operator.
 
 module pressure_operator_alg_mod
-  use linear_operator_mod,                only: abstract_linear_operator_type
+  use hierarchical_linear_operator_mod,   only: abstract_hierarchical_linear_operator_type
   use vector_mod,                         only: abstract_vector_type
   use field_mod,                          only: field_type
   use field_vector_mod,                   only: field_vector_type
@@ -42,15 +42,20 @@ module pressure_operator_alg_mod
                                                 get_helm_diag, &
                                                 get_hb_lumped_inv
   use boundaries_config_mod,              only: limited_area
+  use function_space_mod,                 only: function_space_type
+  use function_space_chain_mod,           only: multigrid_function_space_chain
+
   implicit none
 
-  type, public, extends(abstract_linear_operator_type) :: &
+  type, public, extends(abstract_hierarchical_linear_operator_type) :: &
                         pressure_operator_type
   private
      !> Temporary fields used in operator application
      type(field_type) :: grad_p, div_grad_p
      !> Level of the operator (used for multigrid)
      integer(kind=i_def) :: level
+     !> Id of function space
+     integer(kind=i_def) :: fs_id
      contains
      !> over-ride the abstract interface
      !> param[in] self a linear operator
@@ -62,7 +67,9 @@ module pressure_operator_alg_mod
      !> @param[out] dest   pressure_operator_type lhs
      !> @param[in]  source pressure_operator_type rhs
      procedure, public  :: pressure_operator_assign
-
+     !> Returns a version of the operator on the next-coarser space
+     procedure, public  :: coarsen => coarsen_pressure_operator
+     procedure, private :: coarsen_pressure_operator
      final              :: destroy_pressure_operator
 
      !> Override default assignment for pressure_operator_type pairs.
@@ -111,6 +118,9 @@ contains
 
     self%level = level
 
+    ! Id of pressure function space
+    self%fs_id = wp%get_id()
+
     call log_event( 'done', LOG_LEVEL_INFO )
 
   end function pressure_operator_constructor
@@ -131,6 +141,7 @@ contains
     call source%grad_p%copy_field(dest%grad_p)
     call source%div_grad_p%copy_field(dest%div_grad_p)
     dest%level = source%level
+    dest%fs_id = source%fs_id
   end subroutine pressure_operator_assign
 
   !>@brief Apply Helmholtz operator to a pressure field to obtain \f$y=Hx\f$
@@ -251,6 +262,22 @@ contains
     end select
 
   end subroutine apply_pressure_operator
+
+  !> Return a coarsened version of the operator on the
+  !> next level of the multigrid hierarchy.
+  !>
+  !>@param[in] self instance of pressure_operator_type
+  !>@param[in] fs_coarse coarse level function space
+  !>@param[inout] coarse_operator coarsened version of the operator on the next multigrid level
+  subroutine coarsen_pressure_operator(self,fs_coarse,coarse_operator)
+    implicit none
+    class(pressure_operator_type), intent(in) :: self
+    type(function_space_type), pointer, intent(in) :: fs_coarse
+    class(abstract_hierarchical_linear_operator_type), allocatable, intent(inout) :: coarse_operator
+
+    allocate(coarse_operator, &
+             source=pressure_operator_type(fs_coarse,self%level+1))
+  end subroutine coarsen_pressure_operator
 
   !> Finalizer for the Helmholtz operator
   !> @param [inout] self the pressure operator

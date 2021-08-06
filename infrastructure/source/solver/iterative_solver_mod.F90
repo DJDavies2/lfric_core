@@ -319,6 +319,7 @@ module iterative_solver_mod
 
   type, public, extends(abstract_iterative_solver_type) :: jacobi_type
      private
+     real(kind=r_def) :: rho_relax ! Overrelaxation factor
    contains
      procedure :: apply => jacobi_solve
      procedure :: jacobi_solve
@@ -331,13 +332,15 @@ module iterative_solver_mod
 
   ! the constructor will be in a submodule
   interface
-     module function jacobi_constructor( lin_op, prec, r_tol, a_tol, max_iter) &
+     module function jacobi_constructor( lin_op, prec, r_tol, a_tol, max_iter, &
+                                         rho_relax) &
           result(self)
        class(abstract_linear_operator_type), target, intent(in) :: lin_op
        class(abstract_preconditioner_type),  target, intent(in) :: prec
        real(kind=r_def),                             intent(in) :: r_tol
        real(kind=r_def),                             intent(in) :: a_tol
        integer(kind=i_def),                          intent(in) :: max_iter
+       real(kind=r_def),                             intent(in) :: rho_relax
        type(jacobi_type) :: self
      end function
   end interface
@@ -1472,21 +1475,25 @@ contains
   !> @param[in] r_tol real, the relative tolerance halting condition
   !> @param[in] a_tol real, the absolute tolerance halting condition
   !> @param[in] max_inter, integer the maximum number of iterations
+  !> @param[in] rho_relax, overrelaxation factor
   !> @return the constructed jacobi solver
-  module function jacobi_constructor(lin_op, prec, r_tol, a_tol, max_iter) result(self)
+  module function jacobi_constructor(lin_op, prec, r_tol, a_tol, max_iter, &
+                                     rho_relax) result(self)
     implicit none
     class(abstract_linear_operator_type), target, intent(in) :: lin_op
     class(abstract_preconditioner_type),  target, intent(in) :: prec
     real(kind=r_def),                             intent(in) :: r_tol
     real(kind=r_def),                             intent(in) :: a_tol
     integer(kind=i_def),                          intent(in) :: max_iter
+    real(kind=r_def),                             intent(in) :: rho_relax
     type(jacobi_type) :: self
 
-    self%lin_op   => lin_op
-    self%prec     => prec
-    self%r_tol    = r_tol
-    self%a_tol    = a_tol
-    self%max_iter = max_iter
+    self%lin_op    => lin_op
+    self%prec      => prec
+    self%r_tol     = r_tol
+    self%a_tol     = a_tol
+    self%max_iter  = max_iter
+    self%rho_relax = rho_relax
 
   end function
 
@@ -1510,7 +1517,7 @@ contains
     class(abstract_vector_type), allocatable :: r
     class(abstract_vector_type), allocatable :: z
 
-    real(kind=r_def), parameter :: const = -0.5_r_def
+    real(kind=r_def) :: const
 
     call b%duplicate(r)
     call b%duplicate(z)
@@ -1518,6 +1525,7 @@ contains
     call z%set_scalar(0.0_r_def)
 
     converged=.false.
+    const = -self%rho_relax
 
     ! Solve Ax = b
     do iter=1, self%max_iter
@@ -1527,6 +1535,10 @@ contains
       ! Check for convergence
       r_nrm = r%norm()
       if ( iter == 1 ) r_nrm_0 = r_nrm
+      write(log_scratch_space, &
+           '("  jacobi iteration ",I6,": ||r|| = ",E12.4," ||r||/||r_0|| = ",E12.4)') iter, r_nrm, r_nrm/r_nrm_0
+       call log_event(log_scratch_space,LOG_LEVEL_INFO)
+
       if (      ( r_nrm/r_nrm_0 <= self%r_tol ) &
            .or. ( r_nrm <= self%a_tol ) ) then
          converged=.true.
