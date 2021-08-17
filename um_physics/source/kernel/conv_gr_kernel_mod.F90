@@ -418,7 +418,7 @@ contains
     integer(i_def) :: k, i
 
     ! local switches and scalars
-    integer(i_um) :: n_cumulus, n_deep, n_shallow, n_congestus, n_mid,       &
+    integer(i_um) :: n_deep, n_shallow, n_congestus, n_mid,                  &
                      ntra_lev, segments, n_conv_levels,                      &
                      call_number, ntra_fld, seg_num
 
@@ -489,7 +489,7 @@ contains
     real(r_um), dimension(row_length,rows,nlayers) :: tnuc_new
 
     real(r_um), dimension(row_length,rows) :: zlcl, t1_sd, q1_sd, w_max,     &
-         deep_flag, past_precip, past_conv_ht, ql_ad, ind_cape_reduced,      &
+         deep_flag, past_conv_ht, ql_ad, ind_cape_reduced,                   &
          it_wstar_dn, g_ccp, h_ccp, ccp_strength, tnuc_nlcl
 
     integer(i_um), dimension(row_length,rows) :: conv_type
@@ -686,7 +686,6 @@ contains
     n_shallow = 0
 
     if (cumulus(1,1)) then
-      n_cumulus = 1
       if (iconv_deep >  0  .AND. .NOT. l_shallow(1,1) ) then
         n_deep = 1
       endif
@@ -694,8 +693,6 @@ contains
         n_shallow = 1
       endif
       n_congestus = 1   ! as UM though not actually using scheme
-    else
-      n_cumulus = 0
     end if
 
     ! Loop over convection calls per model time step
@@ -771,10 +768,10 @@ contains
         , it_mid_level, it_kterm_deep, it_kterm_shall                       &
         , it_precip_dp, it_precip_sh, it_precip_md, it_precip_cg            &
         , it_wstar_dn,  it_wstar_up                                         &
-        , it_mb1, it_mb2, it_cg_term, n_cumulus                             &
+        , it_mb1, it_mb2, it_cg_term                                        &
         , uw0, vw0, w_max                                                   &
         , zlcl, zlcl_uv, tnuc_new, tnuc_nlcl, zhpar, entrain_coef           &
-        , conv_prog_precip, conv_prog_flx, deep_flag, past_precip           &
+        , conv_prog_precip, conv_prog_flx, deep_flag                        &
         , past_conv_ht, it_cape_diluted, n_deep, n_congestus, n_shallow     &
         , n_mid, r_rho_levels(1,1,1), r_theta_levels(1,1,1)                 &
         , rho_wet, rho_wet_tq, rho_dry, rho_dry_theta, delta_smag           &

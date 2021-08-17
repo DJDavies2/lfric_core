@@ -849,8 +849,8 @@ contains
     real(r_um), dimension(row_length,rows) ::                                &
          z0h_scm, z0m_scm, soil_clay, soil_sand, dust_mrel1,                 &
          dust_mrel2, dust_mrel3, dust_mrel4, dust_mrel5, dust_mrel6,         &
-         zhpar_shcu, t1_sd, q1_sd, qcl_inv_top, w_max, deep_flag,            &
-         past_precip, past_conv_ht, ql_ad, cin_undilute, cape_undilute,      &
+         zhpar_shcu, t1_sd, q1_sd, qcl_inv_top, w_max,                       &
+         ql_ad, cin_undilute, cape_undilute,                                 &
          entrain_coef, ustar_in, g_ccp, h_ccp,  ccp_strength, fb_surf,       &
          charnock_w, aresist, cu_over_orog, resist_b, rho_aresist, rib_gb,   &
          shallowc, vshr, z0m_eff_gb, zhsc, tnuc_nlcl
@@ -1441,7 +1441,7 @@ contains
           , tstar_land, tstar_sea, tstar_sice, z0msea                   &
           , flux_e, flux_h, ustar_in, L_spec_z0, z0m_scm, z0h_scm       &
           , tstar, land_sea_mask, flandg, ice_fract                     &
-          , w, w_max, deep_flag, past_precip, past_conv_ht              &
+          , w, w_max                                                    &
           , conv_prog_precip                                            &
           , g_ccp, h_ccp, ccp_strength                                  &
     !     IN surface fluxes
