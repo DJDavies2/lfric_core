@@ -124,9 +124,11 @@ module io_dev_init_mod
 
         ! Initialise time axis objects for time comparison
         ! Time unit in seconds
-        call seconds_axis%initialise( "seconds_axis", xios_id="time_seconds", &
-                                      interp_flag = interp_flag,              &
-                                      update_freq = ancil_update_freq )
+        call seconds_axis%initialise( "seconds_axis",                      &
+                                      file_id="io_dev_time_varying_input", &
+                                      xios_id="time_seconds",              &
+                                      interp_flag = interp_flag,           &
+                                      pop_freq = ancil_update_freq )
 
         call core_fields%remove_field( "W3_2D_field" )
         call create_real_field( core_fields, "W3_2D_field", mesh_id, twod_mesh_id, W3, &
@@ -147,18 +149,22 @@ module io_dev_init_mod
         call variable_times_list%insert_item(seconds_axis)
 
         ! Time unit in days
-        call days_axis%initialise( "days_axis", xios_id="time_days", &
-                                   interp_flag = interp_flag,        &
-                                   update_freq = ancil_update_freq )
+        call days_axis%initialise( "days_axis",                         &
+                                   file_id="io_dev_time_varying_input", &
+                                   xios_id="time_days",                 &
+                                   interp_flag = interp_flag,           &
+                                   pop_freq = ancil_update_freq )
         call create_real_field( core_fields, "days_field", mesh_id, twod_mesh_id, W3, &
                                 time_axis=days_axis, twod=.true. )
         call days_axis%set_update_behaviour( tmp_update_ptr )
         call variable_times_list%insert_item(days_axis)
 
         ! Time unit in months
-        call months_axis%initialise( "months_axis", xios_id="time_months", &
-                                      interp_flag = interp_flag,           &
-                                      update_freq = ancil_update_freq )
+        call months_axis%initialise(  "months_axis",                        &
+                                      file_id="io_dev_time_varying_input",  &
+                                      xios_id="time_months",                 &
+                                      interp_flag = interp_flag,            &
+                                      pop_freq = ancil_update_freq )
         call create_real_field( core_fields, "months_field", mesh_id, twod_mesh_id, W3, &
                                 time_axis=months_axis, twod=.true. )
         call months_axis%set_update_behaviour( tmp_update_ptr )
@@ -336,9 +342,11 @@ module io_dev_init_mod
     if ( present(time_axis) ) then
       ! Set up function space
       if ( twod_flag ) then
-        vector_space => function_space_collection%get_fs(twod_mesh_id, element_order, fs_id, ndata=multi_data_level*2)
+        vector_space => function_space_collection%get_fs(twod_mesh_id, element_order, fs_id, &
+                                              ndata=multi_data_level*time_axis%get_window_size())
       else
-        vector_space => function_space_collection%get_fs(mesh_id, element_order, fs_id, ndata=multi_data_level*2)
+        vector_space => function_space_collection%get_fs(mesh_id, element_order, fs_id, &
+                                        ndata=multi_data_level*time_axis%get_window_size())
       end if
       ! Initialise field object from specifications
       call new_field%initialise( vector_space, name=field_name, ndata_first=.true. )

@@ -104,7 +104,7 @@ module create_lbcs_mod
       ! Set pointer to time axis read behaviour
       tmp_update_ptr => read_field_time_var
 
-      call lbc_time_axis%initialise( "lbc_time", yearly=cyclic, &
+      call lbc_time_axis%initialise( "lbc_time", file_id="lbc", yearly=cyclic, &
                                      interp_flag = interp_flag )
 
       call setup_field( lbc_fields, depository, prognostic_fields, &

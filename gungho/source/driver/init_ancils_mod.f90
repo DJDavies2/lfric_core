@@ -103,7 +103,9 @@ contains
       call setup_ancil_field("land_tile_fraction", depository, ancil_fields, &
                               mesh_id, twod_mesh_id, twod=.true.,            &
                               ndata=n_land_tile)
-      call pft_time_axis%initialise("pft_time", interp_flag=interp_flag)
+      call pft_time_axis%initialise("plant_func_time",          &
+                                    file_id="plant_func_ancil", &
+                                    interp_flag=interp_flag)
       call setup_ancil_field("canopy_height", depository, ancil_fields, &
                               mesh_id, twod_mesh_id, twod=.true., ndata=npft, &
                               time_axis=pft_time_axis)
@@ -113,14 +115,16 @@ contains
       call pft_time_axis%set_update_behaviour(tmp_update_ptr)
       call ancil_times_list%insert_item(pft_time_axis)
 
-      call sea_time_axis%initialise("sea_time", interp_flag=interp_flag)
+      call sea_time_axis%initialise("sea_time", file_id="sea_ancil", &
+                                    interp_flag=interp_flag)
       call setup_ancil_field("chloro_sea", depository, ancil_fields, mesh_id, &
                               twod_mesh_id, twod=.true.,                      &
                               time_axis=sea_time_axis)
       call sea_time_axis%set_update_behaviour(tmp_update_ptr)
       call ancil_times_list%insert_item(sea_time_axis)
 
-      call sst_time_axis%initialise("sst_time", interp_flag=interp_flag)
+      call sst_time_axis%initialise("sst_time", file_id="sst_ancil", &
+                                    interp_flag=interp_flag)
       call setup_ancil_field("tstar_sea", depository, ancil_fields, mesh_id, &
                               twod_mesh_id, twod=.true.,                     &
                               time_axis=sst_time_axis)
@@ -128,7 +132,8 @@ contains
       call ancil_times_list%insert_item(sst_time_axis)
 
       !=====  SEA ICE ANCILS  =====
-      call sea_ice_time_axis%initialise("sea_ice_time", interp_flag=interp_flag)
+      call sea_ice_time_axis%initialise("sea_ice_time", file_id="sea_ice_ancil", &
+                                        interp_flag=interp_flag)
       call setup_ancil_field("sea_ice_thickness", depository, ancil_fields, &
                 mesh_id, twod_mesh_id, twod=.true., time_axis=sea_ice_time_axis)
       call setup_ancil_field("sea_ice_fraction", depository, ancil_fields, &
@@ -138,7 +143,8 @@ contains
 
       !=====  RADIATION ANCILS  =====
       call albedo_vis_time_axis%initialise("albedo_vis_time", &
-                                           interp_flag=interp_flag)
+                                           file_id="albedo_vis_ancil", &
+                                           interp_flag=interp_flag )
       call setup_ancil_field("albedo_obs_vis", depository, ancil_fields, &
                              mesh_id, twod_mesh_id, twod=.true., &
                              time_axis=albedo_vis_time_axis)
@@ -146,7 +152,8 @@ contains
       call ancil_times_list%insert_item(albedo_vis_time_axis)
 
       call albedo_nir_time_axis%initialise("albedo_nir_time", &
-                                           interp_flag=interp_flag)
+                                           file_id="albedo_nir_ancil", &
+                                           interp_flag=interp_flag )
       call setup_ancil_field("albedo_obs_nir", depository, ancil_fields, &
                               mesh_id, twod_mesh_id, twod=.true., &
                               time_axis=albedo_nir_time_axis)
@@ -198,14 +205,17 @@ contains
                               mesh_id, twod_mesh_id, twod=.true.)
 
       !=====  OZONE ANCIL  =====
-      call ozone_time_axis%initialise("ozone_time", interp_flag=interp_flag)
+      call ozone_time_axis%initialise("ozone_time", file_id="ozone_ancil", &
+                                      interp_flag=interp_flag)
       call setup_ancil_field("ozone", depository, ancil_fields, mesh_id, &
                              twod_mesh_id, time_axis=ozone_time_axis)
       call ozone_time_axis%set_update_behaviour(tmp_update_ptr)
       call ancil_times_list%insert_item(ozone_time_axis)
 
       !=====  AEROSOL ANCILS  =====
-      call aerosol_time_axis%initialise("aerosols_time", interp_flag=interp_flag)
+      call aerosol_time_axis%initialise("aerosols_time",          &
+                                        file_id="aerosols_ancil", &
+                                        interp_flag=interp_flag)
       call setup_ancil_field("acc_sol_bc", depository, ancil_fields, mesh_id,  &
                              twod_mesh_id, time_axis=aerosol_time_axis)
       call setup_ancil_field("acc_sol_om", depository, ancil_fields, mesh_id,  &
@@ -329,8 +339,8 @@ contains
            "Creating time axis field for ", trim(name)
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
-      ! Multiply ndat by 2 (the number of time windows)
-      time_ndat = ndat * 2
+      ! Multiply ndat by the number of time windows
+      time_ndat = ndat * time_axis%get_window_size()
       if (twod_field) then
         vec_space => function_space_collection%get_fs( twod_mesh_id, fs_order, &
                                                        W3, time_ndat )

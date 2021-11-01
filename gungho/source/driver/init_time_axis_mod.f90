@@ -37,8 +37,10 @@ module init_time_axis_mod
   !> @param[in,out] depository               Depository field collection
   !> @param[in,out] prognostic_fields        Prognostic field collection
   !> @param[in]     name                     Name of the LBC field to be added
-  !> @param[in]     vector_space             Function space of the field
+  !> @param[in]     fs                       Function space of the field
+  !> @param[in]     mesh_id                  Identifier for the primary mesh
   !> @param[in]     checkpoint_restart_flag  Flag to set checkpoint behaviour
+  !> @param[in,out] time_axis                The operable time axis object
   subroutine setup_field( collection, depository, prognostic_fields, &
                           name, fs, mesh_id, checkpoint_restart_flag, &
                           time_axis )
@@ -67,7 +69,6 @@ module init_time_axis_mod
     type(function_space_type),       pointer :: field_space => null()
     class(pure_abstract_field_type), pointer :: field_ptr => null()
     type(field_type)                         :: new_field
-    integer(i_def),                parameter :: time_ndat = 2
 
     procedure(write_interface), pointer :: write_diag_behaviour => null()
     procedure(checkpoint_write_interface), &
@@ -82,7 +83,7 @@ module init_time_axis_mod
     ! Initialise
     if (present(time_axis)) then
       field_space => function_space_collection%get_fs( &
-                     mesh_id, element_order, fs, time_ndat )
+                     mesh_id, element_order, fs, time_axis%get_window_size() )
 
       call new_field%initialise( field_space, name=trim(name) )
 

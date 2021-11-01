@@ -24,13 +24,13 @@ module variable_fields_mod
 
 contains
 
-  subroutine init_variable_fields(time_axis_list, clock, state)
+  subroutine init_variable_fields(time_axis_list, clock, fields)
 
     implicit none
 
     type(linked_list_type),      intent(in)    :: time_axis_list
     class(clock_type),           intent(in)    :: clock
-    type(field_collection_type), intent(inout) :: state
+    type(field_collection_type), intent(inout) :: fields
 
     ! Pointer to linked list - used for looping through the list
     type(linked_list_item_type), pointer :: loop => null()
@@ -52,7 +52,7 @@ contains
           ! Align time window and populate model data
           call time_axis%align()
           call time_axis%update_fields()
-          call time_axis%populate_model_fields(state)
+          call time_axis%populate_model_fields(fields)
 
       end select
 
@@ -65,13 +65,13 @@ contains
 
   end subroutine init_variable_fields
 
-  subroutine update_variable_fields(time_axis_list, clock, state)
+  subroutine update_variable_fields(time_axis_list, clock, fields)
 
     implicit none
 
     type(linked_list_type),      intent(in)    :: time_axis_list
     class(clock_type),           intent(in)    :: clock
-    type(field_collection_type), intent(inout) :: state
+    type(field_collection_type), intent(inout) :: fields
 
     ! Pointer to linked list - used for looping through the list
     type(linked_list_item_type), pointer :: loop => null()
@@ -99,7 +99,7 @@ contains
 
           ! Populate the model fields from the time axis data
           if ( mod(clock%get_step(), time_axis%get_update_frequency()) == 0 ) then
-            call time_axis%populate_model_fields(state)
+            call time_axis%populate_model_fields(fields)
           end if
 
       end select

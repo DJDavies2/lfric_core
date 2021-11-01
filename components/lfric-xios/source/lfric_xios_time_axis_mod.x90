@@ -19,6 +19,7 @@ module lfric_xios_time_axis_mod
                                   LOG_LEVEL_ERROR, LOG_LEVEL_INFO
   use linked_list_data_mod, only: linked_list_data_type
   use xios,                 only: xios_get_field_attr, xios_get_axis_attr,     &
+                                  xios_get_file_attr,                          &
                                   xios_recv_field, xios_date, xios_duration,   &
                                   xios_get_current_date, xios_get_time_origin, &
                                   xios_get_year_length_in_seconds,             &
@@ -34,12 +35,16 @@ module lfric_xios_time_axis_mod
 
     private
 
-    !> Name of the time_axis.
+    !> Name of the time_axis
     character(str_def) :: name = 'unset'
     !> The data values of the time axis
     type(xios_date), allocatable :: time_data( : )
     !> The indices of the data points of the time axis
     integer(kind=i_def), allocatable :: index_data( : )
+    !> The width of the time window
+    integer(kind=i_def) :: window_size = 3
+    !> The current placement in the time window
+    integer(kind=i_def) :: current_window = 1
     !> The XIOS ID of the time axis
     character(str_def) :: xios_id
     !> The collection of fields associated with the time axis
@@ -48,8 +53,12 @@ module lfric_xios_time_axis_mod
     logical(l_def) :: yearly = .true.
     !> Flag for interpolation
     logical(l_def) :: does_interpolation = .false.
+    !> Data population frequency in timesteps
+    integer(i_def) :: populate_frequency = 1
     !> Update frequency in timesteps
-    integer(i_def) :: update_frequency = 1
+    type(xios_duration) :: update_frequency
+    !> XIOS date for next update
+    type(xios_date) :: next_update
 
     procedure(update_interface), nopass, pointer :: update_behaviour => null()
 
@@ -66,7 +75,9 @@ module lfric_xios_time_axis_mod
     procedure, private :: shift_forward
     !> Steps forward time axis with model timestep
     procedure, public :: step
-    !> Returns update frequency of time axis in timesteps
+    !> Returns the window size of the time axis object
+    procedure, public :: get_window_size
+    !> Returns population frequency of time axis in timesteps
     procedure, public :: get_update_frequency
     !> Aligns the active time window with the current model time
     procedure, public :: align
@@ -103,23 +114,26 @@ contains
   !>
   !> @param[in] input_data   The input time data array
   !> @param[in] name         The time axis name
-  !> @param[in] xios_id      The type of time axis
+  !> @param[in] file_id      The XIOS ID of the file the time axis controls
+  !> @param[in] xios_id      The XIOS ID of the time field represented by the time axis
   !> @param[in] yearly       Flag determining if axis is yearly
   !> @param[in] interp_flag  Flag determining if time_axis fields are linearly
   !>                         interpolated before being passed to the model data
-  !> @param[in] update_freq  The update frequency of the time axis in timesteps
-  subroutine initialise( self, name, xios_id, yearly, interp_flag, update_freq )
+  !> @param[in] pop_freq     The data population frequency of the time axis in timesteps
+  subroutine initialise( self, name, file_id, xios_id, yearly, interp_flag, pop_freq )
 
     implicit none
 
     class(time_axis_type),        intent(inout) :: self
     character(*),                 intent(in)    :: name
+    character(*),                 intent(in)    :: file_id
     character(*),   optional,     intent(in)    :: xios_id
     logical(l_def), optional,     intent(in)    :: yearly
     logical(l_def), optional,     intent(in)    :: interp_flag
-    integer(i_def), optional,     intent(in)    :: update_freq
+    integer(i_def), optional,     intent(in)    :: pop_freq
 
     type(field_collection_type) :: init_fields
+    type(xios_date)             :: start_date
 
     ! Name the object
     self%name = name
@@ -129,6 +143,10 @@ contains
       self%xios_id = name
     end if
 
+    call xios_get_file_attr(trim(file_id), output_freq=self%update_frequency)
+    call xios_get_current_date(start_date)
+    self%next_update = start_date + self%update_frequency
+
     ! Create object field collection
     init_fields = field_collection_type(name=trim(name)//'_fields')
     self%fields = init_fields
@@ -136,7 +154,8 @@ contains
     ! Set optional attributes
     if ( present(yearly) ) self%yearly = yearly
     if ( present(interp_flag) ) self%does_interpolation = interp_flag
-    if ( present(update_freq) ) self%update_frequency = update_freq
+    if ( present(pop_freq) ) self%populate_frequency = pop_freq
+
 
     ! Read time data
     call self%read_time_data()
@@ -295,6 +314,12 @@ contains
     self%time_data = cshift(self%time_data, 1)
     self%index_data = cshift(self%index_data, 1)
 
+    ! If there are more then 2 time entries present then we log the movement
+    ! into the next time window
+    if ( self%window_size > 2 ) then
+      self%current_window = self%current_window + 1
+    end if
+
   end subroutine shift_forward
 
   !> @brief Steps the time axis forward with the model timestep
@@ -309,26 +334,44 @@ contains
     ! Get current date from XIOS calendar
     call xios_get_current_date(model_date)
 
+    if ( self%next_update <= model_date ) then
+      call self%update_fields()
+      self%next_update = model_date + self%update_frequency
+    end if
+
     if ( self%time_data(1) <= model_date .and. model_date < self%time_data(2) ) then
       return
     else
       call self%shift_forward()
-      call self%update_fields()
     end if
 
   end subroutine step
 
-  !> @brief Returns time axis update frequency.
-  !> @return update_frequency The update frequency of the time axis in timesteps
-  function get_update_frequency(self) result(update_frequency)
+  !> @brief Returns time axis window size.
+  !> @return  n_window  The window size of the time axis
+  function get_window_size(self) result(n_window)
 
     implicit none
 
     class(time_axis_type), intent(inout) :: self
 
-    integer(i_def) :: update_frequency
+    integer(i_def) :: n_window
 
-    update_frequency = self%update_frequency
+    n_window = self%window_size
+
+  end function get_window_size
+
+  !> @brief Returns time axis update frequency.
+  !> @return pop_frequency The data population frequency of the time axis in timesteps
+  function get_update_frequency(self) result(pop_frequency)
+
+    implicit none
+
+    class(time_axis_type), intent(inout) :: self
+
+    integer(i_def) ::  pop_frequency
+
+    pop_frequency = self%populate_frequency
 
   end function get_update_frequency
 
@@ -423,9 +466,12 @@ contains
             'Reading '//trim(adjustl(updated_field%get_name())), &
             LOG_LEVEL_INFO)
           call self%update_behaviour(updated_field%get_name(), tmp_proxy, &
-                                      self%index_data(1:2), self%xios_id)
+                                      self%index_data(1:self%window_size), self%xios_id)
       end select
     end do
+
+    ! Set current window back to 1
+    self%current_window = 1
 
     nullify(updated_field)
 
@@ -464,9 +510,9 @@ contains
         ! Populate model fields based on interpolation flag
         if ( self%does_interpolation ) then
           call interp_field_1d( model_field, model_proxy, data_proxy, &
-                                self%time_data(1:2) )
+                                self%time_data(1:self%window_size), self%window_size, self%current_window )
         else
-          model_proxy%data(:) = data_proxy%data(1::2)
+          model_proxy%data(:) = data_proxy%data(1::self%window_size)
         end if
 
         ! Set halos dirty
@@ -489,7 +535,7 @@ contains
   !> @param[in] model_proxy Field proxy object for model field
   !> @param[in] data_proxy  Field proxy object for input data field
   !> @param[in] time_window The current time window
-  subroutine interp_field_1d( model_field, model_proxy, data_proxy, time_window )
+  subroutine interp_field_1d( model_field, model_proxy, data_proxy, time_window, window_size, window_start )
 
     implicit none
 
@@ -497,6 +543,8 @@ contains
     type(field_proxy_type), intent(in)             :: model_proxy
     type(field_proxy_type), intent(in)             :: data_proxy
     type(xios_date),        intent(in)             :: time_window(2)
+    integer(i_def),         intent(in)             :: window_size
+    integer(i_def),         intent(in)             :: window_start
 
     type(field_type)       :: field_time_entries(2)
     type(field_type)       :: interp_gradient
@@ -513,7 +561,7 @@ contains
     do t = 1, 2
       call field_time_entries(t)%initialise( model_proxy%vspace )
       time_entry_proxy = field_time_entries(t)%get_proxy()
-      time_entry_proxy%data(:) = data_proxy%data(t::2)
+      time_entry_proxy%data(:) = data_proxy%data(window_start+t-1::window_size)
     end do
 
     ! Initialise interpolation variables
