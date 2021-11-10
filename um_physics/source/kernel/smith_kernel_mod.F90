@@ -120,9 +120,9 @@ contains
 
     ! Arguments
     integer(kind=i_def), intent(in)     :: nlayers
-    integer(kind=i_def), intent(in)     :: ndf_wth, ndf_w3
+    integer(kind=i_def), intent(in)     :: ndf_wth, undf_wth
+    integer(kind=i_def), intent(in)     :: ndf_w3, undf_w3
     integer(kind=i_def), intent(in)     :: ndf_2d, undf_2d
-    integer(kind=i_def), intent(in)     :: undf_wth, undf_w3
 
     integer(kind=i_def), intent(in),    dimension(ndf_wth)  :: map_wth
     integer(kind=i_def), intent(in),    dimension(ndf_w3)   :: map_w3
