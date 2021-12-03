@@ -28,8 +28,8 @@ module semi_implicit_timestep_alg_mod
   use formulation_config_mod,    only: use_moisture, use_physics, dlayer_on, &
                                        use_wavedynamics,                     &
                                        moisture_conservation,                &
-                                       si_momentum_equation
-
+                                       si_momentum_equation,                 &
+                                       exner_from_eos
   use io_config_mod,             only: subroutine_timers,                    &
                                        write_conservation_diag
   use mixed_solver_config_mod,   only: guess_np1,                            &
@@ -79,9 +79,11 @@ module semi_implicit_timestep_alg_mod
   use slow_physics_alg_mod,        only: slow_physics
   use checks_and_balances_alg_mod, only: check_fields
 
-  use semi_implicit_solver_alg_mod,only: semi_implicit_solver_alg_init, &
-                                         semi_implicit_solver_alg_step, &
+  use semi_implicit_solver_alg_mod,only: semi_implicit_solver_alg_init,       &
+                                         semi_implicit_solver_alg_step,       &
                                          semi_implicit_solver_alg_final
+  use derive_exner_from_eos_alg_mod, &
+                                   only: derive_exner_from_eos
   use moisture_conservation_alg_mod, &
                                    only: moisture_conservation_alg
   use update_prognostic_scalars_alg_mod, &
@@ -140,6 +142,8 @@ module semi_implicit_timestep_alg_mod
   public  :: semi_implicit_alg_init
   public  :: semi_implicit_alg_step
   public  :: semi_implicit_alg_final
+  public  :: pre_advection_generic_field
+
 contains
 
   !> @details Initialisation procedure for the timestepping algorithm
@@ -560,6 +564,10 @@ contains
                                               moist_dyn(gas_law), &
                                               mr, clock%get_step(), &
                                               rho_guess, write_moisture_diag )
+          if (exner_from_eos) then
+            call derive_exner_from_eos( state, &
+                                        moist_dyn(gas_law) )
+          end if
 
           ! For poorly balanced initial conditions, we set the vertical
           ! component of W2 wind to zero
@@ -640,7 +648,6 @@ contains
     implicit none
 
     call semi_implicit_solver_alg_final()
-    call advection_alg_final()
 
     call final_si_operators()
 
@@ -651,6 +658,7 @@ contains
     if (allocated(rhs_np1))          deallocate(rhs_np1)
     if (allocated(rhs_adv))          deallocate(rhs_adv)
     if (allocated(rhs_phys))         deallocate(rhs_phys)
+    if (allocated(rhs_lbc))          deallocate(rhs_lbc)
     if (allocated(mr_n))             deallocate(mr_n)
     if (allocated(mr_after_slow))    deallocate(mr_after_slow)
     if (allocated(mr_inc))           deallocate(mr_inc)

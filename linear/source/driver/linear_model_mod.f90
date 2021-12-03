@@ -13,6 +13,11 @@ module linear_model_mod
   use gungho_model_data_mod,      only : model_data_type
   use tl_rk_alg_timestep_mod,     only : tl_rk_alg_init, &
                                          tl_rk_alg_final
+  use tl_si_timestep_alg_mod,     only : tl_semi_implicit_alg_init, &
+                                         tl_semi_implicit_alg_final
+  use si_operators_alg_mod,       only : final_si_operators
+  use semi_implicit_solver_alg_mod, &
+                                  only : semi_implicit_solver_alg_final
   use formulation_config_mod,     only : transport_only
   use timestepping_config_mod,    only : method,               &
                                          method_semi_implicit, &
@@ -47,6 +52,7 @@ contains
     type( field_type ),            pointer :: mr(:) => null()
     type( field_collection_type ), pointer :: ls_fields => null()
     type( field_type ),            pointer :: ls_mr(:) => null()
+    type( field_type ),            pointer :: ls_moist_dyn(:) => null()
 
     type( field_type), pointer :: theta => null()
     type( field_type), pointer :: u => null()
@@ -62,6 +68,7 @@ contains
     mr => model_data%mr
     ls_fields => model_data%ls_fields
     ls_mr => model_data%ls_mr
+    ls_moist_dyn => model_data%ls_moist_dyn
 
     ! Get pointers to fields in the prognostic/diagnostic field collections
     ! for use downstream
@@ -80,7 +87,11 @@ contains
     else
       select case( method )
         case( method_semi_implicit )  ! Semi-Implicit
-          call log_event("TL Semi implicit only not available ",LOG_LEVEL_ERROR)
+          call semi_implicit_solver_alg_final()
+          call final_si_operators()
+          call tl_semi_implicit_alg_init(mesh_id, u, rho, theta, exner, &
+                                         mr, ls_u, ls_rho, ls_theta, ls_exner, &
+                                         ls_mr, ls_moist_dyn)
 
         case( method_rk )             ! RK
           ! Initialise and output initial conditions for first timestep
@@ -104,6 +115,7 @@ contains
 
     if ( .not. transport_only ) then
       if ( method == method_rk )            call tl_rk_alg_final()
+      if ( method == method_semi_implicit ) call tl_semi_implicit_alg_final()
     end if
 
   end subroutine finalise_linear_model

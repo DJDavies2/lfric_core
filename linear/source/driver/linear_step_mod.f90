@@ -34,6 +34,7 @@ module linear_step_mod
   use moisture_conservation_alg_mod,  only : moisture_conservation_alg
   use moisture_fluxes_alg_mod,        only : moisture_fluxes_alg
   use tl_rk_alg_timestep_mod,         only : tl_rk_alg_step
+  use tl_si_timestep_alg_mod,         only : tl_semi_implicit_alg_step
   use timestepping_config_mod,        only : method, &
                                              method_semi_implicit, &
                                              method_rk
@@ -70,6 +71,7 @@ module linear_step_mod
     type( field_collection_type ), pointer :: ls_fields => null()
     type( field_type ),            pointer :: ls_mr(:) => null()
     type( field_type ),            pointer :: ls_moist_dyn(:) => null()
+    type( field_collection_type ), pointer :: cloud_fields => null()
 
     type( field_type), pointer :: theta => null()
     type( field_type), pointer :: u => null()
@@ -95,6 +97,7 @@ module linear_step_mod
     mr => model_data%mr
     moist_dyn => model_data%moist_dyn
     derived_fields => model_data%derived_fields
+    cloud_fields => model_data%cloud_fields
 
     ls_fields => model_data%ls_fields
     ls_mr => model_data%ls_mr
@@ -120,7 +123,13 @@ module linear_step_mod
     else  ! Not transport_only
       select case( method )
         case( method_semi_implicit )  ! Semi-Implicit
-          call log_event('semi-implicit not available for TL', LOG_LEVEL_ERROR)
+          call tl_semi_implicit_alg_step(u, rho, theta,                     &
+                                         exner, mr, moist_dyn,              &
+                                         ls_u, ls_rho, ls_theta,            &
+                                         ls_exner, ls_mr, ls_moist_dyn,     &
+                                         derived_fields,                    &
+                                         cloud_fields,                      &
+                                         clock, dt, mesh_id, twod_mesh_id)
         case( method_rk )             ! RK
           call tl_rk_alg_step(u, rho, theta, moist_dyn, exner,      &
                               ls_u, ls_rho, ls_theta, ls_moist_dyn, &

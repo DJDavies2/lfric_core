@@ -34,6 +34,10 @@ module tl_test_driver_mod
   use tl_test_hydrostatic_mod,             only : test_hydrostatic
   use tl_test_pressure_grad_bd_mod,        only : test_pressure_gradient_bd
   use tl_test_rk_alg_mod,                  only : test_rk_alg
+  use tl_test_advection_control_mod,       only : test_advection_control
+  use tl_test_rhs_eos_mod,                 only : test_rhs_eos
+  use tl_test_rhs_alg_mod,                 only : test_rhs_alg
+  use tl_test_semi_imp_alg_mod,            only : test_semi_imp_alg
 
   implicit none
 
@@ -48,7 +52,11 @@ module tl_test_driver_mod
          run_project_pressure,        &
          run_hydrostatic,             &
          run_pressure_gradient_bd,    &
-         run_rk_alg
+         run_rk_alg,                  &
+         run_rhs_alg,                 &
+         run_rhs_eos,                 &
+         run_advection_control,       &
+         run_semi_imp_alg
 
   type (model_data_type) :: model_data
 
@@ -206,6 +214,54 @@ contains
                       twod_mesh_id )
 
   end subroutine run_rk_alg
+
+  subroutine run_advection_control()
+
+    implicit none
+
+    class(clock_type), pointer :: clock
+    clock => io_context%get_clock()
+
+    call test_advection_control( model_data,   &
+                                 mesh_id,      &
+                                 twod_mesh_id, &
+                                 clock )
+
+  end subroutine run_advection_control
+
+  subroutine run_semi_imp_alg()
+
+    implicit none
+
+    class(clock_type), pointer :: clock
+    clock => io_context%get_clock()
+
+    call test_semi_imp_alg( model_data,   &
+                            mesh_id,      &
+                            twod_mesh_id, &
+                            clock )
+
+  end subroutine run_semi_imp_alg
+
+  subroutine run_rhs_alg()
+
+    implicit none
+
+    call test_rhs_alg( model_data,  &
+                       mesh_id,     &
+                       twod_mesh_id )
+
+  end subroutine run_rhs_alg
+
+  subroutine run_rhs_eos()
+
+    implicit none
+
+    call test_rhs_eos( model_data,  &
+                       mesh_id,     &
+                       twod_mesh_id )
+
+  end subroutine run_rhs_eos
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !>@brief Tidies up after a run.

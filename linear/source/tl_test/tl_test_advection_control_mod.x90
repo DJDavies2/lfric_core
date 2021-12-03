@@ -1,0 +1,340 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2021 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!>@brief
+!>@details
+
+module tl_test_advection_control_mod
+
+  use clock_mod,                      only: clock_type
+  use assign_field_random_kernel_mod, only: assign_field_random_kernel_type
+  use constants_mod,                  only: i_def, r_def, str_def, l_def
+  use field_mod,                      only: field_type
+  use field_bundle_mod,               only: clone_bundle, &
+                                            minus_bundle, &
+                                            add_bundle,   &
+                                            copy_bundle,  &
+                                            set_bundle_scalar
+  use field_collection_mod,           only: field_collection_type
+  use field_indices_mod,              only: igh_u, igh_t, igh_d, igh_p
+  use function_space_collection_mod,  only: function_space_collection
+  use finite_element_config_mod,      only: element_order
+  use fs_continuity_mod,              only: W2, W3, Wtheta
+  use derived_config_mod,             only: bundle_size
+  use gungho_model_data_mod,          only: model_data_type
+  use moist_dyn_mod,                  only: num_moist_factors
+  use mr_indices_mod,                 only: nummr
+  use timestepping_config_mod,        only: dt
+  use log_mod,                        only: log_event,         &
+                                            log_scratch_space, &
+                                            LOG_LEVEL_INFO
+  use tl_advection_alg_mod,           only: tl_advection_alg_init, &
+                                            tl_advection_control
+  use advection_alg_mod,              only: advection_alg_init, &
+                                            advection_control
+  use tl_test_convergence_rate_check, only: convergence_rate_check
+  use semi_implicit_timestep_alg_mod, only: pre_advection_generic_field
+
+  implicit none
+
+  private
+  public test_advection_control
+
+  contains
+
+  subroutine test_advection_control( model_data,    &
+                                     mesh_id,       &
+                                     twod_mesh_id,  &
+                                     clock )
+    implicit none
+
+    integer(i_def),                intent(in) :: mesh_id
+    integer(i_def),                intent(in) :: twod_mesh_id
+    type(model_data_type), target, intent(in) :: model_data
+    class(clock_type),             intent(in) :: clock
+
+    character(str_def) :: label = "advection_control"
+
+    type(field_collection_type ), pointer :: prognostic_fields => null()
+    type(field_collection_type ), pointer :: ls_fields => null()
+
+    type(field_type), pointer :: ls_u => null()
+    type(field_type), pointer :: ls_rho => null()
+    type(field_type), pointer :: ls_theta => null()
+    type(field_type), pointer :: ls_exner => null()
+    type(field_type), pointer :: ls_moist_dyn(:) => null()
+    type(field_type), pointer :: ls_mr(:) => null()
+    type(field_type), pointer :: moist_dyn(:) => null()
+    type(field_type), pointer :: mr(:) => null()
+    type( field_collection_type ), pointer :: cloud_fields => null()
+
+    type( field_type ) :: state(bundle_size)
+    type( field_type ) :: ls_state(bundle_size)
+    type( field_type ) :: p_state(bundle_size)
+    type( field_type ) :: random(bundle_size)
+    type( field_type ) :: p_rhs(bundle_size)
+    type( field_type ) :: n1_rhs(bundle_size)
+    type( field_type ) :: n2_rhs(bundle_size)
+    type( field_type ) :: diff(bundle_size)
+    type(field_type), dimension(num_moist_factors) :: p_moist_dyn
+    type(field_type), dimension(num_moist_factors) :: n_moist_dyn
+    type(field_type), dimension(num_moist_factors) :: r_moist_dyn
+    type(field_type), dimension(num_moist_factors) :: diff_moist_dyn
+    type(field_type), dimension(nummr) :: p_mr
+    type(field_type), dimension(nummr) :: n_mr
+    type(field_type), dimension(nummr) :: r_mr
+    type(field_type), dimension(nummr) :: diff_mr
+    type( field_collection_type ) :: cloud_fields_after_slow
+
+    type( field_type ) :: ls_advected_u, p_advected_u, n_advected_u
+    type( field_type ) :: rho_guess
+
+    real(r_def) :: gamma_u, gamma_rho, gamma_exner, gamma_theta
+    real(r_def) :: gamma_moist_dyn, gamma_mr
+    real(r_def) :: norm_u, norm_rho, norm_exner, norm_theta
+    real(r_def) :: norm_moist_dyn, norm_mr
+    real(r_def) :: norm_diff, norm_diff_prev
+    real(r_def) :: norm_moist_dyn_tmp, norm_mr_tmp
+
+    real(r_def), parameter :: tol = 1.e-2_r_def
+
+    integer :: n, outer, i
+
+    call log_event( "TL Test: " // trim(label), &
+                     LOG_LEVEL_INFO )
+
+    prognostic_fields => model_data%prognostic_fields
+    ls_fields         => model_data%ls_fields
+    ls_moist_dyn      => model_data%ls_moist_dyn
+    ls_mr             => model_data%ls_mr
+    moist_dyn         => model_data%moist_dyn
+    mr                => model_data%mr
+    cloud_fields      => model_data%cloud_fields
+
+    ! Input
+    ls_u => ls_fields%get_field('ls_u')
+    ls_rho => ls_fields%get_field('ls_rho')
+    ls_theta => ls_fields%get_field('ls_theta')
+    ls_exner => ls_fields%get_field('ls_exner')
+
+    call ls_state(igh_u)%initialise( vector_space = ls_u%get_function_space() )
+    call ls_state(igh_t)%initialise( vector_space = ls_theta%get_function_space() )
+    call ls_state(igh_d)%initialise( vector_space = ls_rho%get_function_space() )
+    call ls_state(igh_p)%initialise( vector_space = ls_exner%get_function_space() )
+    call ls_advected_u%initialise( vector_space = ls_u%get_function_space() )
+    call p_advected_u%initialise( vector_space = ls_u%get_function_space() )
+    call n_advected_u%initialise( vector_space = ls_u%get_function_space() )
+
+    call clone_bundle(ls_state, state, bundle_size)
+    call clone_bundle(ls_state, p_state, bundle_size)
+    call clone_bundle(ls_state, random, bundle_size)
+    call clone_bundle(ls_state, p_rhs, bundle_size)
+    call clone_bundle(ls_state, n1_rhs, bundle_size)
+    call clone_bundle(ls_state, n2_rhs, bundle_size)
+    call clone_bundle(ls_state, diff, bundle_size)
+
+    call clone_bundle(moist_dyn, p_moist_dyn, num_moist_factors)
+    call clone_bundle(moist_dyn, r_moist_dyn, num_moist_factors)
+    call clone_bundle(moist_dyn, n_moist_dyn, num_moist_factors)
+    call clone_bundle(moist_dyn, diff_moist_dyn, num_moist_factors)
+
+    call clone_bundle(mr, p_mr, nummr)
+    call clone_bundle(mr, r_mr, nummr)
+    call clone_bundle(mr, n_mr, nummr)
+    call clone_bundle(mr, diff_mr, nummr)
+
+    call invoke( name = "Copy fields to ls_state",   &
+                 setval_X(ls_state(igh_u), ls_u    ), &
+                 setval_X(ls_state(igh_t), ls_theta), &
+                 setval_X(ls_state(igh_d), ls_rho  ), &
+                 setval_X(ls_state(igh_p), ls_exner), &
+                 setval_X(ls_advected_u, ls_u ) )
+
+    call advection_alg_init(mesh_id)
+
+    call invoke( assign_field_random_kernel_type( random(igh_u) ) , &
+                 assign_field_random_kernel_type( random(igh_d) ) , &
+                 assign_field_random_kernel_type( random(igh_t) ) , &
+                 assign_field_random_kernel_type( random(igh_p) ) )
+
+    do i = 1, num_moist_factors
+      call invoke( assign_field_random_kernel_type( r_moist_dyn(i) ) )
+    enddo
+
+    do i = 1, nummr
+      call invoke( assign_field_random_kernel_type( r_mr(i) ) )
+    enddo
+
+    call set_bundle_scalar( 0.0_r_def, n1_rhs, bundle_size )
+
+    call pre_advection_generic_field(cloud_fields_after_slow, cloud_fields)
+
+    outer = 1
+    call advection_control(n1_rhs, &
+                           ls_state, &
+                           ls_state(igh_u), &
+                           ls_state(igh_u),  &
+                           ls_advected_u, &
+                           ls_mr, &
+                           ls_mr, &
+                           clock%get_step(), &
+                           outer, &
+                           ls_moist_dyn, &
+                           ls_mr, &
+                           cloud_fields, &
+                           cloud_fields_after_slow, &
+                           rho_guess, &
+                           dt )
+
+    gamma_u = 7.e8
+    gamma_theta = 1.e5
+    gamma_rho = 1.e5
+    gamma_exner = 1.e5
+    gamma_moist_dyn=1.e0
+    gamma_mr = 1.e0
+
+    do n=1,2
+      gamma_u = gamma_u/2.
+      gamma_theta = gamma_theta/2.
+      gamma_rho = gamma_rho/2.
+      gamma_exner = gamma_exner/2.
+      gamma_moist_dyn = gamma_moist_dyn/2.
+      gamma_mr = gamma_mr/2.
+
+      call set_bundle_scalar( 0.0_r_def, n2_rhs, bundle_size )
+      call set_bundle_scalar( 0.0_r_def, p_rhs, bundle_size )
+      call invoke( a_times_X( p_state(igh_u), gamma_u, random(igh_u) ),       &
+                   a_times_X( p_state(igh_t), gamma_theta, random(igh_t) ),   &
+                   a_times_X( p_state(igh_d), gamma_rho, random(igh_d) ),     &
+                   a_times_X( p_state(igh_p), gamma_exner, random(igh_p) ),   &
+                   a_times_X( p_advected_u,   gamma_u, random(igh_u) ) )
+
+      ! state = ls_state + p_state
+      call add_bundle( ls_state, p_state, state, bundle_size )
+
+      call invoke( setval_X( n_advected_u, ls_advected_u), &
+                   inc_X_plus_Y(n_advected_u, p_advected_u ) )
+
+      do i = 1, num_moist_factors
+        call invoke( &
+          a_times_X( p_moist_dyn(i), gamma_moist_dyn, r_moist_dyn(i) ), &
+          setval_X( n_moist_dyn(i), ls_moist_dyn(i) ),                       &
+          inc_X_plus_Y( n_moist_dyn(i), p_moist_dyn(i) ) )
+      end do
+
+      do i = 1, nummr
+        call invoke( &
+          a_times_X( p_mr(i), gamma_mr, r_mr(i) ), &
+          setval_X( n_mr(i), ls_mr(i) ),                       &
+          inc_X_plus_Y( n_mr(i), p_mr(i) ) )
+      end do
+
+      call advection_control(n2_rhs, &
+                             state, &
+                             state(igh_u), &
+                             state(igh_u),  &
+                             n_advected_u, &
+                             mr, &
+                             mr, &
+                             clock%get_step(), &
+                             outer, &
+                             moist_dyn, &
+                             mr, &
+                             cloud_fields, &
+                             cloud_fields_after_slow, &
+                             rho_guess, &
+                             dt )
+
+      call tl_advection_alg_init(mesh_id)
+
+      call tl_advection_control(p_rhs, &
+                                p_state, &
+                                p_state(igh_u), &
+                                p_state(igh_u), &
+                                p_advected_u, &
+                                p_mr, &
+                                p_mr, &
+                                clock%get_step(), &
+                                outer, &
+                                p_moist_dyn, &
+                                p_mr, &
+                                rho_guess, &
+                                dt, &
+                                ls_state, &
+                                ls_state(igh_u), &
+                                ls_state(igh_u), &
+                                ls_advected_u, &
+                                ls_mr, &
+                                ls_mr, &
+                                ls_moist_dyn, &
+                                ls_mr )
+
+     ! diff = n2_rhs - n1_rhs
+      call minus_bundle( n2_rhs, n1_rhs, diff, bundle_size )
+      call invoke( &
+                 inc_X_minus_Y( diff(igh_u), p_rhs(igh_u) ), &
+                 inc_X_minus_Y( diff(igh_t), p_rhs(igh_t) ), &
+                 inc_X_minus_Y( diff(igh_d), p_rhs(igh_d) ), &
+                 inc_X_minus_Y( diff(igh_p), p_rhs(igh_p) ) )
+
+      call invoke( X_innerproduct_X( norm_u,     diff(igh_u) ) , &
+                   X_innerproduct_X( norm_rho,   diff(igh_d) ) , &
+                   X_innerproduct_X( norm_theta, diff(igh_t) ) , &
+                   X_innerproduct_X( norm_exner, diff(igh_p) ) )
+
+      norm_moist_dyn=0.0_r_def
+      do i = 1, num_moist_factors
+        call invoke( &
+          X_minus_Y( diff_moist_dyn(i), n_moist_dyn(i), moist_dyn(i) ),   &
+          inc_X_minus_Y( diff_moist_dyn(i), p_moist_dyn(i) ),             &
+          X_innerproduct_X( norm_moist_dyn_tmp, diff_moist_dyn(i) ) )
+          norm_moist_dyn = norm_moist_dyn + norm_moist_dyn_tmp
+      end do
+
+      norm_mr=0.0_r_def
+      do i = 1, nummr
+        call invoke( &
+          X_minus_Y( diff_mr(i), n_mr(i), mr(i) ),   &
+          inc_X_minus_Y( diff_mr(i), p_mr(i) ),             &
+          X_innerproduct_X( norm_mr_tmp, diff_mr(i) ) )
+          norm_mr = norm_mr + norm_mr_tmp
+      end do
+
+     write( log_scratch_space, &
+            '(A, E32.12, A, E32.12 )' ) &
+             ' norm_u = ' ,   norm_u,   &
+             ' norm_rho = ' , norm_rho
+
+      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
+      write( log_scratch_space, &
+            '(A, E32.12, A, E32.12 )' )     &
+             ' norm_theta = ' , norm_theta, &
+             ' norm_moist_dyn = ' , norm_moist_dyn
+
+      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
+      write( log_scratch_space, &
+            '(A, E32.12, A, E32.12 )' )     &
+             ' norm_exner = ' , norm_exner, &
+             ' norm_mr = ' , norm_mr
+
+      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
+      norm_diff = norm_rho + norm_theta + norm_exner + norm_u &
+                + norm_moist_dyn + norm_mr
+      norm_diff = sqrt(norm_diff)
+
+      if (n == 2) then
+       call convergence_rate_check( norm_diff, norm_diff_prev, &
+                                     label, tol=tol )
+      end if
+
+      norm_diff_prev = norm_diff
+    end do
+
+  end subroutine test_advection_control
+
+end module tl_test_advection_control_mod

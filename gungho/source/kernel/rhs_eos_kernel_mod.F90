@@ -5,7 +5,7 @@
 !-----------------------------------------------------------------------------
 !> @brief Computes rhs of the equation of state for the nonlinear equations.
 !>
-!> The kernel computes the lhs of the equation of state for the nonlinear
+!> The kernel computes the rhs of the equation of state for the nonlinear
 !> equations,
 !> That is: \f[ rhs_{\Pi} = 1 - p0/Rd * exner ^ (1-kappa)/kappa /(rho*theta_vd) \f]
 !>

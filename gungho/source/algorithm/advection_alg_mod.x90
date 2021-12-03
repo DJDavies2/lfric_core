@@ -316,6 +316,10 @@ contains
         end do
         call invoke(moist_dyn_factors_kernel_type(moist_dyn, mr, recip_epsilon))
 
+#ifdef UM_PHYSICS
+        ! #ifdef UM_PHYSICS added because of problems with cray compiler
+        ! and empty cloud fields field collection.
+        !
         ! Call routine to advect some of the contents of cloud_fields.
         ! If not using PC2, nothing will be advected.
         ! If using PC2, some of these will be advected.
@@ -326,6 +330,7 @@ contains
                                           cloud_fields_after_slow,        &
                                           wind_n, wind_np1,               &
                                           dt, n_control_substeps )
+#endif
 
       end if
       if (do_moisture_diagnostics) then

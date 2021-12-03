@@ -99,6 +99,10 @@ module tl_advection_alg_mod
   public :: tl_advection_alg
   public :: tl_advect_momentum_alg
   public :: tl_advect_field
+  public :: tl_advection_control
+  public :: tl_advection_mr_alg
+
+  integer(i_def)         :: advection_counter = 0_i_def
 
 contains
 
@@ -150,6 +154,151 @@ contains
     call tl_advective_update_alg_final()
 
   end subroutine tl_advection_alg_final
+
+  !> @details Control routine for the tangent linear advection of all fields needed for the model
+  !> @param[in,out] rhs Advective terms
+  !> @param[in]     ACTIVE state_after_slow Current state of the model prognostics with
+  !>                slow physics forcings added
+  !> @param[in]     ACTIVE wind_n Wind field at timestep n
+  !> @param[in]     ACTIVE wind_np1 Latest estimate of wind field at timestep n+1
+  !> @param[in]     ACTIVE advected_wind predictor for the wind to be advected
+  !> @param[in]     ACTIVE mr_inc Increments to the moisture fields
+  !> @param[in]     ACTIVE mr_after_slow Current moisture fields with
+  !>                slow physics forcings added
+  !> @param[in]     PASSIVE t_step The current model timestep
+  !> @param[in]     PASSIVE outer Outer (advection) iteration number
+  !> @param[in]     ACTIVE moist_dyn Factors for moist dynamics
+  !> @param[in]     ACTIVE mr latest state of mixing ratios
+  !>                physics forcings added
+  !> @param[in]     ACTIVE rho_guess Estimate to new timestep density
+  !> @param[in]     PASSIVE ls_state_after_slow Current state of the model prognostics with
+  !>                slow physics forcings added
+  !> @param[in]     PASSIVE ls_wind_n Wind field at timestep n
+  !> @param[in]     PASSIVE ls_wind_np1 Latest estimate of wind field at timestep n+1
+  !> @param[in]     PASSIVE ls_advected_wind predictor for the wind to be advected
+  !> @param[in]     PASSIVE ls_mr_inc Increments to the moisture fields
+  !> @param[in]     PASSIVE ls_mr_after_slow Current moisture fields with
+  !>                slow physics forcings added
+  !> @param[in]     PASSIVE ls_moist_dyn Factors for moist dynamics
+  !> @param[in]     PASSIVE ls_mr latest state of mixing ratios
+  !>                physics forcings added
+  subroutine tl_advection_control(rhs, state_after_slow,                   &
+                                  wind_n, wind_np1, advected_wind,         &
+                                  mr_inc, mr_after_slow,                   &
+                                  t_step, outer,                           &
+                                  moist_dyn, mr,                           &
+                                  rho_guess, dt,                           &
+                                  ls_state_after_slow,                     &
+                                  ls_wind_n, ls_wind_np1, ls_advected_wind,&
+                                  ls_mr_inc, ls_mr_after_slow,             &
+                                  ls_moist_dyn, ls_mr )
+
+  use formulation_config_mod,         only: use_moisture, &
+                                            use_wavedynamics
+  use timestepping_config_mod,        only: outer_iterations
+  use derived_config_mod,             only: bundle_size
+  use mr_indices_mod,                 only: nummr
+  use field_indices_mod,              only: igh_d
+  use io_config_mod,                  only: write_conservation_diag
+  use moist_dyn_mod,                  only: num_moist_factors
+  use moisture_conservation_alg_mod,  only: moisture_conservation_alg
+  use field_bundle_mod,               only: add_bundle, &
+                                            bundle_ax, &
+                                            copy_bundle
+  use enforce_lower_bound_kernel_mod, only: enforce_lower_bound_kernel_type
+  use moist_dyn_factors_kernel_mod,   only: moist_dyn_factors_kernel_type
+  use field_collection_mod,           only: field_collection_type
+
+  implicit none
+
+    type(field_type), dimension(bundle_size),       intent(inout) :: rhs
+    type(field_type), dimension(nummr),             intent(inout) :: mr_inc, mr
+    type(field_type), dimension(num_moist_factors), intent(inout) :: moist_dyn
+    type(field_type),                               intent(inout) :: rho_guess
+
+    type(field_type), dimension(bundle_size), intent(in) :: state_after_slow
+    type(field_type),                         intent(in) :: wind_n, wind_np1, advected_wind
+    type(field_type), dimension(nummr),       intent(in) :: mr_after_slow
+
+    type(field_type), dimension(nummr),             intent(in) :: ls_mr_inc, ls_mr
+    type(field_type), dimension(num_moist_factors), intent(in) :: ls_moist_dyn
+
+    type(field_type), dimension(bundle_size), intent(in) :: ls_state_after_slow
+    type(field_type),                         intent(in) :: ls_wind_n, ls_wind_np1, ls_advected_wind
+    type(field_type), dimension(nummr),       intent(in) :: ls_mr_after_slow
+
+    integer(i_def), intent(in) :: t_step, outer
+    real(r_def),    intent(in) :: dt
+
+    integer(i_def)                     :: imr
+    ! Substepping variables
+    type(field_type)                   :: cfl
+    type(field_type), pointer          :: detj_at_w2 => null()
+    real(r_def)                        :: cfl_min, cfl_max
+    real(r_def)                        :: dt_substep, dt_fraction
+    integer(i_def)                     :: n_control_substeps
+
+    advection_counter = advection_counter + 1_i_def
+
+    if (use_wavedynamics) then
+
+      call log_event("Advecting dynamics prognostic fields...", LOG_LEVEL_INFO)
+
+      ! Calculate substepping timestep if needed for mol, based on the linearisation state values
+      call cfl%initialise( ls_wind_n%get_function_space() )
+      detj_at_w2 => get_detj_at_w2(ls_wind_n%get_mesh_id())
+      call invoke( aX_plus_bY(cfl, 0.5_r_def, ls_wind_n, &
+                                   0.5_r_def, ls_wind_np1), &
+                   inc_X_divideby_Y(cfl, detj_at_w2), &
+                   inc_a_times_X(dt, cfl )        &
+                   )
+      call cfl%field_minmax(cfl_min, cfl_max)
+      cfl_max = max(abs(cfl_max),abs(cfl_min))
+      n_control_substeps = int(cfl_max/(cfl_control_stab+tiny_eps),i_def) + 1_i_def
+      dt_fraction = 1.0_r_def/real(n_control_substeps, r_def)
+      dt_substep = dt*dt_fraction
+      if (n_control_substeps > 1)then
+        write( log_scratch_space, '(A,I3,2E16.8)' )  &
+             'Advection will be substepped: n_control_substeps, cfl_max, dt_substep: ', &
+             n_control_substeps, cfl_max, dt_substep
+        call log_event( log_scratch_space, LOG_LEVEL_INFO )
+      end if
+
+      ! Advect
+      call tl_advection_alg(rhs, state_after_slow, wind_n, wind_np1, advected_wind, &
+                            ls_state_after_slow, ls_wind_n, ls_wind_np1, ls_advected_wind, &
+                            dt, n_control_substeps )
+      call bundle_ax(dt, rhs, rhs, bundle_size)
+
+      if ( use_moisture )then
+        call log_event("Advecting moisture fields...", LOG_LEVEL_INFO)
+        ! Advect mr_after_slow values with latest advecting velocity
+        if ( moisture_conservation ) then
+          call log_event("Moisture conservation not possible for tangent linear", LOG_LEVEL_ERROR)
+        else
+          call tl_advection_mr_alg(mr_inc, mr_after_slow, wind_n, wind_np1, &
+                                   ls_mr_inc, ls_mr_after_slow, ls_wind_n, ls_wind_np1, &
+                                   dt, n_control_substeps)
+          ! Update latest value for mr
+          call add_bundle(mr_inc, mr_after_slow, mr, nummr)
+        end if
+
+        ! Clip moisture mixing ratios to remove negative values
+        do imr = 1, nummr
+          call invoke( enforce_lower_bound_kernel_type (mr(imr), 0.0_r_def) )
+        end do
+
+        call invoke(moist_dyn_factors_kernel_type(moist_dyn, mr, recip_epsilon))
+
+      end if
+
+      call log_event("Finished advecting prognostic fields...", LOG_LEVEL_INFO)
+    else
+      ! No advection without wavedynamics at present
+      if ( use_moisture ) call copy_bundle(mr_after_slow, mr, nummr)
+    end if
+
+  end subroutine tl_advection_control
 
   !>@details A wrapper algorithm for computing the tangent linear for the
   !!         advection of the prognostic equations.
@@ -368,6 +517,82 @@ contains
 
   end subroutine tl_advection_alg
 
+  !===========================================================================!
+  !> @details A wrapper algorithm for computing the advection of the moisture
+  !>          prognostic
+  !> @param[in,out] mr_inc Increment to mixing ratios
+  !> @param[in]     mr Mixing ratios
+  !> @param[in]     wind_n Time level n winds
+  !> @param[in]     wind_np1 Time level n+1 winds
+  !> @param[in]     dt_step Full length of model timestep
+  !> @param[in]     n_substep number of steps
+  subroutine tl_advection_mr_alg( mr_inc, mr, wind_n, wind_np1, &
+                                  ls_mr_inc, ls_mr, ls_wind_n, ls_wind_np1, &
+                                  dt_step, n_substeps )
+    implicit none
+    type(field_type), intent(inout) :: mr_inc(nummr)
+    type(field_type), intent(in)    :: mr(nummr)
+    type(field_type), intent(in)    :: wind_n, wind_np1
+    type(field_type), intent(in)    :: ls_mr_inc(nummr)
+    type(field_type), intent(in)    :: ls_mr(nummr)
+    type(field_type), intent(in)    :: ls_wind_n, ls_wind_np1
+    real(r_def), intent(in)         :: dt_step
+    integer(i_def), intent(in)      :: n_substeps
+
+    type(field_type) :: advecting_wind, ls_advecting_wind
+    integer(i_def)   :: imr
+
+    type(field_type) :: field, field_inc, field_old, ls_field
+    integer(i_def)   :: sub_step_count
+
+    real(r_def) :: dt_substep, dt_fraction
+
+    if ( subroutine_timers ) call timer('advection_mr_alg')
+    call log_event( "Computing moisture advection...", LOG_LEVEL_INFO)
+
+    ! substepping timesteps
+    dt_fraction = 1.0_r_def/real(n_substeps, r_def)
+    dt_substep = dt_step*dt_fraction
+
+    ! Set ls_advecting velocity = 0.5(ls_u_np1 + ls_u_n)
+    call ls_advecting_wind%initialise( ls_wind_n%get_function_space() )
+    call invoke( aX_plus_bY(ls_advecting_wind, 0.5_r_def, ls_wind_n, 0.5_r_def, ls_wind_np1) )
+
+    ! Set advecting velocity = 0.5(u_np1 + u_n)
+    call advecting_wind%initialise( wind_n%get_function_space() )
+    call invoke( aX_plus_bY(advecting_wind, 0.5_r_def, wind_n, 0.5_r_def, wind_np1) )
+
+    do imr = 1, nummr_to_advect
+      call ls_mr(imr)%copy_field(ls_field)
+      call mr(imr)%copy_field(field)
+      call invoke(setval_c(mr_inc(imr), 0.0_r_def))
+      do sub_step_count = 1, n_substeps
+
+        if (n_substeps > 1) then
+          call log_event("Tangent linear only for n_substeps=1", LOG_LEVEL_ERROR)
+        endif
+
+        call field%copy_field(field_old)
+        call field_inc%initialise( field%get_function_space() )
+
+        call tl_advect_field( field_inc, field, advecting_wind,            &
+                              ls_field, ls_advecting_wind,                 &
+                              scheme_method_of_lines, wind_n, wind_np1,    &
+                              advect_density=.false., timestep=dt_substep, &
+                              si_advective_terms=.false.,                  &
+                              density_predictor=.false., logspace=.false., &
+                              dt=dt_step )
+        call invoke( aX_plus_Y(field, dt_substep, field_inc, field_old), &
+                     inc_X_plus_bY(mr_inc(imr), dt_fraction, field_inc) &
+                     )
+      end do
+      ! Make mr_inc into an increment by multiplying by dt
+      call invoke( inc_a_times_X(dt_step, mr_inc(imr)) )
+    end do
+    if ( subroutine_timers ) call timer('advection_mr_alg')
+
+  end subroutine tl_advection_mr_alg
+
   !============================================================================!
   !> @brief Tangent linear: Use MoL reconstruction to compute advective form
   !!        update of momentum
@@ -562,11 +787,13 @@ contains
                                      ls_flux,            &
                                      ls_rhs,             &
                                      ls_field_inc,       &
+                                     divergence_factor,  &
                                      unit_wind
     type(field_type), allocatable :: ls_rk_rhs(:)
     type(field_type), allocatable :: rk_rhs(:)
     type(field_type), allocatable :: ls_field_new(:)
     integer(i_def)                :: stage, s, function_space
+    real(r_def)                   :: minus_beta_dt
 
     integer(i_def)                :: nstage
     real(r_def), allocatable      :: ak_adv(:,:)
@@ -602,8 +829,17 @@ contains
        ! divergence_factor = [1-beta*dt*div(u)]
        ! This helps improve long timestep stability
 
-         call log_event("No Tangent linear for density predictor", &
-                         LOG_LEVEL_ERROR)
+      minus_beta_dt = -beta*dt  ! Note this is dt, not the substep timestep
+      call divergence_factor%initialise( field%get_function_space() )
+      call invoke( name = "compute_density_predictor",                     &
+                   dg_matrix_vector_kernel_type(divergence_factor, wind_n, &
+                                                div),                      &
+                   dg_matrix_vector_kernel_type(rhs, divergence_factor,    &
+                                                mm_w3_inv),                &
+                   setval_c(divergence_factor, 1.0_r_def),                 &
+                   inc_X_plus_bY(divergence_factor, minus_beta_dt, rhs),   &
+                   inc_X_times_Y(field_new, divergence_factor) )
+
     end if
 
     if ( (  rho_splitting /= rho_splitting_none  ) .OR.  &
@@ -671,6 +907,19 @@ contains
 
         call ls_field_new(1)%initialise( field%get_function_space() )
         call ls_field%copy_field( ls_field_new(1) )
+
+        if ( time_method == method_semi_implicit          &
+          .and. advect_density                         &
+          .and. .not. si_momentum_equation             &
+          .and. (rho_splitting == rho_splitting_none)  &
+          .and. density_predictor                      ) then
+          ! Advect predictor for the density: rho*divergence_factor with
+          ! divergence_factor = [1-beta*dt*div(u)]
+          ! This helps improve long timestep stability
+
+          call invoke( inc_X_times_Y(ls_field_new(1), divergence_factor) )
+
+        end if
 
         do stage = 1,nstage
 

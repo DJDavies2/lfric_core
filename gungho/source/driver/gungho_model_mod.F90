@@ -8,6 +8,7 @@
 !>
 module gungho_model_mod
 
+  use advection_alg_mod,          only : advection_alg_final
   use assign_orography_field_mod, only : assign_orography_field
   use base_mesh_config_mod,       only : prime_mesh_name
   use checksum_alg_mod,           only : checksum_alg
@@ -641,7 +642,10 @@ contains
     if (write_minmax_tseries) call minmax_tseries_final(mesh_id)
 
     if ( .not. transport_only ) then
-      if ( method == method_semi_implicit ) call semi_implicit_alg_final()
+      if ( method == method_semi_implicit ) then
+        call semi_implicit_alg_final()
+        call advection_alg_final()
+      end if
       if ( method == method_rk )            call rk_alg_final()
     end if
 

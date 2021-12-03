@@ -367,18 +367,12 @@ contains
                                            mr, step, rho_guess, &
                                            write_moisture_diag)
 
-    use geometric_constants_mod,       only: get_coordinates, &
-                                             get_panel_id
     use fem_constants_mod,             only: get_inverse_w3_mass_matrix, &
                                              get_normalisation, &
                                              get_div, &
                                              get_qr
     use fs_continuity_mod,             only: W2, Wtheta
     use mr_indices_mod,                only: nummr
-    use formulation_config_mod,        only: exner_from_eos
-    use project_pressure_kernel_mod,   only: project_pressure_kernel_type
-    use operator_mod,                  only: operator_type
-    use quadrature_xyoz_mod,           only: quadrature_xyoz_type
     use moisture_conservation_alg_mod, only: moisture_conservation_alg
     use si_operators_alg_mod,          only: get_m3_rho_star,       &
                                              get_rho_at_u,          &
@@ -409,10 +403,6 @@ contains
     real( kind=r_def )                    :: si_err(bundle_size)
     type( field_type ),           pointer :: t_normalisation => null(), &
                                              u_normalisation => null()
-    type( field_type ),           pointer :: chi(:) => null()
-    type( field_type ),           pointer :: panel_id => null()
-    type( operator_type ),        pointer :: m3_inv => null()
-    type( quadrature_xyoz_type ), pointer :: qr => null()
     type( field_vector_type )             :: vector_inc, vector_rhs
 
     ! For eliminate of rho and theta
@@ -579,26 +569,11 @@ contains
                    inc_X_plus_Y( state(igh_d), inc_rho ) )
     end if
 
-    if (exner_from_eos) then
-      if ( subroutine_timers ) call timer('exner_from_eos')
-      m3_inv  => get_inverse_w3_mass_matrix(mesh_id)
-      chi => get_coordinates(mesh_id)
-      panel_id => get_panel_id(mesh_id)
-      qr => get_qr()
-      call invoke( project_pressure_kernel_type( state(igh_p), state(igh_d), &
-                                                 state(igh_t),               &
-                                                 moist_dyn_gas_law, chi,     &
-                                                 panel_id, m3_inv, qr ) )
-      if ( subroutine_timers ) call timer('exner_from_eos')
-    end if
-
     if ( write_moisture_diag )  &
       call moisture_conservation_alg( step, state(igh_d), mr, 'After solve' )
 
     nullify( t_normalisation, &
              u_normalisation, &
-             m3_inv, chi,     &
-             panel_id, qr,    &
              rho_at_u,        &
              m2_diag,         &
              mt_lumped_inv,   &
@@ -614,7 +589,6 @@ contains
     if ( subroutine_timers ) call timer('semi_implicit_solver_alg')
 
   end subroutine semi_implicit_solver_alg_step
-
 
   !> @brief Construct a field vector state out of a field bundle, expanding to
   !>        inlcude the split wind fields if necessary

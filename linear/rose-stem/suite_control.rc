@@ -66,7 +66,7 @@
 {#                                      "mpi_parts_xios":2} } } )'        #}
 {#========================================================================#}
 
-{%- set application_configurations = { 'linear' : [ 'runge-kutta', 'runge-kutta_lsfile' ] } %}
+{%- set application_configurations = { 'linear' : [ 'runge-kutta', 'runge-kutta_lsfile', 'semi-implicit' ] } %}
 
 {%- set canned_configurations = ['linear'] %}
 
@@ -80,7 +80,9 @@
     'run_application("linear", "runge-kutta",
                      resolutions=[("C12",1.0)], env={"nrun":20} )',
     'run_application("linear", "runge-kutta_lsfile",
-                     resolutions=[("C12",1.0)], env={"nrun":20} )'
+                     resolutions=[("C12",1.0)], env={"nrun":20} )',
+    'run_application("linear", "semi-implicit",
+                     resolutions=[("C12",1.0)], env={"nrun":3} )'
   ],
   'nightly':   [
     'check_compilers("full-debug", publish=True)',
