@@ -90,6 +90,10 @@ module slow_physics_alg_mod
   use fsd_condensate_alg_mod,    only: fsd_condensate_alg
   use um_physics_init_mod,       only: sw_band_mode, lw_band_mode, mode_dimen
   use bm_tau_alg_mod,            only: bm_tau_alg
+  use mesh_collection_mod,       only: mesh_collection
+  use mesh_mod,                  only: mesh_type
+  use um_control_init_mod,       only: um_control_init
+  use um_physics_init_mod,       only: um_physics_init
 #endif
 
   implicit none
@@ -229,6 +233,11 @@ contains
     logical( kind=l_def ) :: orographic_drag_done
     logical( kind=l_def ) :: methox_done
     logical( kind=l_def ) :: boundary_layer_done
+#ifdef UM_PHYSICS
+    ! Variables for extracting horizontal number of cells from mesh
+    type(mesh_type), pointer :: mesh => null()
+    integer( kind=i_def ) :: ncells
+#endif
 
     if ( subroutine_timers ) call timer("slow_physics")
 
@@ -334,10 +343,18 @@ contains
     call set_bundle_scalar(0.0_r_def, dmr_mphys, nummr)
     if ( microphysics == microphysics_um .and. &
          microphysics_placement == microphysics_placement_slow) then
+      ! Switch UM to running i-first on whole domain
+      mesh => mesh_collection%get_mesh( mesh_id )
+      ncells = mesh%get_last_edge_cell()
+      call um_control_init(mesh_id, ncells)
+      call um_physics_init(ncells)
       call mphys_alg( mr_n, theta, rho, derived_fields, microphysics_fields, &
                       cloud_fields, aerosol_fields, turbulence_fields,       &
                       f_arr, dmr_mphys, dtheta_mphys, dcfl_pc2_mphys,        &
                       dcff_pc2_mphys, dbcf_pc2_mphys, dt )
+      ! Switch UM back to columns
+      call um_control_init(mesh_id, 1_i_def)
+      call um_physics_init(1_i_def)
       microphysics_done = .true. ! Collect this increment later on
     end if
 

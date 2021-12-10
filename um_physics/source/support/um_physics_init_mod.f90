@@ -112,11 +112,7 @@ module um_physics_init_mod
                                  add_cgw_in => add_cgw,                       &
                                  cgw_scale_factor_in => cgw_scale_factor
 
-  use socrates_init_mod, only: sw_wavelength_short,                            &
-                               sw_wavelength_long,                             &
-                               lw_wavelength_short,                            &
-                               lw_wavelength_long,                             &
-                               n_sw_band,                                      &
+  use socrates_init_mod, only: n_sw_band,                                      &
                                n_lw_band
 
   use orographic_drag_config_mod, only:  include_moisture,       &
@@ -255,11 +251,6 @@ contains
          mix_factor, turb_startlev_vert, turb_endlev_vert
     use ukca_mode_setup, only: ukca_mode_sussbcocdu_7mode
     use ukca_option_mod, only: i_mode_setup
-    use um_read_radaer_lut_mod, only: um_read_radaer_lut
-    use ukca_radaer_read_precalc_mod, only: ukca_radaer_read_precalc
-    use ukca_radaer_lut, only: ip_ukca_lut_accum, ip_ukca_lut_coarse,          &
-         ip_ukca_lut_accnarrow, ip_ukca_lut_sw, ip_ukca_lut_lw
-    
 
     implicit none
 
@@ -322,39 +313,6 @@ contains
       else
         n_aer_mode = 0_i_def
       end if
-
-      select case (glomap_mode)
-        case( glomap_mode_climatology , glomap_mode_ukca )
-
-          if ( l_radaer ) then
-
-            call um_read_radaer_lut ( aclw_file, &
-                                      ip_ukca_lut_accum, ip_ukca_lut_lw )
-
-            call um_read_radaer_lut ( acsw_file, &
-                                      ip_ukca_lut_accum, ip_ukca_lut_sw )
-
-            call um_read_radaer_lut ( anlw_file, &
-                                      ip_ukca_lut_accnarrow, ip_ukca_lut_lw )
-
-            call um_read_radaer_lut ( answ_file, &
-                                      ip_ukca_lut_accnarrow, ip_ukca_lut_sw )
-
-            call um_read_radaer_lut ( crlw_file, &
-                                      ip_ukca_lut_coarse, ip_ukca_lut_lw )
-
-            call um_read_radaer_lut ( crsw_file, &
-                                      ip_ukca_lut_coarse, ip_ukca_lut_sw )
-
-            call ukca_radaer_read_precalc( prec_file,                          &
-                                           sw_wavelength_short,                &
-                                           sw_wavelength_long,                 &
-                                           lw_wavelength_short,                &
-                                           lw_wavelength_long,                 &
-                                           n_sw_band,                          &
-                                           n_lw_band )
-          end if
-      end select
 
     else ! if ( aerosol == aerosol_um ) then
       ! Initialisation of RADAER fields
@@ -887,8 +845,8 @@ contains
     ! a kernel is passed.
     bl_segment_size     = 1
     gw_seg_size         = 1
-    precip_segment_size = 1
-    ussp_seg_size       = int( ncells, i_um )
+    precip_segment_size = int( ncells, i_um )
+    ussp_seg_size       = 1
 
     !-----------------------------------------------------------------------
     ! Smagorinsky mixing options - contained in turb_diff_mod and

@@ -10,7 +10,7 @@ module pc2_conv_coupling_kernel_mod
 use argument_mod,      only: arg_type,              &
                              GH_FIELD, GH_REAL,     &
                              GH_READ, GH_READWRITE, &
-                             GH_SCALAR, CELL_COLUMN
+                             GH_SCALAR, DOMAIN
 use fs_continuity_mod, only: WTHETA
 use kernel_mod,        only: kernel_type
 
@@ -43,7 +43,7 @@ type, public, extends(kernel_type) :: pc2_conv_coupling_kernel_type
        arg_type(GH_FIELD,  GH_REAL, GH_READWRITE, WTHETA),      & ! dbcf_conv_wth
        arg_type(GH_SCALAR, GH_REAL, GH_READ)                    & ! dt
        /)
-   integer :: operates_on = CELL_COLUMN
+   integer :: operates_on = DOMAIN
 contains
   procedure, nopass :: pc2_conv_coupling_code
 end type
@@ -77,10 +77,10 @@ contains
 !> @param[in,out] dbcf_conv_wth Increment to bulk cloud fraction from convection in theta space
 !> @param[in]     dt            The model timestep length
 !> @param[in]     ndf_wth       Number of degrees of freedom per cell for theta space
-!> @param[in]     undf_wth      Number of unique degrees of freedom for theta space
-!> @param[in]     map_wth       Dofmap for the cell at the base of the column for theta space
+!> @param[in]     undf_wth      Number of unique degrees of freedom in segment for theta space
+!> @param[in]     map_wth       Dofmap for a segment of the theta space
 
-subroutine pc2_conv_coupling_code( nlayers,                                    &
+subroutine pc2_conv_coupling_code( nlayers, seg_len,                           &
                                    ! Atmospheric fields
                                    theta_wth,                                  &
                                    mv_wth,                                     &
@@ -107,7 +107,7 @@ subroutine pc2_conv_coupling_code( nlayers,                                    &
     ! UM modules
     !---------------------------------------
 
-    use nlsizes_namelist_mod,       only: row_length, rows, model_levels
+    use nlsizes_namelist_mod,       only: model_levels
     use pc2_hom_conv_mod,           only: pc2_hom_conv
     use cloud_inputs_mod,           only: dbsdtbs_turb_0
     use planet_constants_mod,       only: p_zero, kappa
@@ -115,10 +115,10 @@ subroutine pc2_conv_coupling_code( nlayers,                                    &
     implicit none
 
     ! Arguments
-    integer(kind=i_def), intent(in) :: nlayers
+    integer(kind=i_def), intent(in) :: nlayers, seg_len
     integer(kind=i_def), intent(in) :: ndf_wth
     integer(kind=i_def), intent(in) :: undf_wth
-    integer(kind=i_def), intent(in), dimension(ndf_wth) :: map_wth
+    integer(kind=i_def), intent(in), dimension(ndf_wth, seg_len) :: map_wth
 
     ! Variables
     real(kind=r_def), intent(in),    dimension(undf_wth) :: theta_wth
@@ -143,7 +143,7 @@ subroutine pc2_conv_coupling_code( nlayers,                                    &
     real(kind=r_def), intent(in) :: dt
 
     ! Local variables
-    real(r_um), dimension(row_length,rows) ::                                  &
+    real(r_um), dimension(seg_len,1) ::                                        &
                 p_theta_levels,                                                &
                 ! Work arrays
                 qv_work,  qcl_work, qcf_work,                                  &
@@ -156,43 +156,47 @@ subroutine pc2_conv_coupling_code( nlayers,                                    &
                 ! Other
                 zeros
 
-    integer(i_um) :: k
+    integer(i_um) :: i, j, k
 
     logical, parameter :: l_pc2_prod_qcl_mp=.false.
 
     zeros=0.0_r_um
 
+    j = 1
     do k = 1, model_levels
+      do i = 1, seg_len
 
-      ! Pressure at centre of theta levels
-      p_theta_levels(1,1) = p_zero*(exner_wth(map_wth(1) + k))                 &
+        ! Pressure at centre of theta levels
+        p_theta_levels(i,j) = p_zero*(exner_wth(map_wth(1,i) + k))             &
                                       **(1.0_r_def/kappa)
-      ! Temperature
-      t_work(1,1)     = theta_wth(map_wth(1) + k) * exner_wth(map_wth(1) + k)
+        ! Temperature
+        t_work(i,j)    = theta_wth(map_wth(1,i) + k) *                         &
+                         exner_wth(map_wth(1,i) + k)
 
-      ! Moist prognostics
-      qv_work(1,1)    = mv_wth(map_wth(1) + k)
-      qcl_work(1,1 )  = ml_wth(map_wth(1) + k)
-      qcf_work(1,1)   = mi_wth(map_wth(1) + k)
+        ! Moist prognostics
+        qv_work(i,j)    = mv_wth(map_wth(1,i) + k)
+        qcl_work(i,j)   = ml_wth(map_wth(1,i) + k)
+        qcf_work(i,j)   = mi_wth(map_wth(1,i) + k)
 
-      ! Cloud fractions
-      cfl_work(1,1)   = cfl_wth(map_wth(1) + k)
-      cff_work(1,1)   = cff_wth(map_wth(1) + k)
-      bcf_work(1,1)   = bcf_wth(map_wth(1) + k)
+        ! Cloud fractions
+        cfl_work(i,j)   = cfl_wth(map_wth(1,i) + k)
+        cff_work(i,j)   = cff_wth(map_wth(1,i) + k)
+        bcf_work(i,j)   = bcf_wth(map_wth(1,i) + k)
 
-      ! Forcings
-      t_forcing(1,1)  = dt_conv_wth(map_wth(1) + k)
-      qv_forcing(1,1) = dmv_conv_wth(map_wth(1) + k)
-      cfl_forcing(1,1)= dcfl_conv_wth(map_wth(1) + k)
+        ! Forcings
+        t_forcing(i,j)  = dt_conv_wth(map_wth(1,i) + k)
+        qv_forcing(i,j) = dmv_conv_wth(map_wth(1,i) + k)
+        cfl_forcing(i,j)= dcfl_conv_wth(map_wth(1,i) + k)
 
-      ! Increments
-      t_incr(1,1)     = 0.0_r_um
-      qv_incr(1,1)    = 0.0_r_um
-      qcl_incr(1,1)   = 0.0_r_um
-      qcf_incr(1,1)   = 0.0_r_um
-      cfl_incr(1,1)   = 0.0_r_um
-      cff_incr(1,1)   = 0.0_r_um
-      bcf_incr(1,1)   = 0.0_r_um
+        ! Increments
+        t_incr(i,j)     = 0.0_r_um
+        qv_incr(i,j)    = 0.0_r_um
+        qcl_incr(i,j)   = 0.0_r_um
+        qcf_incr(i,j)   = 0.0_r_um
+        cfl_incr(i,j)   = 0.0_r_um
+        cff_incr(i,j)   = 0.0_r_um
+        bcf_incr(i,j)   = 0.0_r_um
+      end do
 
       call pc2_hom_conv( p_theta_levels,   & ! Pressure
                         dt,               & ! Model timestep in seconds
@@ -223,25 +227,29 @@ subroutine pc2_conv_coupling_code( nlayers,                                    &
                         l_pc2_prod_qcl_mp ) ! Logical turb production of LWC
 
       ! Recast back to LFRic space
-      dt_conv_wth  (map_wth(1) + k) = dt_conv_wth (map_wth(1) + k)  + t_incr(1,1)
-      dmv_conv_wth (map_wth(1) + k) = dmv_conv_wth(map_wth(1) + k)  + qv_incr   (1,1)
-      dmcl_conv_wth(map_wth(1) + k) = dmcl_conv_wth(map_wth(1) + k) + qcl_incr  (1,1)
-      dmcf_conv_wth(map_wth(1) + k) = dmcf_conv_wth(map_wth(1) + k) + qcf_incr  (1,1)
-      dcfl_conv_wth(map_wth(1) + k) = dcfl_conv_wth(map_wth(1) + k) + cfl_incr  (1,1)
-      dcff_conv_wth(map_wth(1) + k) = dcff_conv_wth(map_wth(1) + k) + cff_incr  (1,1)
-      dbcf_conv_wth(map_wth(1) + k) = dbcf_conv_wth(map_wth(1) + k) + bcf_incr  (1,1)
+      do i = 1, seg_len
+        dt_conv_wth  (map_wth(1,i) + k) = dt_conv_wth (map_wth(1,i) + k)  + t_incr(i,j)
+        dmv_conv_wth (map_wth(1,i) + k) = dmv_conv_wth(map_wth(1,i) + k)  + qv_incr   (i,j)
+        dmcl_conv_wth(map_wth(1,i) + k) = dmcl_conv_wth(map_wth(1,i) + k) + qcl_incr  (i,j)
+        dmcf_conv_wth(map_wth(1,i) + k) = dmcf_conv_wth(map_wth(1,i) + k) + qcf_incr  (i,j)
+        dcfl_conv_wth(map_wth(1,i) + k) = dcfl_conv_wth(map_wth(1,i) + k) + cfl_incr  (i,j)
+        dcff_conv_wth(map_wth(1,i) + k) = dcff_conv_wth(map_wth(1,i) + k) + cff_incr  (i,j)
+        dbcf_conv_wth(map_wth(1,i) + k) = dbcf_conv_wth(map_wth(1,i) + k) + bcf_incr  (i,j)
+      end do
     end do
 
     ! Set level 0 increment such that theta increment will equal level 1
-    dt_conv_wth  (map_wth(1) + 0) = dt_conv_wth  (map_wth(1) + 1) &
-                                  * exner_wth(map_wth(1) + 0)     &
-                                  / exner_wth(map_wth(1) + 1)
-    dmv_conv_wth (map_wth(1) + 0) = dmv_conv_wth (map_wth(1) + 1)
-    dmcl_conv_wth(map_wth(1) + 0) = dmcl_conv_wth(map_wth(1) + 1)
-    dmcf_conv_wth(map_wth(1) + 0) = dmcf_conv_wth(map_wth(1) + 1)
-    dcfl_conv_wth(map_wth(1) + 0) = dcfl_conv_wth(map_wth(1) + 1)
-    dcff_conv_wth(map_wth(1) + 0) = dcff_conv_wth(map_wth(1) + 1)
-    dbcf_conv_wth(map_wth(1) + 0) = dbcf_conv_wth(map_wth(1) + 1)
+    do i = 1, seg_len
+      dt_conv_wth  (map_wth(1,i) + 0) = dt_conv_wth  (map_wth(1,i) + 1) &
+                                      * exner_wth(map_wth(1,i) + 0)     &
+                                      / exner_wth(map_wth(1,i) + 1)
+      dmv_conv_wth (map_wth(1,i) + 0) = dmv_conv_wth (map_wth(1,i) + 1)
+      dmcl_conv_wth(map_wth(1,i) + 0) = dmcl_conv_wth(map_wth(1,i) + 1)
+      dmcf_conv_wth(map_wth(1,i) + 0) = dmcf_conv_wth(map_wth(1,i) + 1)
+      dcfl_conv_wth(map_wth(1,i) + 0) = dcfl_conv_wth(map_wth(1,i) + 1)
+      dcff_conv_wth(map_wth(1,i) + 0) = dcff_conv_wth(map_wth(1,i) + 1)
+      dbcf_conv_wth(map_wth(1,i) + 0) = dbcf_conv_wth(map_wth(1,i) + 1)
+    end do
 
 end subroutine pc2_conv_coupling_code
 

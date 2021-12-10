@@ -13,7 +13,7 @@ use argument_mod,      only: arg_type,                  &
                              GH_READWRITE,              &
                              ANY_DISCONTINUOUS_SPACE_1, &
                              ANY_DISCONTINUOUS_SPACE_2, &
-                             CELL_COLUMN
+                             DOMAIN
 use fs_continuity_mod, only: WTHETA, W3
 use kernel_mod,        only: kernel_type
 use empty_data_mod,    only: empty_real_data
@@ -70,7 +70,7 @@ type, public, extends(kernel_type) :: mphys_kernel_type
        arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_DISCONTINUOUS_SPACE_2),    & ! f_arr_wth
        arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA)                        & ! superc_liq_wth
        /)
-   integer :: operates_on = CELL_COLUMN
+   integer :: operates_on = DOMAIN
 contains
   procedure, nopass :: mphys_code
 end type
@@ -81,6 +81,7 @@ contains
 
 !> @brief Interface to the microphysics scheme
 !> @param[in]     nlayers             Number of layers
+!> @param[in]     seg_len             Number of horizontal cells in segment
 !> @param[in]     mv_wth              Vapour mass mixing ratio
 !> @param[in]     ml_wth              Liquid cloud mass mixing ratio
 !> @param[in]     mi_wth              Ice cloud mass mixing ratio
@@ -123,27 +124,24 @@ contains
 !> @param[in,out] superc_liq_wth      Supercooled cloud liquid water content
 !> @param[in]     ndf_wth             Number of degrees of freedom per cell for
 !!                                     potential temperature space
-!> @param[in]     undf_wth            Number unique of degrees of freedom for
+!> @param[in]     undf_wth            Number unique of degrees of freedom in segment for
 !!                                     potential temperature space
-!> @param[in]     map_wth             Dofmap for the cell at the base of the
-!!                                     column for potential temperature space
+!> @param[in]     map_wth             Dofmap for a segment of any potential temperature space field
 !> @param[in]     ndf_w3              Number of degrees of freedom per cell for
 !!                                     density space
-!> @param[in]     undf_w3             Number unique of degrees of freedom for
+!> @param[in]     undf_w3             Number unique of degrees of freedom in segment for
 !!                                     density space
-!> @param[in]     map_w3              Dofmap for the cell at the base of the
-!!                                     column for density space
+!> @param[in]     map_w3              Dofmap for a segment of any density space field
 !> @param[in]     ndf_2d              Number of degrees of freedom per cell for
 !!                                     2D fields
-!> @param[in]     undf_2d             Number unique of degrees of freedom for
+!> @param[in]     undf_2d             Number unique of degrees of freedom in segment for
 !!                                     2D fields
-!> @param[in]     map_2d              Dofmap for the cell at the base of the
-!!                                     column for 2D fields
+!> @param[in]     map_2d              Dofmap for a segment of any 2D field
 !> @param[in]     ndf_farr            Number of degrees of freedom per cell for fsd array
 !> @param[in]     undf_farr           Number unique of degrees of freedom for fsd array
-!> @param[in]     map_farr            Dofmap for the cell at the base of the column for fsd array
+!> @param[in]     map_farr            Dofmap for a segment of the fsd array field
 
-subroutine mphys_code( nlayers,                     &
+subroutine mphys_code( nlayers, seg_len,            &
                        mv_wth,   ml_wth,   mi_wth,  &
                        mr_wth,   mg_wth,            &
                        cf_wth,   cfl_wth,  cff_wth, &
@@ -176,9 +174,6 @@ subroutine mphys_code( nlayers,                     &
     ! UM modules
     !---------------------------------------
 
-    use nlsizes_namelist_mod,       only: row_length, rows, model_levels,      &
-                                          land_field
-
     use mphys_inputs_mod,           only: l_mcr_qcf2, l_mcr_qrain,             &
                                           l_mcr_qgraup, l_mcr_precfrac,        &
                                           l_subgrid_graupel_frac
@@ -209,7 +204,7 @@ subroutine mphys_code( nlayers,                     &
 
     ! Arguments
 
-    integer(kind=i_def), intent(in) :: nlayers
+    integer(kind=i_def), intent(in) :: nlayers, seg_len
     integer(kind=i_def), intent(in) :: ndf_wth,  ndf_w3,  ndf_2d,  ndf_farr
     integer(kind=i_def), intent(in) :: undf_wth, undf_w3, undf_2d, undf_farr
 
@@ -254,14 +249,14 @@ subroutine mphys_code( nlayers,                     &
 
     real(kind=r_def), pointer, intent(inout) :: superc_liq_wth(:)
 
-    integer(kind=i_def), intent(in), dimension(ndf_wth) :: map_wth
-    integer(kind=i_def), intent(in), dimension(ndf_w3)  :: map_w3
-    integer(kind=i_def), intent(in), dimension(ndf_2d)  :: map_2d
-    integer(kind=i_def), intent(in), dimension(ndf_farr):: map_farr
+    integer(kind=i_def), intent(in), dimension(ndf_wth, seg_len) :: map_wth
+    integer(kind=i_def), intent(in), dimension(ndf_w3, seg_len)  :: map_w3
+    integer(kind=i_def), intent(in), dimension(ndf_2d, seg_len)  :: map_2d
+    integer(kind=i_def), intent(in), dimension(ndf_farr, seg_len):: map_farr
 
     ! Local variables for the kernel
 
-    real(r_um), dimension(row_length,rows,model_levels) ::                     &
+    real(r_um), dimension(seg_len,1,nlayers) ::                                &
          u_on_p, v_on_p, w, q_work, qcl_work, qcf_work, deltaz, cfl_work,      &
          cff_work, cf_work, rhodz_dry, rhodz_moist, t_n, t_work,               &
          p_theta_levels, ls_rain3d, ls_snow3d, ls_graup3d, rainfrac3d,         &
@@ -270,31 +265,31 @@ subroutine mphys_code( nlayers,                     &
          nitr_acc_work, nitr_diss_work, aerosol_work, biogenic, rho_r2,        &
          dry_rho, ukca_cdnc_array, tnuc_new
 
-    real(r_um), dimension(row_length,rows,model_levels, 1) :: arcl
+    real(r_um), dimension(seg_len, 1, nlayers, 1) :: arcl
 
-    real(r_um), dimension(row_length,rows,0:model_levels) :: flash_pot
+    real(r_um), dimension(seg_len, 1, 0:nlayers) :: flash_pot
 
-    real(r_um), dimension(row_length,rows) :: ls_rain, ls_snow, ls_graup,      &
-                                              snow_depth, land_frac, hmteff, zb
+    real(r_um), dimension(seg_len, 1) :: ls_rain, ls_snow, ls_graup,      &
+                                         snow_depth, land_frac, hmteff, zb
 
     real(r_um), dimension(:,:,:), allocatable :: qrain_work, qcf2_work,        &
                                                  qgraup_work, precfrac_work
 
-    real(r_um), dimension(model_levels) :: rhcpt
+    real(r_um), dimension(nlayers) :: rhcpt
 
     real(r_um), dimension(1,1,1) :: sea_salt_film, sea_salt_jet
 
     real(r_um) :: stashwork21(1)
 
-    logical, dimension(row_length,rows) :: land_sea_mask
+    logical, dimension(seg_len,1) :: land_sea_mask
 
     integer(i_um) :: i,j,k,n
 
     integer(i_um), dimension(npd_arcl_compnts) :: i_arcl_compnts
 
-    integer(i_um), dimension(land_field) :: land_index
+    integer(i_um), dimension(seg_len) :: land_index
 
-    real(r_um), dimension(land_field) :: ls_rainfrac
+    real(r_um), dimension(seg_len) :: ls_rainfrac
 
     integer(i_um) :: lspice_dim1, lspice_dim2, lspice_dim3,                    &
                      salt_dim1, salt_dim2, salt_dim3, cdnc_dim1, cdnc_dim2,    &
@@ -310,24 +305,27 @@ subroutine mphys_code( nlayers,                     &
     !-----------------------------------------------------------------------
 
     ! These must be set as below to match the declarations above
-    lspice_dim1 = row_length
-    lspice_dim2 = rows
-    lspice_dim3 = model_levels
+    lspice_dim1 = int(seg_len, i_um)
+    lspice_dim2 = 1_i_um
+    lspice_dim3 = nlayers
 
     allocate ( easyaerosol_cdnc % cdnc(1,1,1) )
-    easyaerosol_cdnc % cdnc(1,1,1) = 0.0_r_um
+    easyaerosol_cdnc % cdnc = 0.0_r_um
     easyaerosol_cdnc % dim1 = 1_i_um
     easyaerosol_cdnc % dim2 = 1_i_um
     easyaerosol_cdnc % dim3 = 1_i_um
 
-    cdnc_dim1   = 1_i_um
+    cdnc_dim1   = int(seg_len, i_um)
     cdnc_dim2   = 1_i_um
     cdnc_dim3   = nlayers
-    do k = 1, nlayers
-      ukca_cdnc_array(1,1,k) = cloud_drop_no_conc(map_wth(1) + k)
+    j = 1
+    do i = 1, seg_len
+      do k = 1, nlayers
+        ukca_cdnc_array(i,j,k) = cloud_drop_no_conc(map_wth(1,i) + k)
+      end do
     end do
 
-    salt_dim1   = 1_i_um    ! N.B. Ensure that l_use_seasalt is False
+    salt_dim1   = 1_i_um
     salt_dim2   = 1_i_um
     salt_dim3   = 1_i_um
 
@@ -335,38 +333,49 @@ subroutine mphys_code( nlayers,                     &
     rhc_rows       = 1_i_um
     n_arcl_compnts = 1_i_um
 
-    land_points = land_field
-    land_index  = 1_i_um
+    land_points = int(seg_len, i_um)
+    do i = 1, seg_len
+      land_index(i)  = int(i, i_um)
+    end do
 
-    deltaz(:,:,:)           = 0.0_r_um
-    biogenic(:,:,:)         = 0.0_r_um
-    so4_accu_work(:,:,:)    = 0.0_r_um
-    so4_diss_work(:,:,:)    = 0.0_r_um
-    aged_bmass_work(:,:,:)  = 0.0_r_um
-    cloud_bmass_work(:,:,:) = 0.0_r_um
-    aged_ocff_work(:,:,:)   = 0.0_r_um
-    cloud_ocff_work(:,:,:)  = 0.0_r_um
-    nitr_acc_work(:,:,:)    = 0.0_r_um
-    nitr_diss_work(:,:,:)   = 0.0_r_um
-    aerosol_work(:,:,:)     = 0.0_r_um
+    deltaz           = 0.0_r_um
+    biogenic         = 0.0_r_um
+    so4_accu_work    = 0.0_r_um
+    so4_diss_work    = 0.0_r_um
+    aged_bmass_work  = 0.0_r_um
+    cloud_bmass_work = 0.0_r_um
+    aged_ocff_work   = 0.0_r_um
+    cloud_ocff_work  = 0.0_r_um
+    nitr_acc_work    = 0.0_r_um
+    nitr_diss_work   = 0.0_r_um
+    aerosol_work     = 0.0_r_um
 
-    flash_pot(:,:,:) = 0.0_r_um
-    land_sea_mask(1,1) = .false.
+    flash_pot = 0.0_r_um
+    land_sea_mask = .false.
 
     l_cosp_lsp = .false.
 
-    sea_salt_film(1,1,1)   = 0.0_r_um
-    sea_salt_jet(1,1,1)    = 0.0_r_um
+    sea_salt_film   = 0.0_r_um
+    sea_salt_jet    = 0.0_r_um
 
-    snow_depth(1,1) = 0.0_r_um
-    land_frac(1,1)  = 0.0_r_um
+    snow_depth = 0.0_r_um
+    land_frac  = 0.0_r_um
 
-    hmteff(1,1) = 0.0_r_um
-    zb(1,1) = 0.0_r_um
+    hmteff = 0.0_r_um
+    zb = 0.0_r_um
+    tnuc_new = 0.0_r_um
 
     do i = 1, npd_arcl_compnts
       i_arcl_compnts(i) = i
     end do
+    arcl(:,:,:,:) = 0.0_r_um
+
+    ls_rain = 0.0_r_um
+    ls_snow = 0.0_r_um
+    ls_rain3d = 0.0_r_um
+    ls_snow3d = 0.0_r_um
+    ls_graup3d = 0.0_r_um
+    rainfrac3d = 0.0_r_um
 
     !-----------------------------------------------------------------------
     ! Initialisation of prognostic variables and arrays
@@ -375,84 +384,80 @@ subroutine mphys_code( nlayers,                     &
     ! This assumes that map_wth(1) points to level 0
     ! and map_w3(1) points to level 1
 
-    do k = 1, model_levels
-      do j = 1, rows
-        do i = 1, row_length
-          ! height of levels from centre of planet
-          r_rho_levels(i,j,k)   = height_w3(map_w3(1) + k-1) + planet_radius
-          r_theta_levels(i,j,k) = height_wth(map_wth(1) + k) + planet_radius
+    j = 1
+    do k = 1, nlayers
+      do i = 1, seg_len
+        ! height of levels from centre of planet
+        r_rho_levels(i,j,k)   = height_w3(map_w3(1,i) + k-1) + planet_radius
+        r_theta_levels(i,j,k) = height_wth(map_wth(1,i) + k) + planet_radius
 
-          rho_r2(i,j,k) = wetrho_in_w3(map_w3(1) + k-1) *                      &
-                          ( r_rho_levels(i,j,k)**2 )
-          dry_rho(i,j,k) = dry_rho_in_w3(map_w3(1) + k-1)
+        rho_r2(i,j,k) = wetrho_in_w3(map_w3(1,i) + k-1) *                      &
+                        ( r_rho_levels(i,j,k)**2 )
+        dry_rho(i,j,k) = dry_rho_in_w3(map_w3(1,i) + k-1)
 
-          u_on_p(i,j,k) = u1_in_w3(map_w3(1) + k-1)
-          v_on_p(i,j,k) = u2_in_w3(map_w3(1) + k-1)
-          w(i,j,k)   = w_phys(map_wth(1) + k)
+        u_on_p(i,j,k) = u1_in_w3(map_w3(1,i) + k-1)
+        v_on_p(i,j,k) = u2_in_w3(map_w3(1,i) + k-1)
+        w(i,j,k)   = w_phys(map_wth(1,i) + k)
 
-          t_n(i,j,k)    = theta_in_wth(map_wth(1) + k) *                       &
-                          exner_in_wth(map_wth(1) + k)
-          ! N.B. theta_inc is actually a temperature increment when passed in
-          t_work(i,j,k) = t_n(i,j,k) + theta_inc(map_wth(1) + k)
+        t_n(i,j,k)    = theta_in_wth(map_wth(1,i) + k) *                       &
+                        exner_in_wth(map_wth(1,i) + k)
+        ! N.B. theta_inc is actually a temperature increment when passed in
+        t_work(i,j,k) = t_n(i,j,k) + theta_inc(map_wth(1,i) + k)
 
-          ! pressure on theta levels
-          p_theta_levels(i,j,k)    = p_zero*(exner_in_wth(map_wth(1) + k))     &
-                                          **(1.0_r_um/kappa)
-          ! Compulsory moist prognostics
-          q_work(i,j,k)    = mv_wth(map_wth(1) + k) + dmv_wth(map_wth(1) + k )
-          qcl_work(i,j,k)  = ml_wth(map_wth(1) + k) + dml_wth(map_wth(1) + k )
-          qcf_work(i,j,k)  = mi_wth(map_wth(1) + k) + dmi_wth(map_wth(1) + k )
+        ! pressure on theta levels
+        p_theta_levels(i,j,k)    = p_zero*(exner_in_wth(map_wth(1,i) + k))     &
+                                        **(1.0_r_um/kappa)
+        ! Compulsory moist prognostics
+        q_work(i,j,k)    = mv_wth(map_wth(1,i) + k) + dmv_wth(map_wth(1,i) + k )
+        qcl_work(i,j,k)  = ml_wth(map_wth(1,i) + k) + dml_wth(map_wth(1,i) + k )
+        qcf_work(i,j,k)  = mi_wth(map_wth(1,i) + k) + dmi_wth(map_wth(1,i) + k )
 
-        end do ! i
-      end do   ! j
-    end do     ! k
-
-    do j = 1, rows
-      do i = 1, row_length
-        ! surface height
-        r_theta_levels(i,j,0) = height_wth(map_wth(1) + 0) + planet_radius
       end do ! i
-    end do   ! j
+    end do ! k
+
+    j = 1
+    do i = 1, seg_len
+      ! surface height
+      r_theta_levels(i,j,0) = height_wth(map_wth(1,i) + 0) + planet_radius
+    end do ! i
 
     ! Optional moist prognostics
 
     ! Perform allocation of the qcf2 variable as it is required in the UM
     ! microphysics, even if it is not actually used.
     allocate(qcf2_work(1,1,1))
-    qcf2_work(1,1,1) = 0.0_r_um
+    qcf2_work = 0.0_r_um
 
     if (l_mcr_qrain) then
-      allocate (qrain_work (row_length, rows, model_levels) )
-      do k = 1, model_levels
-        do j = 1, rows
-          do i = 1, row_length
-            qrain_work(i,j,k) = mr_wth(map_wth(1) + k)
-          end do ! i
-        end do   ! j
-      end do     ! k
+      allocate (qrain_work (seg_len, 1, nlayers) )
+      j = 1
+      do k = 1, nlayers
+        do i = 1, seg_len
+          qrain_work(i,j,k) = mr_wth(map_wth(1,i) + k)
+        end do ! i
+      end do ! k
     else
       allocate (qrain_work(1,1,1))
-      qrain_work(1,1,1) = 0.0_r_um
+      qrain_work = 0.0_r_um
     end if
 
     if (l_mcr_qgraup) then
-      allocate (qgraup_work (row_length, rows, model_levels) )
-      do k = 1, model_levels
-        do j = 1, rows
-          do i = 1, row_length
-            qgraup_work(i,j,k) = mg_wth(map_wth(1) + k)
-          end do ! i
-        end do   ! j
-      end do     ! k
+      allocate (qgraup_work (seg_len, 1, nlayers) )
+      j = 1
+      do k = 1, nlayers
+        do i = 1, seg_len
+          qgraup_work(i,j,k) = mg_wth(map_wth(1,i) + k)
+        end do ! i
+      end do ! k
     else
       allocate(qgraup_work(1,1,1))
-      qgraup_work(1,1,1) = 0.0_r_um
+      qgraup_work = 0.0_r_um
     end if
 
     if ( l_mcr_precfrac ) then
       ! Prognostic precipitation fraction...
 
-      allocate (precfrac_work (row_length, rows, model_levels) )
+      allocate (precfrac_work (seg_len, 1, nlayers) )
 
       ! Prognostic precip fraction not yet included in lfric.
       ! For now, just initialise it to 1 if any precip-mass is present,
@@ -461,37 +466,35 @@ subroutine mphys_code( nlayers,                     &
       ! model timestep.
       if ( l_mcr_qgraup .and. l_subgrid_graupel_frac ) then
         ! If using graupel and including it within the precip fraction
-        do k = 1, model_levels
-          do j = 1, rows
-            do i = 1, row_length
-              if ( qrain_work(i,j,k)+qgraup_work(i,j,k) > mprog_min ) then
-                precfrac_work(i,j,k) = 1.0_r_um
-              else
-                precfrac_work(i,j,k) = 0.0_r_um
-              end if
-            end do ! i
-          end do   ! j
-        end do     ! k
+        j = 1
+        do k = 1, nlayers
+          do i = 1, seg_len
+            if ( qrain_work(i,j,k)+qgraup_work(i,j,k) > mprog_min ) then
+              precfrac_work(i,j,k) = 1.0_r_um
+            else
+              precfrac_work(i,j,k) = 0.0_r_um
+            end if
+          end do ! i
+        end do ! k
       else  ! ( l_mcr_qgraup .and. l_subgrid_graupel_frac )
         ! Otherwise, precfrac is just the rain fraction
-        do k = 1, model_levels
-          do j = 1, rows
-            do i = 1, row_length
-              if ( qrain_work(i,j,k) > mprog_min ) then
-                precfrac_work(i,j,k) = 1.0_r_um
-              else
-                precfrac_work(i,j,k) = 0.0_r_um
-              end if
-            end do ! i
-          end do   ! j
-        end do     ! k
+        j = 1
+        do k = 1, nlayers
+          do i = 1, seg_len
+            if ( qrain_work(i,j,k) > mprog_min ) then
+              precfrac_work(i,j,k) = 1.0_r_um
+            else
+              precfrac_work(i,j,k) = 0.0_r_um
+            end if
+          end do ! i
+        end do ! k
       end if  ! ( l_mcr_qgraup .and. l_subgrid_graupel_frac )
 
     else  ! ( l_mcr_precfrac )
       ! Prognostic precipitation fraction switched off; minimal allocation
 
       allocate(precfrac_work(1,1,1))
-      precfrac_work(1,1,1) = 0.0_r_um
+      precfrac_work = 0.0_r_um
 
     end if  ! ( l_mcr_precfrac )
 
@@ -499,33 +502,35 @@ subroutine mphys_code( nlayers,                     &
       ! Parameters from fractional standard deviation (FSD) parametrization
       ! There are 3 parameters used in the empirical fit, each stored as a different
       ! element in the f_arr array.
+      j = 1
       do n = 1, 3
-        do k = 1, model_levels
-          f_arr(n,1,1,k) = f_arr_wth(map_farr(1) + (n-1)*(model_levels+1) + k)
+        do k = 1, nlayers
+          do i = 1, seg_len
+            f_arr(n,i,j,k) = f_arr_wth(map_farr(1,i) + (n-1)*(nlayers+1) + k)
+          end do
         end do
       end do
     end if
 
     ! Note: need other options once Smith scheme is in use.
     if ( i_cld_vn == i_cld_off ) then
-      do k = 1, model_levels
-        do j = 1, rows
-          do i = 1, row_length
-            if (qcl_work(i,j,k) >= mprog_min) then
-              cfl_work(i,j,k) = 1.0_r_um
-            else
-              cfl_work(i,j,k) = 0.0_r_um
-            end if
+      j = 1
+      do k = 1, nlayers
+        do i = 1, seg_len
+          if (qcl_work(i,j,k) >= mprog_min) then
+            cfl_work(i,j,k) = 1.0_r_um
+          else
+            cfl_work(i,j,k) = 0.0_r_um
+          end if
 
-            if (qcf_work(i,j,k) >= mprog_min) then
-              cff_work(i,j,k) = 1.0_r_um
-            else
-              cff_work(i,j,k) = 0.0_r_um
-            end if
+          if (qcf_work(i,j,k) >= mprog_min) then
+            cff_work(i,j,k) = 1.0_r_um
+          else
+            cff_work(i,j,k) = 0.0_r_um
+          end if
 
-            cf_work(i,j,k) = max( cff_work(i,j,k), cfl_work(i,j,k) )
+          cf_work(i,j,k) = max( cff_work(i,j,k), cfl_work(i,j,k) )
 
-          end do
         end do
 
         rhcpt(k) = 1.0_r_um
@@ -533,17 +538,16 @@ subroutine mphys_code( nlayers,                     &
       end do
 
     else ! i_cld_vn > 0
-      do k = 1, model_levels
-        do j = 1, rows
-          do i = 1, row_length
-            cf_work(i,j,k)  = cf_wth( map_wth(1) + k) + dbcf_wth( map_wth(1) + k)
-            cfl_work(i,j,k) = cfl_wth(map_wth(1) + k) + dcfl_wth( map_wth(1) + k)
-            cff_work(i,j,k) = cff_wth(map_wth(1) + k) + dcff_wth( map_wth(1) + k)
-
-            rhcpt(k) = rhcrit(k)
-
-          end do
+      j = 1
+      do k = 1, nlayers
+        do i = 1, seg_len
+          cf_work(i,j,k)  = cf_wth( map_wth(1,i) + k) + dbcf_wth( map_wth(1,i) + k)
+          cfl_work(i,j,k) = cfl_wth(map_wth(1,i) + k) + dcfl_wth( map_wth(1,i) + k)
+          cff_work(i,j,k) = cff_wth(map_wth(1,i) + k) + dcff_wth( map_wth(1,i) + k)
         end do
+
+         rhcpt(k) = rhcrit(k)
+
       end do
     end if ! i_cld_vn
 
@@ -552,19 +556,19 @@ subroutine mphys_code( nlayers,                     &
 
     ! Allocate arrays for diagnostics
     if (l_praut_diag) then
-      allocate(praut( 1, 1, nlayers ))
+      allocate(praut( seg_len, 1, nlayers ))
       praut = 0.0_r_um
     endif
     if (l_pracw_diag) then
-      allocate(pracw( 1, 1, nlayers ))
+      allocate(pracw( seg_len, 1, nlayers ))
       pracw = 0.0_r_um
     endif
     if (l_piacw_diag) then
-      allocate(piacw( 1, 1, nlayers ))
+      allocate(piacw( seg_len, 1, nlayers ))
       piacw = 0.0_r_um
     endif
     if (l_psacw_diag) then
-      allocate(psacw( 1, 1, nlayers ))
+      allocate(psacw( seg_len, 1, nlayers ))
       psacw = 0.0_r_um
     endif
 
@@ -605,91 +609,106 @@ subroutine mphys_code( nlayers,                     &
 if (l_mcr_qgraup .and. ( electric_method == em_gwp .or. &
      electric_method == em_mccaul ) )  then
 
-  call electric_main( qcf_work, qcf2_work, qgraup_work, rhodz_dry,            &
-                      rhodz_moist, t_n, w, stashwork21,                       &
+  call electric_main( qcf_work, qcf2_work, qgraup_work, rhodz_dry,             &
+                      rhodz_moist, t_n, w, stashwork21,                        &
                       flash_pot(:, :, 1 : tdims%k_end ) )
 end if
 
-
   ! Update theta and compulsory prognostic variables
-  do k = 1, model_levels
-    theta_inc(map_wth(1) + k) = ( t_work(1,1,k) - t_n(1,1,k) )      &
-                              / exner_in_wth(map_wth(1) + k)
+  j = 1
+  do i = 1, seg_len
+    do k = 1, nlayers
+      theta_inc(map_wth(1,i) + k) = ( t_work(i,j,k) - t_n(i,j,k) )             &
+                                / exner_in_wth(map_wth(1,i) + k)
 
-    dmv_wth(map_wth(1) + k ) = q_work(1,1,k)   - mv_wth( map_wth(1) + k )
-    dml_wth(map_wth(1) + k ) = qcl_work(1,1,k) - ml_wth( map_wth(1) + k )
-    dmi_wth(map_wth(1) + k ) = qcf_work(1,1,k) - mi_wth( map_wth(1) + k )
-
-  end do ! k (model_levels)
+      dmv_wth(map_wth(1,i) + k ) = q_work(i,j,k)   - mv_wth( map_wth(1,i) + k )
+      dml_wth(map_wth(1,i) + k ) = qcl_work(i,j,k) - ml_wth( map_wth(1,i) + k )
+      dmi_wth(map_wth(1,i) + k ) = qcf_work(i,j,k) - mi_wth( map_wth(1,i) + k )
+    end do
+  end do ! k (nlayers)
 
   ! Increment level 0 the same as level 1
   !  (as done in the UM)
-  theta_inc(map_wth(1) + 0) = theta_inc(map_wth(1) + 1)
-  dmv_wth(map_wth(1) + 0)   = dmv_wth(map_wth(1) + 1)
-  dml_wth(map_wth(1) + 0)   = dml_wth(map_wth(1) + 1)
-  dmi_wth(map_wth(1) + 0)   = dmi_wth(map_wth(1) + 1)
+  do i = 1, seg_len
+    theta_inc(map_wth(1,i) + 0) = theta_inc(map_wth(1,i) + 1)
+    dmv_wth(map_wth(1,i) + 0)   = dmv_wth(map_wth(1,i) + 1)
+    dml_wth(map_wth(1,i) + 0)   = dml_wth(map_wth(1,i) + 1)
+    dmi_wth(map_wth(1,i) + 0)   = dmi_wth(map_wth(1,i) + 1)
+  end do
 
   ! Update optional additional prognostic variables
   ! No need for else statements here as dmi_wth and associated variables
   ! should have already been initialised to zero.
 
   if (l_mcr_qrain) then
-    do k = 1, model_levels
-      dmr_wth( map_wth(1) + k) = qrain_work(1,1,k) - mr_wth( map_wth(1) + k )
+    j = 1
+    do i = 1, seg_len
+      do k = 1, nlayers
+        dmr_wth( map_wth(1,i) + k) = qrain_work(i,j,k) - mr_wth( map_wth(1,i) + k )
+      end do
+      ! Update level 0 to be the same as level 1 (as per UM)
+      dmr_wth(map_wth(1,i) + 0) = qrain_work(i,j,1) - mr_wth(map_wth(1,i) + 0)
     end do
-    ! Update level 0 to be the same as level 1 (as per UM)
-    dmr_wth(map_wth(1) + 0) = qrain_work(1,1,1) - mr_wth(map_wth(1) + 0)
   end if
 
   if (l_mcr_qgraup) then
-    do k = 1, model_levels
-      dmg_wth( map_wth(1) + k) = qgraup_work(1,1,k) - mg_wth( map_wth(1) + k )
+    j = 1
+    do i = 1, seg_len
+      do k = 1, nlayers
+        dmg_wth( map_wth(1,i) + k) = qgraup_work(i,i,k) - mg_wth( map_wth(1,i) + k )
+      end do
+      ! Update level 0 to be the same as level 1 (as per UM)
+      dmg_wth(map_wth(1,i) + 0) = qgraup_work(i,j,1) - mg_wth(map_wth(1,i) + 0)
     end do
-    ! Update level 0 to be the same as level 1 (as per UM)
-    dmg_wth(map_wth(1) + 0) = qgraup_work(1,1,1) - mg_wth(map_wth(1) + 0)
   end if
 
   ! Cloud fraction increments
   ! Always calculate them, but only add them on in slow_physics if using PC2.
-  do k = 1, model_levels
-    dbcf_wth( map_wth(1) + k) = cf_work(1,1,k)  - cf_wth(  map_wth(1) + k )
-    dcfl_wth( map_wth(1) + k) = cfl_work(1,1,k) - cfl_wth( map_wth(1) + k )
-    dcff_wth( map_wth(1) + k) = cff_work(1,1,k) - cff_wth( map_wth(1) + k )
-  end do
-  ! Set level 0 as the same as level 1
-  dbcf_wth(map_wth(1) + 0) = dbcf_wth(map_wth(1) + 1)
-  dcfl_wth(map_wth(1) + 0) = dcfl_wth(map_wth(1) + 1)
-  dcff_wth(map_wth(1) + 0) = dcff_wth(map_wth(1) + 1)
+  j = 1
+  do i = 1, seg_len
+    do k = 1, nlayers
+      dbcf_wth( map_wth(1,i) + k) = cf_work(i,j,k)  - cf_wth(  map_wth(1,i) + k )
+      dcfl_wth( map_wth(1,i) + k) = cfl_work(i,j,k) - cfl_wth( map_wth(1,i) + k )
+      dcff_wth( map_wth(1,i) + k) = cff_work(i,j,k) - cff_wth( map_wth(1,i) + k )
+    end do
+    ! Set level 0 as the same as level 1
+    dbcf_wth(map_wth(1,i) + 0) = dbcf_wth(map_wth(1,i) + 1)
+    dcfl_wth(map_wth(1,i) + 0) = dcfl_wth(map_wth(1,i) + 1)
+    dcff_wth(map_wth(1,i) + 0) = dcff_wth(map_wth(1,i) + 1)
 
-  ! Copy ls_rain and ls_snow
-  ls_rain_2d(map_2d(1))  = ls_rain(1,1)
-  ls_snow_2d(map_2d(1))  = ls_snow(1,1)
-  lsca_2d(map_2d(1))     = ls_rainfrac(1)
-  do k = 1, model_levels
-    ls_rain_3d(map_wth(1) + k) = ls_rain3d(1,1,k)
-    ls_snow_3d(map_wth(1) + k) = ls_snow3d(1,1,k)
-  end do ! model levels
+    ! Copy ls_rain and ls_snow
+    ls_rain_2d(map_2d(1,i))  = ls_rain(i,j)
+    ls_snow_2d(map_2d(1,i))  = ls_snow(i,j)
+    lsca_2d(map_2d(1,i))     = ls_rainfrac(i)
+    do k = 1, nlayers
+      ls_rain_3d(map_wth(1,i) + k) = ls_rain3d(i,j,k)
+      ls_snow_3d(map_wth(1,i) + k) = ls_snow3d(i,j,k)
+    end do ! model levels
+
+    ! Copy diagnostics if selected: autoconversion, accretion & riming rates
+    do k = 1, nlayers
+      if (l_praut_diag) autoconv(map_wth(1,i) + k) = praut(i,j,k)
+      if (l_pracw_diag) accretion(map_wth(1,i) + k) = pracw(i,j,k)
+      if (l_piacw_diag) rim_cry(map_wth(1,i) + k) = piacw(i,j,k)
+      if (l_psacw_diag) rim_agg(map_wth(1,i) + k) = psacw(i,j,k)
+    end do
+
+  end do ! seg_len
 
   if (.not. associated(superc_liq_wth, empty_real_data) ) then
-    do k = 1, model_levels
-      if (t_n(1,1,k) < tm) then
-        ! Following the UM, have taken start of timestep quantity for the
-        ! supercooled liquid cloud. This is where the model cloud should
-        ! be in a steady-state.
-        superc_liq_wth( map_wth(1) + k) = ml_wth(map_wth(1) + k)
-      else
-        superc_liq_wth( map_wth(1) + k) = 0.0_r_um
-      end if
-    end do ! model_levels
+    do i = 1, seg_len
+      do k = 1, nlayers
+        if (t_n(i,j,k) < tm) then
+          ! Following the UM, have taken start of timestep quantity for the
+          ! supercooled liquid cloud. This is where the model cloud should
+          ! be in a steady-state.
+          superc_liq_wth( map_wth(1,i) + k) = ml_wth(map_wth(1,i) + k)
+        else
+          superc_liq_wth( map_wth(1,i) + k) = 0.0_r_um
+        end if
+      end do ! nlayers
+    end do ! seg_len
   end if ! not assoc. superc_liq_wth
-
-  ! Copy diagnostics if selected: autoconversion, accretion & riming rates
-  do k = 1, model_levels
-    if (l_praut_diag) autoconv(map_wth(1) + k) = praut(1,1,k)
-    if (l_pracw_diag) accretion(map_wth(1) + k) = pracw(1,1,k)
-    if (l_piacw_diag) rim_cry(map_wth(1) + k) = piacw(1,1,k)
-    if (l_psacw_diag) rim_agg(map_wth(1) + k) = psacw(1,1,k)
-  end do
 
   if (allocated(psacw)) deallocate (psacw)
   if (allocated(piacw)) deallocate (piacw)

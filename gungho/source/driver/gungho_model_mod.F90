@@ -110,6 +110,7 @@ module gungho_model_mod
   use um_clock_init_mod,          only : um_clock_init
   use um_control_init_mod,        only : um_control_init
   use um_physics_init_mod,        only : um_physics_init
+  use um_radaer_lut_init_mod,     only : um_radaer_lut_init
   use um_ukca_init_mod,           only : um_ukca_init
 #endif
 
@@ -391,6 +392,8 @@ contains
 
       ! Initialisation of UM physics variables
       call um_physics_init(ncells)
+      !Read all the radaer lut namelist files
+      call um_radaer_lut_init()
       ! Initialisation of Jules high-level variables
       call jules_control_init()
       if (surface == surface_jules) then
