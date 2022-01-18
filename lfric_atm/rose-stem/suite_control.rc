@@ -320,6 +320,17 @@
   ],
 
   'performance': [
+    'run_application("lfric_atm", "basic_gal7_c192mg",
+                     configuration_suffix="24nodes",
+                     checkkgo=False,
+                     resolutions=[("C192_MG", 720.0)],
+                     env={"crun":1, "nrun":120,
+                          "directives":{
+                                        "C192_MG":{"mpi_parts":864,
+                                               "threads":1,
+                                               "use_xios":"True",
+                                               "wallclock":"2:00:00"},
+					       } },)',
     'run_application("lfric_atm", "aquaplanet_profile",
                      configuration_suffix="6nodes",
                      checkkgo=False,
