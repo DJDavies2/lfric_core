@@ -12,6 +12,10 @@ module realtype_rd
   implicit none
   private
 
-  integer, public, parameter :: RealK=r_def
+  ! Internal Socrates precision
+  integer, public, parameter :: RealK = r_def
+
+  ! Precision of variables passed through the Socrates interface
+  integer, public, parameter :: RealExt = r_def
 
 end module realtype_rd
