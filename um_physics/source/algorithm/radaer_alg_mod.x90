@@ -14,6 +14,8 @@ module radaer_alg_mod
                                              use_xios_io,                      &
                                              write_diag
   use timer_mod,                       only: timer
+  use constants_mod,                   only: i_def
+  use radiation_config_mod,            only: n_radstep
 
   implicit none
 
@@ -35,6 +37,7 @@ contains
   !>@param[in,out] aer_lw_absorption     MODE aerosol LW absorption
   !>@param[in,out] aer_lw_scattering     MODE aerosol LW scattering
   !>@param[in,out] aer_lw_asymmetry      MODE aerosol LW asymmetry
+  !>@param[in]     timestep              Current timestep number
 
   subroutine radaer_alg( aerosol_fields,                                       &
                          theta_in_wth,                                         &
@@ -43,7 +46,8 @@ contains
                          aer_mix_ratio,                                        &
                          aer_sw_absorption, aer_sw_scattering,                 &
                          aer_sw_asymmetry, aer_lw_absorption,                  &
-                         aer_lw_scattering, aer_lw_asymmetry )
+                         aer_lw_scattering, aer_lw_asymmetry,                  &
+                         timestep )
 
     use radaer_kernel_mod, only: radaer_kernel_type
 
@@ -61,6 +65,7 @@ contains
     type( field_type ), intent( inout )            :: aer_lw_absorption
     type( field_type ), intent( inout )            :: aer_lw_scattering
     type( field_type ), intent( inout )            :: aer_lw_asymmetry
+    integer( kind=i_def ), intent( in )            :: timestep
 
     ! Temporary unpacked fields from collection aerosol_fields
     type( field_type ), pointer :: n_ait_sol => null()
@@ -124,134 +129,139 @@ contains
 
     if ( subroutine_timers ) call timer('radaer_alg')
 
-    ! Unpack fields from aerosol_fields
-    n_ait_sol  => aerosol_fields%get_field('n_ait_sol')
-    ait_sol_su => aerosol_fields%get_field('ait_sol_su')
-    ait_sol_bc => aerosol_fields%get_field('ait_sol_bc')
-    ait_sol_om => aerosol_fields%get_field('ait_sol_om')
-    n_acc_sol  => aerosol_fields%get_field('n_acc_sol')
-    acc_sol_su => aerosol_fields%get_field('acc_sol_su')
-    acc_sol_bc => aerosol_fields%get_field('acc_sol_bc')
-    acc_sol_om => aerosol_fields%get_field('acc_sol_om')
-    acc_sol_ss => aerosol_fields%get_field('acc_sol_ss')
-    acc_sol_du => aerosol_fields%get_field('acc_sol_du')
-    n_cor_sol  => aerosol_fields%get_field('n_cor_sol')
-    cor_sol_su => aerosol_fields%get_field('cor_sol_su')
-    cor_sol_bc => aerosol_fields%get_field('cor_sol_bc')
-    cor_sol_om => aerosol_fields%get_field('cor_sol_om')
-    cor_sol_ss => aerosol_fields%get_field('cor_sol_ss')
-    cor_sol_du => aerosol_fields%get_field('cor_sol_du')
-    n_ait_ins  => aerosol_fields%get_field('n_ait_ins')
-    ait_ins_bc => aerosol_fields%get_field('ait_ins_bc')
-    ait_ins_om => aerosol_fields%get_field('ait_ins_om')
-    n_acc_ins  => aerosol_fields%get_field('n_acc_ins')
-    acc_ins_du => aerosol_fields%get_field('acc_ins_du')
-    n_cor_ins  => aerosol_fields%get_field('n_cor_ins')
-    cor_ins_du => aerosol_fields%get_field('cor_ins_du')
-    drydp_ait_sol => aerosol_fields%get_field('drydp_ait_sol')
-    drydp_acc_sol => aerosol_fields%get_field('drydp_acc_sol')
-    drydp_cor_sol => aerosol_fields%get_field('drydp_cor_sol')
-    drydp_ait_ins => aerosol_fields%get_field('drydp_ait_ins')
-    drydp_acc_ins => aerosol_fields%get_field('drydp_acc_ins')
-    drydp_cor_ins => aerosol_fields%get_field('drydp_cor_ins')
-    wetdp_ait_sol => aerosol_fields%get_field('wetdp_ait_sol')
-    wetdp_acc_sol => aerosol_fields%get_field('wetdp_acc_sol')
-    wetdp_cor_sol => aerosol_fields%get_field('wetdp_cor_sol')
-    rhopar_ait_sol => aerosol_fields%get_field('rhopar_ait_sol')
-    rhopar_acc_sol => aerosol_fields%get_field('rhopar_acc_sol')
-    rhopar_cor_sol => aerosol_fields%get_field('rhopar_cor_sol')
-    rhopar_ait_ins => aerosol_fields%get_field('rhopar_ait_ins')
-    rhopar_acc_ins => aerosol_fields%get_field('rhopar_acc_ins')
-    rhopar_cor_ins => aerosol_fields%get_field('rhopar_cor_ins')
-    pvol_wat_ait_sol => aerosol_fields%get_field('pvol_wat_ait_sol')
-    pvol_wat_acc_sol => aerosol_fields%get_field('pvol_wat_acc_sol')
-    pvol_wat_cor_sol => aerosol_fields%get_field('pvol_wat_cor_sol')
-    pvol_su_ait_sol => aerosol_fields%get_field('pvol_su_ait_sol')
-    pvol_bc_ait_sol => aerosol_fields%get_field('pvol_bc_ait_sol')
-    pvol_om_ait_sol => aerosol_fields%get_field('pvol_om_ait_sol')
-    pvol_su_acc_sol => aerosol_fields%get_field('pvol_su_acc_sol')
-    pvol_bc_acc_sol => aerosol_fields%get_field('pvol_bc_acc_sol')
-    pvol_om_acc_sol => aerosol_fields%get_field('pvol_om_acc_sol')
-    pvol_ss_acc_sol => aerosol_fields%get_field('pvol_ss_acc_sol')
-    pvol_du_acc_sol => aerosol_fields%get_field('pvol_du_acc_sol')
-    pvol_su_cor_sol => aerosol_fields%get_field('pvol_su_cor_sol')
-    pvol_bc_cor_sol => aerosol_fields%get_field('pvol_bc_cor_sol')
-    pvol_om_cor_sol => aerosol_fields%get_field('pvol_om_cor_sol')
-    pvol_ss_cor_sol => aerosol_fields%get_field('pvol_ss_cor_sol')
-    pvol_du_cor_sol => aerosol_fields%get_field('pvol_du_cor_sol')
-    pvol_bc_ait_ins => aerosol_fields%get_field('pvol_bc_ait_ins')
-    pvol_om_ait_ins => aerosol_fields%get_field('pvol_om_ait_ins')
-    pvol_du_acc_ins => aerosol_fields%get_field('pvol_du_acc_ins')
-    pvol_du_cor_ins => aerosol_fields%get_field('pvol_du_cor_ins')
+    ! Call on radiation time steps only
+    if (mod(timestep-1_i_def, n_radstep) == 0) then
 
-    call invoke( radaer_kernel_type( theta_in_wth,                             &
-                                     exner_in_wth,                             &
-                                     trop_level,                               &
-                                     n_ait_sol,                                &
-                                     ait_sol_su,                               &
-                                     ait_sol_bc,                               &
-                                     ait_sol_om,                               &
-                                     n_acc_sol,                                &
-                                     acc_sol_su,                               &
-                                     acc_sol_bc,                               &
-                                     acc_sol_om,                               &
-                                     acc_sol_ss,                               &
-                                     acc_sol_du,                               &
-                                     n_cor_sol,                                &
-                                     cor_sol_su,                               &
-                                     cor_sol_bc,                               &
-                                     cor_sol_om,                               &
-                                     cor_sol_ss,                               &
-                                     cor_sol_du,                               &
-                                     n_ait_ins,                                &
-                                     ait_ins_bc,                               &
-                                     ait_ins_om,                               &
-                                     n_acc_ins,                                &
-                                     acc_ins_du,                               &
-                                     n_cor_ins,                                &
-                                     cor_ins_du,                               &
-                                     drydp_ait_sol,                            &
-                                     drydp_acc_sol,                            &
-                                     drydp_cor_sol,                            &
-                                     drydp_ait_ins,                            &
-                                     drydp_acc_ins,                            &
-                                     drydp_cor_ins,                            &
-                                     wetdp_ait_sol,                            &
-                                     wetdp_acc_sol,                            &
-                                     wetdp_cor_sol,                            &
-                                     rhopar_ait_sol,                           &
-                                     rhopar_acc_sol,                           &
-                                     rhopar_cor_sol,                           &
-                                     rhopar_ait_ins,                           &
-                                     rhopar_acc_ins,                           &
-                                     rhopar_cor_ins,                           &
-                                     pvol_wat_ait_sol,                         &
-                                     pvol_wat_acc_sol,                         &
-                                     pvol_wat_cor_sol,                         &
-                                     pvol_su_ait_sol,                          &
-                                     pvol_bc_ait_sol,                          &
-                                     pvol_om_ait_sol,                          &
-                                     pvol_su_acc_sol,                          &
-                                     pvol_bc_acc_sol,                          &
-                                     pvol_om_acc_sol,                          &
-                                     pvol_ss_acc_sol,                          &
-                                     pvol_du_acc_sol,                          &
-                                     pvol_su_cor_sol,                          &
-                                     pvol_bc_cor_sol,                          &
-                                     pvol_om_cor_sol,                          &
-                                     pvol_ss_cor_sol,                          &
-                                     pvol_du_cor_sol,                          &
-                                     pvol_bc_ait_ins,                          &
-                                     pvol_om_ait_ins,                          &
-                                     pvol_du_acc_ins,                          &
-                                     pvol_du_cor_ins,                          &
-                                     aer_mix_ratio,                            &
-                                     aer_sw_absorption,                        &
-                                     aer_sw_scattering,                        &
-                                     aer_sw_asymmetry,                         &
-                                     aer_lw_absorption,                        &
-                                     aer_lw_scattering,                        &
-                                     aer_lw_asymmetry ) )
+      ! Unpack fields from aerosol_fields
+      n_ait_sol  => aerosol_fields%get_field('n_ait_sol')
+      ait_sol_su => aerosol_fields%get_field('ait_sol_su')
+      ait_sol_bc => aerosol_fields%get_field('ait_sol_bc')
+      ait_sol_om => aerosol_fields%get_field('ait_sol_om')
+      n_acc_sol  => aerosol_fields%get_field('n_acc_sol')
+      acc_sol_su => aerosol_fields%get_field('acc_sol_su')
+      acc_sol_bc => aerosol_fields%get_field('acc_sol_bc')
+      acc_sol_om => aerosol_fields%get_field('acc_sol_om')
+      acc_sol_ss => aerosol_fields%get_field('acc_sol_ss')
+      acc_sol_du => aerosol_fields%get_field('acc_sol_du')
+      n_cor_sol  => aerosol_fields%get_field('n_cor_sol')
+      cor_sol_su => aerosol_fields%get_field('cor_sol_su')
+      cor_sol_bc => aerosol_fields%get_field('cor_sol_bc')
+      cor_sol_om => aerosol_fields%get_field('cor_sol_om')
+      cor_sol_ss => aerosol_fields%get_field('cor_sol_ss')
+      cor_sol_du => aerosol_fields%get_field('cor_sol_du')
+      n_ait_ins  => aerosol_fields%get_field('n_ait_ins')
+      ait_ins_bc => aerosol_fields%get_field('ait_ins_bc')
+      ait_ins_om => aerosol_fields%get_field('ait_ins_om')
+      n_acc_ins  => aerosol_fields%get_field('n_acc_ins')
+      acc_ins_du => aerosol_fields%get_field('acc_ins_du')
+      n_cor_ins  => aerosol_fields%get_field('n_cor_ins')
+      cor_ins_du => aerosol_fields%get_field('cor_ins_du')
+      drydp_ait_sol => aerosol_fields%get_field('drydp_ait_sol')
+      drydp_acc_sol => aerosol_fields%get_field('drydp_acc_sol')
+      drydp_cor_sol => aerosol_fields%get_field('drydp_cor_sol')
+      drydp_ait_ins => aerosol_fields%get_field('drydp_ait_ins')
+      drydp_acc_ins => aerosol_fields%get_field('drydp_acc_ins')
+      drydp_cor_ins => aerosol_fields%get_field('drydp_cor_ins')
+      wetdp_ait_sol => aerosol_fields%get_field('wetdp_ait_sol')
+      wetdp_acc_sol => aerosol_fields%get_field('wetdp_acc_sol')
+      wetdp_cor_sol => aerosol_fields%get_field('wetdp_cor_sol')
+      rhopar_ait_sol => aerosol_fields%get_field('rhopar_ait_sol')
+      rhopar_acc_sol => aerosol_fields%get_field('rhopar_acc_sol')
+      rhopar_cor_sol => aerosol_fields%get_field('rhopar_cor_sol')
+      rhopar_ait_ins => aerosol_fields%get_field('rhopar_ait_ins')
+      rhopar_acc_ins => aerosol_fields%get_field('rhopar_acc_ins')
+      rhopar_cor_ins => aerosol_fields%get_field('rhopar_cor_ins')
+      pvol_wat_ait_sol => aerosol_fields%get_field('pvol_wat_ait_sol')
+      pvol_wat_acc_sol => aerosol_fields%get_field('pvol_wat_acc_sol')
+      pvol_wat_cor_sol => aerosol_fields%get_field('pvol_wat_cor_sol')
+      pvol_su_ait_sol => aerosol_fields%get_field('pvol_su_ait_sol')
+      pvol_bc_ait_sol => aerosol_fields%get_field('pvol_bc_ait_sol')
+      pvol_om_ait_sol => aerosol_fields%get_field('pvol_om_ait_sol')
+      pvol_su_acc_sol => aerosol_fields%get_field('pvol_su_acc_sol')
+      pvol_bc_acc_sol => aerosol_fields%get_field('pvol_bc_acc_sol')
+      pvol_om_acc_sol => aerosol_fields%get_field('pvol_om_acc_sol')
+      pvol_ss_acc_sol => aerosol_fields%get_field('pvol_ss_acc_sol')
+      pvol_du_acc_sol => aerosol_fields%get_field('pvol_du_acc_sol')
+      pvol_su_cor_sol => aerosol_fields%get_field('pvol_su_cor_sol')
+      pvol_bc_cor_sol => aerosol_fields%get_field('pvol_bc_cor_sol')
+      pvol_om_cor_sol => aerosol_fields%get_field('pvol_om_cor_sol')
+      pvol_ss_cor_sol => aerosol_fields%get_field('pvol_ss_cor_sol')
+      pvol_du_cor_sol => aerosol_fields%get_field('pvol_du_cor_sol')
+      pvol_bc_ait_ins => aerosol_fields%get_field('pvol_bc_ait_ins')
+      pvol_om_ait_ins => aerosol_fields%get_field('pvol_om_ait_ins')
+      pvol_du_acc_ins => aerosol_fields%get_field('pvol_du_acc_ins')
+      pvol_du_cor_ins => aerosol_fields%get_field('pvol_du_cor_ins')
+
+      call invoke( radaer_kernel_type( theta_in_wth,                           &
+                                       exner_in_wth,                           &
+                                       trop_level,                             &
+                                       n_ait_sol,                              &
+                                       ait_sol_su,                             &
+                                       ait_sol_bc,                             &
+                                       ait_sol_om,                             &
+                                       n_acc_sol,                              &
+                                       acc_sol_su,                             &
+                                       acc_sol_bc,                             &
+                                       acc_sol_om,                             &
+                                       acc_sol_ss,                             &
+                                       acc_sol_du,                             &
+                                       n_cor_sol,                              &
+                                       cor_sol_su,                             &
+                                       cor_sol_bc,                             &
+                                       cor_sol_om,                             &
+                                       cor_sol_ss,                             &
+                                       cor_sol_du,                             &
+                                       n_ait_ins,                              &
+                                       ait_ins_bc,                             &
+                                       ait_ins_om,                             &
+                                       n_acc_ins,                              &
+                                       acc_ins_du,                             &
+                                       n_cor_ins,                              &
+                                       cor_ins_du,                             &
+                                       drydp_ait_sol,                          &
+                                       drydp_acc_sol,                          &
+                                       drydp_cor_sol,                          &
+                                       drydp_ait_ins,                          &
+                                       drydp_acc_ins,                          &
+                                       drydp_cor_ins,                          &
+                                       wetdp_ait_sol,                          &
+                                       wetdp_acc_sol,                          &
+                                       wetdp_cor_sol,                          &
+                                       rhopar_ait_sol,                         &
+                                       rhopar_acc_sol,                         &
+                                       rhopar_cor_sol,                         &
+                                       rhopar_ait_ins,                         &
+                                       rhopar_acc_ins,                         &
+                                       rhopar_cor_ins,                         &
+                                       pvol_wat_ait_sol,                       &
+                                       pvol_wat_acc_sol,                       &
+                                       pvol_wat_cor_sol,                       &
+                                       pvol_su_ait_sol,                        &
+                                       pvol_bc_ait_sol,                        &
+                                       pvol_om_ait_sol,                        &
+                                       pvol_su_acc_sol,                        &
+                                       pvol_bc_acc_sol,                        &
+                                       pvol_om_acc_sol,                        &
+                                       pvol_ss_acc_sol,                        &
+                                       pvol_du_acc_sol,                        &
+                                       pvol_su_cor_sol,                        &
+                                       pvol_bc_cor_sol,                        &
+                                       pvol_om_cor_sol,                        &
+                                       pvol_ss_cor_sol,                        &
+                                       pvol_du_cor_sol,                        &
+                                       pvol_bc_ait_ins,                        &
+                                       pvol_om_ait_ins,                        &
+                                       pvol_du_acc_ins,                        &
+                                       pvol_du_cor_ins,                        &
+                                       aer_mix_ratio,                          &
+                                       aer_sw_absorption,                      &
+                                       aer_sw_scattering,                      &
+                                       aer_sw_asymmetry,                       &
+                                       aer_lw_absorption,                      &
+                                       aer_lw_scattering,                      &
+                                       aer_lw_asymmetry ) )
+
+    end if
 
     if ( subroutine_timers ) call timer('radaer_alg')
 

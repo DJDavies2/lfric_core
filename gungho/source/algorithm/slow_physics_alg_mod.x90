@@ -370,7 +370,8 @@ contains
                          trop_level,                                           &
                          aer_mix_ratio,                                        &
                          aer_sw_absorption,aer_sw_scattering,aer_sw_asymmetry, &
-                         aer_lw_absorption,aer_lw_scattering,aer_lw_asymmetry )
+                         aer_lw_absorption,aer_lw_scattering,aer_lw_asymmetry, &
+                         clock%get_step() )
       end if
 
       call illuminate_alg( radiation_fields, clock%get_step(), &
