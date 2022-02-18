@@ -25,12 +25,13 @@ module cld_diags_kernel_mod
   !>
   type, public, extends(kernel_type) :: cld_diags_kernel_type
     private
-    type(arg_type) :: meta_args(13) = (/                                       &
+    type(arg_type) :: meta_args(14) = (/                                       &
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cld_amount_max
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cld_amount_rnd
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cld_amount_maxrnd
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! ceil_cld_amount_maxrnd
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cld_base_altitude
+         arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! low_cld_base_altitude
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! very_low_cld_amount
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! low_cld_amount
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! medium_cld_amount
@@ -58,6 +59,7 @@ contains
   !> @param[in,out] cld_amount_maxrnd      Cloud amount maximum-random overlap
   !> @param[in,out] ceil_cld_amount_maxrnd Ceilometer filtered cloud amount maximum-random overlap
   !> @param[in,out] cld_base_altitude      Cloud base altitude wrt sea level
+  !> @param[in,out] low_cld_base_altitude  Cloud base altitude wrt sea level for very low amount of cloud
   !> @param[in,out] very_low_cld_amount    Maximum cloud amount below 111m
   !> @param[in,out] low_cld_amount         Maximum cloud amount between 111 and 1949m above sea level
   !> @param[in,out] medium_cld_amount      Maximum cloud amount between 1949 and 5574m above sea level
@@ -83,6 +85,7 @@ contains
                              cld_amount_maxrnd,       &
                              ceil_cld_amount_maxrnd,  &
                              cld_base_altitude,       &
+                             low_cld_base_altitude,   &
                              very_low_cld_amount,     &
                              low_cld_amount,          &
                              medium_cld_amount,       &
@@ -119,6 +122,7 @@ contains
     real(kind=r_def), pointer, intent(inout)            :: cld_amount_maxrnd(:)
     real(kind=r_def), pointer, intent(inout)            :: ceil_cld_amount_maxrnd(:)
     real(kind=r_def), pointer, intent(inout)            :: cld_base_altitude(:)
+    real(kind=r_def), pointer, intent(inout)            :: low_cld_base_altitude(:)
     real(kind=r_def), pointer, intent(inout)            :: very_low_cld_amount(:)
     real(kind=r_def), pointer, intent(inout)            :: low_cld_amount(:)
     real(kind=r_def), pointer, intent(inout)            :: medium_cld_amount(:)
@@ -149,9 +153,11 @@ contains
     ! ...  150 hPa:
     real(kind=r_def), parameter :: high_to_very_high = 13608.0_r_def  ! metres
     ! When looking for cloud base: how much cloud cover defines cloud base.
-    real(kind=r_def), parameter :: cld_cover_for_cld_base = 2.5_r_def/8.0_r_def 
-    ! For tracking whether cloud base has been found.
-    logical( l_def ) :: found
+    real(kind=r_def), parameter :: cld_cover_for_cld_base = 2.5_r_def/8.0_r_def
+    ! When looking for cloud base sometimes want much smaller amount of cloud.
+    real(kind=r_def), parameter :: low_cld_cover_for_cld_base = 0.05_r_def
+    ! For tracking whether cloud has been found.
+    logical(kind=l_def) :: found 
     ! Cloud-base height diagnostic is often used by the aviation community,
     ! so the units need to be converted from metres to kilofeet
     real(kind=r_def), parameter :: m_to_kfeet = 0.001_r_def / feet_to_metres
@@ -233,11 +239,12 @@ contains
     end if
 
     ! Find heights above sea level (asl) if required.
-    if (.not. associated(cld_base_altitude, empty_real_data)    .or. &
-        .not. associated(very_low_cld_amount, empty_real_data)  .or. &
-        .not. associated(low_cld_amount, empty_real_data)       .or. &
-        .not. associated(medium_cld_amount, empty_real_data)    .or. &
-        .not. associated(high_cld_amount, empty_real_data)      .or. &
+    if (.not. associated(cld_base_altitude, empty_real_data)     .or. &
+        .not. associated(low_cld_base_altitude, empty_real_data) .or. &
+        .not. associated(very_low_cld_amount, empty_real_data)   .or. &
+        .not. associated(low_cld_amount, empty_real_data)        .or. &
+        .not. associated(medium_cld_amount, empty_real_data)     .or. &
+        .not. associated(high_cld_amount, empty_real_data)       .or. &
         .not. associated(very_high_cld_amount, empty_real_data) ) then
       z_asl_base_of_levels(1)   = 0.0_r_def
       z_asl_centre_of_levels(1) = height_wth(map_wth(1) + 1 )
@@ -254,12 +261,24 @@ contains
       cld_base_altitude(map_2d(1)) = 1.1_r_def *                               &
                                      z_asl_centre_of_levels(nlayers) *         &
                                      m_to_kfeet
-      found = .false.
+
       do k = 1, nlayers
-        if ( combined_cld_amount(k) >= cld_cover_for_cld_base .and. &
-             .not. found ) then
+        if ( combined_cld_amount(k) >= cld_cover_for_cld_base ) then
           cld_base_altitude(map_2d(1)) = z_asl_base_of_levels(k) * m_to_kfeet
-          found = .true.
+          exit
+        end if
+      end do
+    end if
+
+    ! low_cld_base_altitude (in feet) for low threshold cloud amounts
+    if (.not. associated(low_cld_base_altitude, empty_real_data) ) then
+      ! As a default, set cloud-base to beyond top of model
+      low_cld_base_altitude(map_2d(1)) = 1.1_r_def * &
+                            z_asl_centre_of_levels(nlayers) / feet_to_metres
+      do k = 1, nlayers
+        if ( combined_cld_amount(k) >= low_cld_cover_for_cld_base ) then
+          low_cld_base_altitude(map_2d(1)) = z_asl_base_of_levels(k) / feet_to_metres
+          exit
         end if
       end do
     end if

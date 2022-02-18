@@ -118,6 +118,7 @@ contains
     type( field_type ) :: cld_amount_maxrnd
     type( field_type ) :: ceil_cld_amount_maxrnd
     type( field_type ) :: cld_base_altitude
+    type( field_type ) :: low_cld_base_altitude
     type( field_type ) :: very_low_cld_amount
     type( field_type ) :: low_cld_amount
     type( field_type ) :: medium_cld_amount
@@ -149,6 +150,7 @@ contains
                                    cld_amount_maxrnd,                          &
                                    ceil_cld_amount_maxrnd,                     &
                                    cld_base_altitude,                          &
+                                   low_cld_base_altitude,                      &
                                    very_low_cld_amount,                        &
                                    low_cld_amount,                             &
                                    medium_cld_amount,                          &
@@ -244,6 +246,7 @@ contains
                                  cld_amount_maxrnd,      &
                                  ceil_cld_amount_maxrnd, &
                                  cld_base_altitude,      &
+                                 low_cld_base_altitude,  &
                                  very_low_cld_amount,    &
                                  low_cld_amount,         &
                                  medium_cld_amount,      &

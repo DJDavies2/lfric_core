@@ -29,6 +29,7 @@ module cld_diags_mod
                       cld_amount_maxrnd_flag,                                  &
                       ceil_cld_amount_maxrnd_flag,                             &
                       cld_base_altitude_flag,                                  &
+                      low_cld_base_altitude_flag,                              &
                       very_low_cld_amount_flag,                                &
                       low_cld_amount_flag,                                     &
                       medium_cld_amount_flag,                                  &
@@ -49,6 +50,7 @@ contains
                                        cld_amount_maxrnd,                      &
                                        ceil_cld_amount_maxrnd,                 &
                                        cld_base_altitude,                      &
+                                       low_cld_base_altitude,                  &
                                        very_low_cld_amount,                    &
                                        low_cld_amount,                         &
                                        medium_cld_amount,                      &
@@ -67,6 +69,7 @@ contains
                                          cld_amount_maxrnd,                    &
                                          ceil_cld_amount_maxrnd,               &
                                          cld_base_altitude,                    &
+                                         low_cld_base_altitude,                &
                                          very_low_cld_amount,                  &
                                          low_cld_amount,                       &
                                          medium_cld_amount,                    &
@@ -97,6 +100,9 @@ contains
 
     cld_base_altitude_flag = .true.
     call zh%copy_field_properties(cld_base_altitude)
+
+    low_cld_base_altitude_flag = .true.
+    call zh%copy_field_properties(low_cld_base_altitude)
 
     very_low_cld_amount_flag = .true.
     call zh%copy_field_properties(very_low_cld_amount)
@@ -133,6 +139,7 @@ contains
                                    cld_amount_maxrnd,      &
                                    ceil_cld_amount_maxrnd, &
                                    cld_base_altitude,      &  
+                                   low_cld_base_altitude,  & 
                                    very_low_cld_amount,    &
                                    low_cld_amount,         &
                                    medium_cld_amount,      &
@@ -158,6 +165,7 @@ contains
                                                  cld_amount_maxrnd,            &
                                                  ceil_cld_amount_maxrnd,       &
                                                  cld_base_altitude,            &
+                                                 low_cld_base_altitude,        &
                                                  very_low_cld_amount,          &
                                                  low_cld_amount,               &
                                                  medium_cld_amount,            &
@@ -186,7 +194,6 @@ contains
     type( field_type ), pointer :: ccw        => null()
     type( field_type ), pointer :: w_wind     => null()
 
-    type( field_type ) :: x_equal_1
     type( field_type ) :: ls_fraction
     type( field_type ) :: theta_updated
     type( field_type ) :: icing_condensate
@@ -199,6 +206,7 @@ contains
         cld_amount_maxrnd_flag      .or. &
         ceil_cld_amount_maxrnd_flag .or. &
         cld_base_altitude_flag      .or. &
+        low_cld_base_altitude_flag  .or. &
         very_low_cld_amount_flag    .or. &
         low_cld_amount_flag         .or. &
         medium_cld_amount_flag      .or. &
@@ -214,20 +222,12 @@ contains
         cca        => convection_fields%get_field('cca')
         cf_area    => cloud_fields%get_field('area_fraction')
 
-        ! NB once the following ticket is done
-        ! https://github.com/stfc/PSyclone/issues/1425
-        ! the first two invokes below can be replaced by single call to 
-        ! a_minus_X(ls_fraction,1.0_r_def,cca) and we don't need to define x_equal_1
-        ! This will be dealt with by ticket:
-        ! https://code.metoffice.gov.uk/trac/lfric/ticket/2915
-        call cf_area%copy_field_properties(x_equal_1)
         call cf_area%copy_field_properties(ls_fraction)
 
-        call invoke( setval_c(x_equal_1,1.0_r_def),                            &
-                     X_minus_Y(ls_fraction,x_equal_1,cca),                     &
-                     inc_X_times_Y(ls_fraction, cf_area),                      &
-                     ! Calculate combined_cld_amount...
-                     X_plus_Y(combined_cld_amount,ls_fraction,cca) )
+        call invoke ( a_minus_X(ls_fraction, 1.0_r_def, cca), &
+                      inc_X_times_Y(ls_fraction, cf_area),    &
+                      ! Calculate combined_cld_amount.
+                      X_plus_Y(combined_cld_amount, ls_fraction, cca) )
       end if
 
       if (cld_amount_max_flag         .or. &
@@ -235,6 +235,7 @@ contains
           cld_amount_maxrnd_flag      .or. &
           ceil_cld_amount_maxrnd_flag .or. &
           cld_base_altitude_flag      .or. &
+          low_cld_base_altitude_flag  .or. &
           very_low_cld_amount_flag    .or. &
           low_cld_amount_flag         .or. &
           medium_cld_amount_flag      .or. &
@@ -252,6 +253,7 @@ contains
                                             cld_amount_maxrnd,                 &
                                             ceil_cld_amount_maxrnd,            &
                                             cld_base_altitude,                 &
+                                            low_cld_base_altitude,             &
                                             very_low_cld_amount,               &
                                             low_cld_amount,                    &
                                             medium_cld_amount,                 &
@@ -332,6 +334,10 @@ contains
         ceil_cld_amount_maxrnd%write_field('cloud__ceilometer_cloud_amount_maxrnd')
     if (cld_base_altitude_flag) call &
         cld_base_altitude%write_field('cloud__cloud_base_altitude')
+
+    if (low_cld_base_altitude_flag) call &
+        low_cld_base_altitude%write_field('cloud__low_cloud_base_altitude')
+
     if (very_low_cld_amount_flag) call &
         very_low_cld_amount%write_field('cloud__very_low_type_cloud_amount')
     if (low_cld_amount_flag) call &
