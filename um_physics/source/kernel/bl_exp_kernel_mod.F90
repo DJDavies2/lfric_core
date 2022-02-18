@@ -892,7 +892,7 @@ contains
     integer, dimension(ntype) :: surft_pts
 
     ! fields on land points and carbon pools
-    real(r_um), dimension(land_field,dim_cs1) :: cs_pool_gb_um, resp_s_gb_um
+    real(r_um), dimension(land_field,dim_cs1) :: resp_s_gb_um
 
     ! fields on land points and tiles
     real(r_um), dimension(land_field,ntiles) :: canopy_surft, catch_surft,   &
@@ -1214,9 +1214,6 @@ contains
     ! Soil thermal conductivity (hcon_soilt)
     hcon_soilt = real(soil_thermal_cond(map_2d(1)), r_um)
 
-    ! Soil carbon content (cs_pool_gb_um)
-    cs_pool_gb_um = real(soil_carbon_content(map_2d(1)), r_um)
-
     ! Soil ancils dependant on smvcst_soilt (soil moisture saturation limit)
     if ( smvcst_soilt(1,1) > 0.0_r_um ) then
       ainfo%l_soil_point = .true.
@@ -1451,7 +1448,7 @@ contains
          z0m_soil_gb, lw_down, tstar_surft, tsurf_elev_surft,                  &
          co2,                                                                  &
          asteps_since_triffid,                                                 &
-         cs_pool_gb_um,frac_surft,canht_pft,lai_pft,fland,flandg,              &
+         frac_surft,canht_pft,lai_pft,fland,flandg,                            &
          albsoil_soilt, cos_zenith_angle,                                      &
     !     IN: input from the wave model
          charnock_w,                                                           &
@@ -1597,7 +1594,7 @@ contains
          z0m_soil_gb, lw_down, tstar_surft, tsurf_elev_surft, &
          co2,                                                           &
          asteps_since_triffid,                                          &
-         cs_pool_gb_um,frac_surft,canht_pft,lai_pft,fland,flandg,       &
+         frac_surft,canht_pft,lai_pft,fland,flandg,                     &
          albsoil_soilt, cos_zenith_angle,                               &
     !     IN: input from the wave model
          charnock_w,                                                    &

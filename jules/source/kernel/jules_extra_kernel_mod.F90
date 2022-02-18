@@ -432,14 +432,13 @@ contains
 
     real(r_um), dimension(river_row_length, river_rows) :: twatstor
 
-    real(r_um), dimension(land_pts, dim_cs1) :: resp_s_acc_gb_um,             &
-         cs_pool_gb_um
+    real(r_um), dimension(land_pts, dim_cs1) :: resp_s_acc_gb_um
 
     real(r_um), dimension(land_pts) :: dhf_surf_minus_soil,                   &
          ls_rainfrac_gb, tot_surf_runoff, tot_sub_runoff, inlandout_atm_gb
 
     real(r_um), dimension(land_pts, nsoilt) :: hcons_soilt, fsat_soilt,       &
-         fwetl_soilt, zw_soilt, sthzw_soilt, cs_ch4_soilt
+         fwetl_soilt, zw_soilt, sthzw_soilt
 
     real(r_um), dimension(land_pts, nsoilt, 1, dim_cs1) :: resp_s_soilt
 
@@ -509,12 +508,6 @@ contains
                ainfo%frac_surft, progs%canht_pft, progs%lai_pft, psparms%z0m_soil_gb, &
                psparms%catch_snow_surft, psparms%catch_surft,                         &
                psparms%z0_surft, psparms%z0h_bare_surft, urban_param%ztm_gb)
-
-    ! Soil carbon content (cs_pool_gb_um, )
-    cs_pool_gb_um = real(soil_carbon_content(map_2d(1)), r_um)
-
-    ! GPW fudge while TRIFFID not implemented: set cs_ch4_soilt = cs_pool_gb_um
-    cs_ch4_soilt = cs_pool_gb_um
 
     ! Decrease in saturated conductivity of soil with depth
     fexp_soilt = decrease_sath_cond
@@ -672,9 +665,9 @@ contains
     land_pts, row_length, rows, river_row_length, river_rows,                 &
     ls_graup_ij, cca_2d_ij, nsurft, surft_pts,                                &
     lice_pts, soil_pts, stf_sub_surf_roff,fexp_soilt,                         &
-    gamtot_soilt, ti_mean_soilt, ti_sig_soilt, cs_ch4_soilt, flash_rate_ancil,&
+    gamtot_soilt, ti_mean_soilt, ti_sig_soilt, flash_rate_ancil,              &
     pop_den_ancil, a_fsat_soilt, c_fsat_soilt, a_fwet_soilt, c_fwet_soilt,    &
-    ntype, delta_lambda, delta_phi,                                &
+    ntype, delta_lambda, delta_phi,                                           &
     cos_theta_latitude, aocpl_row_length, aocpl_p_rows, xpa, xua, xva, ypa,   &
     yua, yva, g_p_field, g_r_field, nproc, global_row_length, global_rows,    &
     global_river_row_length, global_river_rows, flandg, trivdir, trivseq,     &
@@ -686,7 +679,7 @@ contains
     fsat_soilt, fwetl_soilt, zw_soilt, sthzw_soilt,                           &
     ls_rainfrac_gb, substore, surfstore, flowin, bflowin,                     &
     tot_surf_runoff, tot_sub_runoff, acc_lake_evap, twatstor,                 &
-    asteps_since_triffid, resp_s_acc_gb_um,  cs_pool_gb_um,                   &
+    asteps_since_triffid, resp_s_acc_gb_um,                                   &
     inlandout_atm_gb,                                                         &
 
     !OUT- mostly for SCM diagnostics output below

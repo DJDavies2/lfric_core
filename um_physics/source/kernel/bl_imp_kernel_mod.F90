@@ -714,7 +714,7 @@ contains
 
     real(r_um), dimension(dim_cs2) :: resp_s_tot_soilt
 
-    real(r_um), dimension(land_field,dim_cs1) :: resp_s_gb_um, cs_pool_gb_um
+    real(r_um), dimension(land_field,dim_cs1) :: resp_s_gb_um
 
     real(r_um), dimension(land_field) :: npp_gb
 
@@ -1233,7 +1233,7 @@ contains
           , t_soil_soilt, snow_surft, sstfrz                            &
     ! IN JULES variables for STASH
           , gs_gb, npp_gb, resp_s_gb_um                                 &
-          , resp_s_tot_soilt,cs_pool_gb_um                              &
+          , resp_s_tot_soilt                                            &
           , catch_surft                                                 &
           , co2_emits, co2flux                                          &
     ! INOUT diagnostic info
