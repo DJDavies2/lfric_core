@@ -52,7 +52,8 @@ contains
 
     use initial_wind_config_mod,     only : profile_deep_baroclinic_steady
 
-    use formulation_config_mod,      only : eos_method_projected
+    use formulation_config_mod,      only : eos_method_projected,    &
+                                            moisture_formulation_dry
 
     use base_mesh_config_mod,        only : geometry_spherical, &
                                             topology_fully_periodic
@@ -95,7 +96,8 @@ contains
 
     call feign_formulation_config(rotating=.true.,                         &
                                   l_multigrid=.false.,                     &
-                                  use_moisture=.false.,                    &
+                                  moisture_formulation =                   &
+                                  moisture_formulation_dry,                &
                                   shallow=.false., use_physics=.false.,    &
                                   use_wavedynamics=.true.,                 &
                                   use_multires_coupling=.false.,           &

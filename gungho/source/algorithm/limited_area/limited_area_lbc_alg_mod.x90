@@ -12,8 +12,9 @@ module limited_area_lbc_alg_mod
 
   use field_mod,                      only: field_type
   use field_collection_mod,           only: field_collection_type
+  use formulation_config_mod,         only: moisture_formulation,    &
+                                            moisture_formulation_dry
   use mesh_mod,                       only: mesh_type
-  use formulation_config_mod,         only: use_moisture
   use mr_indices_mod,                 only: nummr, mr_names
   use mesh_mod,                       only: mesh_type
   use limited_area_constants_mod,     only: get_boundary_mask, &
@@ -108,12 +109,12 @@ contains
     call blend_field( state_d, lbc_fields, name_d )
     call blend_field( state_t, lbc_fields, name_t )
 
-    if ( use_moisture ) then
+    if ( moisture_formulation /= moisture_formulation_dry ) then
       do imr = 1, nummr
         name_mr = trim( 'lbc_' // adjustl(mr_names (imr)) )
         call blend_field( mr(imr), lbc_fields, name_mr )
       enddo
-    endif
+    end if
 
   end subroutine lam_blend_lbc
 

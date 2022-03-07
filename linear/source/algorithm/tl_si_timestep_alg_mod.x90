@@ -17,7 +17,9 @@ module tl_si_timestep_alg_mod
   use reference_element_mod,       only: T
 
   ! Configuration options
-  use formulation_config_mod,      only: use_moisture, dlayer_on,              &
+  use formulation_config_mod,      only: dlayer_on,                            &
+                                         moisture_formulation,                 &
+                                         moisture_formulation_dry,             &
                                          use_wavedynamics,                     &
                                          si_momentum_equation,                 &
                                          exner_from_eos
@@ -41,12 +43,11 @@ module tl_si_timestep_alg_mod
                                          add_bundle,        &
                                          copy_bundle,       &
                                          set_bundle_scalar
-  use planet_config_mod,           only: recip_epsilon
   use fs_continuity_mod,           only: Wtheta
 
   ! PsyKAl PSYClone kernels
-  use moist_dyn_factors_kernel_mod,       only: moist_dyn_factors_kernel_type
-  use tl_moist_dyn_factors_kernel_mod,    only: tl_moist_dyn_factors_kernel_type
+  use moist_dyn_factors_alg_mod,          only: moist_dyn_factors_alg
+  use tl_moist_dyn_factors_alg_mod,       only: tl_moist_dyn_factors_alg
   use enforce_lower_bound_kernel_mod,     only: enforce_lower_bound_kernel_type
   use set_any_dof_kernel_mod,             only: set_any_dof_kernel_type
 
@@ -104,6 +105,8 @@ module tl_si_timestep_alg_mod
   implicit none
 
   private
+
+  logical(l_def) :: use_moisture
 
   ! 'State' items private to the algorithm that need to be
   !  created once but used every step
@@ -173,6 +176,8 @@ contains
     type( field_type ), intent( inout ) :: ls_mr(nummr)
     type( field_type ), intent( inout ) :: ls_moist_dyn(num_moist_factors)
     integer(kind=i_def) :: outer, inner
+
+    use_moisture = ( moisture_formulation /= moisture_formulation_dry )
 
     !--------------------------------------------------------------------
     ! Allocate internal state field arrays
@@ -429,9 +434,7 @@ contains
       call copy_bundle(ls_mr, ls_mr_n(:), nummr)
       call copy_bundle(ls_mr, ls_mr_after_slow(:), nummr)
 
-      call invoke(moist_dyn_factors_kernel_type(ls_moist_dyn_itns(:, 1, 1), &
-                                                ls_mr_n(:),                 &
-                                                recip_epsilon))
+      call moist_dyn_factors_alg(ls_moist_dyn_itns(:, 1, 1), ls_mr_n(:) )
     end if
 
     call copy_bundle(ls_state, ls_state_itns(:, 1, 1), bundle_size)
@@ -477,10 +480,8 @@ contains
 
         ! Update factors for moist dynamics
         if (use_moisture) then
-          call invoke(moist_dyn_factors_kernel_type(        &
-                            ls_moist_dyn_itns(:, outer, 1), &
-                            ls_mr_itns(:, outer, 1),        &
-                            recip_epsilon))
+          call moist_dyn_factors_alg( ls_moist_dyn_itns(:, outer, 1), &
+                                      ls_mr_itns(:, outer, 1) )
         end if
 
         ! Use advective update to guess n+1 level scalar fieldsgv .
@@ -666,7 +667,7 @@ contains
       end do
       call copy_bundle(mr, mr_n, nummr)
       call copy_bundle(mr, mr_after_slow, nummr)
-      call invoke(tl_moist_dyn_factors_kernel_type(moist_dyn, mr_n, recip_epsilon))
+      call tl_moist_dyn_factors_alg(moist_dyn, mr_n)
     end if
     call copy_bundle(state, state_n, bundle_size)
     call copy_bundle(state, state_after_slow, bundle_size)
@@ -710,8 +711,7 @@ contains
 
         ! Update factors for moist dynamics
         if (use_moisture) then
-          call invoke(tl_moist_dyn_factors_kernel_type(moist_dyn, mr, &
-                                                       recip_epsilon))
+          call tl_moist_dyn_factors_alg(moist_dyn, mr )
         end if
 
         ! Use advective update to guess n+1 level scalar fieldsgv .

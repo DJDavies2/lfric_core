@@ -17,7 +17,7 @@ module gungho_model_mod
   use configuration_mod,          only : final_configuration
   use check_configuration_mod,    only : get_required_stencil_depth
   use conservation_algorithm_mod, only : conservation_algorithm
-  use constants_mod,              only : i_def, i_native, r_def, &
+  use constants_mod,              only : i_def, i_native, r_def, l_def, &
                                          PRECISION_REAL, r_second
   use convert_to_upper_mod,       only : convert_to_upper
   use count_mod,                  only : count_type, halo_calls
@@ -26,8 +26,9 @@ module gungho_model_mod
   use field_mod,                  only : field_type
   use field_parent_mod,           only : write_interface
   use field_collection_mod,       only : field_collection_type
-  use formulation_config_mod,     only : l_multigrid,    &
-                                         use_moisture,   &
+  use formulation_config_mod,     only : l_multigrid,              &
+                                         moisture_formulation,     &
+                                         moisture_formulation_dry, &
                                          use_physics
   use gungho_extrusion_mod,       only : create_extrusion
   use gungho_mod,                 only : load_configuration
@@ -116,11 +117,13 @@ module gungho_model_mod
   implicit none
 
   private
+
+  logical(l_def) :: use_moisture
+
   public initialise_infrastructure, &
          initialise_model,          &
          finalise_infrastructure,   &
          finalise_model
-
 
 contains
 
@@ -435,6 +438,8 @@ contains
     type( field_type), pointer :: u => null()
     type( field_type), pointer :: rho => null()
     type( field_type), pointer :: exner => null()
+
+    use_moisture = ( moisture_formulation /= moisture_formulation_dry )
 
     ! Get pointers to field collections for use downstream
     prognostic_fields => model_data%prognostic_fields

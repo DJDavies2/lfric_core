@@ -54,7 +54,8 @@ contains
                                           topology_fully_periodic
     use finite_element_config_mod, only : cellshape_quadrilateral,  &
                                           coord_system_xyz
-    use formulation_config_mod,    only : eos_method_sampled
+    use formulation_config_mod,    only : eos_method_sampled,       &
+                                          moisture_formulation_dry
 
     implicit none
 
@@ -84,7 +85,8 @@ contains
     ! used
     call feign_formulation_config(rotating=.true., &
                                   l_multigrid=.false.,                     &
-                                  use_moisture=.false.,                    &
+                                  moisture_formulation =                   &
+                                  moisture_formulation_dry,                &
                                   shallow=.false., use_physics=.false.,    &
                                   use_wavedynamics=.true.,                 &
                                   use_multires_coupling=.false.,           &

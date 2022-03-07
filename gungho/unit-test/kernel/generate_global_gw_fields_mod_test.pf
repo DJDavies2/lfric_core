@@ -60,7 +60,8 @@ contains
                                         feign_formulation_config,         &
                                         feign_initial_pressure_config
 
-    use formulation_config_mod, only : eos_method_sampled
+    use formulation_config_mod, only :  eos_method_sampled,      &
+                                        moisture_formulation_dry
 
     use initial_pressure_config_mod,                    &
                                  only : method_balanced
@@ -102,7 +103,8 @@ contains
 
     call feign_formulation_config(rotating=.false.,                         &
                                   l_multigrid=.false.,                      &
-                                  use_moisture=.false.,                     &
+                                  moisture_formulation =                    &
+                                  moisture_formulation_dry,                 &
                                   shallow=.true., use_physics=.false.,      &
                                   use_wavedynamics=.true.,                  &
                                   use_multires_coupling=.false.,            &

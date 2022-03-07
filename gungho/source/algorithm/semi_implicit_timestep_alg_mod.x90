@@ -28,8 +28,10 @@ module semi_implicit_timestep_alg_mod
 
   use aerosol_config_mod,         only: glomap_mode, glomap_mode_ukca
 
-  use formulation_config_mod,     only: use_moisture, use_physics, dlayer_on, &
+  use formulation_config_mod,     only: use_physics, dlayer_on,   &
                                         use_wavedynamics,                     &
+                                        moisture_formulation,     &
+                                        moisture_formulation_dry, &
                                         si_momentum_equation,                 &
                                         exner_from_eos
   use io_config_mod,              only: subroutine_timers,                    &
@@ -51,14 +53,12 @@ module semi_implicit_timestep_alg_mod
                                         add_bundle,        &
                                         copy_bundle,       &
                                         set_bundle_scalar
-  use planet_config_mod,          only: recip_epsilon
   use fs_continuity_mod,          only: Wtheta
 
   ! PsyKAl PSYClone kernels
   use matrix_vector_kernel_mod,   only: matrix_vector_kernel_type
-  use dg_inc_matrix_vector_kernel_mod, only: dg_inc_matrix_vector_kernel_type
-  use moist_dyn_factors_kernel_mod,   &
-                                  only: moist_dyn_factors_kernel_type
+  use dg_inc_matrix_vector_kernel_mod, &
+                                  only: dg_inc_matrix_vector_kernel_type
   use enforce_lower_bound_kernel_mod, &
                                   only: enforce_lower_bound_kernel_type
   use enforce_bc_kernel_mod,      only: enforce_bc_kernel_type
@@ -92,6 +92,7 @@ module semi_implicit_timestep_alg_mod
                                         semi_implicit_solver_alg_final
   use derive_exner_from_eos_alg_mod, &
                                   only: derive_exner_from_eos
+  use moist_dyn_factors_alg_mod,  only: moist_dyn_factors_alg
   use update_prognostic_scalars_alg_mod, &
                                   only: update_prognostic_scalars_alg
   use mixing_alg_mod,             only: mixing_alg
@@ -129,6 +130,8 @@ module semi_implicit_timestep_alg_mod
   implicit none
 
   private
+
+  logical(kind=l_def) :: use_moisture
 
   ! 'State' items private to the algorithm that need to be
   !  created once but used every step
@@ -188,15 +191,11 @@ contains
     allocate(rhs_adv(bundle_size))
     allocate(rhs_phys(bundle_size))
     allocate(rhs_lbc(bundle_size))
-
-    ! These need to be allocated for the call to 'slow_physics'
-    ! 'advection_control', even if moisture is not used.
-    ! The intention is that in future
-    ! there will be no use_moisture logical and moisture fields
-    ! will be set to zero for dry runs.
     allocate(mr_n(nummr))
     allocate(mr_after_slow(nummr))
     allocate(mr_inc(nummr))
+
+    use_moisture = ( moisture_formulation /= moisture_formulation_dry )
 
     !--------------------------------------------------------------------
     ! Initialise internal state field objects
@@ -407,7 +406,7 @@ contains
       end do
       call copy_bundle(mr, mr_n, nummr)
       call copy_bundle(mr, mr_after_slow, nummr)
-      call invoke(moist_dyn_factors_kernel_type(moist_dyn, mr_n, recip_epsilon))
+      call moist_dyn_factors_alg(moist_dyn, mr_n)
     end if
     call copy_bundle(state, state_n, bundle_size)
     call copy_bundle(state, state_after_slow, bundle_size)
@@ -513,10 +512,7 @@ contains
       if (use_wavedynamics) then
 
         ! Update factors for moist dynamics
-        if (use_moisture) then
-          call invoke(moist_dyn_factors_kernel_type(moist_dyn, mr, &
-                                                    recip_epsilon))
-        end if
+        if (use_moisture) call moist_dyn_factors_alg(moist_dyn, mr)
 
         ! Use advective update to guess n+1 level scalar fieldsgv .
         if ( guess_np1 ) &

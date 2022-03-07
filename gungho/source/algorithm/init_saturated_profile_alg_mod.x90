@@ -11,7 +11,8 @@ module init_saturated_profile_alg_mod
 use constants_mod,                   only: r_def, i_def
 use field_bundle_mod,                only: set_bundle_scalar, clone_bundle
 use field_mod,                       only: field_type
-use formulation_config_mod,          only: use_moisture
+use formulation_config_mod,          only: moisture_formulation,    &
+                                           moisture_formulation_dry
 use function_space_mod,              only: function_space_type
 use geometric_constants_mod,         only: get_coordinates, get_panel_id
 use idealised_config_mod,            only: test, test_bryan_fritsch
@@ -129,8 +130,7 @@ subroutine init_saturated_profile_alg( theta, mr, exner, rho, moist_dyn )
   ! Specify background theta_e and mr_t fields
   !----------------------------------------------------------------------------!
 
-  ! Set initial moisture to be zero
-  ! This will not be changed if use_moisture == .false.
+  ! Set initial moisture fields to be zero
   call set_bundle_scalar(0.0_r_def, mr, nummr)
 
   select case( test )
@@ -138,14 +138,14 @@ subroutine init_saturated_profile_alg( theta, mr, exner, rho, moist_dyn )
       ! First guess for theta
       call invoke( setval_c(theta, 300.0_r_def ) )
       ! Set total moisture
-      if ( use_moisture ) then
+      if ( moisture_formulation == moisture_formulation_dry ) then
+        call invoke( setval_c( mr_t, 0.0_r_def ), &
+                     setval_c( theta, 300.0_r_def ) )
+      else
         call invoke( setval_c( mr_t, 0.02_r_def ), &
                      setval_c( specified_theta_e, 320.0_r_def ), &
                      setval_c( mr(imr_v), 0.02_r_def ), &
                      setval_c( theta, 320.0_r_def ) )
-      else
-        call invoke( setval_c( mr_t, 0.0_r_def ), &
-                     setval_c( theta, 300.0_r_def ) )
       end if
 
     case default
@@ -160,7 +160,7 @@ subroutine init_saturated_profile_alg( theta, mr, exner, rho, moist_dyn )
   ! Update moist dynamics factors
   call moist_dyn_factors_alg( moist_dyn, mr )
 
-  if ( use_moisture ) then
+  if ( moisture_formulation /= moisture_formulation_dry ) then
 
     allocate( latest_mr(nummr) )
     call clone_bundle( mr, latest_mr, nummr )
@@ -243,7 +243,7 @@ subroutine init_saturated_profile_alg( theta, mr, exner, rho, moist_dyn )
 
     end do ! outer loop
 
-  end if ! use moisture
+  end if ! moist formulation
 
   ! Update moist dynamics factors and readjust to get hydrostatic balance again
   call init_exner_field( exner, theta, moist_dyn, initial_time )
@@ -256,7 +256,7 @@ subroutine init_saturated_profile_alg( theta, mr, exner, rho, moist_dyn )
                inc_X_times_Y( theta, theta_pert ) )
 
   ! Return to saturation
-  if (use_moisture) then
+  if ( moisture_formulation /= moisture_formulation_dry ) then
     call init_mr_fields( mr, theta, exner, rho, moist_dyn )
     call invoke( X_minus_Y( mr(imr_cl), mr_t, mr(imr_v) ) )
     call moist_dyn_factors_alg( moist_dyn, mr )

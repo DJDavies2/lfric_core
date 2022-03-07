@@ -9,7 +9,8 @@ module tl_transport_control_alg_mod
 
   use constants_mod,                     only: i_def, r_def, l_def
   use field_mod,                         only: field_type
-  use formulation_config_mod,            only: use_moisture
+  use formulation_config_mod,            only: moisture_formulation,    &
+                                               moisture_formulation_dry
   use log_mod,                           only: log_event,         &
                                                LOG_LEVEL_INFO
   use transport_config_mod,              only: moisture_eqn, &
@@ -62,16 +63,14 @@ contains
     use fem_constants_mod,               only: get_mass_matrix
     use field_bundle_mod,                only: clone_bundle, set_bundle_scalar
     use field_indices_mod,               only: igh_u, igh_t, igh_d, igh_p
-    use formulation_config_mod,          only: use_moisture
     use fs_continuity_mod,               only: Wtheta
     use dg_inc_matrix_vector_kernel_mod, only: dg_inc_matrix_vector_kernel_type
     use mesh_mod,                        only: mesh_type
     use mesh_collection_mod,             only: mesh_collection
     use moist_dyn_mod,                   only: num_moist_factors
-    use moist_dyn_factors_kernel_mod,    only: moist_dyn_factors_kernel_type
+    use moist_dyn_factors_alg_mod,       only: moist_dyn_factors_alg
     use mr_indices_mod,                  only: nummr
     use operator_mod,                    only: operator_type
-    use planet_config_mod,               only: recip_epsilon
     use timestepping_config_mod,         only: time_method => method, &
                                                method_semi_implicit
     use tl_moist_mr_transport_alg_mod,   only: tl_moist_mr_transport_alg
@@ -191,14 +190,14 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Transport moisture mixing ratio fields
-    if ( use_moisture ) then
+    if ( moisture_formulation /= moisture_formulation_dry ) then
 
       call log_event("Transporting moisture mixing ratio fields...", LOG_LEVEL_INFO)
       transport_metadata => transport_metadata_collection%get_transport_metadata('moisture')
       call tl_moist_mr_transport_alg( mr_out, mr_in, ls_mr_in,      &
                                       nummr_to_transport, model_dt, &
                                       transport_metadata )
-      call invoke(moist_dyn_factors_kernel_type(moist_dyn, mr_out, recip_epsilon))
+      call moist_dyn_factors_alg(moist_dyn, mr_out)
 
 
     end if

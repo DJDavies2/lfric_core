@@ -15,7 +15,8 @@ module linear_step_mod
   use constants_mod,                  only : i_def, r_def
   use field_collection_mod,           only : field_collection_type
   use field_mod,                      only : field_type
-  use formulation_config_mod,         only : use_moisture, &
+  use formulation_config_mod,         only : moisture_formulation,     &
+                                             moisture_formulation_dry, &
                                              use_physics
   use geometric_constants_mod,        only : get_da_at_w2
   use gungho_model_data_mod,          only : model_data_type
@@ -138,7 +139,7 @@ module linear_step_mod
                                    u,                &
                                    theta,            &
                                    exner )
-      if ( use_moisture ) then
+      if ( moisture_formulation /= moisture_formulation_dry ) then
         call moisture_conservation_alg( clock%get_step(), &
                                         rho,              &
                                         mr,               &

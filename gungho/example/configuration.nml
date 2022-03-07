@@ -35,8 +35,8 @@
 
 &formulation
   l_multigrid           = .true.
+  moisture_formulation  = 'dry'
   rotating              = .true.
-  use_moisture          = .false.
   shallow               = .false.
   use_physics           = .false.
   use_wavedynamics      = .true.

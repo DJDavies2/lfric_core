@@ -30,8 +30,8 @@ coord_system='xyz',
 
 &formulation
   l_multigrid           = .false.
+  moisture_formulation  = 'dry'
   rotating              = .false.
-  use_moisture          = .false.
   shallow               = .false.
   use_physics           = .false.
   use_wavedynamics      = .false.

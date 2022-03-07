@@ -125,7 +125,7 @@ contains
 
     ! The moisture mixing ratio fields (mr) and moist dynamics fields
     ! (moist_dyn) are always passed into the timestep algorithm, so are
-    ! always created here (even if use_moisture is false).
+    ! always created here, even when moisture_formulation = 'dry'
     do imr = 1,nummr
       call mr(imr)%initialise( vector_space = &
       function_space_collection%get_fs(mesh, element_order, theta%which_function_space()), &

@@ -71,7 +71,8 @@ module um_physics_init_mod
 
   use extrusion_config_mod,      only : domain_top, number_of_layers
 
-  use formulation_config_mod,    only : use_moisture
+  use formulation_config_mod,    only : moisture_formulation,    &
+                                        moisture_formulation_dry
 
   use microphysics_config_mod,   only : a_ratio_exp_in => a_ratio_exp, &
                                         a_ratio_fac_in => a_ratio_fac, &
@@ -592,9 +593,9 @@ contains
     rhcrit(1) = 0.96_r_um
     if ( cloud == cloud_um ) then
 
-      if ( .not. use_moisture ) then
+      if ( moisture_formulation == moisture_formulation_dry ) then
         write( log_scratch_space, '(A)' )                                   &
-            'use_moisture is required for UM cloud - please switch on'
+            'moisture_formulation /= ''dry'' is required for UM cloud'
         call log_event( log_scratch_space, LOG_LEVEL_ERROR )
       end if
 

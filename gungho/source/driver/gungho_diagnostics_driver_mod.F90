@@ -28,8 +28,9 @@ module gungho_diagnostics_driver_mod
   use gungho_model_data_mod,     only : model_data_type
   use field_mod,                 only : field_type
   use field_parent_mod,          only : field_parent_type
-  use formulation_config_mod,    only : use_moisture, &
-                                        use_physics
+  use formulation_config_mod,    only : use_physics,             &
+                                        moisture_formulation,    &
+                                        moisture_formulation_dry
   use fs_continuity_mod,         only : W3, Wtheta
   use integer_field_mod,         only : integer_field_type
   use moist_dyn_mod,             only : num_moist_factors
@@ -131,7 +132,7 @@ contains
     call write_vorticity_diagnostic( u, clock )
 
     ! Moisture fields
-    if (use_moisture) then
+    if ( moisture_formulation /= moisture_formulation_dry ) then
       do i=1,nummr
         call write_scalar_diagnostic( trim(mr_names(i)), mr(i), &
                                       clock, mesh, nodal_output_on_w3 )
@@ -158,7 +159,7 @@ contains
         call write_scalar_diagnostic('readlbc_v_u', v_u, &
                                  clock, mesh, nodal_output_on_w3)
 
-        if (use_moisture) then
+        if ( moisture_formulation /= moisture_formulation_dry ) then
           theta => lbc_fields%get_field('lbc_m_v')
           call write_scalar_diagnostic('lbc_m_v', theta, &
                                    clock, mesh, nodal_output_on_w3)

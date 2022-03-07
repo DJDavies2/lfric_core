@@ -35,9 +35,8 @@ prime_mesh_name='dynamics',
 
 &formulation
   l_multigrid           = .false.
-  transport_only        = .false.
+  moisture_formulation  = 'dry'
   rotating              = .true.
-  use_moisture          = .false.
   use_multires_coupling = .true.
   shallow               = .false.
   use_physics           = .false.

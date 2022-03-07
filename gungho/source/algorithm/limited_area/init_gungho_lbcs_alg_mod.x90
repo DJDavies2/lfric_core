@@ -11,7 +11,8 @@ module init_gungho_lbcs_alg_mod
   use constants_mod,                   only: i_def, str_def
   use field_mod,                       only: field_type
   use field_collection_mod,            only: field_collection_type
-  use formulation_config_mod,          only: use_moisture
+  use formulation_config_mod,          only: moisture_formulation,    &
+                                             moisture_formulation_dry
   use fs_continuity_mod,               only: W2, W3, Wtheta
   use geometric_constants_mod,         only: get_da_at_w2
   use initialization_config_mod,       only: lbc_option,             &
@@ -102,8 +103,7 @@ module init_gungho_lbcs_alg_mod
                  X_times_Y( lbc_theta,  theta, wtheta_lbc_mask ), &
                  X_times_Y( boundary_u, u,     w2_boundary_mask ) )
 
-    if ( use_moisture ) then
-
+    if ( moisture_formulation /= moisture_formulation_dry ) then
       do imr = 1, nummr
 
         lbc_name = trim( 'lbc_' // adjustl(mr_names(imr)) )

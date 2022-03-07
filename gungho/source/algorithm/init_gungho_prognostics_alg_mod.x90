@@ -22,12 +22,13 @@ module init_gungho_prognostics_alg_mod
   use base_mesh_config_mod,            only: geometry,           &
                                              geometry_spherical, &
                                              geometry_planar
-  use formulation_config_mod,          only: use_moisture,         &
-                                             eos_method,           &
-                                             eos_method_sampled,   &
-                                             eos_method_projected
-  use idealised_config_mod,            only: test, &
-                                             test_bryan_fritsch, &
+  use formulation_config_mod,          only: eos_method,              &
+                                             eos_method_sampled,      &
+                                             eos_method_projected,    &
+                                             moisture_formulation,    &
+                                             moisture_formulation_dry
+  use idealised_config_mod,            only: test,                &
+                                             test_bryan_fritsch,  &
                                              test_grabowski_clark
   use initial_pressure_config_mod,     only: method,           &
                                              method_sampled,   &
@@ -346,7 +347,10 @@ contains
     real(kind=r_def)    :: initial_time
     integer(kind=i_def) :: mesh_id
 
-    if (use_moisture) then
+    if ( moisture_formulation == moisture_formulation_dry ) then
+      call set_bundle_scalar(0.0_r_def, mr, nummr)
+      call moist_dyn_factors_alg( moist_dyn, mr )
+    else
       mesh_id = theta%get_mesh_id()
       chi => get_coordinates(mesh_id)
       panel_id => get_panel_id(mesh_id)
@@ -371,8 +375,6 @@ contains
 
         call init_rho_field( rho, theta, exner, moist_dyn, initial_time )
       end if
-    else
-      call set_bundle_scalar(0.0_r_def, mr, nummr)
     end if
 
     nullify(chi, panel_id, height_w3, height_wth)

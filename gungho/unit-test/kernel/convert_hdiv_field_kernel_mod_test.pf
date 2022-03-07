@@ -42,7 +42,8 @@ contains
 
     use finite_element_config_mod, only : cellshape_quadrilateral, &
                                           coord_system_xyz
-    use formulation_config_mod,    only : eos_method_sampled
+    use formulation_config_mod,    only : eos_method_sampled,      &
+                                          moisture_formulation_dry
     use feign_config_mod,          only : feign_finite_element_config, &
                                           feign_formulation_config
 
@@ -65,7 +66,8 @@ contains
 
     call feign_formulation_config( l_multigrid           = .false.,              &
                                    rotating              = .true.,               &
-                                   use_moisture          = .false.,              &
+                                   moisture_formulation  =                       &
+                                   moisture_formulation_dry,                     &
                                    use_physics           = .false.,              &
                                    use_multires_coupling = .false.,              &
                                    shallow               = .false.,              &

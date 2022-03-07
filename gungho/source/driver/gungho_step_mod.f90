@@ -13,11 +13,12 @@ module gungho_step_mod
 
   use clock_mod,                      only : clock_type
   use conservation_algorithm_mod,     only : conservation_algorithm
-  use constants_mod,                  only : i_def, r_def
+  use constants_mod,                  only : i_def, r_def, l_def
   use field_collection_mod,           only : field_collection_type
   use field_mod,                      only : field_type
-  use formulation_config_mod,         only : use_moisture, &
-                                             use_physics
+  use formulation_config_mod,         only : use_physics,             &
+                                             moisture_formulation,    &
+                                             moisture_formulation_dry
   use geometric_constants_mod,        only : get_da_at_w2
   use gungho_model_data_mod,          only : model_data_type
   use io_config_mod,                  only : write_conservation_diag, &
@@ -91,11 +92,15 @@ module gungho_step_mod
 
     real(r_def) :: dt
 
+    logical(l_def) :: use_moisture
+
     write( log_scratch_space, '("/", A, "\ ")' ) repeat( "*", 76 )
     call log_event( log_scratch_space, LOG_LEVEL_TRACE )
     write( log_scratch_space, &
            '(A,I0)' ) 'Start of timestep ', clock%get_step()
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
+    use_moisture = ( moisture_formulation /= moisture_formulation_dry )
 
     ! Get pointers to field collections for use downstream
     prognostic_fields => model_data%prognostic_fields

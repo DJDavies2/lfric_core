@@ -15,7 +15,8 @@ module linear_diagnostics_driver_mod
   use field_collection_mod,      only : field_collection_type
   use gungho_model_data_mod,     only : model_data_type
   use field_mod,                 only : field_type
-  use formulation_config_mod,    only : use_moisture
+  use formulation_config_mod,    only : moisture_formulation,    &
+                                        moisture_formulation_dry
   use mesh_mod,                  only : mesh_type
   use mr_indices_mod,            only : nummr, mr_names
   use initialization_config_mod, only : ls_option, &
@@ -95,7 +96,7 @@ contains
     end if
 
     ! Moisture fields
-    if (use_moisture) then
+    if (moisture_formulation /= moisture_formulation_dry) then
       do i=1,nummr
         call write_scalar_diagnostic( 'ls_'//trim(mr_names(i)), ls_mr(i), &
                                       clock, mesh, nodal_output_on_w3 )

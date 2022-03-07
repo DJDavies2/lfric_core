@@ -28,9 +28,10 @@ module multires_coupling_model_mod
                                   only : physics_mesh_name,          &
                                          dynamics_mesh_name,         &
                                          multires_coupling_mesh_tags
-  use formulation_config_mod,     only : l_multigrid,    &
-                                         use_moisture,   &
-                                         use_physics,    &
+  use formulation_config_mod,     only : l_multigrid,              &
+                                         moisture_formulation,     &
+                                         moisture_formulation_dry, &
+                                         use_physics,              &
                                          use_multires_coupling
   use mesh_collection_mod,        only : mesh_collection, &
                                          mesh_collection_type
@@ -493,10 +494,10 @@ contains
                                       dynamics_u,       &
                                       dynamics_theta,   &
                                       dynamics_exner )
-         if ( use_moisture ) &
-           call moisture_conservation_alg( clock%get_step(), &
-                                           dynamics_rho,     &
-                                           dynamics_mr,      &
+         if ( moisture_formulation /= moisture_formulation_dry ) &
+           call moisture_conservation_alg( clock%get_step(),     &
+                                           dynamics_rho,         &
+                                           dynamics_mr,          &
                                            'Before timestep' )
         end if
       case( method_rk )             ! RK
@@ -509,10 +510,10 @@ contains
                                       dynamics_u,       &
                                       dynamics_theta,   &
                                       dynamics_exner )
-         if ( use_moisture ) &
-           call moisture_conservation_alg( clock%get_step(), &
-                                           dynamics_rho,     &
-                                           dynamics_mr,      &
+         if ( moisture_formulation /= moisture_formulation_dry ) &
+           call moisture_conservation_alg( clock%get_step(),     &
+                                           dynamics_rho,         &
+                                           dynamics_mr,          &
                                            'Before timestep' )
         end if
       case default
@@ -639,7 +640,7 @@ contains
     call physics_u%log_field(     LOG_LEVEL_DEBUG, 'u' )
 
     ! Write checksums to file
-    if ( use_moisture ) then
+    if ( moisture_formulation /= moisture_formulation_dry ) then
       call checksum_alg(program_name,             &
                         dynamics_rho, 'rho',      &
                         dynamics_theta, 'theta',  &

@@ -11,7 +11,6 @@ module init_unsaturated_profile_alg_mod
 use constants_mod,                   only: r_def, i_def
 use field_bundle_mod,                only: set_bundle_scalar, clone_bundle
 use field_mod,                       only: field_type
-use formulation_config_mod,          only: use_moisture
 use function_space_mod,              only: function_space_type
 use idealised_config_mod,            only: test, test_grabowski_clark
 use init_gungho_prognostics_alg_mod, only: init_exner_field, &
@@ -121,8 +120,8 @@ subroutine init_unsaturated_profile_alg( theta, mr, exner, rho, moist_dyn )
   ! Do nested loops to compute background prognostic fields
   !----------------------------------------------------------------------------!
 
-  ! Set initial moisture to be zero
-  ! This will not be changed if use_moisture == .false.
+  ! Set initial moisture fields to be zero
+  ! This will not be changed if moisture_formulation = 'dry'
   call set_bundle_scalar(0.0_r_def, mr, nummr)
 
   ! First guess for mr_v is 0.02

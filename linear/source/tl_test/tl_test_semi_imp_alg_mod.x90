@@ -17,7 +17,8 @@ module tl_test_semi_imp_alg_mod
   use field_collection_mod,           only: field_collection_type
   use function_space_collection_mod,  only: function_space_collection
   use finite_element_config_mod,      only: element_order
-  use formulation_config_mod,         only: use_moisture
+  use formulation_config_mod,         only: moisture_formulation,    &
+                                            moisture_formulation_dry
   use fs_continuity_mod,              only: W2, W3, Wtheta
   use gungho_model_data_mod,          only: model_data_type
   use moist_dyn_mod,                  only: num_moist_factors
@@ -33,10 +34,9 @@ module tl_test_semi_imp_alg_mod
   use semi_implicit_timestep_alg_mod, only: semi_implicit_alg_init, &
                                             semi_implicit_alg_step, &
                                             semi_implicit_alg_final
-  use moist_dyn_factors_kernel_mod,   only: moist_dyn_factors_kernel_type
-  use tl_moist_dyn_factors_kernel_mod, &
-                                      only: tl_moist_dyn_factors_kernel_type
-  use planet_config_mod,              only: recip_epsilon
+  use moist_dyn_factors_alg_mod,      only: moist_dyn_factors_alg
+  use tl_moist_dyn_factors_alg_mod,                                  &
+                                      only: tl_moist_dyn_factors_alg
   use tl_test_convergence_rate_check, only: convergence_rate_check
 
   implicit none
@@ -242,10 +242,10 @@ module tl_test_semi_imp_alg_mod
     gamma_rho = 1.e0_r_def
     gamma_exner = 6.5e-1_r_def
 
-    if (use_moisture) then
-      gamma_mr = 1.e-1_r_def
-    else
+    if ( moisture_formulation == moisture_formulation_dry ) then
       gamma_mr = 0.0_r_def
+    else
+      gamma_mr = 1.e-1_r_def
     end if
 
     do n=1,2
@@ -276,14 +276,9 @@ module tl_test_semi_imp_alg_mod
           inc_X_plus_Y( n_mr(i), p_mr(i) ) )
       end do
 
-      call invoke(moist_dyn_factors_kernel_type(n_moist_dyn, &
-                                                n_mr,        &
-                                                recip_epsilon))
+      call moist_dyn_factors_alg(n_moist_dyn, n_mr)
 
-      call invoke(tl_moist_dyn_factors_kernel_type(p_moist_dyn, &
-                                                   p_mr,        &
-                                                   recip_epsilon))
-
+      call tl_moist_dyn_factors_alg(p_moist_dyn, p_mr )
 
       call semi_implicit_alg_init(mesh, n_u, n_rho, n_theta, n_exner, n_mr)
 

@@ -12,7 +12,8 @@ module init_thermo_profile_alg_mod
 use constants_mod,              only: r_def, i_def, rmdi
 use kernel_mod,                 only: kernel_type
 use field_mod,                  only: field_type
-use formulation_config_mod,     only: use_moisture
+use formulation_config_mod,     only: moisture_formulation,    &
+                                      moisture_formulation_dry
 use fs_continuity_mod,          only: Wtheta
 use geometric_constants_mod,    only: get_height
 
@@ -66,7 +67,7 @@ else
   call invoke( profile_interp_kernel_type( theta, height_wth ) )
 end if
 
-if (use_moisture) then
+if ( moisture_formulation /= moisture_formulation_dry ) then
   profile_size    = vapour_prof_size
   profile_data    = vapour_prof_data
   profile_heights = vapour_prof_heights

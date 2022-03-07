@@ -233,7 +233,8 @@ contains
   subroutine test_bottom_up( this )
 
     use hydrostatic_exner_kernel_mod, only : hydrostatic_exner_code
-    use formulation_config_mod,       only : eos_method_sampled
+    use formulation_config_mod,       only : eos_method_sampled,           &
+                                             moisture_formulation_dry
     use feign_config_mod,             only : feign_formulation_config,     &
                                              feign_initial_pressure_config
     use initial_pressure_config_mod,  only : method_balanced
@@ -250,7 +251,8 @@ contains
 
     call feign_formulation_config(l_multigrid=.false.,                      &
                                   rotating=.false.,                         &
-                                  use_moisture=.false.,                     &
+                                  moisture_formulation =                    &
+                                  moisture_formulation_dry,                 &
                                   shallow=.true., use_physics=.false.,      &
                                   use_wavedynamics=.true.,                  &
                                   use_multires_coupling=.false.,            &
@@ -304,7 +306,8 @@ contains
     use hydrostatic_exner_kernel_mod, only : hydrostatic_exner_code
     use feign_config_mod,             only : feign_formulation_config,     &
                                              feign_initial_pressure_config
-    use formulation_config_mod,       only : eos_method_sampled
+    use formulation_config_mod,       only : eos_method_sampled,           &
+                                             moisture_formulation_dry
     use initial_pressure_config_mod,  only : method_balanced
 
     implicit none
@@ -318,7 +321,8 @@ contains
 
     call feign_formulation_config(rotating=.false.,                          &
                                   l_multigrid=.false.,                       &
-                                  use_moisture=.false.,                      &
+                                  moisture_formulation =                     &
+                                  moisture_formulation_dry,                  &
                                   shallow=.true., use_physics=.false.,       &
                                   use_wavedynamics=.true.,                   &
                                   use_multires_coupling=.false.,             &

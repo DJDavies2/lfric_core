@@ -713,13 +713,13 @@ contains
     use constants_mod,                 only: i_def
 
     use field_indices_mod,             only: igh_u, igh_t, igh_d, igh_p
-    use formulation_config_mod,        only: use_moisture
+    use formulation_config_mod,        only: moisture_formulation,    &
+                                             moisture_formulation_dry
     use moist_dyn_mod,                 only: num_moist_factors, total_mass
-    use moist_dyn_factors_kernel_mod,  only: moist_dyn_factors_kernel_type
+    use moist_dyn_factors_alg_mod,     only: moist_dyn_factors_alg
     use physics_mappings_alg_mod,      only: map_physics_scalars
     use geometric_constants_mod,       only: get_da_at_W2
     use extract_w_kernel_mod,          only: extract_w_kernel_type
-    use planet_config_mod,             only: recip_epsilon
 
     implicit none
 
@@ -765,7 +765,7 @@ contains
     call u_physics%initialise(vector_space = w2_fs)
     call w_physics%initialise(vector_space = wtheta_fs)
     call wetrho_in_w3%initialise(vector_space = w3_fs)
-    if (use_moisture) then
+    if ( moisture_formulation /= moisture_formulation_dry ) then
       call rho_in_wth%initialise(vector_space = wtheta_fs)
       allocate(moist_dyn(num_moist_factors))
       do i = 1, num_moist_factors
@@ -785,11 +785,10 @@ contains
                  extract_w_kernel_type( w_physics, u_physics ) )
 
     ! Get wetrho_in_w3
-    if (use_moisture) then
+    if ( moisture_formulation /= moisture_formulation_dry ) then
       call map_physics_scalars( rho_in_wth, state(igh_d) )
-      call invoke(                                                             &
-        moist_dyn_factors_kernel_type( moist_dyn, mr, recip_epsilon ),         &
-        X_times_Y( wetrho_in_wth, rho_in_wth, moist_dyn(total_mass) ) )
+      call moist_dyn_factors_alg( moist_dyn, mr )
+      call invoke( X_times_Y( wetrho_in_wth, rho_in_wth, moist_dyn(total_mass) ) )
       deallocate(moist_dyn)
       call map_physics_scalars( wetrho_in_w3, wetrho_in_wth )
     else

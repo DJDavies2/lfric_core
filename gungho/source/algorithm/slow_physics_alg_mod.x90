@@ -52,7 +52,8 @@ module slow_physics_alg_mod
   use fs_continuity_mod,         only: W3, Wtheta
   use field_bundle_mod,          only: add_bundle, clone_bundle, &
                                        set_bundle_scalar
-  use formulation_config_mod,    only: use_moisture
+  use formulation_config_mod,    only: moisture_formulation,     &
+                                       moisture_formulation_dry
   use io_config_mod,             only: subroutine_timers,                    &
                                        write_conservation_diag
   use timer_mod,                 only: timer
@@ -638,7 +639,7 @@ contains
     call print_field_stats_alg(dtheta, LOG_LEVEL_INFO, printmin=-20.0_r_def, &
                                printmax=20.0_r_def, name='dtheta slow')
 
-    if (use_moisture) then
+    if ( moisture_formulation /= moisture_formulation_dry ) then
       do i_mr = 1, nummr
         call invoke( enforce_lower_bound_kernel_type (mr(i_mr), 0.0_r_def) )
       end do
