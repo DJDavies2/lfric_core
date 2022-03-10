@@ -71,6 +71,16 @@
 {%- set canned_configurations = ['lfric_atm'] %}
 
 {%- set groups = {
+  'rce': [
+    'run_application("lfric_atm", "basic_rce",
+                     resolutions=[("BiP60x60-100x100",5.0)],
+                     env={"crun":12, "nrun":720,
+                          "directives":{"default":{"mpi_parts":36,
+                                                   "threads":1,
+                                                   "use_xios":"True",
+                                                   "wallclock":"01:30:00"} } },
+                     plotstr="plot_rce.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")'],
+
   'developer': [
     'validate_rose_meta_graph("lfric_atm",appName="lfric_atm")',
     'check_style_graph()',
@@ -171,18 +181,11 @@
                      resolutions=[("BiP4x4-2500x2500",600.0)] ,
                      env={"crun":1, "nrun":48},
                      plotstr="plot_scm.py -ukca $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
-    'run_application("lfric_atm", "robert_moist_3d_smag",
-                     resolutions=[("BiP50x4-20x20",2.5)],
-                     env={"crun":2, "nrun":100,
-                          "directives":{"default":{"mpi_parts":5,
-                                                   "panel_decomp":' + row + ',
-                                                   "use_xios":"False" } } },
-                     plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 50 4 theta:m_v:u1_in_w3:u2_in_w3:u3_in_w3 T000000:T000100:T000200 $PLOT_DIR")',
-    'run_application("lfric_atm", "temp_tend",
-                     resolutions=[("BiP4x4-600x400",10.0)],
-                     env={"nrun":360,
+    'run_application("lfric_atm", "small_rce",
+                     resolutions=[("BiP4x4-600x400",5.0)],
+                     env={"crun":1, "nrun":10,
                           "directives":{"default":{"use_xios":"True"} } },
-                     plotstr="profile_plot.py $NODAL_DATA_DIR theta geometric 38 12 $PLOT_DIR")',
+                     plotstr="profile_plot.py $NODAL_DATA_DIR theta:m_v geometric 70 40 $PLOT_DIR")',
     'run_application("lfric_atm", "basic_ral2",
                      resolutions=[("BiP50x4-20x20",2.5)],
                      env={"crun":2, "nrun":50,

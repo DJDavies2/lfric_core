@@ -83,6 +83,8 @@ contains
                                           feign_idealised_config,           &
                                           feign_initial_density_config
     use idealised_config_mod,      only : test_gravity_wave
+    use initial_temperature_config_mod, &
+                                   only : perturb_none
     use mesh_mod,                  only : PLANE_BI_PERIODIC
 
     implicit none
@@ -122,6 +124,7 @@ contains
     call feign_initial_temperature_config( bvf_square=bvf_square,                 &
                                            theta_surf=theta_surf,                 &
                                            pert_width_scaling=pert_width_scaling, &
+                                           perturb=perturb_none,                  &
                                            profile_size=profile_size,             &
                                            profile_data=profile_data,             &
                                            profile_heights=profile_heights )

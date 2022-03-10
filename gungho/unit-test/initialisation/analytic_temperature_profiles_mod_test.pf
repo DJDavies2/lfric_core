@@ -68,6 +68,8 @@ contains
 
     use initial_pressure_config_mod,  only : method_balanced
 
+    use initial_temperature_config_mod, only : perturb_none
+
     use initial_wind_config_mod, only : profile_none
 
     use base_mesh_config_mod, only : geometry_planar, &
@@ -86,6 +88,7 @@ contains
     call feign_initial_temperature_config( bvf_square=bvf_square,                 &
                                            theta_surf=theta_surf,                 &
                                            pert_width_scaling=pert_width_scaling, &
+                                           perturb=perturb_none,                  &
                                            profile_size=profile_size,             &
                                            profile_data=profile_data,             &
                                            profile_heights=profile_heights )

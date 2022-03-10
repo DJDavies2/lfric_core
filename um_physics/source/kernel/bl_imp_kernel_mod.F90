@@ -28,6 +28,7 @@ module bl_imp_kernel_mod
   use fs_continuity_mod,         only : W3, Wtheta
   use kernel_mod,                only : kernel_type
   use timestepping_config_mod,   only : outer_iterations
+  use mixing_config_mod,         only : leonard_term
   use physics_config_mod,        only : lowest_level,          &
                                         lowest_level_constant, &
                                         lowest_level_gradient, &
@@ -46,7 +47,7 @@ module bl_imp_kernel_mod
   !>
   type, public, extends(kernel_type) :: bl_imp_kernel_type
     private
-    type(arg_type) :: meta_args(101) = (/                                         &
+    type(arg_type) :: meta_args(103) = (/                                         &
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                &! outer
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      WTHETA),                   &! theta_in_wth
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W3),                       &! wetrho_in_w3
@@ -112,6 +113,8 @@ module bl_imp_kernel_mod
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, W3),                       &! heat_flux_bl
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      WTHETA),                   &! dtrdz_tq_bl
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W3),                       &! rdz_tq_bl
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      WTHETA),                   &! thetal_inc_leonard_wth
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      WTHETA),                   &! mt_inc_leonard_wth
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! alpha1_tile
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! ashtf_prime_tile
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! dtstar_tile
@@ -230,6 +233,8 @@ contains
   !> @param[in,out] heat_flux_bl         Vertical heat flux on BL levels
   !> @param[in]     dtrdz_tq_bl          dt/(rho*r*r*dz) in wth
   !> @param[in]     rdz_tq_bl            1/dz in w3
+  !> @param[in]     thetal_inc_leonard_wth  Leonard term increment for water potential temperature
+  !> @param[in]     mt_inc_leonard_wth   Leonard term increment for total moisture
   !> @param[in]     alpha1_tile          dqsat/dT in surface layer on tiles
   !> @param[in]     ashtf_prime_tile     Heat flux coefficient on tiles
   !> @param[in]     dtstar_tile          Change in surface temperature on tiles
@@ -359,6 +364,8 @@ contains
                          heat_flux_bl,                       &
                          dtrdz_tq_bl,                        &
                          rdz_tq_bl,                          &
+                         thetal_inc_leonard_wth,             &
+                         mt_inc_leonard_wth,                 &
                          alpha1_tile,                        &
                          ashtf_prime_tile,                   &
                          dtstar_tile,                        &
@@ -433,6 +440,7 @@ contains
     ! spatially varying fields used from modules
     use level_heights_mod, only: r_theta_levels, r_rho_levels
     use dyn_coriolis_mod, only: f3_at_u
+    use leonard_incs_mod, only: thetal_inc_leonard, qw_inc_leonard
 
     ! subroutines used
     use bl_diags_mod, only: bl_diag, dealloc_bl_imp, alloc_bl_expl
@@ -511,7 +519,9 @@ contains
                                                            gradrinr,           &
                                                            tau_dec_bm,         &
                                                            tau_hom_bm,         &
-                                                           tau_mph_bm
+                                                           tau_mph_bm,         &
+                                                           mt_inc_leonard_wth, &
+                                                           thetal_inc_leonard_wth
 
     real(kind=r_def), dimension(undf_2d), intent(in) :: ntml_2d,              &
                                                         cumulus_2d, zh_2d,    &
@@ -1040,6 +1050,13 @@ contains
       ! 3D RH_crit field
       rhcpt(1,1,k) = rh_crit_wth(map_wth(1) + k)
     end do
+
+    if ( leonard_term ) then
+      do k = 1, nlayers
+        thetal_inc_leonard(1,1,k) = thetal_inc_leonard_wth(map_wth(1) + k)
+        qw_inc_leonard(1,1,k) = mt_inc_leonard_wth(map_wth(1) + k)
+      end do
+    end if
 
     ! surface pressure
     p_theta_levels(1,1,0) = p_zero*(exner_in_wth(map_wth(1) + 0))**(1.0_r_def/kappa)

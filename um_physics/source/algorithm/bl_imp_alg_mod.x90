@@ -134,6 +134,8 @@ contains
     type( field_type ), pointer :: rhokm_w2       => null()
     type( field_type ), pointer :: tau_w2         => null()
     type( field_type ), pointer :: dw_bl          => null()
+    type( field_type ), pointer :: mt_inc_leonard => null()
+    type( field_type ), pointer :: thetal_inc_leonard => null()
 
     type( field_type ), pointer :: ls_rain => null()
     type( field_type ), pointer :: ls_snow => null()
@@ -270,6 +272,8 @@ contains
     rhokm_w2        => turbulence_fields%get_field('rhokm_w2')
     tau_w2          => turbulence_fields%get_field('tau_w2')
     dw_bl           => turbulence_fields%get_field('dw_bl')
+    mt_inc_leonard     => turbulence_fields%get_field('mt_inc_leonard')
+    thetal_inc_leonard => turbulence_fields%get_field('thetal_inc_leonard')
 
     ! Unpack cloud fields
     cf_area  => cloud_fields%get_field('area_fraction')
@@ -460,6 +464,7 @@ contains
                            tau_mph_bm,                                         &
                            rhokh_bl, bq_bl, bt_bl, moist_flux_bl, heat_flux_bl,&
                            dtrdz_tq_bl, rdz_tq_bl,                             &
+                           thetal_inc_leonard, mt_inc_leonard,                 &
                            alpha1_tile, ashtf_prime_tile, dtstar_tile,         &
                            fraca_tile, z0h_tile, z0m_tile, rhokh_tile,         &
                            chr1p5m_tile, resfs_tile, canhc_tile,               &

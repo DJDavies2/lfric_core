@@ -617,6 +617,12 @@ contains
     call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
       advected_fields, &
       'dw_bl', wtheta_space )
+    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
+      advected_fields, &
+      'thetal_inc_leonard', wtheta_space )
+    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
+      advected_fields, &
+      'mt_inc_leonard', wtheta_space )
 
     ! 3D fields on W3 (rho) levels
     call add_physics_field( turbulence_fields, depository, prognostic_fields,  &

@@ -82,12 +82,13 @@ module um_physics_init_mod
                                         z_surf_in => z_surf,           &
                                         turb_gen_mixph
 
-  use mixing_config_mod,         only : smagorinsky,                &
-                                        mixing_method => method,    &
-                                        method_3d_smag,             &
-                                        method_2d_smag,             &
-                                        method_blending,            &
-                                        mix_factor_in => mix_factor
+  use mixing_config_mod,         only : smagorinsky,                 &
+                                        mixing_method => method,     &
+                                        method_3d_smag,              &
+                                        method_2d_smag,              &
+                                        method_blending,             &
+                                        mix_factor_in => mix_factor, &
+                                        leonard_term
 
   use section_choice_config_mod, only : aerosol,           &
                                         aerosol_um,        &
@@ -224,6 +225,7 @@ contains
          i_gc_sussocbcdu_7mode, l_glomap_clim_aie2
     use g_wave_input_mod, only: ussp_launch_factor, wavelstar, l_add_cgw,  &
          cgw_scale_factor, i_moist, scale_aware, middle, var
+    use leonard_incs_mod, only: thetal_inc_leonard, qw_inc_leonard
     use mphys_bypass_mod, only: mphys_mod_top
     use mphys_constants_mod, only: cx, constp
     use mphys_inputs_mod, only: ai, ar, bi, c_r_correl, ci_input, cic_input, &
@@ -250,7 +252,7 @@ contains
     use turb_diff_ctl_mod, only: visc_m, visc_h, max_diff, delta_smag,   &
          rneutml_sq
     use turb_diff_mod, only: l_subfilter_horiz, l_subfilter_vert,        &
-         mix_factor, turb_startlev_vert, turb_endlev_vert
+         mix_factor, turb_startlev_vert, turb_endlev_vert, l_leonard_term
     use ukca_mode_setup, only: ukca_mode_sussbcocdu_7mode
 
     implicit none
@@ -914,6 +916,28 @@ contains
       l_subfilter_vert  = .false.
 
     end if
+
+    !-----------------------------------------------------------------------
+    ! Smagorinsky mixing options - contained in turb_diff_mod and
+    !                              turb_diff_ctl_mod
+    !-----------------------------------------------------------------------
+    if ( leonard_term ) then
+
+      if(allocated(thetal_inc_leonard))deallocate(thetal_inc_leonard)
+      allocate ( thetal_inc_leonard(row_length, rows, number_of_layers), source=rmdi )
+      if(allocated(qw_inc_leonard))deallocate(qw_inc_leonard)
+      allocate ( qw_inc_leonard(row_length, rows, number_of_layers), source=rmdi )
+      l_leonard_term = .true.
+
+     else ! not Leonard_term
+
+      if(allocated(thetal_inc_leonard))deallocate(thetal_inc_leonard)
+      allocate ( thetal_inc_leonard(1,1,1), source=rmdi )
+      if(allocated(qw_inc_leonard))deallocate(qw_inc_leonard)
+      allocate ( qw_inc_leonard(1,1,1), source=rmdi )
+      l_leonard_term = .false.
+
+   end if
 
   end subroutine um_physics_init
 

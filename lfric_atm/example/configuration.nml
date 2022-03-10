@@ -123,6 +123,7 @@ surface_pressure=1000.0e2
 /
 &initial_temperature
 bvf_square=0.0001,
+perturb='none',
 pert_width_scaling=1.0,
 theta_surf=300.0,
 /
@@ -178,6 +179,7 @@ si_tolerance=1.0e-3,
 split_w=.true.,
 /
 &mixing
+leonard_term=.false.,
 smagorinsky=.false.,
 viscosity=.false.,
 viscosity_mu=0.0,

@@ -55,11 +55,13 @@ contains
     call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
-    call feign_mixing_config( viscosity     = .false.,    &
-                              viscosity_mu  = 0.0_r_def,  &
-                              smagorinsky   = .false.,    &
-                              mix_factor    = 0.2_r_def,  &
-                              method        = method_3d_smag )
+    call feign_mixing_config( viscosity     = .false.,       &
+                              viscosity_mu  = 0.0_r_def,     &
+                              smagorinsky   = .false.,       &
+                              mix_factor    = 0.2_r_def,     &
+                              method        = method_3d_smag,&
+                              leonard_term  = .false.,       &
+                              leonard_kl    = 1.0_r_def )
 
     call feign_finite_element_config(      &
         cellshape=cellshape_quadrilateral, &
