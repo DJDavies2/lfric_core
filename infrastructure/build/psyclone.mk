@@ -50,7 +50,6 @@ $(OPTIMISATION_PATH)/global.py:
 else
 $(WORKING_DIR)/%_psy.f90: $(WORKING_DIR)/%.x90 | $(KERNEL_SOURCE)
 	$(call MESSAGE,Full psyclone,$(subst $(PWD)/,,$<))
-	$(call MESSAGE,Full psyclone working dir,$(shell ls $(WORKING_DIR)/field/*mod.x90))
 	$(Q)psyclone -api dynamo0.3 -l all -d $(WORKING_DIR) \
 	             -opsy $@ -oalg $(WORKING_DIR)/$*.f90 $<
 endif
@@ -64,7 +63,6 @@ $(WORKING_DIR)/%.f90: $(WORKING_DIR)/%.x90
 $(WORKING_DIR)/%.x90: $(SOURCE_DIR)/%.x90 \
                       | $$(patsubst $$(PERCENT)/,$$(PERCENT),$$(dir $$@))
 	$(call MESSAGE,Preprocessing,$<)
-	$(call MESSAGE,Preprocessing,$(Q)$(FPP) $(FPPFLAGS) $(MACRO_ARGS))
 	$(Q)$(FPP) $(FPPFLAGS) $(MACRO_ARGS) $< $@
 
 $(DIRECTORIES): ALWAYS
