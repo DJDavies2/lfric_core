@@ -4,12 +4,13 @@
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
 
-!> Test the r_solver field representation
+!> Test the field representation
 !>
 !-------------------------------------------------------------------------------
-module r_solver_field_mod_test
+module field_r64_mod_test
 
-  use constants_mod,                  only : i_def, r_def, str_def, r_solver
+  use, intrinsic :: iso_fortran_env,  only : real64
+  use constants_mod,                  only : i_def, str_def, imdi
   use halo_routing_collection_mod,    only : halo_routing_collection_type, &
                                              halo_routing_collection
   use halo_routing_mod,               only : halo_routing_type
@@ -20,7 +21,7 @@ module r_solver_field_mod_test
                                              mesh_collection
   use mesh_mod,                       only : mesh_type, PLANE_BI_PERIODIC
   use function_space_mod,             only : function_space_type
-  use fs_continuity_mod,              only : W2
+  use fs_continuity_mod,              only : W2, W3
   use yaxt,                           only : xt_initialize, xt_finalize
   use mpi_mod,                        only : store_comm, clear_comm
   use pFUnit_Mod
@@ -28,21 +29,25 @@ module r_solver_field_mod_test
   implicit none
 
   private
-  public :: test_r_solver_field, test_r_solver_field_proxy
+  public :: test_field_r64, &
+            test_field_r64_proxy, &
+            test_empty_field_r64
 
   @TestCase
-  type, extends(MPITestCase), public :: r_solver_field_test_type
+  type, extends(MPITestCase), public :: field_r64_test_type
     private
     type(function_space_type), pointer :: w2_fs => null()
-    type(local_mesh_type) :: unit_test_local_mesh
-    type(mesh_type), pointer :: mesh => null()
+    type(function_space_type), pointer :: w3_fs => null()
+    type(local_mesh_type)              :: unit_test_local_mesh
+    type(mesh_type), pointer           :: mesh => null()
   contains
     procedure setUp
     procedure tearDown
     procedure get_local_mesh_ptr
-    procedure test_r_solver_field
-    procedure test_r_solver_field_proxy
-  end type r_solver_field_test_type
+    procedure test_field_r64
+    procedure test_field_r64_proxy
+    procedure test_empty_field_r64
+  end type field_r64_test_type
 
   integer(i_def), parameter :: element_order = 0
 
@@ -53,7 +58,7 @@ contains
 
     implicit none
 
-    class(r_solver_field_test_type), intent(inout) :: this
+    class(field_r64_test_type), intent(inout) :: this
 
     type(local_mesh_type), pointer :: unit_test_local_mesh_ptr
     type(mesh_type) :: unit_test_mesh
@@ -82,6 +87,8 @@ contains
     ! Make a function space to be used to create fields in the tests
     this%w2_fs => function_space_collection%get_fs( this%mesh, &
                                                     element_order, W2 )
+    this%w3_fs => function_space_collection%get_fs( this%mesh, &
+                                                    element_order, W3 )
 
   end subroutine setUp
 
@@ -90,7 +97,7 @@ contains
 
     implicit none
 
-    class(r_solver_field_test_type), intent(inout) :: this
+    class(field_r64_test_type), intent(inout) :: this
 
     call function_space_collection%clear()
     call mesh_collection%clear()
@@ -107,7 +114,7 @@ contains
 
   function get_local_mesh_ptr(this) result(unit_test_local_mesh_ptr)
     implicit none
-    class(r_solver_field_test_type), intent(inout), target :: this
+    class(field_r64_test_type), intent(inout), target :: this
     type(local_mesh_type), pointer :: unit_test_local_mesh_ptr
     unit_test_local_mesh_ptr => this%unit_test_local_mesh
   end function get_local_mesh_ptr
@@ -115,27 +122,27 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   @Test( npes=[1] )
-  subroutine test_r_solver_field( this )
+  subroutine test_field_r64( this )
 
-    use r_solver_field_mod,     only: r_solver_field_type, &
-                                      r_solver_field_proxy_type
+    use field_r64_mod, only: field_r64_type, field_r64_proxy_type
 
     implicit none
 
-    class(r_solver_field_test_type), intent(inout) :: this
+    class(field_r64_test_type), intent(inout) :: this
 
-    type(r_solver_field_type)          :: f1
-    type(r_solver_field_type)          :: f2
-    type(r_solver_field_proxy_type)    :: f1_p
-    type(r_solver_field_proxy_type)    :: f2_p
+    type(field_r64_type)          :: f1
+    type(field_r64_type)          :: f2
+    type(field_r64_proxy_type)    :: f1_p
+    type(field_r64_proxy_type)    :: f2_p
 
     character(str_def) :: name
 
     type(function_space_type), pointer :: fs => null()
     type(mesh_type),           pointer :: mesh_out => null()
+    type(mesh_type),           pointer :: mesh => null()
 
-    integer(i_def) :: iface, iedge, lid, test_r_solver
-    integer(i_def) :: order, mesh_id
+    integer(i_def) :: iface, iedge, lid, test_integer
+    integer(i_def) :: order
 
     ! Make a field with a function space
     call f1%initialise( vector_space = this%w2_fs, name='f1' )
@@ -161,9 +168,9 @@ contains
     order=f1%get_element_order()
     @assertEqual( element_order, order )
 
-    ! Check what the field thinks the mesh is
-    mesh_out => f1%get_mesh()
-    @assertTrue( associated(this%mesh, mesh_out) )
+    ! Check what the field thinks the mesh_id is
+    mesh => f1%get_mesh()
+    @assertTrue( associated(this%mesh, mesh) )
 
     ! Copy field operator tests follow...
     call f1%copy_field(f2)
@@ -172,32 +179,36 @@ contains
     ! Check that contained vector_space pointers point to same address
     @assertTrue(associated(f1_p%vspace, f2_p%vspace), "Assigned field_type vspace pointers differ.")
 
-  end subroutine test_r_solver_field
+    ! Test copy_field with an optional name
+    call f1%copy_field(f2, name='f2')
+    name = f2%get_name()
+    @assertEqual( 'f2', trim(name) )
+
+  end subroutine test_field_r64
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   @Test( npes=[1] )
-  subroutine test_r_solver_field_proxy( this )
+  subroutine test_field_r64_proxy( this )
 
-    use r_solver_field_mod,             only: r_solver_field_type, &
-                                              r_solver_field_proxy_type
+    use field_r64_mod, only: field_r64_type, field_r64_proxy_type
 
     implicit none
 
-    class(r_solver_field_test_type), intent(inout) :: this
+    class(field_r64_test_type), intent(inout) :: this
 
-    type(r_solver_field_type)         :: f1
-    type(r_solver_field_type)         :: f2
-    type(r_solver_field_type)         :: f3
-    type(r_solver_field_proxy_type)   :: f1_p
-    type(r_solver_field_proxy_type)   :: f2_p
-    type(r_solver_field_proxy_type)   :: f3_p
-    integer(i_def)                    :: i
-    integer(i_def)                    :: max_halo_depth
-    type(halo_routing_type), pointer  :: halo_routing
-    integer(i_def)                    :: order
-    integer(i_def)                    :: test_sum, test_min, test_max
-    logical                           :: dirty
-    logical                           :: multidata_order
+    type(field_r64_type)       :: f1
+    type(field_r64_type)       :: f2
+    type(field_r64_type)       :: f3
+    type(field_r64_proxy_type) :: f1_p
+    type(field_r64_proxy_type) :: f2_p
+    type(field_r64_proxy_type) :: f3_p
+    integer(i_def)             :: i
+    integer(i_def)             :: max_halo_depth
+    type(halo_routing_type), pointer :: halo_routing
+    integer(i_def)             :: order
+    real(real64)               :: test_sum, test_min, test_max
+    logical                    :: dirty
+    logical                    :: multidata_order
 
     ! Make a field with a function space
     call f1%initialise( vector_space = this%w2_fs, name='f1' )
@@ -207,31 +218,33 @@ contains
 
     !Initialise field data
     do i=1,f1_p%vspace%get_undf()
-      f1_p%data(i)=int(i, i_def)
+      f1_p%data(i)=real(i)
     end do
 
     ! Make a second field, identical to the first
     call f2%initialise( vector_space = this%w2_fs )
     f2_p = f2%get_proxy()
     do i=1,f2_p%vspace%get_undf()
-      f2_p%data(i)=int(i, i_def)
+      f2_p%data(i)=real(i)
     end do
 
     ! Perform a halo swap on the second field
-    call f2_p%halo_exchange(1)
+    call f2_p%halo_exchange_start(1)
+    ! If I had any calculations to overlap with comms - I'd put them here!
+    call f2_p%halo_exchange_finish(1)
 
     ! For serial case, the halo swapped field should be the same as the original
-    @assertEqual( f1_p%data  , f2_p%data )
+    @assertEqual( f1_p%data  , f2_p%data, 1.0e-2_real64 )
 
     ! Test the global reductions
     test_sum=f1_p%get_sum()
-    @assertEqual( 4095  , test_sum )
+    @assertEqual( 4095.0  , test_sum, 1.0e-2_real64 )
 
     test_min=f1_p%get_min()
-    @assertEqual( 1  , test_min )
+    @assertEqual( 1.0  , test_min, 1.0e-2_real64 )
 
     test_max=f1_p%get_max()
-    @assertEqual( 90  , test_max )
+    @assertEqual( 90.0  , test_max, 1.0e-2_real64)
 
     max_halo_depth=f1_p%max_halo_depth()
     @assertEqual ( 3, max_halo_depth )
@@ -240,13 +253,20 @@ contains
     order = halo_routing%get_element_order()
     @assertEqual( element_order, order )
 
+    dirty=f1_p%is_dirty(0)
+    @assertFalse ( dirty )
+
+    call f1_p%set_dirty()
+    dirty=f1_p%is_dirty(0)
+    @assertFalse ( dirty )
+
     call f1_p%set_dirty()
     dirty=f1_p%is_dirty(1)
-    @assertEqual ( .true., dirty )
+    @assertTrue ( dirty )
 
     call f1_p%set_clean(1)
     dirty=f1_p%is_dirty(1)
-    @assertEqual ( .false., dirty )
+    @assertFalse ( dirty )
 
     ! check that a default field is ordered layer-first
     ! i.e. ndata_first is false
@@ -265,6 +285,50 @@ contains
     multidata_order=f3_p%is_ndata_first()
     @assertTrue ( multidata_order )
 
-  end subroutine test_r_solver_field_proxy
+  end subroutine test_field_r64_proxy
 
-end module r_solver_field_mod_test
+  @Test( npes=[1] )
+  subroutine test_empty_field_r64( this )
+
+    use field_r64_mod, only: field_r64_type, field_r64_proxy_type
+
+    implicit none
+
+    class(field_r64_test_type), intent(inout) :: this
+
+    type(field_r64_type)       :: f1
+    type(field_r64_proxy_type) :: f1_p
+    integer(i_def)             :: i
+
+    real(real64), target :: empty_data(1)
+
+    ! Make a field, but provide override data
+    call f1%initialise( vector_space = this%w2_fs, name = 'f1', override_data = empty_data )
+
+    ! get the proxy
+    f1_p = f1%get_proxy()
+
+    ! Check that the proxy returns the empty_data array
+    @assertTrue( associated( f1_p%data, empty_data ) )
+
+    ! Re-initialise as a normal field
+    call f1%initialise( vector_space = this%w2_fs, name = 'f1' )
+
+    ! get the proxy
+    f1_p = f1%get_proxy()
+
+    ! Check that the proxy does not return the empty_data array
+    @assertFalse( associated( f1_p%data, empty_data ) )
+
+    ! Re-initialise again with the override data
+    call f1%initialise( vector_space = this%w2_fs, name = 'f1', override_data = empty_data )
+
+    ! get the proxy
+    f1_p = f1%get_proxy()
+
+    ! Check that the proxy returns the empty_data array once again
+    @assertTrue( associated( f1_p%data, empty_data ) )
+
+  end subroutine test_empty_field_r64
+
+end module field_r64_mod_test

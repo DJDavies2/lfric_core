@@ -8,7 +8,7 @@
 !>
 module field_collection_iterator_mod_test
 
-    use constants_mod,                 only : i_def, r_def, l_def, r_solver, r_tran
+    use constants_mod,                 only : i_def, r_def, l_def
     use function_space_mod,            only : function_space_type
     use function_space_collection_mod, only : function_space_collection_type, &
                                               function_space_collection
@@ -20,15 +20,9 @@ module field_collection_iterator_mod_test
     use field_parent_mod,              only : field_parent_type
     use integer_field_mod,             only : integer_field_type, &
                                               integer_field_proxy_type
-    use r_solver_field_mod,            only : r_solver_field_type, &
-                                              r_solver_field_proxy_type
-    use r_tran_field_mod,              only : r_tran_field_type, &
-                                              r_tran_field_proxy_type
     use field_collection_iterator_mod, only : field_collection_iterator_type, &
                                               field_collection_real_iterator_type, &
-                                              field_collection_integer_iterator_type, &
-                                              field_collection_r_solver_iterator_type, &
-                                              field_collection_r_tran_iterator_type
+                                              field_collection_integer_iterator_type
     use field_collection_mod,          only : field_collection_type
     use fs_continuity_mod,             only : W0, W2, W3
     use local_mesh_mod,                only : local_mesh_type
@@ -147,39 +141,27 @@ contains
 
     type(field_type)                    :: test_field1
     type(integer_field_type)            :: test_field2
-    type(r_solver_field_type)           :: test_field3
-    type(r_tran_field_type)             :: test_field4
 
     type(field_proxy_type)              :: test_field1_p
     type(integer_field_proxy_type)      :: test_field2_p
-    type(r_solver_field_proxy_type)     :: test_field3_p
-    type(r_tran_field_proxy_type)       :: test_field4_p
 
     type(field_type), pointer           :: returned_field1
     type(integer_field_type), pointer   :: returned_field2
-    type(r_solver_field_type), pointer  :: returned_field3
-    type(r_tran_field_type), pointer    :: returned_field4
 
     type(field_proxy_type)              :: returned_field1_p
     type(integer_field_proxy_type)      :: returned_field2_p
-    type(r_solver_field_proxy_type)     :: returned_field3_p
-    type(r_tran_field_proxy_type)       :: returned_field4_p
 
     type(field_collection_type)         :: test_field_collectionA
 
     type(field_collection_iterator_type)           :: iter
     type(field_collection_real_iterator_type)      :: iter_real
     type(field_collection_integer_iterator_type)   :: iter_integer
-    type(field_collection_r_solver_iterator_type)  :: iter_r_solver
-    type(field_collection_r_tran_iterator_type)    :: iter_r_tran
     class(field_parent_type), pointer              :: fld => null()
 
     real(r_def), parameter              :: tol = 1.0e-6_r_def
-    real(r_solver), parameter           :: tol_r_solver = 1.0e-6_r_solver
-    real(r_tran), parameter             :: tol_r_tran = 1.0e-6_r_tran
     integer(i_def)                      :: i
 
-    !-------------- Create real, integer, r_solver & r_tran fields -------------------!
+    !----------------------- Create real & integer fields ----------------------------!
     ! Create a field object with the name 'test_field1'
     ! and put 99.0 in the first dof
     call test_field1%initialise( this%w0_fs, name='test_field1' )
@@ -192,63 +174,39 @@ contains
     test_field2_p = test_field2%get_proxy()
     test_field2_p%data(1) = 33_i_def
 
-    ! Create an r_solver field object with the name 'test_field3'
-    ! and put 600.0 in the first dof
-    call test_field3%initialise( this%w3_fs, name='test_field3' )
-    test_field3_p = test_field3%get_proxy()
-    test_field3_p%data(1) = 600.0_r_solver
-
-    ! Create an r_tran field object with the name 'test_field3'
-    ! and put 333.0 in the first dof
-    call test_field4%initialise( this%w3_fs, name='test_field4' )
-    test_field4_p = test_field4%get_proxy()
-    test_field4_p%data(1) = 333.0_r_tran
-
     !----------------- Create field collection 'A' & test extracts -------------------!
     ! Create a field_collection_A and put test_field1 and test_field2 in it
     call test_field_collectionA%initialise(name="test_field_collectionA5", &
                                            table_len=5)
     call test_field_collectionA%add_field(test_field1)  ! a real field
     call test_field_collectionA%add_field(test_field2)  ! an integer field
-    call test_field_collectionA%add_field(test_field3)  ! an r_solver field
-    call test_field_collectionA%add_field(test_field4)  ! an r_tran field
 
     !----------------------Iterating over the 'A' Collection --------------------------!
 
     ! Check we can iterate over a collection
     ! test_field_collectionA created above with table_len=5 and the given
     ! field names, should contain fields in the following order:
-    ! 1. The r_solver field with 600.0 as the first data item
-    ! 2. The r_tran field with 333.0 as the first data item
-    ! 3. The real field with a first data item of 99.0
-    ! 4. The integer field with 33 as the first data item
+    ! 1. The real field with a first data item of 99.0
+    ! 2. The integer field with 33 as the first data item
     !    - so check for that:
     call iter%initialise(test_field_collectionA)
     do i=1,10
       if(.not.iter%has_next())exit
       fld=>iter%next()
       select type(fld)
-        type is (r_solver_field_type)
-          @assertEqual(1, i)
-          returned_field3_p = fld%get_proxy()
-          @assertEqual(600_r_solver, returned_field3_p%data(1), tol_r_solver)
-        type is (r_tran_field_type)
-          @assertEqual(2, i)
-          returned_field4_p = fld%get_proxy()
-          @assertEqual(333_r_tran, returned_field4_p%data(1), tol_r_tran)
         type is (field_type)  ! r_def
-          @assertEqual(3, i)
+          @assertEqual(1, i)
           returned_field1_p = fld%get_proxy()
           @assertEqual(99.0_r_def, returned_field1_p%data(1), tol)
         type is (integer_field_type)
-          @assertEqual(4, i)
+          @assertEqual(2, i)
           returned_field2_p = fld%get_proxy()
           @assertEqual(33_i_def, returned_field2_p%data(1))
       end select
     end do
-    ! Test that there were only four items in the collection (so the iteration
-    ! loop exited on i==5)
-    @assertEqual(5, i)
+    ! Test that there were only two items in the collection (so the iteration
+    ! loop exited on i==3)
+    @assertEqual(3, i)
 
     !----------------------Iterating selectively by kind -----------------------
 
@@ -276,32 +234,6 @@ contains
       @assertEqual(33_i_def, returned_field2_p%data(1))
     end do
     ! Test that there was only one integer field in the collection (so the
-    ! iteration loop should exit on i==2)
-    @assertEqual(2, i)
-
-    ! ------- r_solver ---------
-    ! Check the r_solver field iterator sees just the r_solver field:
-    call iter_r_solver%initialise(test_field_collectionA)
-    do i=1,10
-      if(.not.iter_r_solver%has_next())exit
-      returned_field3=>iter_r_solver%next()
-      returned_field3_p = returned_field3%get_proxy()
-      @assertEqual(600.0_r_solver, returned_field3_p%data(1), tol_r_solver)
-    end do
-    ! Test that there was only one r_solver field in the collection (so the
-    ! iteration loop should exit on i==2)
-    @assertEqual(2, i)
-
-    ! ------- r_tran ---------
-    ! Check the r_tran field iterator sees just the r_tran field:
-    call iter_r_tran%initialise(test_field_collectionA)
-    do i=1,10
-      if(.not.iter_r_tran%has_next())exit
-      returned_field4=>iter_r_tran%next()
-      returned_field4_p = returned_field4%get_proxy()
-      @assertEqual(333.0_r_tran, returned_field4_p%data(1), tol_r_tran)
-    end do
-    ! Test that there was only one r_tran field in the collection (so the
     ! iteration loop should exit on i==2)
     @assertEqual(2, i)
 

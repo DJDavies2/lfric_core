@@ -12,7 +12,8 @@ module lfric_xios_write_mod
   use clock_mod,            only: clock_type
   use constants_mod,        only: i_def, dp_xios, str_def, &
                                   str_max_filename, xios_max_int
-  use field_mod,            only: field_type, field_proxy_type
+  use field_r32_mod,        only: field_r32_type, field_r32_proxy_type
+  use field_r64_mod,        only: field_r64_type, field_r64_proxy_type
   use field_parent_mod,     only: field_parent_proxy_type
   use field_collection_iterator_mod, &
                             only: field_collection_iterator_type
@@ -21,8 +22,6 @@ module lfric_xios_write_mod
   use fs_continuity_mod,    only: W3
   use io_mod,               only: ts_fname
   use integer_field_mod,    only: integer_field_type, integer_field_proxy_type
-  use r_solver_field_mod,   only: r_solver_field_type, r_solver_field_proxy_type
-  use r_tran_field_mod,     only: r_tran_field_type, r_tran_field_proxy_type
   use log_mod,              only: log_event,         &
                                   log_scratch_space, &
                                   LOG_LEVEL_INFO,    &
@@ -76,7 +75,10 @@ subroutine checkpoint_write_xios(xios_field_name, file_name, field_proxy)
   ! Different field kinds are selected to access data
   select type(field_proxy)
 
-    type is (field_proxy_type)
+    type is (field_r32_proxy_type)
+    send_field = field_proxy%data(1:undf)
+
+    type is (field_r64_proxy_type)
     send_field = field_proxy%data(1:undf)
 
     type is (integer_field_proxy_type)
@@ -85,12 +87,6 @@ subroutine checkpoint_write_xios(xios_field_name, file_name, field_proxy)
                       '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
     end if
     send_field = real( field_proxy%data(1:undf), dp_xios )
-
-    type is (r_solver_field_proxy_type)
-    send_field = field_proxy%data(1:undf)
-
-    type is (r_tran_field_proxy_type)
-    send_field = field_proxy%data(1:undf)
 
     class default
     call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
@@ -137,7 +133,13 @@ subroutine write_field_node(xios_field_name, field_proxy)
   ! based on model level
   select type(field_proxy)
 
-    type is (field_proxy_type)
+    type is (field_r32_proxy_type)
+    do i = 0, axis_size-1
+      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                 field_proxy%data(i+1:undf:axis_size)
+    end do
+
+    type is (field_r64_proxy_type)
     do i = 0, axis_size-1
       send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
                  field_proxy%data(i+1:undf:axis_size)
@@ -151,18 +153,6 @@ subroutine write_field_node(xios_field_name, field_proxy)
     do i = 0, axis_size-1
       send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
                  real( field_proxy%data(i+1:undf:axis_size), dp_xios )
-    end do
-
-    type is (r_solver_field_proxy_type)
-    do i = 0, axis_size-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                 field_proxy%data(i+1:undf:axis_size)
-    end do
-
-    type is (r_tran_field_proxy_type)
-    do i = 0, axis_size-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                 field_proxy%data(i+1:undf:axis_size)
     end do
 
     class default
@@ -214,7 +204,13 @@ subroutine write_field_edge(xios_field_name, field_proxy)
 
   select type(field_proxy)
 
-    type is (field_proxy_type)
+    type is (field_r32_proxy_type)
+    do i = 0, axis_size-1
+      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                 field_proxy%data(i+1:undf:axis_size)
+    end do
+
+    type is (field_r64_proxy_type)
     do i = 0, axis_size-1
       send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
                  field_proxy%data(i+1:undf:axis_size)
@@ -229,18 +225,6 @@ subroutine write_field_edge(xios_field_name, field_proxy)
       send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
                  real( field_proxy%data(i+1:undf:axis_size), dp_xios )
     end do
-
-    type is (r_solver_field_proxy_type)
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   field_proxy%data(i+1:undf:axis_size)
-      end do
-
-    type is (r_tran_field_proxy_type)
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   field_proxy%data(i+1:undf:axis_size)
-      end do
 
     class default
       call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
@@ -291,7 +275,13 @@ subroutine write_field_single_face(xios_field_name, field_proxy)
   ! slabs according to ndata
   select type(field_proxy)
 
-    type is (field_proxy_type)
+    type is (field_r32_proxy_type)
+    do i = 0, ndata-1
+      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
+    end do
+
+    type is (field_r64_proxy_type)
     do i = 0, ndata-1
       send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
                               field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
@@ -302,18 +292,6 @@ subroutine write_field_single_face(xios_field_name, field_proxy)
       call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
                       '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
     end if
-    do i = 0, ndata-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
-    end do
-
-    type is (r_solver_field_proxy_type)
-    do i = 0, ndata-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
-    end do
-
-    type is (r_tran_field_proxy_type)
     do i = 0, ndata-1
       send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
                               field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
@@ -350,16 +328,13 @@ subroutine write_field_face(xios_field_name, field_proxy)
 
   ! Field must be cast to kind to get function space ID
   select type(field_proxy)
-    type is (field_proxy_type)
+    type is (field_r32_proxy_type)
+    fs_id = field_proxy%vspace%which()
+
+    type is (field_r64_proxy_type)
     fs_id = field_proxy%vspace%which()
 
     type is (integer_field_proxy_type)
-    fs_id = field_proxy%vspace%which()
-
-    type is (r_solver_field_proxy_type)
-    fs_id = field_proxy%vspace%which()
-
-    type is (r_tran_field_proxy_type)
     fs_id = field_proxy%vspace%which()
 
     class default
@@ -389,7 +364,13 @@ subroutine write_field_face(xios_field_name, field_proxy)
   ! based on model level
   select type(field_proxy)
 
-    type is (field_proxy_type)
+    type is (field_r32_proxy_type)
+      do i = 0, axis_size-1
+        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                   field_proxy%data(i+1:undf:axis_size)
+      end do
+
+    type is (field_r64_proxy_type)
       do i = 0, axis_size-1
         send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
                    field_proxy%data(i+1:undf:axis_size)
@@ -403,18 +384,6 @@ subroutine write_field_face(xios_field_name, field_proxy)
       do i = 0, axis_size-1
         send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
                    real( field_proxy%data(i+1:undf:axis_size), dp_xios )
-      end do
-
-    type is (r_solver_field_proxy_type)
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   field_proxy%data(i+1:undf:axis_size)
-      end do
-
-    type is (r_tran_field_proxy_type)
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   field_proxy%data(i+1:undf:axis_size)
       end do
 
     class default
@@ -459,7 +428,25 @@ subroutine write_state(state, prefix, suffix)
     if ( .not.iter%has_next() ) exit
     fld => iter%next()
     select type(fld)
-      type is (field_type)
+      type is (field_r32_type)
+        if ( fld%can_write() ) then
+          write(log_scratch_space,'(3A,I6)') &
+              "Writing ", trim(adjustl(fld%get_name()))
+          call log_event(log_scratch_space,LOG_LEVEL_INFO)
+
+          ! Construct the XIOS field ID from the LFRic field name and optional arguments
+          xios_field_id = trim(adjustl(fld%get_name()))
+          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
+          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
+
+          call fld%write_field(xios_field_id)
+        else
+
+          call log_event( 'Write method for '// trim(adjustl(fld%get_name())) // &
+                      ' not set up', LOG_LEVEL_INFO )
+
+        end if
+      type is (field_r64_type)
         if ( fld%can_write() ) then
           write(log_scratch_space,'(3A,I6)') &
               "Writing ", trim(adjustl(fld%get_name()))
@@ -484,46 +471,6 @@ subroutine write_state(state, prefix, suffix)
           call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
           ! Construct the XIOS field ID from the LFRic field name and optional arguments
-          xios_field_id = trim(adjustl(fld%get_name()))
-          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
-          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
-
-          call fld%write_field(xios_field_id)
-        else
-
-          call log_event( 'Write method for '// trim(adjustl(fld%get_name())) // &
-                      ' not set up', LOG_LEVEL_INFO )
-
-        end if
-
-      type is (r_solver_field_type)
-        if ( fld%can_write() ) then
-          write(log_scratch_space,'(3A,I6)') &
-              "Writing ", trim(adjustl(fld%get_name()))
-          call log_event(log_scratch_space,LOG_LEVEL_INFO)
-
-          ! Construct the XIOS field ID from the LFRic field name and optional
-          ! arguments
-          xios_field_id = trim(adjustl(fld%get_name()))
-          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
-          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
-
-          call fld%write_field(xios_field_id)
-        else
-
-          call log_event( 'Write method for '// trim(adjustl(fld%get_name())) // &
-                      ' not set up', LOG_LEVEL_INFO )
-
-        end if
-
-      type is (r_tran_field_type)
-        if ( fld%can_write() ) then
-          write(log_scratch_space,'(3A,I6)') &
-              "Writing ", trim(adjustl(fld%get_name()))
-          call log_event(log_scratch_space,LOG_LEVEL_INFO)
-
-          ! Construct the XIOS field ID from the LFRic field name and optional
-          ! arguments
           xios_field_id = trim(adjustl(fld%get_name()))
           if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
           if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
@@ -569,7 +516,27 @@ subroutine write_checkpoint( state, clock, checkpoint_stem_name )
      if ( .not.iter%has_next() ) exit
      fld => iter%next()
      select type(fld)
-     type is (field_type)
+     type is (field_r32_type)
+        if ( fld%can_checkpoint() ) then
+           write(log_scratch_space,'(2A)') &
+                "Checkpointing ", trim(adjustl(fld%get_name()))
+           call log_event(log_scratch_space, LOG_LEVEL_INFO)
+           call fld%write_checkpoint( trim(adjustl(fld%get_name())),      &
+                                      trim(ts_fname(checkpoint_stem_name, &
+                                      "",                                 &
+                                      trim(adjustl(fld%get_name())),      &
+                                      clock%get_step(),                   &
+                                      "")) )
+        else if ( fld%can_write() ) then
+           write(log_scratch_space,'(2A)') &
+                "Writing checkpoint for ", trim(adjustl(fld%get_name()))
+           call log_event(log_scratch_space, LOG_LEVEL_INFO)
+           call fld%write_field( "checkpoint_" // trim(adjustl(fld%get_name())) )
+        else
+           call log_event( 'Writing not set up for '// trim(adjustl(fld%get_name())), &
+                          LOG_LEVEL_INFO )
+        end if
+     type is (field_r64_type)
         if ( fld%can_checkpoint() ) then
            write(log_scratch_space,'(2A)') &
                 "Checkpointing ", trim(adjustl(fld%get_name()))

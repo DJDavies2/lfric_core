@@ -16,12 +16,12 @@ module field_collection_mod
   use constants_mod,           only: i_def, l_def, str_def
   use field_mod,               only: field_type, &
                                      field_pointer_type
+  use field_r32_mod,           only: field_r32_type, &
+                                     field_r32_pointer_type
+  use field_r64_mod,           only: field_r64_type, &
+                                     field_r64_pointer_type
   use integer_field_mod,       only: integer_field_type, &
                                      integer_field_pointer_type
-  use r_solver_field_mod,      only: r_solver_field_type, &
-                                     r_solver_field_pointer_type
-  use r_tran_field_mod,        only: r_tran_field_type, &
-                                     r_tran_field_pointer_type
   use pure_abstract_field_mod, only: pure_abstract_field_type
   use log_mod,                 only: log_event, log_scratch_space, &
                                      LOG_LEVEL_ERROR
@@ -58,8 +58,6 @@ module field_collection_mod
     procedure, public :: get_next_item
     procedure, public :: get_field
     procedure, public :: get_integer_field
-    procedure, public :: get_r_solver_field
-    procedure, public :: get_r_tran_field
     procedure, public :: get_length
     procedure, public :: get_name
     procedure, public :: get_table_len
@@ -117,21 +115,17 @@ subroutine add_field(self, field)
 
   ! Check field name is valid, if not then exit with error
   select type(infield => field)
-    type is (field_type)
+    type is (field_r32_type)
+      name = infield%get_name()
+    type is (field_r64_type)
       name = infield%get_name()
     type is (integer_field_type)
       name = infield%get_name()
-    type is (r_solver_field_type)
-      name = infield%get_name()
-    type is (r_tran_field_type)
-      name = infield%get_name()
-    type is (field_pointer_type)
+    type is (field_r32_pointer_type)
+      name = infield%field_ptr%get_name()
+    type is (field_r64_pointer_type)
       name = infield%field_ptr%get_name()
     type is (integer_field_pointer_type)
-      name = infield%field_ptr%get_name()
-    type is (r_solver_field_pointer_type)
-      name = infield%field_ptr%get_name()
-    type is (r_tran_field_pointer_type)
       name = infield%field_ptr%get_name()
   end select
   if ( trim(name) == 'none' .OR. trim(name) == 'unset') then
@@ -143,7 +137,14 @@ subroutine add_field(self, field)
 
   ! Check if field exists in collection already, if it does, exit with error
   select type(infield => field)
-    type is (field_type)
+    type is (field_r32_type)
+      if ( self%field_exists( trim(name) ) ) then
+        write(log_scratch_space, '(4A)') &
+          'Field [', trim(infield%get_name()), &
+          '] already exists in field collection: ', trim(self%name)
+        call log_event( log_scratch_space, LOG_LEVEL_ERROR)
+      end if
+    type is (field_r64_type)
       if ( self%field_exists( trim(name) ) ) then
         write(log_scratch_space, '(4A)') &
           'Field [', trim(infield%get_name()), &
@@ -157,21 +158,14 @@ subroutine add_field(self, field)
           '] already exists in field collection: ', trim(self%name)
         call log_event( log_scratch_space, LOG_LEVEL_ERROR)
       end if
-    type is (r_solver_field_type)
+    type is (field_r32_pointer_type)
       if ( self%field_exists( trim(name) ) ) then
         write(log_scratch_space, '(4A)') &
-          'Field [', trim(infield%get_name()), &
+          'Field [', trim(infield%field_ptr%get_name()), &
           '] already exists in field collection: ', trim(self%name)
         call log_event( log_scratch_space, LOG_LEVEL_ERROR)
       end if
-    type is (r_tran_field_type)
-      if ( self%field_exists( trim(name) ) ) then
-        write(log_scratch_space, '(4A)') &
-          'Field [', trim(infield%get_name()), &
-          '] already exists in field collection: ', trim(self%name)
-        call log_event( log_scratch_space, LOG_LEVEL_ERROR)
-      end if
-    type is (field_pointer_type)
+    type is (field_r64_pointer_type)
       if ( self%field_exists( trim(name) ) ) then
         write(log_scratch_space, '(4A)') &
           'Field [', trim(infield%field_ptr%get_name()), &
@@ -179,20 +173,6 @@ subroutine add_field(self, field)
         call log_event( log_scratch_space, LOG_LEVEL_ERROR)
       end if
     type is (integer_field_pointer_type)
-      if ( self%field_exists( trim(name) ) ) then
-        write(log_scratch_space, '(4A)') &
-          'Field [', trim(infield%field_ptr%get_name()), &
-          '] already exists in field collection: ', trim(self%name)
-        call log_event( log_scratch_space, LOG_LEVEL_ERROR)
-      end if
-    type is (r_solver_field_pointer_type)
-      if ( self%field_exists( trim(name) ) ) then
-        write(log_scratch_space, '(4A)') &
-          'Field [', trim(infield%field_ptr%get_name()), &
-          '] already exists in field collection: ', trim(self%name)
-        call log_event( log_scratch_space, LOG_LEVEL_ERROR)
-      end if
-    type is (r_tran_field_pointer_type)
       if ( self%field_exists( trim(name) ) ) then
         write(log_scratch_space, '(4A)') &
           'Field [', trim(infield%field_ptr%get_name()), &
@@ -240,12 +220,22 @@ function field_exists(self, field_name) result(exists)
 
     ! 'cast' to the field_type
     select type(listfield => loop%payload)
-      type is (field_type)
+      type is (field_r32_type)
       if ( trim(field_name) == trim(listfield%get_name()) ) then
           exists=.true.
           exit
       end if
-      type is (field_pointer_type)
+      type is (field_r32_pointer_type)
+      if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
+          exists=.true.
+          exit
+      end if
+      type is (field_r64_type)
+      if ( trim(field_name) == trim(listfield%get_name()) ) then
+          exists=.true.
+          exit
+      end if
+      type is (field_r64_pointer_type)
       if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
           exists=.true.
           exit
@@ -260,26 +250,6 @@ function field_exists(self, field_name) result(exists)
           exists=.true.
           exit
       end if
-      type is (r_solver_field_type)
-      if ( trim(field_name) == trim(listfield%get_name()) ) then
-          exists=.true.
-          exit
-      end if
-      type is (r_solver_field_pointer_type)
-      if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
-          exists=.true.
-          exit
-      end if
-      type is (r_tran_field_type)
-      if ( trim(field_name) == trim(listfield%get_name()) ) then
-          exists=.true.
-          exit
-      end if
-      type is (r_tran_field_pointer_type)
-      if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
-          exists=.true.
-          exit
-      end if
     end select
 
     loop => loop%next
@@ -290,9 +260,9 @@ end function field_exists
 !> Adds a pointer to a field into the field collection. The pointer will point
 !> to a field held elsewhere. If that field is destroyed, the pointer will
 !> become an orphan.
-!> @param [in] field_ptr : A pointer to the field (real, integer, r_solver or r_tran)
+!> @param [in] field_ptr : A pointer to the field (real32, real64 or integer)
 !>                         that is to be referenced in the collection.
-! The routine accepts a pointer to a field (real, integer, r_solver or r_tran). It
+! The routine accepts a pointer to a field (real32, real64 or integer). It
 ! packages it up into a field pointer object and calls the routine to add this
 ! to the collection
 subroutine add_reference_to_field(self, field_ptr)
@@ -302,36 +272,29 @@ subroutine add_reference_to_field(self, field_ptr)
   class(field_collection_type), intent(inout)          :: self
   class(pure_abstract_field_type), pointer, intent(in) :: field_ptr
 
-  type(field_type), pointer :: fld_ptr
-  type(field_pointer_type)  :: field_pointer
+  type(field_r32_type), pointer      :: fld_r32_ptr
+  type(field_r32_pointer_type)       :: field_r32_pointer
+  type(field_r64_type), pointer      :: fld_r64_ptr
+  type(field_r64_pointer_type)       :: field_r64_pointer
   type(integer_field_type), pointer  :: int_fld_ptr
   type(integer_field_pointer_type)   :: integer_field_pointer
-  type(r_solver_field_type), pointer :: r_solver_fld_ptr
-  type(r_solver_field_pointer_type)  :: r_solver_field_pointer
-  type(r_tran_field_type), pointer   :: r_tran_fld_ptr
-  type(r_tran_field_pointer_type)    :: r_tran_field_pointer
 
   select type(field_ptr)
-    type is (field_type)
-      ! Create a field pointer object that just contains a field pointer
-      fld_ptr => field_ptr
-      call field_pointer%field_pointer_initialiser(fld_ptr)
-      call self%add_field( field_pointer )
+    type is (field_r32_type)
+      ! Create a field pointer object that just contains an r32 field pointer
+      fld_r32_ptr => field_ptr
+      call field_r32_pointer%initialise(fld_r32_ptr)
+      call self%add_field( field_r32_pointer )
+    type is (field_r64_type)
+      ! Create a field pointer object that just contains an r64 field pointer
+      fld_r64_ptr => field_ptr
+      call field_r64_pointer%initialise(fld_r64_ptr)
+      call self%add_field( field_r64_pointer )
     type is (integer_field_type)
       ! Create an integer field pointer object that just contains a field ptr
       int_fld_ptr => field_ptr
-      call integer_field_pointer%integer_field_pointer_initialiser(int_fld_ptr)
+      call integer_field_pointer%initialise(int_fld_ptr)
       call self%add_field( integer_field_pointer )
-    type is (r_solver_field_type)
-      ! Create an r_solver field pointer object that just contains a field ptr
-      r_solver_fld_ptr => field_ptr
-      call r_solver_field_pointer%r_solver_field_pointer_initialiser(r_solver_fld_ptr)
-      call self%add_field( r_solver_field_pointer )
-    type is (r_tran_field_type)
-      ! Create an r_tran field pointer object that just contains a field ptr
-      r_tran_fld_ptr => field_ptr
-      call r_tran_field_pointer%r_tran_field_pointer_initialiser(r_tran_fld_ptr)
-      call self%add_field( r_tran_field_pointer )
   end select
 
 end subroutine add_reference_to_field
@@ -367,7 +330,12 @@ subroutine remove_field(self, field_name)
 
     ! 'cast' to the field_type
     select type(listfield => loop%payload)
-      type is (field_type)
+      type is (field_r32_type)
+        if ( trim(field_name) == trim(listfield%get_name()) ) then
+          call self%field_list(hash)%remove_item(loop)
+          exit
+        end if
+      type is (field_r64_type)
         if ( trim(field_name) == trim(listfield%get_name()) ) then
           call self%field_list(hash)%remove_item(loop)
           exit
@@ -377,32 +345,17 @@ subroutine remove_field(self, field_name)
           call self%field_list(hash)%remove_item(loop)
           exit
         end if
-      type is (r_solver_field_type)
-        if ( trim(field_name) == trim(listfield%get_name()) ) then
+      type is (field_r32_pointer_type)
+        if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
           call self%field_list(hash)%remove_item(loop)
           exit
         end if
-      type is (r_tran_field_type)
-        if ( trim(field_name) == trim(listfield%get_name()) ) then
-          call self%field_list(hash)%remove_item(loop)
-          exit
-        end if
-      type is (field_pointer_type)
+      type is (field_r64_pointer_type)
         if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
           call self%field_list(hash)%remove_item(loop)
           exit
         end if
       type is (integer_field_pointer_type)
-        if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
-          call self%field_list(hash)%remove_item(loop)
-          exit
-        end if
-      type is (r_solver_field_pointer_type)
-        if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
-          call self%field_list(hash)%remove_item(loop)
-          exit
-        end if
-      type is (r_tran_field_pointer_type)
         if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
           call self%field_list(hash)%remove_item(loop)
           exit
@@ -436,21 +389,17 @@ function get_next_item(self, start) result(item)
     if (.not.associated(new_item) ) then
       ! Next item is in the following linked list. Calculate the hash of 'start'
       select type(listfield => start%payload)
-        type is (field_type)
+        type is (field_r32_type)
+          name = listfield%get_name()
+        type is (field_r64_type)
           name = listfield%get_name()
         type is (integer_field_type)
           name = listfield%get_name()
-        type is (r_solver_field_type)
-          name = listfield%get_name()
-        type is (r_tran_field_type)
-          name = listfield%get_name()
-        type is (field_pointer_type)
+        type is (field_r32_pointer_type)
+          name = listfield%field_ptr%get_name()
+        type is (field_r64_pointer_type)
           name = listfield%field_ptr%get_name()
         type is (integer_field_pointer_type)
-          name = listfield%field_ptr%get_name()
-        type is (r_solver_field_pointer_type)
-          name = listfield%field_ptr%get_name()
-        type is (r_tran_field_pointer_type)
           name = listfield%field_ptr%get_name()
       end select
       hash = mod(sum_string(trim(name)),self%table_len)
@@ -477,9 +426,9 @@ function get_next_item(self, start) result(item)
 
 end function get_next_item
 
-!> Access an r_def field from the collection
-!> @param [in] field_name The name of the r_def field to be accessed
-!> @return field Pointer to the r_def field that is extracted
+!> Access a real field from the collection
+!> @param [in] field_name The name of the real field to be accessed
+!> @return field Pointer to the real field that is extracted
 function get_field(self, field_name) result(field)
 
   implicit none
@@ -581,110 +530,6 @@ function get_integer_field(self, field_name) result(field)
 
 end function get_integer_field
 
-!> Access an r_solver field from the collection
-!> @param [in] field_name The name of the r_solver field to be accessed
-!> @return field Pointer to the r_solver field that is extracted
-function get_r_solver_field(self, field_name) result(field)
-
-  implicit none
-
-  class(field_collection_type), intent(in) :: self
-
-  character(*), intent(in) :: field_name
-  type(r_solver_field_type), pointer :: field
-
-  ! Pointer to linked list - used for looping through the list
-  type(linked_list_item_type), pointer :: loop => null()
-
-  integer(i_def) :: hash
-
-  ! Calculate the hash of the field being searched for
-  hash = mod(sum_string(trim(field_name)),self%table_len)
-
-  ! start at the head of the mesh collection linked list
-  loop => self%field_list(hash)%get_head()
-
-  do
-    ! If list is empty or we're at the end of list and we didn't find the
-    ! field, fail with an error
-    if ( .not. associated(loop) ) then
-      write(log_scratch_space, '(4A)') 'No r_solver field [', trim(field_name), &
-         '] in field collection: ', trim(self%name)
-      call log_event( log_scratch_space, LOG_LEVEL_ERROR)
-    end if
-    ! otherwise search list for the name of field we want
-
-    ! 'cast' to the r_solver_field_type
-    select type(listfield => loop%payload)
-      type is (r_solver_field_type)
-      if ( trim(field_name) == trim(listfield%get_name()) ) then
-          field => listfield
-          exit
-      end if
-      type is (r_solver_field_pointer_type)
-      if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
-          field => listfield%field_ptr
-          exit
-      end if
-    end select
-
-    loop => loop%next
-  end do
-
-end function get_r_solver_field
-
-!> Access an r_tran field from the collection
-!> @param [in] field_name The name of the r_tran field to be accessed
-!> @return field Pointer to the r_tran field that is extracted
-function get_r_tran_field(self, field_name) result(field)
-
-  implicit none
-
-  class(field_collection_type), intent(in) :: self
-
-  character(*), intent(in) :: field_name
-  type(r_tran_field_type), pointer :: field
-
-  ! Pointer to linked list - used for looping through the list
-  type(linked_list_item_type), pointer :: loop => null()
-
-  integer(i_def) :: hash
-
-  ! Calculate the hash of the field being searched for
-  hash = mod(sum_string(trim(field_name)),self%table_len)
-
-  ! start at the head of the mesh collection linked list
-  loop => self%field_list(hash)%get_head()
-
-  do
-    ! If list is empty or we're at the end of list and we didn't find the
-    ! field, fail with an error
-    if ( .not. associated(loop) ) then
-      write(log_scratch_space, '(4A)') 'No r_tran field [', trim(field_name), &
-         '] in field collection: ', trim(self%name)
-      call log_event( log_scratch_space, LOG_LEVEL_ERROR)
-    end if
-    ! otherwise search list for the name of field we want
-
-    ! 'cast' to the r_solver_field_type
-    select type(listfield => loop%payload)
-      type is (r_tran_field_type)
-      if ( trim(field_name) == trim(listfield%get_name()) ) then
-          field => listfield
-          exit
-      end if
-      type is (r_tran_field_pointer_type)
-      if ( trim(field_name) == trim(listfield%field_ptr%get_name()) ) then
-          field => listfield%field_ptr
-          exit
-      end if
-    end select
-
-    loop => loop%next
-  end do
-
-end function get_r_tran_field
-
 !> Returns the number of entries in the field collection
 function get_length(self) result(length)
 
@@ -775,21 +620,17 @@ subroutine copy_collection(self, dest, name)
       field_item => self%field_list(i)%get_head()
       do while (associated(field_item))
         select type(item => field_item%payload)
-          type is (field_type)
+          type is (field_r32_type)
+            call dest%add_field(item)
+          type is (field_r64_type)
             call dest%add_field(item)
           type is (integer_field_type)
             call dest%add_field(item)
-          type is (r_solver_field_type)
+          type is (field_r32_pointer_type)
             call dest%add_field(item)
-          type is (r_tran_field_type)
-            call dest%add_field(item)
-          type is (field_pointer_type)
+          type is (field_r64_pointer_type)
             call dest%add_field(item)
           type is (integer_field_pointer_type)
-            call dest%add_field(item)
-          type is (r_solver_field_pointer_type)
-            call dest%add_field(item)
-          type is (r_tran_field_pointer_type)
             call dest%add_field(item)
         end select
         field_item => field_item%next

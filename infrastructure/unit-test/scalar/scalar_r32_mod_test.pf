@@ -1,15 +1,16 @@
 !-----------------------------------------------------------------------------
-! Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
-! For further details please refer to the file LICENCE.original which you
-! should have received as part of this distribution.
+! (C) Crown copyright 2022 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
 !-----------------------------------------------------------------------------
 
 !> Test the scalar object
 !>
 !-------------------------------------------------------------------------------
-module scalar_mod_test
+module scalar_r32_mod_test
 
-  use constants_mod, only : r_def
+  use, intrinsic :: iso_fortran_env, only : real32
   use mpi_mod, only : store_comm
   use pFUnit_Mod
 
@@ -19,13 +20,13 @@ module scalar_mod_test
   public :: test_all
 
   @TestCase
-  type, extends(MPITestCase), public :: scalar_test_type
+  type, extends(MPITestCase), public :: scalar_r32_test_type
     private
   contains
     procedure setUp
     procedure tearDown
     procedure test_all
-  end type scalar_test_type
+  end type scalar_r32_test_type
 
 contains
 
@@ -34,7 +35,7 @@ contains
 
     implicit none
 
-    class(scalar_test_type), intent(inout) :: this
+    class(scalar_r32_test_type), intent(inout) :: this
 
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
@@ -46,7 +47,7 @@ contains
 
     implicit none
 
-    class(scalar_test_type), intent(inout) :: this
+    class(scalar_r32_test_type), intent(inout) :: this
 
   end subroutine tearDown
 
@@ -54,37 +55,37 @@ contains
   @Test( npes=[1] )
   subroutine test_all( this )
 
-    use scalar_mod, only: scalar_type
+    use scalar_r32_mod, only: scalar_r32_type
 
     implicit none
 
-    class(scalar_test_type), intent(inout) :: this
+    class(scalar_r32_test_type), intent(inout) :: this
 
-    type(scalar_type)          :: s1
+    type(scalar_r32_type)          :: s1
 
-    real(r_def) :: s1_val
-    real(r_def) :: sum, min, max
+    real(real32) :: s1_val
+    real(real32) :: sum, min, max
 
-    s1_val = 23.0
+    s1_val = 23.0_real32
 
-    s1 = scalar_type ( s1_val )
+    s1%value = s1_val
 
     ! Check the scalar type has been correctly constructed and that
     ! we have access to the data
-    @assertEqual( s1_val, s1%value, 1.0e-2_r_def )
+    @assertEqual( s1_val, s1%value, 1.0e-2_real32 )
 
     ! Test the global reductions
     ! - a bit trivial until we have parallel tests
     sum = s1%get_sum()
-    @assertEqual( s1_val, sum, 1.0e-2_r_def )
+    @assertEqual( s1_val, sum, 1.0e-2_real32 )
 
     min = s1%get_min()
-    @assertEqual( s1_val, min, 1.0e-2_r_def )
+    @assertEqual( s1_val, min, 1.0e-2_real32 )
 
     max = s1%get_max()
-    @assertEqual( s1_val, max, 1.0e-2_r_def )
+    @assertEqual( s1_val, max, 1.0e-2_real32 )
 
 
   end subroutine test_all
 
-end module scalar_mod_test
+end module scalar_r32_mod_test

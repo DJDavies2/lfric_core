@@ -18,13 +18,13 @@ module field_collection_iterator_mod
   use field_collection_mod,    only: field_collection_type
   use field_mod,               only: field_type, &
                                      field_pointer_type
+  use field_r32_mod,           only: field_r32_type, &
+                                     field_r32_pointer_type
+  use field_r64_mod,           only: field_r64_type, &
+                                     field_r64_pointer_type
   use field_parent_mod,        only: field_parent_type
   use integer_field_mod,       only: integer_field_type, &
                                      integer_field_pointer_type
-  use r_solver_field_mod,      only: r_solver_field_type, &
-                                     r_solver_field_pointer_type
-  use r_tran_field_mod,        only: r_tran_field_type, &
-                                     r_tran_field_pointer_type
   use log_mod,                 only: log_event, log_scratch_space, &
                                      LOG_LEVEL_ERROR
   use linked_list_data_mod,    only: linked_list_data_type
@@ -88,42 +88,6 @@ module field_collection_iterator_mod
     procedure, public :: next => next_integer
     procedure, public :: has_next => has_next_integer
   end type field_collection_integer_iterator_type
-
-  !-----------------------------------------------------------------------------
-  ! Type that iterates through the r_solver fields in a field collection
-  !-----------------------------------------------------------------------------
-  type, public :: field_collection_r_solver_iterator_type
-    private
-    !> Dummy allocatable - workaround for gcc bug (ref:61767)
-    integer(i_def), allocatable :: dummy_for_gnu
-    !> A pointer to the field collection being iterated over
-    type(field_collection_type), pointer :: collection
-    !> A pointer to the linked list item within the collection that will
-    !> contain the next r_solver field to be returned
-    type(linked_list_item_type), pointer :: current
-  contains
-    procedure, public :: initialise => initialise_r_solver_iter
-    procedure, public :: next => next_r_solver
-    procedure, public :: has_next => has_next_r_solver
-  end type field_collection_r_solver_iterator_type
-
-  !-----------------------------------------------------------------------------
-  ! Type that iterates through the r_tran fields in a field collection
-  !-----------------------------------------------------------------------------
-  type, public :: field_collection_r_tran_iterator_type
-    private
-    !> Dummy allocatable - workaround for gcc bug (ref:61767)
-    integer(i_def), allocatable :: dummy_for_gnu
-    !> A pointer to the field collection being iterated over
-    type(field_collection_type), pointer :: collection
-    !> A pointer to the r_tran field within the collection that will be
-    !> the next to be returned
-    type(linked_list_item_type), pointer :: current
-  contains
-    procedure, public :: initialise => initialise_r_tran_iter
-    procedure, public :: next => next_r_tran
-    procedure, public :: has_next => has_next_r_tran
-  end type field_collection_r_tran_iterator_type
 
 contains
 
@@ -226,78 +190,6 @@ subroutine initialise_integer_iter(self, collection)
 end subroutine initialise_integer_iter
 
 
-!> Initialise an iterator over the r_solver fields in a field collection
-!> @param [in] collection The collection to iterate over
-subroutine initialise_r_solver_iter(self, collection)
-
-  implicit none
-
-  class(field_collection_r_solver_iterator_type) :: self
-  type(field_collection_type), target :: collection
-
-  ! Store a pointer to the collection being iterated over
-  self%collection => collection
-
-  ! Start the iterator at the beginning of the field list.
-  nullify(self%current)
-  self%current => self%collection%get_next_item(self%current)
-
-  do
-    if(.not.associated(self%current))then
-      write(log_scratch_space, '(2A)') &
-         'Cannot create an r_solver field iterator on field collection: ', &
-          trim(self%collection%get_name())
-      call log_event( log_scratch_space, LOG_LEVEL_ERROR)
-    end if
-
-    ! Make sure first field pointed to in list is an r_solver field
-    select type(listfield => self%current%payload)
-      type is (r_solver_field_type)
-        exit
-      type is (r_solver_field_pointer_type)
-        exit
-    end select
-    self%current => self%collection%get_next_item(self%current)
-  end do
-
-end subroutine initialise_r_solver_iter
-
-!> Initialise an iterator over the r_tran fields in a field collection
-!> @param [in] collection The collection to iterate over
-subroutine initialise_r_tran_iter(self, collection)
-
-  implicit none
-
-  class(field_collection_r_tran_iterator_type) :: self
-  type(field_collection_type), target :: collection
-
-  ! Store a pointer to the collection being iterated over
-  self%collection => collection
-
-  ! Start the iterator at the beginning of the field list.
-  nullify(self%current)
-  self%current => self%collection%get_next_item(self%current)
-
-  do
-    if(.not.associated(self%current))then
-      write(log_scratch_space, '(2A)') &
-         'Cannot create an r_tran field iterator on field collection: ', &
-          trim(self%collection%get_name())
-      call log_event( log_scratch_space, LOG_LEVEL_ERROR)
-    end if
-
-    ! Make sure first field pointed to in list is an r_solver field
-    select type(listfield => self%current%payload)
-      type is (r_tran_field_type)
-        exit
-      type is (r_tran_field_pointer_type)
-        exit
-    end select
-    self%current => self%collection%get_next_item(self%current)
-  end do
-
-end subroutine initialise_r_tran_iter
-
 !> Returns the next field from the collection
 !> @return A polymorphic field pointer to either a field or field pointer
 !>         that is next in the collection
@@ -310,21 +202,17 @@ function next(self) result (field)
 
   ! Extract a pointer to the current field in the collection
   select type(listfield => self%current%payload)
-    type is (field_type)
+    type is (field_r32_type)
+      field => listfield
+    type is (field_r64_type)
       field => listfield
     type is (integer_field_type)
       field => listfield
-    type is (r_solver_field_type)
-      field => listfield
-    type is (r_tran_field_type)
-      field => listfield
-    type is (field_pointer_type)
+    type is (field_r32_pointer_type)
+      field => listfield%field_ptr
+    type is (field_r64_pointer_type)
       field => listfield%field_ptr
     type is (integer_field_pointer_type)
-      field => listfield%field_ptr
-    type is (r_solver_field_pointer_type)
-      field => listfield%field_ptr
-    type is (r_tran_field_pointer_type)
       field => listfield%field_ptr
   end select
   ! Move the current item pointer onto the next field in the collection
@@ -403,76 +291,6 @@ function next_integer(self) result (field)
 end function next_integer
 
 
-!> Returns the next r_solver field from the collection
-!> @return A field pointer to the next (r_solver) field in the collection
-function next_r_solver(self) result (field)
-
-  implicit none
-
-  class(field_collection_r_solver_iterator_type), intent(inout), target :: self
-  type(r_solver_field_type), pointer :: field
-
-  ! Extract a pointer to the current field in the collection
-  select type(listfield => self%current%payload)
-    type is (r_solver_field_type)
-      field => listfield
-    type is (r_solver_field_pointer_type)
-      field => listfield%field_ptr
-  end select
-
-  ! Move the current item pointer onto the next r_solver field in the collection
-  self%current => self%collection%get_next_item(self%current)
-  do
-    if(.not.associated(self%current))then
-      exit
-    end if
-    ! Make sure field pointed to in list is an r_solver field
-    select type(listfield => self%current%payload)
-      type is (r_solver_field_type)
-        exit
-      type is (r_solver_field_pointer_type)
-        exit
-    end select
-    self%current => self%collection%get_next_item(self%current)
-  end do
-
-end function next_r_solver
-
-!> Returns the next r_tran field from the collection
-!> @return A field pointer to the next (r_tran) field in the collection
-function next_r_tran(self) result (field)
-
-  implicit none
-
-  class(field_collection_r_tran_iterator_type), intent(inout), target :: self
-  type(r_tran_field_type), pointer :: field
-
-  ! Extract a pointer to the current field in the collection
-  select type(listfield => self%current%payload)
-    type is (r_tran_field_type)
-      field => listfield
-    type is (r_tran_field_pointer_type)
-      field => listfield%field_ptr
-  end select
-
-  ! Move the current item pointer onto the next r_solver field in the collection
-  self%current => self%collection%get_next_item(self%current)
-  do
-    if(.not.associated(self%current))then
-      exit
-    end if
-    ! Make sure field pointed to in list is an r_solver field
-    select type(listfield => self%current%payload)
-      type is (r_tran_field_type)
-        exit
-      type is (r_tran_field_pointer_type)
-        exit
-    end select
-    self%current => self%collection%get_next_item(self%current)
-  end do
-
-end function next_r_tran
-
 !> Checks if there are any further fields in the collection being iterated over
 !> @return next true if there is another field in the collection, and false if
 !> there isn't.
@@ -507,29 +325,5 @@ function has_next_integer(self) result(next)
   next = .true.
   if(.not.associated(self%current)) next = .false.
 end function has_next_integer
-
-!> Checks if there are any further r_solver fields in the collection being
-!> iterated over.
-!> @return next true if there is another r_solver field in the collection, and
-!> false if there isn't.
-function has_next_r_solver(self) result(next)
-  implicit none
-  class(field_collection_r_solver_iterator_type), intent(in) :: self
-  logical(l_def) :: next
-  next = .true.
-  if(.not.associated(self%current)) next = .false.
-end function has_next_r_solver
-
-!> Checks if there are any further r_tran fields in the collection being
-!> iterated over.
-!> @return next true if there is another r_tran field in the collection, and
-!> false if there isn't.
-function has_next_r_tran(self) result(next)
-  implicit none
-  class(field_collection_r_tran_iterator_type), intent(in) :: self
-  logical(l_def) :: next
-  next = .true.
-  if(.not.associated(self%current)) next = .false.
-end function has_next_r_tran
 
 end module field_collection_iterator_mod

@@ -13,8 +13,7 @@
 
 module field_parent_mod
 
-  use constants_mod,               only: i_def, l_def, str_def, r_def, &
-                                         real_type, imdi
+  use constants_mod,               only: i_def, l_def, str_def, imdi
   use function_space_mod,          only: function_space_type
   use halo_routing_collection_mod, only: halo_routing_collection
   use halo_routing_mod,            only: halo_routing_type
@@ -125,26 +124,26 @@ module field_parent_mod
   abstract interface
 
     subroutine write_interface(field_name, field_proxy)
-      import r_def, field_parent_proxy_type
+      import field_parent_proxy_type
       character(len=*),                intent(in) :: field_name
       class(field_parent_proxy_type ), intent(in) :: field_proxy
     end subroutine write_interface
 
     subroutine read_interface(field_name, field_proxy)
-      import r_def, field_parent_proxy_type
+      import field_parent_proxy_type
       character(len=*),                intent(in)    :: field_name
       class(field_parent_proxy_type ), intent(inout) :: field_proxy
     end subroutine read_interface
 
     subroutine checkpoint_write_interface(field_name, file_name, field_proxy)
-      import r_def, field_parent_proxy_type
+      import field_parent_proxy_type
       character(len=*),                intent(in) :: field_name
       character(len=*),                intent(in) :: file_name
       class(field_parent_proxy_type ), intent(in) :: field_proxy
     end subroutine checkpoint_write_interface
 
     subroutine checkpoint_read_interface(field_name, file_name, field_proxy)
-      import r_def, field_parent_proxy_type
+      import field_parent_proxy_type
       character(len=*),                intent(in)    :: field_name
       character(len=*),                intent(in)    :: file_name
       class(field_parent_proxy_type ), intent(inout) :: field_proxy
