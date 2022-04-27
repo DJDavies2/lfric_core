@@ -13,7 +13,6 @@ module tracer_smagorinsky_diff_kernel_mod_test
                                                   get_wtheta_m3x3_dofmap,      &
                                                   get_m3x3_stencil_dofmap_cross
    use pFUnit_Mod
-  use yaxt,                          only : xt_initialize, xt_finalize
   use mpi_mod,                       only : store_comm, clear_comm
 
   implicit none
@@ -47,8 +46,6 @@ contains
 
     class(tracer_smagorinsky_diff_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
     call feign_mixing_config( viscosity     = .false.,       &
@@ -85,8 +82,6 @@ contains
     call final_chi_transforms()
     call final_configuration()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

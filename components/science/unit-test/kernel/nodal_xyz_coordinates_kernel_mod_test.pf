@@ -21,7 +21,6 @@ module nodal_xyz_coordinates_kernel_mod_test
   use get_unit_test_3x3x3_chi_mod,         only : get_w0_3x3x3_field
 
   use pFUnit_Mod
-  use yaxt,                                only : xt_initialize, xt_finalize
   use mpi_mod,                             only : store_comm, clear_comm
 
   implicit none
@@ -54,8 +53,6 @@ contains
 
     class(nodal_xyz_coordinates_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -80,8 +77,6 @@ contains
 
     class(nodal_xyz_coordinates_test_type), intent(inout) :: this
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

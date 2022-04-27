@@ -12,7 +12,6 @@ module get_dz_w3_kernel_mod_test
     use constants_mod,                       only : i_def, r_def
     use mpi_mod,                             only : store_comm, clear_comm
     use pFUnit_Mod
-    use yaxt,                                only : xt_initialize, xt_finalize
     use get_unit_test_m3x3_q3x3x3_sizes_mod, only : get_w2_m3x3_q3x3x3_size, &
                                                     get_w3_m3x3_q3x3x3_size
     use get_unit_test_m3x3_dofmap_mod,       only : get_w2_m3x3_dofmap, &
@@ -48,8 +47,6 @@ contains
 
     class(get_dz_w3_kernel_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -81,8 +78,6 @@ contains
 
     call final_configuration()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

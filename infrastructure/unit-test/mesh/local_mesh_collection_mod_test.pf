@@ -23,7 +23,6 @@ module local_mesh_collection_mod_test
                                      partitioner_interface
     use ugrid_mesh_data_mod,  only : ugrid_mesh_data_type
 
-    use yaxt,                 only : xt_initialize, xt_finalize
     use mpi_mod,              only : store_comm, clear_comm,      &
                                      get_comm_size, get_comm_rank
     use pFUnit_Mod
@@ -53,8 +52,6 @@ contains
 
     class(local_mesh_collection_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -78,8 +75,6 @@ contains
     call global_mesh_collection%clear()
     call local_mesh_collection%clear()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

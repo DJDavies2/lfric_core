@@ -8,7 +8,6 @@ module compute_map_u_operators_kernel_mod_test
 
   use constants_mod,                 only : i_def, r_def, pi
   use pFUnit_Mod
-  use yaxt,                          only : xt_initialize, xt_finalize
   use mpi_mod,                       only : store_comm, clear_comm
 
   implicit none
@@ -51,8 +50,6 @@ contains
 
     class(compute_map_u_operators_test_type), intent(inout) :: this
 
-   ! Initialise YAXT
-    call xt_initialize( this%getMpiCommunicator() )
     ! Store the MPI communicator for later use
     call store_comm( this%getMpiCommunicator() )
 
@@ -92,8 +89,6 @@ contains
     call final_configuration()
     call final_chi_transforms()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

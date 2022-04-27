@@ -10,7 +10,6 @@ module consist_w2_to_sh_w2_kernel_mod_test
 
   use constants_mod,         only: i_def, r_def
   use reference_element_mod, only: E, W, N, S, T, B
-  use yaxt,                  only: xt_initialize, xt_finalize
   use mpi_mod,               only: store_comm, clear_comm
   use pFUnit_Mod
 
@@ -39,8 +38,6 @@ contains
 
     class(consist_w2_to_sh_w2_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -57,8 +54,6 @@ contains
 
     call final_configuration()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

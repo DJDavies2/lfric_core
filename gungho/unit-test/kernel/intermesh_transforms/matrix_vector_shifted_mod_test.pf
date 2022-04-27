@@ -9,7 +9,6 @@ module matrix_vector_shifted_mod_test
 
   use constants_mod, only : r_def, i_def
   use pFUnit_Mod
-  use yaxt,          only: xt_initialize, xt_finalize
   use mpi_mod,       only: store_comm, clear_comm
 
   implicit none
@@ -37,8 +36,6 @@ contains
 
     class(matrix_vector_shifted_kernel_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
 
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
@@ -55,8 +52,6 @@ contains
 
     call final_configuration()
 
-    ! Finalise YAXT
-    call xt_finalize()
 
     ! Clear the stored MPI communicator
     call clear_comm()

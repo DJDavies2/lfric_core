@@ -25,7 +25,6 @@ module compute_curl_operator_kernel_mod_test
     use get_unit_test_3x3x3_chi_mod,         only : get_w0_3x3x3_field
     use mpi_mod,                             only : store_comm, clear_comm
     use pFUnit_Mod
-    use yaxt,                                only : xt_initialize, xt_finalize
 
   implicit none
 
@@ -60,8 +59,6 @@ contains
     integer(i_def) :: nqp_h, nqp_v
     integer(i_def) :: i
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -82,8 +79,6 @@ contains
 
     class(compute_curl_operator_test_type), intent(inout) :: this
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

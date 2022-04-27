@@ -8,7 +8,6 @@
 module methox_kernel_mod_test
 
   use pFUnit_Mod
-  use yaxt,                          only : xt_initialize, xt_finalize
   use constants_mod,                 only : r_def, i_def
   use mpi_mod,                       only : store_comm, clear_comm
 
@@ -40,8 +39,6 @@ contains
 
   integer(kind=i_def) :: undf_wth
 
-  ! Initialise YAXT
-  call xt_initialize(this%getMpiCommunicator())
   ! Store the MPI communicator for later use
   call store_comm(this%getMpiCommunicator())
 
@@ -62,8 +59,6 @@ contains
 
   deallocate ( this%answer_dmv, this%dmv, this%m_v)
 
-  ! Finalise YAXT
-  call xt_finalize()
   ! Clear the stored MPI communicator
   call clear_comm()
 

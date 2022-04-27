@@ -14,7 +14,6 @@ use profile_interp_kernel_mod, only: profile_size,   &
                                      profile_data,   &
                                      profile_heights
 use pFUnit_Mod
-use yaxt,                only: xt_initialize, xt_finalize
 use mpi_mod,             only: store_comm, clear_comm
 
 implicit none
@@ -54,8 +53,6 @@ contains
 
     integer(i_def) :: k
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
 
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
@@ -129,8 +126,6 @@ contains
     deallocate( theta )
     deallocate( height_wt )
 
-    ! Finalise YAXT
-    call xt_finalize()
 
     ! Clear the stored MPI communicator
     call clear_comm()

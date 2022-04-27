@@ -15,7 +15,6 @@ module compute_dof_level_kernel_mod_test
     only : get_w2_nodal_coords
   use mpi_mod,       only : store_comm, clear_comm
   use pFUnit_Mod
-  use yaxt,          only : xt_initialize, xt_finalize
 
   implicit none
 
@@ -42,8 +41,6 @@ contains
 
     class(compute_dof_level_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -56,8 +53,6 @@ contains
 
     class(compute_dof_level_test_type), intent(inout) :: this
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

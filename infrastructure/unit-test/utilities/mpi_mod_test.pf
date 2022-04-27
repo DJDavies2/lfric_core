@@ -19,7 +19,6 @@ module mpi_mod_test
                      all_gather, broadcast, &
                      get_mpi_datatype, &
                      get_comm_size, get_comm_rank
-  use yaxt, only   : xt_initialize, xt_finalize
 
   implicit none
 
@@ -45,8 +44,6 @@ contains
 
     class(mpi_mod_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -59,8 +56,6 @@ contains
 
     class(mpi_mod_test_type), intent(inout) :: this
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

@@ -13,7 +13,6 @@ module limit_wind_kernel_mod_test
   use get_unit_test_m3x3_dofmap_mod,       only : get_w2_m3x3_dofmap
 
   use pFUnit_Mod
-  use yaxt,                          only : xt_initialize, xt_finalize
   use mpi_mod,                       only : store_comm, clear_comm
 
   implicit none
@@ -49,8 +48,6 @@ contains
 
     class(limit_wind_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -76,8 +73,6 @@ contains
 
     call final_configuration()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

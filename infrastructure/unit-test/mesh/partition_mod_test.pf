@@ -20,7 +20,6 @@ module partition_mod_test
                                         partitioner_interface
   use pFUnit_Mod
   use reference_element_mod,      only: reference_cube_type
-  use yaxt, only : xt_initialize, xt_finalize
   use ugrid_mesh_data_mod,        only : ugrid_mesh_data_type
 
   implicit none
@@ -64,8 +63,6 @@ contains
 
     global_mesh_collection = global_mesh_collection_type()
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -84,8 +81,6 @@ contains
 
     call global_mesh_collection%clear()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

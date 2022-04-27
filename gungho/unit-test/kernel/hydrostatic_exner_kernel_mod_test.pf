@@ -18,7 +18,6 @@ module hydrostatic_exner_kernel_mod_test
                                                   get_wtheta_m3x3_dofmap
   use formulation_config_mod,              only : init_exner_bt
   use pFUnit_Mod
-  use yaxt,                                only : xt_initialize, xt_finalize
   use mpi_mod,                             only : store_comm, clear_comm
 
   implicit none
@@ -100,8 +99,6 @@ contains
     integer(i_def) :: nqp_h, nqp_v
     integer(i_def) :: nlayers, i, j, k
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -224,8 +221,6 @@ contains
     call final_configuration()
     call final_chi_transforms()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

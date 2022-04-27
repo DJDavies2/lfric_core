@@ -74,7 +74,6 @@ module function_space_mod_test
                                     WB, SB, EB, NB,         &
                                     SW, SE, NE, NW,         &
                                     WT, ST, ET, NT
-  use yaxt,                  only : xt_initialize, xt_finalize
   use mpi_mod,               only : store_comm, clear_comm
 
   implicit none
@@ -209,8 +208,6 @@ contains
     type(local_mesh_type), pointer :: unit_test_local_mesh_ptr
     type(mesh_type) :: unit_test_mesh
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -248,8 +245,6 @@ contains
     call mesh_collection%clear()
     call final_configuration()
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

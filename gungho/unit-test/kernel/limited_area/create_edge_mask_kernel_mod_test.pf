@@ -11,7 +11,6 @@ module create_edge_mask_kernel_mod_test
 
   use constants_mod, only : i_def, r_def
   use pFUnit_Mod
-  use yaxt,          only : xt_initialize, xt_finalize
   use mpi_mod,       only : store_comm, clear_comm
 
   implicit none
@@ -56,8 +55,6 @@ module create_edge_mask_kernel_mod_test
     ! Dimensions (not used)
     integer(kind=i_def) :: dim_space, dim_space_diff
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -92,8 +89,6 @@ module create_edge_mask_kernel_mod_test
     deallocate(this%mask_in)
     deallocate(this%mask_out)
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 

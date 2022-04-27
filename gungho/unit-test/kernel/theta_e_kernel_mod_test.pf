@@ -11,7 +11,6 @@ module theta_e_kernel_mod_test
   use get_unit_test_m3x3_q3x3x3_sizes_mod, only : get_wtheta_m3x3_q3x3x3_size
   use get_unit_test_m3x3_dofmap_mod,       only : get_wtheta_m3x3_dofmap
   use pFUnit_Mod
-  use yaxt,                                only : xt_initialize, xt_finalize
   use mpi_mod,                             only : store_comm, clear_comm
 
   implicit none
@@ -37,8 +36,6 @@ contains
 
     class(theta_e_test_type), intent(inout) :: this
 
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
     ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
@@ -51,8 +48,6 @@ contains
 
     class(theta_e_test_type), intent(inout) :: this
 
-    ! Finalise YAXT
-    call xt_finalize()
     ! Clear the stored MPI communicator
     call clear_comm()
 
