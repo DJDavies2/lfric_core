@@ -1,38 +1,37 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 ##############################################################################
 # Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
 # For further details please refer to the file LICENCE.original which you
 # should have received as part of this distribution.
 ##############################################################################
-'''
+# pylint: disable=invalid-name
+"""
 Reads in a set of namelist description files, produces a Fortran module of frig
 functions for use in unit testing.
-'''
-
-from __future__ import print_function
-
+"""
 import argparse
-import os.path
+import logging
+from pathlib import Path
 
 from configurator import __version__
 import configurator.namelistdescription as namelist
 import configurator.namelistfeigner
-import utilities.logging as logging
 
 
 def main():
-
+    """
+    Entry point. Handles command-line arguments.
+    """
     parser = argparse.ArgumentParser(add_help=False,
                                      description=__doc__)
     parser.add_argument('-help', '-h', '--help', action='help',
                         help='Show this help message and exit')
     parser.add_argument('-version', action='version',
-                        version='%(prog)s {}'.format(__version__))
+                        version=f'%(prog)s {__version__}')
     parser.add_argument('-verbose', action='store_true',
                         help='Provide a running commentry')
     parser.add_argument('-output', metavar='path',
-                        default='feign_config_mod.f90',
+                        type=Path, default=Path('feign_config_mod.f90'),
                         help='Resulting output file')
     parser.add_argument('meta_filename', metavar='description-file',
                         nargs=1, help='The metadata file to load')
@@ -40,12 +39,11 @@ def main():
     args = parser.parse_args()
 
     if args.verbose:
-        import sys
-        logger = logging.PrintLogger(sys.stdout)
-    else:
-        logger = logging.NoLogger()
+        handler = logging.StreamHandler()
+        logging.getLogger('configurator').addHandler(handler)
+        logging.getLogger('configurator').setLevel(logging.WARNING)
 
-    module_name, junk = os.path.splitext(os.path.basename(args.output))
+    module_name = args.output.stem
 
     meta_filename = args.meta_filename[0]
 
@@ -54,8 +52,7 @@ def main():
     meta_parser = namelist.NamelistConfigDescription()
     feigner.add_namelist(meta_parser.process_config(meta_filename))
 
-    with open(args.output, 'wt') as module_file:
-        feigner.write_module(module_file)
+    feigner.write_module(args.output)
 
 
 if __name__ == '__main__':

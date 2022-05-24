@@ -294,12 +294,12 @@ unit-tests/%:
 do-integration-tests: ANY_TESTS = $(patsubst $(TEST_DIR)/%,%,$(basename $(shell find $(TEST_DIR) -name '*.[Ff]90' -exec egrep -l "^\s*program" {} \; 2>/dev/null)))
 do-integration-tests: export PROGRAMS = $(ANY_TESTS)
 do-integration-tests: export TEST_RUN_DIR = $(BIN_DIR)/test_files
+# We recurse into the make file here in order to reify all the target
+# specific variables. They only appear in recipes and we need them to
+# make decissions. This does mean we reload the makefile in order to
+# log a message in the case where there is nothing to test.
+#
 do-integration-tests:
-	# We recurse into the make file here in order to reify all the target
-	# specific variables. They only appear in recipes and we need them to
-	# make decissions. This does mean we reload the makefile in order to
-	# log a message in the case where there is nothing to test.
-	#
 	$Q$(MAKE) -f $(LFRIC_BUILD)/lfric.mk                                   \
 	          $(if $(ANY_TESTS), $(ANY_TESTS:%=do-integration-test/run/%), \
 	                             do-integration-test/none)

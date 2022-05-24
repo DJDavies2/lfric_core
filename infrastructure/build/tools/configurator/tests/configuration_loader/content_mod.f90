@@ -1,5 +1,3 @@
-{#- This is the skeleton of the configuration loading module.              -#}
-{#- The Jinja templating library is used to insert the actual code.        -#}
 !-----------------------------------------------------------------------------
 ! (C) Crown copyright 2022 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
@@ -7,24 +5,18 @@
 !-----------------------------------------------------------------------------
 ! Handles the loading of namelists.
 !
-module {{moduleName}}
+module content_mod
 
   use constants_mod, only : i_native, l_def, str_def, str_max_filename
   use log_mod,       only : log_scratch_space, log_event, LOG_LEVEL_ERROR
   use mpi_mod,       only : get_comm_rank, broadcast
   use mpi,           only : MPI_SUCCESS
-{%- if namelists %}
-{{-'\n'}}
-{%-   for listname in namelists %}
-  use {{listname}}_config_mod, only : read_{{listname}}_namelist, &
-{%-   set indent = '  use '+listname+'_config_mod, only : ' %}
-{%-   set indent = indent | length() %}
-{{' '*indent}}postprocess_{{listname}}_namelist, &
-{{' '*indent}}{{listname}}_is_loadable, &
-{{' '*indent}}{{listname}}_is_loaded, &
-{{' '*indent}}{{listname}}_final
-{%-   endfor %}
-{%- endif %}
+
+  use foo_config_mod, only : read_foo_namelist, &
+                             postprocess_foo_namelist, &
+                             foo_is_loadable, &
+                             foo_is_loaded, &
+                             foo_final
 
   implicit none
 
@@ -154,10 +146,8 @@ contains
 
     name_loop: do i = 1, size(names)
       select case(trim( names(i) ))
-{%- for listname in namelists %}
-        case ('{{listname}}')
-          configuration_found = {{listname}}_is_loaded()
-{%- endfor %}
+        case ('foo')
+          configuration_found = foo_is_loaded()
         case default
           write( log_scratch_space, '(A, A, A)' )          &
                "Tried to ensure unrecognised namelist """, &
@@ -188,10 +178,9 @@ contains
     ! Read the namelists
     do i = 1, size(namelists)
       select case (trim(namelists(i)))
-{%- for listname in namelists %}
-        case ('{{listname}}')
-          if ({{listname}}_is_loadable()) then
-            call read_{{listname}}_namelist( unit, local_rank )
+        case ('foo')
+          if (foo_is_loadable()) then
+            call read_foo_namelist( unit, local_rank )
           else
             write( log_scratch_space, '(A)' )      &
                   "Namelist """//                   &
@@ -199,7 +188,6 @@ contains
                   """ can not be read. Too many instances?"
             call log_event( log_scratch_space, LOG_LEVEL_ERROR )
           end if
-{%- endfor %}
         case default
           write( log_scratch_space, '(A)' )        &
                 "Unrecognised namelist """//        &
@@ -213,10 +201,8 @@ contains
     ! Perform post load actions
     do i = 1, size(namelists)
       select case (trim(namelists(i)))
-{%- for listname in namelists %}
-        case ('{{listname}}')
-          call postprocess_{{listname}}_namelist()
-{%- endfor %}
+        case ('foo')
+          call postprocess_foo_namelist()
         case default
           write( log_scratch_space, '(A)' )        &
                 "Unrecognised namelist """//        &
@@ -233,14 +219,9 @@ contains
 
     implicit none
 
-{%- if namelists %}
-{{-'\n'}}
-{%-   for listname in namelists %}
-    call {{listname}}_final()
-{%-   endfor %}
-{%- endif %}
+    call foo_final()
 
     return
   end subroutine final_configuration
 
-end module {{moduleName}}
+end module content_mod

@@ -2,9 +2,9 @@
 {#- tests. The Jinja templating library is used to insert the actual code. -#}
 
 !-----------------------------------------------------------------------------
-! Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
-! For further details please refer to the file LICENCE.original which you
-! should have received as part of this distribution.
+! (C) Crown copyright 2022 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
 !-----------------------------------------------------------------------------
 ! Handles the feigning of namelists.
 !
@@ -65,6 +65,9 @@ contains
 {%-   endif %}
 {%- endfor %}
 
+    character(*), parameter :: temp_close_message &
+      = "feign_{{name}}_config: Unable to close temporary file"
+
     integer(i_native)  :: condition
 
 {%- if string_arrays %}
@@ -124,9 +127,7 @@ contains
     call read_{{name}}_namelist( temporary_unit, local_rank )
     call postprocess_{{name}}_namelist()
     close(temporary_unit, iostat=condition )
-    if (condition /= 0) stop &
-        'feign_{{name}}_config: '// &
-        'Unable to close temporary file'
+    if (condition /= 0) stop temp_close_message
 
   end subroutine feign_{{name}}_config
 {%- endfor %}

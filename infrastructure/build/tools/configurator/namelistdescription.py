@@ -1,62 +1,64 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 ##############################################################################
 # Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
 # For further details please refer to the file LICENCE.original which you
 # should have received as part of this distribution.
 ##############################################################################
-'''
+"""
 Turns namelist descriptions into namelist modules.
-'''
-
-from __future__ import print_function
-
-from __future__ import absolute_import
-from abc import ABCMeta, abstractmethod
-
+"""
+from abc import ABC, abstractmethod
 import collections
+import json
+from pathlib import Path
 import random
 import re
-import json
-import six
+from typing import Dict, List, Optional, Sequence, Tuple
 
-import jinja2 as jinja
-import configurator.jinjamacros as jinjamacros
+import jinja2
+
+from configurator import jinjamacros
 
 
 ##############################################################################
 class NamelistDescriptionException(Exception):
-    pass
+    """
+    Thrown for problems in the namelist.
+    """
+    pass  # pylint: disable=unnecessary-pass
 
 
 ##############################################################################
-class FortranType(object):
-    _singletonMap = {}
+class FortranType:
+    """
+    Represents a Fortran type.
 
-    @classmethod
-    def instance(cls, intrinsic_type, kind, write_format):
-        if intrinsic_type not in cls._singletonMap:
-            cls._singletonMap[intrinsic_type] = {}
+    Implements the singleton pattern such that there is only one object per
+    type.
+    """
+    _singletonMap: Dict[str, Dict[str, Dict[str, "FortranType"]]] = {}
 
-        if kind not in cls._singletonMap[intrinsic_type]:
-            cls._singletonMap[intrinsic_type][kind] = {}
-
-        if write_format not in cls._singletonMap[intrinsic_type][kind]:
-            cls._singletonMap[intrinsic_type][kind][write_format] \
-                = cls(intrinsic_type, kind, write_format)
-
-        return cls._singletonMap[intrinsic_type][kind][write_format]
-
-    def __init__(self, intrinsic_type, kind, write_format):
+    def __init__(self, intrinsic_type: str, kind: str, write_format: str):
+        """
+        :param intrinsic_type: One of "integer", "real", etc.
+        :param kind: Name of data type kind.
+        :param write_format: Formatting string for this type.
+        """
         self.intrinsic_type = intrinsic_type
         self.kind = kind
         self.write_format = write_format
 
-    def declaration(self):
-        return self.intrinsic_type + '(' + self.kind + ')'
+    def declaration(self) -> str:
+        """
+        Gets the type designator used by declarations in source files.
+        """
+        return f'{self.intrinsic_type}({self.kind})'
 
-    def label(self):
-        return self.intrinsic_type + '_' + self.kind
+    def label(self) -> str:
+        """
+        Gets a label for this type.
+        """
+        return f'{self.intrinsic_type}_{self.kind}'
 
     def __lt__(self, other):
         return self.declaration() < other.declaration()
@@ -70,60 +72,109 @@ class FortranType(object):
     def __hash__(self):
         return hash(self.__key())
 
+    @classmethod
+    def instance(cls, intrinsic_type, kind, write_format) -> "FortranType":
+        """
+        Gets the singleton object for a given type.
+        """
+        if intrinsic_type not in cls._singletonMap:
+            cls._singletonMap[intrinsic_type] = {}
+
+        if kind not in cls._singletonMap[intrinsic_type]:
+            cls._singletonMap[intrinsic_type][kind] = {}
+
+        if write_format not in cls._singletonMap[intrinsic_type][kind]:
+            cls._singletonMap[intrinsic_type][kind][write_format] \
+                = cls(intrinsic_type, kind, write_format)
+
+        return cls._singletonMap[intrinsic_type][kind][write_format]
+
 
 ##############################################################################
-class _Property(six.with_metaclass(ABCMeta, object)):
-    def __init__(self, name, fortran_type):
+class _Property(ABC):
+    """
+    Root of all namelist fields.
+
+    .. todo:: This interface is used externally so shouldn't be "private."
+    """
+    def __init__(self, name: str, fortran_type: FortranType):
+        """
+        :param name: Identifying name.
+        :param fortran_type: field's Fortran type.
+        """
         self.name = name
         self.fortran_type = fortran_type
 
-    def required_kinds(self):
-        '''Returns a list of the fortran "kind" statements used by
-           this fortran namelist module'''
+    def required_kinds(self) -> List[str]:
+        """
+        Gets Fortran kind of this field.
+        """
         return [self.fortran_type.kind]
 
     @abstractmethod
-    def get_configure_type(self):
-        pass
+    def get_configure_type(self) -> str:
+        """
+        Gets the configuration meta-data type of this field.
+        """
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def missing_data_indicator(self) -> str:
+        """
+        Gets the value used to indicate an unset field.
+        """
+        raise NotImplementedError()
 
 
 ##############################################################################
 class _String(_Property):
+    """
+    Namelist string field.
+    """
     _fortranStringMap = {'default':  'str_def',
                          'filename': 'str_max_filename'}
 
-    def __init__(self, name, length=None):
-
+    def __init__(self, name: str, length: Optional[str] = None):
+        """
+        :param name: Identifying name.
+        :param length: String length is a name which resolves to a length.
+        """
         if not length:
             length = 'default'
 
-        super(_String, self).__init__(
-            name, FortranType.instance('character',
-                                       self._fortranStringMap[length],
-                                       'A'))
-        self._missing_data_indicator = 'cmdi'
+        super().__init__(name,
+                         FortranType.instance('character',
+                                              self._fortranStringMap[length],
+                                              'A'))
 
-    def get_configure_type(self):
+    def get_configure_type(self) -> str:
         return 'string'
 
     @property
-    def missing_data_indicator(self):
-        return self._missing_data_indicator
+    def missing_data_indicator(self) -> str:
+        return 'cmdi'
+
 
 ##############################################################################
 class _Enumeration(_Property):
-
-    def __init__(self, name, keyDictionary):
-        super(_Enumeration, self).__init__(name,
-                                           FortranType.instance('integer',
-                                                                'i_native',
-                                                                'I0'))
+    """
+    Namelist enumeration field.
+    """
+    def __init__(self, name: str, keyDictionary: Dict[str, int]):
+        """
+        :param name: Identifying name.
+        :param keyDictionary: Mapping of enumerator to representation.
+        """
+        super().__init__(name,
+                         FortranType.instance('integer',
+                                              'i_native',
+                                              'I0'))
 
         self.mapping = keyDictionary
         self.inverse_mapping = {value:
                                 key for key, value in self.mapping.items()}
         self.first_key = self.inverse_mapping[min(self.inverse_mapping.keys())]
-        self._missing_data_indicator = 'emdi'
 
     def required_kinds(self):
         return [self.fortran_type.kind, 'str_def']
@@ -133,10 +184,14 @@ class _Enumeration(_Property):
 
     @property
     def missing_data_indicator(self):
-        return self._missing_data_indicator
+        return 'emdi'
+
 
 ##############################################################################
 class _Scalar(_Property):
+    """
+    Namelist scalar value field.
+    """
     _fortranKindMap = {'character': {'default': 'str_def',
                                      'filename': 'str_max_filename'},
                        'logical':   {'default': 'l_def',
@@ -162,38 +217,58 @@ class _Scalar(_Property):
                                     'integer':   'imdi',
                                     'real':      'rmdi'}
 
-    def __init__(self, name, configure_type, configure_kind=None):
-
+    def __init__(self, name: str,
+                 configure_type: str,
+                 configure_kind: Optional[str] = None):
+        """
+        :param name: Identifying name.
+        :param configure_type: Configuration type identifier.
+        :param configure_kind: Configuration kind identifier.
+        """
         if not configure_kind:
             configure_kind = 'default'
 
         if configure_type == 'string':
             configure_type = 'character'
 
-        super(_Scalar, self).__init__(
-            name, FortranType.instance(
+        super().__init__(
+            name,
+            FortranType.instance(
                 configure_type,
                 self._fortranKindMap[configure_type][configure_kind],
-                self._fortranFormatMap[configure_type]))
-        self._missing_data_indicator = \
-            self._fortranMissingDataIndicator[configure_type]
+                self._fortranFormatMap[configure_type]
+            )
+        )
+        self._mdi = self._fortranMissingDataIndicator[configure_type]
 
     def get_configure_type(self):
         return 'scalar'
 
     @property
     def missing_data_indicator(self):
-        return self._missing_data_indicator
+        return self._mdi
 
 
 ##############################################################################
 class _Computed(_Scalar):
-
-    def __init__(self, name, configure_type, configure_kind, computation,
-                 dereferenced_list_vars=None):
-
-        super(_Computed, self).__init__(name, configure_type, configure_kind)
-        self.computation = computation[0]
+    """
+    Namelist computed value field.
+    """
+    def __init__(self, name: str,
+                 configure_type: str,
+                 computation: str,
+                 configure_kind: Optional[str],
+                 dereferenced_list_vars: Optional[Sequence[str]] = None):
+        # pylint: disable=too-many-arguments
+        """
+        :param name: Identifying name.
+        :param configure_type: Configuration type identifier.
+        :param configure_kind: Configuration kind identifier.
+        :param computation: Fortran expression.
+        :param derefernced_list_vars: Fields needed from other namelists.
+        """
+        super().__init__(name, configure_type, configure_kind)
+        self.computation = computation
         self.dereferenced_list_vars = dereferenced_list_vars
 
     def get_configure_type(self):
@@ -202,65 +277,89 @@ class _Computed(_Scalar):
 
 ##############################################################################
 class _Array(_Property):
-    def __init__(self, name, contentProperty, bounds):
-        super(_Array, self).__init__(name, contentProperty.fortran_type)
+    """
+    Namelist array field.
+    """
+    def __init__(self, name: str,
+                 contentProperty: _Property,
+                 bounds: str):
+        """
+        :param name: Identifying name.
+        :param contentProperty: Description of array elements.
+        :param bounds: Description of array size.
+        """
+        super().__init__(name, contentProperty.fortran_type)
         self.content = contentProperty
 
-        if not len(bounds) == 1:
+        if ',' in bounds:
             message = 'Only 1D arrays allowed in configuration: {}'
             raise NamelistDescriptionException(message.format(bounds))
 
-        if ':' in bounds[0] and bounds[0].strip() != ':':
-            lower, upper = bounds[0].split(':')
+        if ':' in bounds and bounds.strip() != ':':
+            lower, upper = bounds.split(':')
 
             if (lower.strip() not in ['1', '']):
                 message = 'Only lower bound of 1 '\
                           'is allowed in configuration: {}'
-                raise NamelistDescriptionException(message.format(bounds[0]))
+                raise NamelistDescriptionException(message.format(bounds))
 
             self.bounds = upper
         else:
-            self.bounds = bounds[0]
+            self.bounds = bounds
 
     def get_configure_type(self):
         return 'array'
 
     @property
     def missing_data_indicator(self):
-        return self.content._missing_data_indicator
+        return self.content.missing_data_indicator
 
-    def is_immediate_size(self):
+    def is_immediate_size(self) -> bool:
+        """
+        :return: True if array size is a fixed number.
+        """
         if self.bounds.isdigit():
             return True
 
         return False
 
     def is_deferred_size(self):
+        """
+        :return: True if array size is dependent on another field.
+        """
         if not self.bounds[0].isdigit() and self.bounds[0] != ':':
             return True
 
         return False
 
     def is_arbitrary_size(self):
+        """
+        :return: True if array size is unspecified.
+        """
         if self.bounds[0] == ':':
             return True
 
         return False
 
 
-
 ##############################################################################
-class NamelistDescription(object):
-
-    def __init__(self, listname, fix_enum=False):
+class NamelistDescription:
+    """
+    Describes a namelist and its contained fields.
+    """
+    def __init__(self, listname: str, fix_enum: bool = False):
+        """
+        :param listname: Identifying name.
+        :param fix_enum: Do not randomise enumerator values.
+        """
         self._listname = listname
 
-        self._engine = jinja.Environment(
-            loader=jinja.PackageLoader('configurator', 'templates'),
+        self._engine = jinja2.Environment(
+            loader=jinja2.PackageLoader('configurator', 'templates'),
             extensions=['jinja2.ext.do'])
         self._engine.filters['decorate'] = jinjamacros.decorate_macro
 
-        self._parameters = collections.OrderedDict()
+        self._parameters: Dict[str, _Property] = collections.OrderedDict()
         self._module_usage = collections.defaultdict(set)
         self._module_usage['constants_mod'] = set(['cmdi', 'emdi', 'unset_key',
                                                    'imdi', 'rmdi'])
@@ -268,16 +367,25 @@ class NamelistDescription(object):
         self._fix_enum = fix_enum
         self._enum_pool = list(range(1, 1000))
 
-    def get_namelist_name(self):
-        '''Returns the fortran namelist name as string'''
+    def get_namelist_name(self) -> str:
+        """
+        :return: Namelist identifier.
+        """
         return self._listname
 
-    def get_module_name(self):
-        '''Returns the fortran namelist module name as string'''
+    def get_module_name(self) -> str:
+        """
+        :return: Namelist loader Fortran module name.
+        """
         return self._listname + '_config_mod'
 
-    def add_enumeration(self, name, enumerators):
-        '''Adds an enumeration variable to the namelist description'''
+    def add_enumeration(self, name: str, enumerators: Sequence[str]) -> None:
+        """
+        Adds an enumerated field to the namelist.
+
+        :param name: Identifying name.
+        :param enumerators:
+        """
         if not isinstance(enumerators, list):
             message = 'Expected list of enumerators'
             raise NamelistDescriptionException(message)
@@ -294,55 +402,91 @@ class NamelistDescription(object):
 
         self._parameters[name] = _Enumeration(name, key_dict)
 
-    def add_usage(self, name, module=None):
-        '''Add add variable from a different fortran module that
-           this fortran namelist module should access via the fortran
-           `use` statement'''
+    def add_usage(self, name: str, module: str) -> None:
+        """
+        Makes this namelist loading module depend on another Fortran module
+        for values used in computed fields.
+
+        :param name: Variable name.
+        :param module: Module name.
+        """
         self._module_usage[module].add(name)
 
-    def add_string(self, name, configure_string_length=None, bounds=None):
-        '''Add a scalar/array string variable to the namelist description'''
+    def add_string(self, name: str,
+                   configure_string_length: Optional[str] = None,
+                   bounds: Optional[str] = None) -> None:
+        """
+        Adds a scalar or array string field to the namelist.
 
+        :param name: Field name.
+        :param configure_string_length: Length of string is a label which
+            resolves to a length.
+        :param bounds: Either a length, slice or naked colon.
+        """
         new_parameter = _String(name, configure_string_length)
 
         if bounds:
-            bounds[0], dereferenced_list_vars = (
-                self._dereference_expression(bounds[0]))
-            self._parameters[name] = _Array(name, new_parameter, bounds)
+            dereffed_bounds, _ = self._dereference_expression(bounds)
+            self._parameters[name] = _Array(name,
+                                            new_parameter,
+                                            dereffed_bounds)
         else:
             self._parameters[name] = new_parameter
 
-    def add_value(self, name, configure_type, configure_kind=None,
-                  bounds=None):
-        '''Add a scalar/array variable of type [logical,integer,real]
-           to the namelist description'''
+    def add_value(self, name: str,
+                  configure_type: str,
+                  configure_kind: Optional[str] = None,
+                  bounds: Optional[str] = None) -> None:
+        """
+        Adds a scalar or array field of type logical, integer or real to the
+        namelist.
 
+        :param name: Field name.
+        :param configure_type: type identifier.
+        :param configure_kind: kind identifier.
+        :param bounds: Either a length, slice or naked colon.
+        """
         new_parameter = _Scalar(name, configure_type, configure_kind)
-
         if bounds:
-            bounds[0], dereferenced_list_vars = (
-                self._dereference_expression(bounds[0]))
-            self._parameters[name] = _Array(name, new_parameter, bounds)
+            dereffed_bounds, _ = self._dereference_expression(bounds)
+            self._parameters[name] = _Array(name,
+                                            new_parameter,
+                                            dereffed_bounds)
         else:
             self._parameters[name] = new_parameter
 
-    def add_computed(self, name, configure_type, configure_kind=None,
-                     calculation=None):
-        '''Add a variable the namelist module which is derived from an
-           expression provided as a string variable'''
+    def add_computed(self, name: str,
+                     configure_type: str,
+                     calculation: str,
+                     configure_kind: Optional[str] = None) -> None:
+        """
+        Adds a computed field to the namelist.
 
-        calculation[0], dereferenced_list_vars = (
-            self._dereference_expression(calculation[0]))
+        :param name: Field name.
+        :param configure_type: type identifier.
+        :param configure_kind: kind identifier.
+        :param colculation: Fortran expression.
+        """
+        calculation, dereferenced_list_vars = (
+            self._dereference_expression(calculation))
         self._parameters[name] = _Computed(
             name, configure_type,
-            configure_kind, calculation,
+            calculation,
+            configure_kind,
             dereferenced_list_vars=dereferenced_list_vars)
 
-    def get_parameters(self):
+    def get_parameters(self) -> List[_Property]:
+        """
+        Gets all the properties associated with this namelist.
+        """
         return list(self._parameters.values())
 
-    def write_module(self, file_object):
+    def write_module(self, file_object: Path) -> None:
+        """
+        Generates Fortran module source and writes it to a file.
 
+        :param file_object: Filename to write to.
+        """
         if not self._parameters:
             message = ('Cannot write a module to load an empty namelist ('
                        + self._listname + ')')
@@ -350,7 +494,7 @@ class NamelistDescription(object):
 
         all_kinds = set(['i_native'])
         lone_kind_index = {}
-        lone_kind_tally = collections.defaultdict(int)
+        lone_kind_tally: Dict[FortranType, int] = collections.defaultdict(int)
         namelist = []
 
         for name, parameter in self._parameters.items():
@@ -385,22 +529,28 @@ class NamelistDescription(object):
                    'use_from':      self._module_usage}
 
         template = self._engine.get_template('namelist.f90.jinja')
-        print(template.render(inserts), file=file_object)
+        file_object.write_text(template.render(inserts))
 
-    def _dereference_expression(self, string):
+    def _dereference_expression(self,
+                                expression: str) -> Tuple[str, List[str]]:
+        """
+        Resolve field references in an expression.
 
+        :param expression: Fortran expression containing field references.
+        :result: Expression with references resolved and a list of namelist
+                 fields involved.
+        """
         str_dict = {'namelist': {'regexString':   r'namelist:(\w*)=(\w*)',
                                  'removalString': r'namelist:\w*=',
                                  'moduleSuffix':  '_config_mod'},
                     'source':   {'regexString':   r'source:(\w*)=(\w*)',
                                  'removalString': r'source:\w*=',
                                  'moduleSuffix':  ''}}
-        result = string
+        result = expression
 
-        dereferenced_list_vars = []
+        dereferenced_list_vars: List[str] = []
 
         for key, value in str_dict.items():
-
             use_variables = re.findall(value['regexString'], result)
             if use_variables is not None:
                 n_vars = len(use_variables)
@@ -411,9 +561,7 @@ class NamelistDescription(object):
                     var_name = use_variables[i_var][1]
 
                     if use_variables[i_var][0] != self._listname:
-                        module_name = '{}{}'.format(
-                            list_name,
-                            value['moduleSuffix'])
+                        module_name = f'{list_name}{value["moduleSuffix"]}'
                         self.add_usage(var_name, module=module_name)
 
                     if key == 'namelist':
@@ -422,17 +570,24 @@ class NamelistDescription(object):
             result = re.sub(value['removalString'], '', result)
 
         if len(dereferenced_list_vars) == 0:
-            dereferenced_list_vars = None
+            dereferenced_list_vars = []
 
         return result, dereferenced_list_vars
 
-    def add_member(self, member_name, meta_dict):
+    def add_member(self, member_name: str, meta_dict: Dict[str, str]) -> None:
+        # pylint: disable=too-many-branches
+        """
+        Processes one field entry from the metadata and adds the appropriate
+        property to this namelist.
 
+        :param member_name: Identifying name.
+        :param meta_dict: Field description.
+        """
         meta_keys = list(meta_dict.keys())
-        string_length = None
-        xkind = None
-        xtype = None
-        xbounds = None
+        string_length: Optional[str] = None
+        xtype: str = ''
+        xkind: Optional[str] = None
+        xbounds: Optional[str] = None
 
         if 'string_length' in meta_keys:
             string_length = meta_dict['string_length']
@@ -462,27 +617,26 @@ class NamelistDescription(object):
 
                 if 'bounds' in meta_keys:
                     xbounds = meta_dict['bounds']
-                    xbounds = [xbounds]
                 else:
-                    xbounds = [':']
+                    xbounds = ':'
 
             elif isinstance(int(xlength), int):
-                xbounds = [xlength]
+                xbounds = xlength
 
         # Generating Enumerators from metadata
         # These are not dependant on xtype being specified
         if ('enumeration' in meta_keys and
                 meta_dict['enumeration'] == 'true'):
 
-            enumeration_keys = meta_dict['values']
-            if all(isinstance(item, str) for item in enumeration_keys):
-                enumeration_keys = enumeration_keys.replace('\n', '')
-                enumeration_keys = enumeration_keys.replace(' ', '')
-                enumeration_keys = enumeration_keys.replace("'", '')
-                enumeration_keys = enumeration_keys.split(',')
+            key_values = meta_dict['values']
+            if all(isinstance(item, str) for item in key_values):
+                key_values = key_values.replace('\n', '')
+                key_values = key_values.replace(' ', '')
+                key_values = key_values.replace("'", '')
+                keys = key_values.split(',')
 
                 enumeration_keys = [re.sub(r'namelist:', '', member)
-                                    for member in enumeration_keys]
+                                    for member in keys]
 
                 self.add_enumeration(
                     member_name, enumerators=enumeration_keys)
@@ -492,7 +646,7 @@ class NamelistDescription(object):
             expression_string = meta_dict['expression']
             self.add_computed(
                 member_name, xtype, configure_kind=xkind,
-                calculation=[expression_string])
+                calculation=expression_string)
 
         elif xtype == 'string':
             self.add_string(
@@ -506,15 +660,19 @@ class NamelistDescription(object):
 
 
 ###############################################################################
-class NamelistConfigDescription(object):
-
-    def __init__(self):
-        pass
-
-    def process_config(self, nml_config_file, fix_enum=False):
-
-        # Process json
-        with open(nml_config_file) as config_file:
+class NamelistConfigDescription:  # pylint: disable=too-few-public-methods
+    """
+    Manages the JSON representation of the configuration metadata.
+    """
+    @staticmethod
+    def process_config(nml_config_file: Path,
+                       fix_enum: bool = False) -> List[NamelistDescription]:
+        """
+        Loads the file and dissects it.
+        :param nml_config_file: Input JSON file.
+        :param fix_enum: Force enumerator values to be repeatable.
+        """
+        with open(nml_config_file, encoding='utf8') as config_file:
             namelist_config = json.load(config_file)
 
         result = []
