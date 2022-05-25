@@ -31,6 +31,8 @@ USE mesh_collection_mod,        ONLY: mesh_collection,                         &
 USE mesh_mod,                   ONLY: mesh_type
 USE time_config_mod,            ONLY: calendar_start, calendar_type, &
                                       key_from_calendar_type
+USE lfricinp_runtime_constants_mod, ONLY: lfricinp_create_runtime_constants
+
 ! Interface to mpi
 USE mpi_mod,                    ONLY: initialise_comm, store_comm,             &
                                       get_comm_size, get_comm_rank,            &
@@ -165,6 +167,14 @@ CALL io_context%initialise( xios_ctx,                                   &
                             calendar_start,                             &
                             key_from_calendar_type(calendar_type),      &
                             file_list )
+
+! Initialise runtime constants
+CALL log_event('Initialising runtime constants', LOG_LEVEL_INFO)
+CALL lfricinp_create_runtime_constants(mesh,                                   &
+                              twod_mesh,                                       &
+                              chi,                                             &
+                              panel_id,                                        &
+                              seconds_per_step)
 
 END SUBROUTINE lfricinp_initialise_lfric
 

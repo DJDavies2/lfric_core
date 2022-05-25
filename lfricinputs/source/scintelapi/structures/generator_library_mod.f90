@@ -16,7 +16,7 @@ USE log_mod,              ONLY: log_event, LOG_LEVEL_ERROR
 IMPLICIT NONE
 
 ! Number of generators
-INTEGER, PARAMETER :: no_generators = 13
+INTEGER, PARAMETER :: no_generators = 14
 
 ! Generator array containing all generators
 TYPE(field_generator), TARGET :: generator_list(no_generators)
@@ -44,6 +44,7 @@ USE soil_moist_content_to_soil_moist_stress_mod, ONLY:                         &
                                      soil_moist_content_to_soil_moist_stress
 USE soil_moist_stress_to_soil_moist_content_mod, ONLY:                         &
                                      soil_moist_stress_to_soil_moist_content
+USE specific_humidity_to_mixing_ratio_mod, ONLY: specific_humidity_to_mixing_ratio
 
 IMPLICIT NONE
 
@@ -122,6 +123,11 @@ generator_list(l)%generator => soil_moist_content_to_soil_moist_stress
 l = 13
 generator_list(l)%identifier = 'soil_moist_stress_to_soil_moist_content '
 generator_list(l)%generator => soil_moist_stress_to_soil_moist_content
+
+! Convert specific humidities to equivalent mixing ratios
+l = 14
+generator_list(l)%identifier = 'spec_humidity_to_mixing_ratios'
+generator_list(l)%generator => specific_humidity_to_mixing_ratio
 
 END SUBROUTINE init_generator_lib
 
