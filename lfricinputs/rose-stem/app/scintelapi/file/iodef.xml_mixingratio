@@ -43,11 +43,6 @@
         <field id="write_m_cl" name="m_cl" long_name="cloud_liquid_water_mixing_ratio"  unit="1" grid_ref="full_level_face_grid" operation="once" prec="8"/>
         <field id="write_m_cf" name="m_cf" long_name="cloud_ice_mixing_ratio"  unit="1" grid_ref="full_level_face_grid" operation="once" prec="8"/>
         <field id="write_m_r" name="m_r" long_name="rain_mixing_ratio" unit="1" grid_ref="full_level_face_grid" operation="once" prec="8"/>
-        <field id="write_rho_r2" name="rho_r2" long_name="density_times_r_squared" unit="1" grid_ref="half_level_face_grid" operation="once" prec="8"/>
-        <field id="write_q" name="q" long_name="specific humidity"  unit="1" grid_ref="full_level_face_grid" operation="once" prec="8"/>
-        <field id="write_qcl" name="qcl" long_name="specific_humidity_cloud_liquid"  unit="1" grid_ref="full_level_face_grid" operation="once" prec="8"/>
-        <field id="write_qcf" name="qcf" long_name="specific_humidity_cloud_ice"  unit="1" grid_ref="full_level_face_grid" operation="once" prec="8"/>
-        <field id="write_qrain" name="qrain" long_name="mass_fraction_of_rain_in_air" unit="1" grid_ref="full_level_face_grid" operation="once" prec="8"/>
       </file>
 
       <!-- File definition for lfric checkpoint read -->

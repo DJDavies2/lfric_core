@@ -40,10 +40,10 @@
   "scintelapi-spice_ifort_gcc_rigorous-basic_C48L38_C48L38"                         : BASE~"_t2917",
   "scintelapi-spice_ifort_gcc_safe-basic_C48L38_C48L38"                             : BASE~"_t2917",
 
-  "scintelapi-spice_gfortran_gcc_rigorous-aquaplanet_C48L38_C48L38_mixingratio"     : BASE,
-  "scintelapi-spice_gfortran_gcc_safe-aquaplanet_C48L38_C48L38_mixingratio"         : BASE,
-  "scintelapi-spice_ifort_gcc_rigorous-aquaplanet_C48L38_C48L38_mixingratio"        : BASE,
-  "scintelapi-spice_ifort_gcc_safe-aquaplanet_C48L38_C48L38_mixingratio"            : BASE,
+  "scintelapi-spice_gfortran_gcc_rigorous-basicgal_C12L70_mixingratio"              : BASE~"_t2942",
+  "scintelapi-spice_gfortran_gcc_safe-basicgal_C12L70_mixingratio"                  : BASE~"_t2942",
+  "scintelapi-spice_ifort_gcc_rigorous-basicgal_C12L70_mixingratio"                 : BASE~"_t2942",
+  "scintelapi-spice_ifort_gcc_safe-basicgal_C12L70_mixingratio"                     : BASE~"_t2942",
 
   "integration-spice_gfortran_gcc_safe-um2um"                                       : BASE~"_t2337",
   "integration-spice_gfortran_gcc_rigorous-um2um"                                   : BASE~"_t2337n",
@@ -87,10 +87,8 @@
   "scintelapi-xc40_ifort_icc_safe-basic_C48L38_C48L38"                              : BASE~"_t2917",
   "scintelapi-xc40_ifort_icc_rigorous-basic_C48L38_C48L38"                          : BASE~"_t2917",
 
-  "scintelapi-xc40_crayftn_craycc_safe-aquaplanet_C48L38_C48L38_mixingratio"        : BASE,
-  "scintelapi-xc40_crayftn_craycc_rigorous-aquaplanet_C48L38_C48L38_mixingratio"    : BASE,
-  "scintelapi-xc40_ifort_icc_safe-aquaplanet_C48L38_C48L38_mixingratio"             : BASE,
-  "scintelapi-xc40_ifort_icc_rigorous-aquaplanet_C48L38_C48L38_mixingratio"         : BASE,
+  "scintelapi-xc40_ifort_icc_safe-basicgal_C12L70_mixingratio"                      : BASE~"_t2942",
+  "scintelapi-xc40_ifort_icc_rigorous-basicgal_C12L70_mixingratio"                  : BASE~"_t2942",
 
   "integration-xc40_ifort_icc_safe-um2um"                                           : BASE~"_t2337n",
   "integration-xc40_ifort_icc_rigorous-um2um"                                       : BASE~"_t2337n",
