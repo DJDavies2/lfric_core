@@ -16,12 +16,16 @@ module mpi_mod
   use constants_mod, only : i_def, i_halo_index, i_native,              &
                             l_def, r_double, r_single, str_def,         &
                             real_type, integer_type, logical_type
+#ifdef NO_MPI
+  ! No "use mpi" in non-mpi build
+#else
   use mpi,           only : mpi_comm_rank, mpi_comm_size, mpi_finalize, &
                             mpi_init, mpi_success, mpi_comm_world,      &
                             mpi_max, mpi_min, mpi_sum,                  &
                             mpi_character, mpi_double_precision,        &
                             mpi_integer, mpi_integer1, mpi_integer2,    &
                             mpi_integer8, mpi_logical, mpi_real4
+#endif
   use log_mod,       only : log_event, LOG_LEVEL_ERROR
 
   implicit none
@@ -80,10 +84,15 @@ contains
     integer(i_native), intent(out) :: out_comm
     integer(i_native) :: ierr
 
+#ifdef NO_MPI
+    ! Don't initialise mpi in non-mpi build.
+    out_comm = 0
+#else
     call mpi_init(ierr)
     if (ierr /= mpi_success) &
           call log_event('Unable to initialise MPI', LOG_LEVEL_ERROR )
     out_comm = mpi_comm_world
+#endif
   end subroutine initialise_comm
 
   !> Stores the MPI communicator in a private variable, ready for later use.
@@ -96,8 +105,14 @@ contains
     integer(i_def) :: ierr
 
     comm = in_comm
+#ifdef NO_MPI
+    ! Set default values for number of ranks and local rank in non-mpi build
+    comm_size = 1
+    comm_rank = 0
+#else
     call mpi_comm_size(comm,comm_size,ierr)
     call mpi_comm_rank(comm,comm_rank,ierr)
+#endif
     comm_set = .true.
   end subroutine store_comm
 
@@ -107,9 +122,13 @@ contains
     implicit none
     integer(i_def) :: ierr
 
+#ifdef NO_MPI
+    ! Don't finalise mpi in non-mpi build
+#else
     call mpi_finalize(ierr)
     if (ierr /= mpi_success) &
           call log_event('Unable to finalise MPI', LOG_LEVEL_ERROR )
+#endif
     comm = -999
     comm_size = -999
     comm_rank = -999
@@ -156,6 +175,10 @@ contains
 
     integer(i_def) :: err
 
+#ifdef NO_MPI
+    ! Global sum and local sum are the same thing in a non-mpi build
+    g_sum = l_sum
+#else
     if(comm_set)then
       ! Generate global sum
       call mpi_allreduce( l_sum, g_sum, 1, get_mpi_datatype( real_type, r_double ), &
@@ -168,6 +191,7 @@ contains
       'Call to global_sum failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_sum_r_double
 
@@ -184,6 +208,10 @@ contains
 
     integer(i_def) :: err
 
+#ifdef NO_MPI
+    ! Global sum and local sum are the same thing in a non-mpi build
+    g_sum = l_sum
+#else
     if(comm_set)then
       ! Generate global sum
       call mpi_allreduce( l_sum, g_sum, 1, get_mpi_datatype( real_type, r_single), &
@@ -196,6 +224,7 @@ contains
       'Call to global_sum failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_sum_r_single
 
@@ -212,6 +241,10 @@ contains
 
     integer(i_def):: err
 
+#ifdef NO_MPI
+    ! Global sum and local sum are the same thing in a non-mpi build
+    g_sum = l_sum
+#else
     if(comm_set)then
       ! Generate global sum
       call mpi_allreduce( l_sum, g_sum, 1, get_mpi_datatype( integer_type, i_def ), &
@@ -224,6 +257,7 @@ contains
       'Call to global_sum failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_sum_i_def
 
@@ -240,6 +274,10 @@ contains
 
     integer(i_def)  :: err
 
+#ifdef NO_MPI
+    ! Global minimum and local minimum are the same thing in a non-mpi build
+    g_min = l_min
+#else
     if(comm_set)then
       ! Generate global min
       call mpi_allreduce( l_min, g_min, 1, get_mpi_datatype( real_type, r_double ), &
@@ -252,6 +290,7 @@ contains
       'Call to global_min failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_min_r_double
 
@@ -267,6 +306,10 @@ contains
 
     integer(i_def)  :: err
 
+#ifdef NO_MPI
+    ! Global minimum and local minimum are the same thing in a non-mpi build
+    g_min = l_min
+#else
     if(comm_set)then
       ! Generate global min
       call mpi_allreduce( l_min, g_min, 1, get_mpi_datatype( real_type, r_single), &
@@ -279,6 +322,7 @@ contains
       'Call to global_min failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_min_r_single
 
@@ -295,6 +339,10 @@ contains
 
     integer(i_def)  :: err
 
+#ifdef NO_MPI
+    ! Global minimum and local minimum are the same thing in a non-mpi build
+    g_min = l_min
+#else
     if(comm_set)then
       ! Generate global min
       call mpi_allreduce( l_min, g_min, 1, get_mpi_datatype( integer_type, i_def ), &
@@ -307,6 +355,7 @@ contains
       'Call to global_min failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_min_i_def
 
@@ -323,6 +372,10 @@ contains
 
     integer(i_def)  :: err
 
+#ifdef NO_MPI
+    ! Global maximum and local maximum are the same thing in a non-mpi build
+    g_max = l_max
+#else
     if(comm_set)then
       ! Generate global max
       call mpi_allreduce( l_max, g_max, 1, get_mpi_datatype( real_type, r_double ), &
@@ -335,6 +388,7 @@ contains
       'Call to global_max failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_max_r_double
 
@@ -351,6 +405,10 @@ contains
 
     integer(i_def)  :: err
 
+#ifdef NO_MPI
+    ! Global maximum and local maximum are the same thing in a non-mpi build
+    g_max = l_max
+#else
     if(comm_set)then
       ! Generate global max
       call mpi_allreduce( l_max, g_max, 1, get_mpi_datatype( real_type, r_single), &
@@ -363,6 +421,7 @@ contains
       'Call to global_max failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_max_r_single
 
@@ -379,6 +438,10 @@ contains
 
     integer(i_def)  :: err
 
+#ifdef NO_MPI
+    ! Global maximum and local maximum are the same thing in a non-mpi build
+    g_max = l_max
+#else
     if(comm_set)then
       ! Generate global max
       call mpi_allreduce( l_max, g_max, 1, get_mpi_datatype( integer_type, i_def ), &
@@ -391,6 +454,7 @@ contains
       'Call to global_max failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
 
   end subroutine global_max_i_def
 
@@ -410,6 +474,10 @@ contains
 
     integer(i_def) :: err
 
+#ifdef NO_MPI
+    ! Send and recv buffers in a gather are the same thing in a non-mpi build
+    recv_buffer = send_buffer
+#else
     if(comm_set)then
       call mpi_allgather(send_buffer, count, get_mpi_datatype( integer_type, i_def ), &
                          recv_buffer, count, get_mpi_datatype( integer_type, i_def ), &
@@ -422,6 +490,7 @@ contains
       'Call to all_gather failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
   end subroutine all_gather
 
 
@@ -442,6 +511,9 @@ contains
 
     integer(i_def) :: err
 
+#ifdef NO_MPI
+    ! In a non-mpi build there is nowhere to broadcast to - so do nothing
+#else
     if(comm_set)then
       call mpi_bcast( buffer, count, MPI_LOGICAL, root, comm, err )
       if (err /= mpi_success) &
@@ -452,6 +524,7 @@ contains
       'Call to broadcast failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
   end subroutine broadcast_l_def
 
   !> Broadcasts integer data from the root MPI task to all other MPI tasks
@@ -470,6 +543,9 @@ contains
 
     integer(i_def) :: err
 
+#ifdef NO_MPI
+    ! In a non-mpi build there is nowhere to broadcast to - so do nothing
+#else
     if(comm_set)then
       call mpi_bcast( buffer, count, get_mpi_datatype( integer_type, i_def ), root, comm, err )
       if (err /= mpi_success) &
@@ -480,6 +556,7 @@ contains
       'Call to broadcast failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
   end subroutine broadcast_i_def
 
   !> Broadcasts double real data from the root MPI task to all other MPI tasks.
@@ -498,6 +575,9 @@ contains
 
     integer(i_def) :: err
 
+#ifdef NO_MPI
+    ! In a non-mpi build there is nowhere to broadcast to - so do nothing
+#else
     if(comm_set)then
       call mpi_bcast( buffer, count, &
                       get_mpi_datatype( real_type, r_double ), &
@@ -510,6 +590,7 @@ contains
       'Call to broadcast failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
   end subroutine broadcast_r_double
 
   !> Broadcasts single real data from the root MPI task to all other MPI tasks.
@@ -528,6 +609,9 @@ contains
 
     integer(i_def) :: err
 
+#ifdef NO_MPI
+    ! In a non-mpi build there is nowhere to broadcast to - so do nothing
+#else
     if(comm_set)then
       call mpi_bcast( buffer, count, &
                       get_mpi_datatype( real_type, r_single ), &
@@ -540,6 +624,7 @@ contains
       'Call to broadcast failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
   end subroutine broadcast_r_single
 
   !> Broadcasts character data from the root MPI task to all other MPI tasks
@@ -558,6 +643,9 @@ contains
 
     integer(i_def) :: err
 
+#ifdef NO_MPI
+    ! In a non-mpi build there is nowhere to broadcast to - so do nothing
+#else
     if(comm_set)then
       call mpi_bcast( buffer, count, MPI_CHARACTER, root, comm, err )
       if (err /= mpi_success) &
@@ -568,6 +656,7 @@ contains
       'Call to broadcast failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
   end subroutine broadcast_str
 
 
@@ -586,6 +675,10 @@ contains
     integer(i_native), intent(in) :: fortran_kind
     integer(i_native)             :: mpi_datatype
 
+#ifdef NO_MPI
+    ! In a non-mpi build the mpi datatype is meaningless - just return zero
+    mpi_datatype = 0
+#else
    ! Determine MPI datatype enumerator from a Fortran kind.
    ! (To support a new Fortran kind, just add a new case clause)
     select case (fortran_type)
@@ -621,6 +714,7 @@ contains
     case (logical_type)
       mpi_datatype = MPI_LOGICAL
     end select
+#endif
 
   end function get_mpi_datatype
 
@@ -630,6 +724,10 @@ contains
   function get_comm_size() result(c_size)
     implicit none
     integer(i_def) :: c_size
+#ifdef NO_MPI
+    ! A non-mpi run is serial, therefore, number of ranks has to be one
+    c_size = 1
+#else
     if(comm_set)then
       c_size = comm_size
     else
@@ -637,6 +735,7 @@ contains
       'Call to get_com_size failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
   end function get_comm_size
 
   !> Returns the number of the local MPI rank
@@ -645,6 +744,10 @@ contains
   function get_comm_rank() result(c_rank)
     implicit none
     integer(i_def) :: c_rank
+#ifdef NO_MPI
+    ! A non-mpi run is serial, therefore, local rank is always rank zero
+    c_rank = 0
+#else
     if(comm_set)then
       c_rank = comm_rank
     else
@@ -652,6 +755,7 @@ contains
       'Call to get_com_rank failed. Must call store_comm first',&
       LOG_LEVEL_ERROR )
     end if
+#endif
   end function get_comm_rank
 
 end module mpi_mod
