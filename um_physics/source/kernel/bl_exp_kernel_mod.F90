@@ -572,6 +572,7 @@ contains
                           rad_nband, nsoilt, nsurft, dim_cslayer, nmasst
     use atm_fields_bounds_mod, only: tdims, pdims_s, pdims_l, pdims
     use atm_step_local, only: dim_cs1, dim_cs2, co2_dim_len, co2_dim_row
+    use bl_option_mod, only: alpha_cd
     use c_kappai, only: kappai, de
     use cv_run_mod, only: i_convection_vn, i_convection_vn_6a,                &
                           cldbase_opt_dp, cldbase_opt_md
@@ -874,8 +875,6 @@ contains
     real(r_um), dimension(row_length,rows,bl_levels) ::                      &
          fqw, ftl, rhokh, bq_gb, bt_gb, dtrdz_charney_grid,                  &
          dtrdz_u, rdz_charney_grid, rhokm_mix, w_mixed, w_flux
-
-    real(r_um), dimension(bl_levels) :: gamma
 
     real(r_um), dimension(0:row_length+1,0:rows+1,bl_levels) :: rhokm,       &
          tau_fd_x, tau_fd_y
@@ -1863,17 +1862,16 @@ contains
 
       zeroes = 0.0_r_um
       w_mixed(:,:,:) = w(:,:,1:bl_levels)
-      gamma = 1.0_r_um
 
-      call  tr_mix (                                              &
+      call  tr_mix (                                                 &
            ! IN fields
-           bl_levels, gamma, rhokm_mix(:,:,2:), rhokm_mix(:,:,1), &
-           dtrdz_charney_grid, zeroes, zeroes,                    &
-           kent, we_lim, t_frac, zrzi,                            &
-           kent_dsc, we_lim_dsc, t_frac_dsc, zrzi_dsc,            &
-           zhnl, zhsc, z_rho,                                     &
+           bl_levels, alpha_cd, rhokm_mix(:,:,2:), rhokm_mix(:,:,1), &
+           dtrdz_charney_grid, zeroes, zeroes,                       &
+           kent, we_lim, t_frac, zrzi,                               &
+           kent_dsc, we_lim_dsc, t_frac_dsc, zrzi_dsc,               &
+           zhnl, zhsc, z_rho,                                        &
            ! INOUT / OUT fields
-           w_mixed, w_flux, surf_dep_flux                         &
+           w_mixed, w_flux, surf_dep_flux                            &
            )
 
       do k = 1, bl_levels
@@ -2050,10 +2048,14 @@ contains
 
     ! update blended Smagorinsky diffusion coefficients only if using Smagorinsky scheme
     if ( smagorinsky ) then
-      do k = 1, nlayers
+      visc_m_blend(map_wth(1)) = visc_m(1,1,1)
+      visc_h_blend(map_wth(1)) = visc_h(1,1,1)
+      do k = 1, bl_levels-1
         visc_m_blend(map_wth(1) + k) = visc_m(1,1,k)
         visc_h_blend(map_wth(1) + k) = visc_h(1,1,k)
       end do
+      visc_m_blend(map_wth(1) + bl_levels) = visc_m(1,1,bl_levels-1)
+      visc_h_blend(map_wth(1) + bl_levels) = visc_h(1,1,bl_levels-1)
     endif
 
     ! write BL diagnostics

@@ -73,9 +73,9 @@
 {%- set groups = {
   'rce': [
     'run_application("lfric_atm", "basic_rce", checkkgo=False,
-                     resolutions=[("BiP60x60-100x100",5.0)],
+                     resolutions=[("BiP64x64-100x100_MG",5.0)],
                      env={"crun":12, "nrun":720,
-                          "directives":{"default":{"mpi_parts":36,
+                          "directives":{"default":{"mpi_parts":64,
                                                    "threads":1,
                                                    "wallclock":"00:20:00"} } },
                      plotstr="plot_rce.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")'],
@@ -238,10 +238,12 @@
                      plotstr="plot_map.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR"
                      )',
     'run_application("lfric_atm", "small_rce",
-                     resolutions=[("BiP4x4-600x400",5.0)],
-                     env={"crun":1, "nrun":10,
-                          "directives":{"default":{"wallclock":"00:05:00"} } },
-                     plotstr="profile_plot.py $NODAL_DATA_DIR theta:m_v geometric 70 40 $PLOT_DIR")',
+                     resolutions=[("BiP64x64-1500x1500_MG",60.0)],
+                     env={"crun":1, "nrun":120,
+                          "directives":{"default":{"mpi_parts":16,
+                                                   "threads":1,
+ 		                                   "wallclock":"00:15:00"} } },
+                     plotstr="plot_rce.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "basic_ral_setup",
                      resolutions=[("n96_lam", 600.)],
  		     env={"crun":2, "nrun":18,

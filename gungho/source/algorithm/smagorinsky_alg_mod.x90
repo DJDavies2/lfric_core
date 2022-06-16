@@ -45,27 +45,29 @@ contains
   !> @details Either uses Smagorinsky diffusion coefficients calculated
   !>          in the UM boundary-layer scheme or those calculate locally
   !>          to diffuse quantities in the horizontal
+  !> @param[in,out] dtheta_io      Potential temperature increment to update
+  !> @param[in,out] du_io          3D wind increment to update
   !> @param[in,out] mr             mixing ratios
-  !> @param[in,out] theta          Potential temperature
-  !> @param[in,out] u              3D wind field
+  !> @param[in]     theta          Potential temperature
+  !> @param[in]     u              3D wind field
   !> @param[in,out] visc_m         Smag diffusion coef for momentum
   !> @param[in,out] visc_h         Smag diffusion coef for heat
   !> @param[in]     derived_fields Group of derived fields
   !> @param[in]     rho            Density
   !> @param[in]     dt             The model timestep length
-subroutine smagorinsky_alg(mr, theta, u, visc_m,                   &
+subroutine smagorinsky_alg(dtheta_io, du_io, mr, theta, u, visc_m, &
                              visc_h, derived_fields, rho, dt )
 
     implicit none
 
     ! Prognostic fields
-    type( field_type ), intent(inout) :: u, theta
+    type( field_type ), intent(inout) :: du_io, dtheta_io
     type( field_type ), intent(inout) :: visc_m, visc_h
     type( field_type ), intent(inout) :: mr ( nummr )
 
     type( field_collection_type ), intent(in) :: derived_fields
 
-    type( field_type ), intent(in) :: rho
+    type( field_type ), intent(in) :: rho, theta, u
     real( r_def ),      intent(in) :: dt
 
     ! Increments on state fields
@@ -194,8 +196,8 @@ subroutine smagorinsky_alg(mr, theta, u, visc_m,                   &
     end if
 
     ! Apply increments from Smagorinsky mixing
-    call invoke( inc_X_plus_bY( theta, dt, dtheta ),      &
-                 inc_X_plus_bY( u,     dt, du ) )
+    call invoke( inc_X_plus_bY( dtheta_io, dt, dtheta ),      &
+                 inc_X_plus_bY( du_io,     dt, du ) )
 
     if (write_conservation_diag .and. use_moisture) &
       call moisture_conservation_alg( rho, mr, 'After mixing' )

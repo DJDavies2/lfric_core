@@ -19,12 +19,14 @@ module semi_implicit_timestep_alg_mod
   ! Configuration options
   use section_choice_config_mod,  only: cloud, cloud_um,                &
                                         aerosol, aerosol_um
-  use physics_config_mod,         only: blayer_placement,               &
-                                        blayer_placement_fast,          &
-                                        convection_placement,           &
-                                        convection_placement_fast,      &
-                                        stochastic_physics_placement,   &
-                                        stochastic_physics_placement_fast
+  use physics_config_mod,         only: blayer_placement,                  &
+                                        blayer_placement_fast,             &
+                                        convection_placement,              &
+                                        convection_placement_fast,         &
+                                        stochastic_physics_placement,      &
+                                        stochastic_physics_placement_fast, &
+                                        smagorinsky_placement,             &
+                                        smagorinsky_placement_outer
 
   use aerosol_config_mod,         only: glomap_mode, glomap_mode_ukca
 
@@ -120,7 +122,7 @@ module semi_implicit_timestep_alg_mod
 
   ! Mixing settings
   use mixing_config_mod,          only: smagorinsky
-
+  use smagorinsky_alg_mod,        only: smagorinsky_alg
   ! Physics routines called
 #ifdef UM_PHYSICS
   use cld_alg_mod,                only: cld_alg
@@ -495,13 +497,18 @@ contains
         ! Call the fast physics terms
         !--------------------------------------------------------------------
         call fast_physics(du, dtheta, mr, state_n(igh_t), state_n(igh_d),      &
-                          state_n(igh_p), mr_n, derived_fields,                &
+                          state_n(igh_p), mr_n, visc_m, visc_h, derived_fields,&
                           radiation_fields, microphysics_fields,               &
                           orography_fields, turbulence_fields,                 &
                           convection_fields, cloud_fields,                     &
                           surface_fields, soil_fields, snow_fields,            &
                           chemistry_fields, aerosol_fields,                    &
                           outer, clock, dt, rho_guess)
+
+        if (smagorinsky .and. smagorinsky_placement == smagorinsky_placement_outer) then
+          call smagorinsky_alg(dtheta, du, mr, state(igh_t), state(igh_u), &
+                               visc_m, visc_h, derived_fields, state(igh_d), dt)
+        end if
 
         if (use_wavedynamics) then
           ! copy increments into rhs_phys, including premultiplication by mass matrix

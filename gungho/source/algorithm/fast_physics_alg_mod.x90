@@ -25,7 +25,9 @@ module fast_physics_alg_mod
                                   convection_placement,                    &
                                   convection_placement_fast,               &
                                   stochastic_physics_placement,            &
-                                  stochastic_physics_placement_fast
+                                  stochastic_physics_placement_fast,       &
+                                  smagorinsky_placement,                   &
+                                  smagorinsky_placement_fast
 
   use formulation_config_mod,                              &
                             only: moisture_formulation,    &
@@ -40,7 +42,8 @@ module fast_physics_alg_mod
   use mr_indices_mod,       only: nummr, imr_v
   use enforce_lower_bound_kernel_mod, only: enforce_lower_bound_kernel_type
   use moisture_conservation_alg_mod,  only: moisture_conservation_alg
-
+  use mixing_config_mod,              only: smagorinsky
+  use smagorinsky_alg_mod,            only: smagorinsky_alg
   use timestepping_config_mod, only : outer_iterations
 
 #ifdef UM_PHYSICS
@@ -69,6 +72,8 @@ contains
   !> @param[in]     rho                 Rho on w3 space
   !> @param[in]     exner               Exner pressure on w3 space
   !> @param[in]     mr_n                Mixing ratios at start of timestep
+  !> @param[in]     visc_m              Smagorinsky momentum diffusion coef
+  !> @param[in]     visc_h              Smagorinsky heat diffusion coef
   !> @param[in]     derived_fields      Group of derived fields
   !> @param[in]     radition_fields     Fields for radiation scheme
   !> @param[in]     microphysics_fields Fields for microphysics scheme
@@ -86,8 +91,8 @@ contains
   !> @param[in]     dt                  The model timestep length
   !> @param[in]     rho_guess           Estimate of rho^n+1 for conservation
   !!                                    diagnostics
-    subroutine fast_physics(du, dtheta, mr, theta, rho, exner, mr_n,           &
-                            derived_fields, radiation_fields,                  &
+    subroutine fast_physics(du, dtheta, mr, theta, rho, exner, mr_n, visc_m,   &
+                            visc_h, derived_fields, radiation_fields,          &
                             microphysics_fields, orography_fields,             &
                             turbulence_fields, convection_fields, cloud_fields,&
                             surface_fields, soil_fields, snow_fields,          &
@@ -97,7 +102,7 @@ contains
     implicit none
 
     ! Fields
-    type( field_type ), intent( inout ) :: du, dtheta
+    type( field_type ), intent( inout ) :: du, dtheta, visc_m, visc_h
     type( field_type ), intent( in )    :: theta, rho, exner, rho_guess
 
     ! Field bundles
@@ -140,6 +145,8 @@ contains
     ! Temporary field to unpack from field collection
     type( field_type), pointer :: dmv_conv => null()
 #endif
+    type( field_type), pointer :: theta_star => null()
+    type( field_type), pointer :: u_star => null()
 
     ! Flags to indicate whether scheme has run and increments need adding
     logical(kind=l_def) :: boundary_layer_done, stph_done
@@ -252,6 +259,13 @@ contains
       ! as part of the implicit solution
       call invoke(inc_X_plus_Y(dtheta, dtheta_stph), &
                   inc_X_plus_Y(mr(imr_v), dmv_stph) )
+    end if
+
+    if (smagorinsky .and. smagorinsky_placement == smagorinsky_placement_fast) then
+      theta_star => derived_fields%get_field('theta_star')
+      u_star => derived_fields%get_field('u_star')
+      call smagorinsky_alg(dtheta, du, mr, theta_star, u_star, &
+                           visc_m, visc_h, derived_fields, rho_guess, dt)
     end if
 
     call print_field_stats_alg(dtheta, LOG_LEVEL_INFO, printmin=-20.0_r_def, &

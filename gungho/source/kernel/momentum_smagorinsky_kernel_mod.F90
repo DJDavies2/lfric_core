@@ -113,9 +113,9 @@ subroutine momentum_smagorinsky_code( nlayers,                                 &
   ! Internal variables
   integer(kind=i_def)                      :: k, kp, df
   real(kind=r_def)                         :: d2dx, d2dy
-  real(kind=r_def), dimension(0:nlayers-1) :: idx2, idy2
+  real(kind=r_def), dimension(1:nlayers-1) :: idx2, idy2
   real(kind=r_def), dimension(0:nlayers-1,4) :: idx2_w2, idy2_w2
-  real(kind=r_def), dimension(1:nlayers-1,4) :: visc_m_w2
+  real(kind=r_def), dimension(0:nlayers,4) :: visc_m_w2
   real(kind=r_def)                         :: weight_pl, weight_min
   real(kind=r_def)                         :: visc_m_w2_w3
 
@@ -167,7 +167,7 @@ subroutine momentum_smagorinsky_code( nlayers,                                 &
       if (df == 1 .or. df == 3) then
         ! For Dofs 1 & 3, dx is given by the input field,
         ! whilst dy needs to be computed from the 4 neighbouring dy points
-        do k = 1, nlayers - 2
+        do k = 0, nlayers - 1
           idx2_w2(k,df) = 1.0_r_def/(dx_at_w2(map_dx_stencil(df,1)+k))**2
           idy2_w2(k,df) = (4.0_r_def/(dx_at_w2(map_dx_stencil(2,1)+k)+dx_at_w2(map_dx_stencil(4,1)+k)+ &
                                       dx_at_w2(map_dx_stencil(2,df+1)+k)+dx_at_w2(map_dx_stencil(4,df+1)+k)))**2
@@ -175,7 +175,7 @@ subroutine momentum_smagorinsky_code( nlayers,                                 &
       else
         ! For Dofs 2 & 4, dy is given by the input field,
         ! whilst dx needs to be computed from the 4 neighbouring dx points
-        do k = 1, nlayers - 2
+        do k = 0, nlayers - 1
           idx2_w2(k,df) = (4.0_r_def/(dx_at_w2(map_dx_stencil(1,1)+k)+dx_at_w2(map_dx_stencil(3,1)+k)+ &
                                       dx_at_w2(map_dx_stencil(1,df+1)+k)+dx_at_w2(map_dx_stencil(3,df+1)+k)))**2
           idy2_w2(k,df) = 1.0_r_def/(dx_at_w2(map_dx_stencil(df,1)+k))**2
@@ -183,12 +183,12 @@ subroutine momentum_smagorinsky_code( nlayers,                                 &
       end if
 
       ! Horizontal interpolation of visc_m to cell face
-      do k = 1, nlayers - 1
+      do k = 0, nlayers
         visc_m_w2(k,df) = ( visc_m(map_wt_stencil(1,1) + k) + visc_m(map_wt_stencil(1,1+df) + k) ) / 2.0_r_def
       end do
 
       ! Horizontal velocity diffusion
-      do k = 1, nlayers - 2
+      do k = 0, nlayers - 1
         kp = k + 1
 
         ! Vertical interpolation weights:
@@ -213,7 +213,7 @@ subroutine momentum_smagorinsky_code( nlayers,                                 &
 
   end do
 
-  ! Vertical diffusion for this cell
+  ! Vertical velocity diffusion for this cell
   do k = 1, nlayers - 1
 
     ! dx and dy are average of cell face values

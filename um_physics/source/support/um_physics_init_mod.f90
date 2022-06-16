@@ -877,7 +877,7 @@ contains
 
       ! The following are needed regardless of which mixing option is used
       mix_factor = real(mix_factor_in, r_um)
-      turb_startlev_vert  = 1
+      turb_startlev_vert  = 2
       turb_endlev_vert    = bl_levels
 
       ! Options which are bespoke to the choice of scheme

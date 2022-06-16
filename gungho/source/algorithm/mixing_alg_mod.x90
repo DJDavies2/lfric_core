@@ -39,6 +39,8 @@ contains
     use tracer_viscosity_kernel_mod,   only: tracer_viscosity_kernel_type
     use psykal_lite_mod,               only: invoke_momentum_viscosity_kernel_type
     use physical_op_constants_mod,     only: get_dx_at_w2
+    use physics_config_mod,            only: smagorinsky_placement, &
+                                             smagorinsky_placement_end
 
     implicit none
 
@@ -63,8 +65,19 @@ contains
     !--------------------------------------------------------------------
     ! Apply horizontal Smagorinsky subgrid mixing
     !--------------------------------------------------------------------
-    if ( smagorinsky ) call smagorinsky_alg(mr, theta, u, visc_m, visc_h, &
+    if ( smagorinsky .and. smagorinsky_placement == smagorinsky_placement_end) then
+
+      call dtheta%initialise( theta%get_function_space() )
+      call du%initialise( u%get_function_space() )
+      call invoke( setval_c(dtheta, 0.0_r_def), &
+                   setval_c(du, 0.0_r_def) )
+      call smagorinsky_alg(dtheta, du, mr, theta, u, visc_m, visc_h, &
                                             derived_fields, rho, dt)
+      call invoke( inc_X_plus_Y( theta, dtheta ), &
+                   inc_X_plus_Y( u,     du ) )
+
+    end if
+
     !--------------------------------------------------------------------
     ! Apply viscosity
     !--------------------------------------------------------------------
