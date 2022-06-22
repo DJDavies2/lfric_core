@@ -624,6 +624,9 @@ contains
                                                            resfs_tile,       &
                                                            canhc_tile
 
+    real(kind=r_um) :: target_mass(pdims%i_start:pdims%i_end,                &
+                                   pdims%j_start:pdims%j_end,1)
+
     !-----------------------------------------------------------------------
     ! Local variables for the kernel
     !-----------------------------------------------------------------------
@@ -739,7 +742,7 @@ contains
 
     real(r_um), dimension(row_length,rows) :: ti_sice,                       &
          xx_cos_theta_latitude, ls_rain, ls_snow, conv_rain, conv_snow,      &
-         co2_emits, co2flux, tscrndcl_ssi, tstbtrans,                        &
+         co2_emits, co2flux, co2_flux_tot, tscrndcl_ssi, tstbtrans,          &
          sum_eng_fluxes, sum_moist_flux, drydep2, olr, surf_ht_flux_land,    &
          theta_star_surf, qv_star_surf, uwind_wav,                           &
          vwind_wav, sstfrz, aresist, resist_b, rho_aresist, rib_gb,          &
@@ -1408,7 +1411,9 @@ contains
           , tstar, ti_sice, tstar_land,tstar_sice                       &
     ! OUT fields for coupling to the wave model
           , uwind_wav, vwind_wav                                        &
-            )
+    ! OUT Fields for use in conservation of atmospheric CO2
+          , co2_flux_tot, target_mass                                   &
+        )
 
     !-----------------------------------------------------------------------
     ! update main model prognostics
