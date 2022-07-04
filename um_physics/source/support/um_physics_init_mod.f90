@@ -126,8 +126,9 @@ module um_physics_init_mod
   use socrates_init_mod, only: n_sw_band,                                      &
                                n_lw_band
 
-  use orographic_drag_config_mod, only:  include_moisture,       &
-                                         include_moisture_moist, &
+  use orographic_drag_config_mod, only:  include_moisture,          &
+                                         include_moisture_lowmoist, &
+                                         include_moisture_moist,    &
                                          include_moisture_dry
 
   ! Other LFRic modules used
@@ -855,8 +856,10 @@ contains
       select case (include_moisture)
         case(include_moisture_dry)
           i_moist = 0
-        case(include_moisture_moist)
+        case(include_moisture_lowmoist)
           i_moist = 1
+        case(include_moisture_moist)
+          i_moist = 2
       end select
     end if
 
