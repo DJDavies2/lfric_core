@@ -433,7 +433,8 @@ contains
                                      model_data%fd_fields,      &
                                      model_data%surface_fields, &
                                      model_data%soil_fields,    &
-                                     model_data%snow_fields)
+                                     model_data%snow_fields,    &
+                                     model_data%radiation_fields )
           end if
 #endif
         case default

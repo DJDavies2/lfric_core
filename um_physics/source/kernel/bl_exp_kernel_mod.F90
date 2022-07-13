@@ -33,6 +33,7 @@ module bl_exp_kernel_mod
   use cloud_config_mod,       only : rh_crit_opt, rh_crit_opt_tke, scheme,    &
                                      scheme_bimodal, scheme_pc2,              &
                                      pc2ini, pc2ini_bimodal
+  use radiation_config_mod,   only : topography, topography_horizon
   use convection_config_mod,  only : use_jules_flux
   use microphysics_config_mod, only: turb_gen_mixph
   use mixing_config_mod,      only : smagorinsky
@@ -54,7 +55,7 @@ module bl_exp_kernel_mod
   !>
   type, public, extends(kernel_type) :: bl_exp_kernel_type
     private
-    type(arg_type) :: meta_args(141) = (/                                      &
+    type(arg_type) :: meta_args(142) = (/                                      &
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      WTHETA),                   &! theta_in_wth
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      W3),                       &! rho_in_w3
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      WTHETA),                   &! wetrho_in_wth
@@ -114,6 +115,7 @@ module bl_exp_kernel_mod
          arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! gross_prim_prod
          arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! net_prim_prod
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      ANY_DISCONTINUOUS_SPACE_1),&! cos_zen_angle
+         arg_type(GH_FIELD, GH_REAL,  GH_READ,      ANY_DISCONTINUOUS_SPACE_1),&! skyview
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! sw_up_tile
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      ANY_DISCONTINUOUS_SPACE_1),&! sw_down_surf
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      ANY_DISCONTINUOUS_SPACE_1),&! lw_down_surf
@@ -271,6 +273,7 @@ contains
   !> @param[in,out] gross_prim_prod        Gross Primary Productivity
   !> @param[in,out] net_prim_prod          Net Primary Productivity
   !> @param[in]     cos_zen_angle          Cosine of solar zenith angle
+  !> @param[in]     skyview                Skyview / area enhancement factor
   !> @param[in]     sw_up_tile             Upwelling SW radiation on surface tiles
   !> @param[in]     sw_down_surf           Downwelling SW radiation at surface
   !> @param[in]     lw_down_surf           Downwelling LW radiation at surface
@@ -459,6 +462,7 @@ contains
                          gross_prim_prod,                       &
                          net_prim_prod,                         &
                          cos_zen_angle,                         &
+                         skyview,                               &
                          sw_up_tile,                            &
                          sw_down_surf,                          &
                          lw_down_surf,                          &
@@ -606,6 +610,7 @@ contains
     ! spatially varying fields used from modules
     use level_heights_mod, only: r_theta_levels, r_rho_levels
     use turb_diff_ctl_mod, only: visc_m, visc_h, max_diff, delta_smag
+    use solinc_data, only: sky
 
     ! subroutines used
     use atmos_physics2_save_restore_mod, only: ap2_init_conv_diag
@@ -797,6 +802,7 @@ contains
     real(kind=r_def), intent(in) :: soil_thermal_cond(undf_2d)
     real(kind=r_def), intent(inout) :: surface_conductance(undf_2d)
     real(kind=r_def), intent(in) :: cos_zen_angle(undf_2d)
+    real(kind=r_def), intent(in) :: skyview(undf_2d)
     real(kind=r_def), intent(in) :: sw_down_surf(undf_2d)
     real(kind=r_def), intent(in) :: lw_down_surf(undf_2d)
     real(kind=r_def), intent(in) :: sw_down_surf_blue(undf_2d)
@@ -1416,6 +1422,11 @@ contains
 
     ! Cosine of the solar zenith angle
     cos_zenith_angle = real(cos_zen_angle(map_2d(1)), r_um)
+
+    if (topography == topography_horizon) then
+      ! Set skyview factor used internally by JULES
+      sky = real(skyview(map_2d(1)), r_um)
+    end if
 
     ! Downwelling LW radiation at surface
     lw_down = real(lw_down_surf(map_2d(1)), r_um)

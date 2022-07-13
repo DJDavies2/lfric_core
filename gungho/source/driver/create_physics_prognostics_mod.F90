@@ -28,6 +28,9 @@ module create_physics_prognostics_mod
                                              cloud_representation_combined,    &
                                              cloud_representation_conv_strat_liq_ice, &
                                              cloud_representation_split,       &
+                                             topography, topography_flat,      &
+                                             topography_horizon,               &
+                                             n_horiz_layer, n_horiz_ang,       &
                                              l_inc_radstep
   use aerosol_config_mod,             only : glomap_mode,                      &
                                              glomap_mode_climatology,          &
@@ -134,6 +137,8 @@ contains
     type(function_space_type), pointer :: soil_space => null()
     type(function_space_type), pointer :: sice_space => null()
     type(function_space_type), pointer :: snow_space => null()
+    type(function_space_type), pointer :: h_ang_space => null()
+    type(function_space_type), pointer :: h_asp_space => null()
 #endif
     type(function_space_type), pointer :: wtheta_space => null()
     type(function_space_type), pointer :: w3_space => null()
@@ -335,6 +340,40 @@ contains
       adv_fields_last_outer, &
       'sw_up_blue_tile', surft_space, twod=.true. )
 
+    ! Fields that need checkpointing for the topographic correction scheme
+    if (radiation == radiation_socrates .and. &
+        topography /= topography_flat) then
+      checkpoint_flag = .true.
+    else
+      checkpoint_flag = .false.
+    end if
+    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
+      adv_fields_last_outer, &
+      'slope_angle', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
+      adv_fields_last_outer, &
+      'slope_aspect', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
+      adv_fields_last_outer, &
+      'skyview', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    if (radiation == radiation_socrates .and. &
+        topography == topography_horizon) then
+      checkpoint_flag = .true.
+      h_ang_space => function_space_collection%get_fs( &
+                       twod_mesh, 0, W3, n_horiz_layer*n_horiz_ang)
+      h_asp_space => function_space_collection%get_fs( &
+                       twod_mesh, 0, W3, n_horiz_ang)
+    else
+      checkpoint_flag = .false.
+      h_ang_space => function_space_collection%get_fs(twod_mesh, 0, W3, 1)
+      h_asp_space => function_space_collection%get_fs(twod_mesh, 0, W3, 1)
+    end if
+    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
+      adv_fields_last_outer, &
+      'horizon_angle', h_ang_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
+      adv_fields_last_outer, &
+      'horizon_aspect', h_asp_space, checkpoint_flag=checkpoint_flag, twod=.true. )
 
     ! Fields which need checkpointing for radiation timestepping
     !
@@ -402,6 +441,9 @@ contains
       adv_fields_last_outer, &
       'stellar_eqn_of_time_rts', twod_space, checkpoint_flag=checkpoint_flag,  &
       twod=.true. )
+    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
+      adv_fields_last_outer, 'orographic_correction_rts', twod_space,          &
+      checkpoint_flag=checkpoint_flag, twod=.true. )
 
     ! 3D fields
     call add_physics_field( radiation_fields, depository, prognostic_fields,   &
@@ -552,6 +594,16 @@ contains
     call add_physics_field( orography_fields, depository, prognostic_fields,   &
       adv_fields_last_outer, &
       'silhouette_area_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+
+    ! Mean X, Y Gradients for the orographic correction to radiation
+    checkpoint_flag = .false.
+    call add_physics_field( orography_fields, depository, prognostic_fields,   &
+      adv_fields_last_outer, &
+      'grad_x_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call add_physics_field( orography_fields, depository, prognostic_fields,   &
+      adv_fields_last_outer, &
+      'grad_y_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+
 
     !========================================================================
     ! Fields owned by the turbulence scheme

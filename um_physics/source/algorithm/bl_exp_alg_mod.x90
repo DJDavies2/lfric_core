@@ -143,6 +143,7 @@ contains
     type( field_type ), pointer :: ent_zrzi_dsc    => null()
 
     type( field_type ), pointer :: cos_zenith_angle  => null()
+    type( field_type ), pointer :: skyview           => null()
     type( field_type ), pointer :: sw_heating_rate   => null()
     type( field_type ), pointer :: lw_heating_rate   => null()
     type( field_type ), pointer :: lw_down_surf      => null()
@@ -304,6 +305,7 @@ contains
 
     ! Radiation fields
     cos_zenith_angle  => radiation_fields%get_field('cos_zenith_angle')
+    skyview           => radiation_fields%get_field('skyview')
     sw_heating_rate   => radiation_fields%get_field('sw_heating_rate')
     lw_heating_rate   => radiation_fields%get_field('lw_heating_rate')
     lw_down_surf      => radiation_fields%get_field('lw_down_surf')
@@ -473,7 +475,8 @@ contains
                            unfrozen_soil_moisture, frozen_soil_moisture,       &
                            tile_heat_flux, tile_moisture_flux,                 &
                            gross_prim_prod, net_prim_prod,                     &
-                           cos_zenith_angle, sw_up_tile, sw_down_surf,         &
+                           cos_zenith_angle, skyview,                          &
+                           sw_up_tile, sw_down_surf,                           &
                            lw_down_surf, sw_down_blue_surf, dd_mf_cb,          &
                            dtl_mphys, dmt_mphys,                               &
                            sw_heating_rate, lw_heating_rate, ozone,            &

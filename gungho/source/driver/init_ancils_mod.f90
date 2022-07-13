@@ -37,6 +37,9 @@ module init_ancils_mod
                                              glomap_mode_climatology
   use jules_surface_config_mod,       only : l_vary_z0m_soil
   use surface_config_mod,             only : sea_alb_var_chl, albedo_obs
+  use radiation_config_mod,           only : topography, topography_slope, &
+                                             topography_horizon, &
+                                             n_horiz_ang, n_horiz_layer
   use derived_config_mod,             only : l_esm_couple
 
   implicit none
@@ -224,6 +227,21 @@ contains
                               mesh, twod_mesh, twod=.true.)
     call setup_ancil_field("silhouette_area_orog", depository, ancil_fields, &
                               mesh, twod_mesh, twod=.true.)
+    if (topography == topography_slope .or. &
+        topography == topography_horizon) then
+      call setup_ancil_field("grad_x_orog", depository, ancil_fields, &
+                                mesh, twod_mesh, twod=.true.)
+      call setup_ancil_field("grad_y_orog", depository, ancil_fields, &
+                                mesh, twod_mesh, twod=.true.)
+    end if
+    if (topography == topography_horizon) then
+      call setup_ancil_field("horizon_angle", depository, ancil_fields, &
+                                mesh, twod_mesh, twod=.true., &
+                                ndata=n_horiz_ang*n_horiz_layer)
+      call setup_ancil_field("horizon_aspect", depository, ancil_fields, &
+                                mesh, twod_mesh, twod=.true., &
+                                ndata=n_horiz_ang)
+    end if
 
     !=====  OZONE ANCIL  =====
     call ozone_time_axis%initialise("ozone_time", file_id="ozone_ancil", &

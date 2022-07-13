@@ -9,8 +9,13 @@ module process_inputs_alg_mod
   use field_collection_mod, only : field_collection_type
   use field_mod,            only : field_type
   use integer_field_mod,    only : integer_field_type
+  use constants_mod,        only : i_def
 
-  use section_choice_config_mod,  only: surface, surface_jules
+  use section_choice_config_mod,  only: surface, surface_jules, &
+                                        radiation, radiation_socrates
+  use radiation_config_mod,       only: topography, topography_flat, &
+                                        topography_horizon, &
+                                        n_horiz_ang, n_horiz_layer
   use process_land_kernel_mod,    only: process_land_kernel_type
   use process_ssi_kernel_mod,     only: process_ssi_kernel_type
   use process_soil_kernel_mod,    only: process_soil_kernel_type
@@ -22,6 +27,7 @@ module process_inputs_alg_mod
   use multi_insert_kernel_mod,    only: multi_insert_kernel_type
   use int_multi_insert_kernel_mod, only: int_multi_insert_kernel_type
   use derived_config_mod,         only: l_esm_couple
+  use set_topography_kernel_mod,  only: set_topography_kernel_type
 
   implicit none
 
@@ -32,13 +38,15 @@ contains
 
   !> @details Processes ancils that don't match exactly what the model
   !>          expects into the fields it does
-  !> @param[in] ancil_fields   (in)     Ancil fields read in
-  !> @param[in] fd_fields      (in)     um2lfric fields read in
-  !> @param[in] surface_fields (in,out) Surface field collection to update
-  !> @param[in] soil_fields    (in,out) Soil field collection to update
-  !> @param[in] snow_fields    (in,out) Snow field collection to update
+  !> @param[in] ancil_fields     (in)     Ancil fields read in
+  !> @param[in] fd_fields        (in)     um2lfric fields read in
+  !> @param[in] surface_fields   (in,out) Surface field collection to update
+  !> @param[in] soil_fields      (in,out) Soil field collection to update
+  !> @param[in] snow_fields      (in,out) Snow field collection to update
+  !> @param[in] radiation_fields (in,out) Radiation field collection to update
   subroutine process_inputs_alg(ancil_fields, fd_fields, &
-                                surface_fields, soil_fields, snow_fields)
+                                surface_fields, soil_fields, snow_fields, &
+                                radiation_fields)
 
     implicit none
 
@@ -47,6 +55,7 @@ contains
     type( field_collection_type ), intent(in) :: surface_fields
     type( field_collection_type ), intent(in) :: soil_fields
     type( field_collection_type ), intent(in) :: snow_fields
+    type( field_collection_type ), intent(in) :: radiation_fields
 
     type( field_type ), pointer :: land_area_fraction => null()
     type( field_type ), pointer :: land_tile_fraction => null()
@@ -94,6 +103,17 @@ contains
     type( field_type ), pointer :: snow_depth_in        => null()
     type( field_type ), pointer :: snow_under_canopy_in => null()
     type( field_type ), pointer :: snowpack_density_in  => null()
+
+    type( field_type ), pointer :: grad_x_orog    => null()
+    type( field_type ), pointer :: grad_y_orog    => null()
+    type( field_type ), pointer :: slope_angle    => null()
+    type( field_type ), pointer :: slope_aspect   => null()
+    type( field_type ), pointer :: skyview        => null()
+    type( field_type ), pointer :: horizon_angle  => null()
+    type( field_type ), pointer :: horizon_aspect => null()
+
+    integer( i_def ) :: n_horizon_angle, n_horizon_layer
+
 
     if (surface == surface_jules) then
       land_area_fraction => ancil_fields%get_field('land_area_fraction')
@@ -200,6 +220,32 @@ contains
                                           snow_layer_liq_mass,                &
                                           snow_layer_temp, snow_layer_rgrain, &
                                           soil_temperature) )
+
+    end if
+
+
+    if (radiation == radiation_socrates .and. &
+        topography /= topography_flat) then
+
+      grad_x_orog    => ancil_fields%get_field('grad_x_orog')
+      grad_y_orog    => ancil_fields%get_field('grad_y_orog')
+      slope_angle    => radiation_fields%get_field('slope_angle')
+      slope_aspect   => radiation_fields%get_field('slope_aspect')
+      skyview        => radiation_fields%get_field('skyview')
+      horizon_angle  => radiation_fields%get_field('horizon_angle')
+      horizon_aspect => radiation_fields%get_field('horizon_aspect')
+      
+      if (topography == topography_horizon) then
+        n_horizon_angle = n_horiz_ang
+        n_horizon_layer = n_horiz_layer
+      else
+        n_horizon_angle = 0
+        n_horizon_layer = 0
+      end if
+
+      call invoke(set_topography_kernel_type(grad_x_orog, grad_y_orog, &
+        slope_angle, slope_aspect, skyview, horizon_angle, horizon_aspect, &
+        n_horizon_angle, n_horizon_layer))
 
     end if
 

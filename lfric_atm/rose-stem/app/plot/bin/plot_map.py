@@ -65,6 +65,14 @@ lw_up_toa_rts = ['lw_up_toa_rts', 100, 400]
 lw_up_clear_toa_rts = ['lw_up_clear_toa_rts', 100, 400]
 lw_down_clear_surf_rts = ['lw_down_clear_surf_rts', 100, 600]
 lw_up_clear_surf_rts = ['lw_up_clear_surf_rts', 100, 600]
+orographic_correction_rts = ['orographic_correction_rts', 0, 4]
+slope_angle = ['slope_angle', 0, 0.1]
+slope_aspect = ['slope_aspect', 0, 6.3]
+skyview = ['skyview', 0.999, 1.001]
+horizon_angle = ['horizon_angle', 1.4, 1.6]
+horizon_aspect = ['horizon_aspect', 0, 6.3]
+sw_direct_orog_incr_rts = ['sw_direct_orog_incr_rts', -27, 27]
+lw_net_skyview_incr = ['lw_net_skyview_incr', -0.2, 0.2]
 
 def load_cube_by_varname(filename, var):
    variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == var))
@@ -137,6 +145,8 @@ if __name__ == "__main__":
         datapath, plotpath = args[0:2]
         rts_plots = '-rts' in opts
         ral_plots = '-ral' in opts
+        slope_plots = '-slope' in opts
+        horizon_plots = '-horizon' in opts
     except ValueError:
         print("Usage: {0} <datapath> <plotpath>".format(sys.argv[0]))
         exit(1)
@@ -153,6 +163,15 @@ if __name__ == "__main__":
     do_plot(datapath, lw_down_surf,    plotpath)
     do_plot(datapath, lw_up_toa,       plotpath)
     do_plot(datapath, trop_level,      plotpath)
+    if slope_plots:
+        do_plot(datapath, slope_angle, plotpath)
+        do_plot(datapath, slope_aspect, plotpath)
+        do_plot(datapath, sw_heating_rate, plotpath)
+    if horizon_plots:
+        do_plot(datapath, skyview, plotpath)
+        do_plot(datapath, lw_net_skyview_incr, plotpath)
+        do_plot(datapath, horizon_angle, plotpath, plotlevel=2)
+        do_plot(datapath, horizon_aspect, plotpath, plotlevel=2)
     if rts_plots:
         do_plot(datapath, cloud_cover_rts,        plotpath)
         do_plot(datapath, cloud_fraction_rts,     plotpath, plotlevel=17)
@@ -170,6 +189,8 @@ if __name__ == "__main__":
         do_plot(datapath, lw_up_clear_toa_rts,    plotpath)
         do_plot(datapath, lw_down_clear_surf_rts, plotpath)
         do_plot(datapath, lw_up_clear_surf_rts,   plotpath)
+        do_plot(datapath, orographic_correction_rts, plotpath)
+        do_plot(datapath, sw_direct_orog_incr_rts, plotpath)
     if ral_plots:
         do_plot(datapath, ls_prec,      plotpath)
     else:

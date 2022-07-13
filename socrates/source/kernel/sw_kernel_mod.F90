@@ -37,7 +37,7 @@ public :: sw_code
 ! Contains the metadata needed by the PSy layer.
 type, extends(kernel_type) :: sw_kernel_type
   private
-  type(arg_type) :: meta_args(79) = (/ &
+  type(arg_type) :: meta_args(80) = (/ &
     arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     Wtheta),                    & ! sw_heating_rate
     arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1), & ! sw_down_surf
     arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1), & ! sw_direct_surf
@@ -81,6 +81,7 @@ type, extends(kernel_type) :: sw_kernel_type
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! cos_zenith_angle_rts
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! lit_fraction_rts
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! stellar_irradiance_rts
+    arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! orographic_correction_rts
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! ozone
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! mv
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! mcl
@@ -173,6 +174,7 @@ contains
 ! @param[in]     cos_zenith_angle_rts      Cosine of the stellar zenith angle
 ! @param[in]     lit_fraction_rts          Lit fraction of the timestep
 ! @param[in]     stellar_irradiance_rts    Stellar irradaince at the planet
+! @param[in]     orographic_correction_rts Orographic Correction
 ! @param[in]     ozone                     Ozone field
 ! @param[in]     mv                        Water vapour field
 ! @param[in]     mcl                       Cloud liquid field
@@ -253,7 +255,7 @@ subroutine sw_code(nlayers,                                                    &
                    theta, exner, exner_in_wth, rho_in_wth, dz_in_wth,          &
                    cos_zenith_angle, lit_fraction,                             &
                    cos_zenith_angle_rts, lit_fraction_rts,                     &
-                   stellar_irradiance_rts,                                     &
+                   stellar_irradiance_rts, orographic_correction_rts,          &
                    ozone, mv, mcl, mci,                                        &
                    area_fraction, liquid_fraction, frozen_fraction,            &
                    sigma_mc, cca, ccw, cloud_drop_no_conc,                     &
@@ -285,7 +287,7 @@ subroutine sw_code(nlayers,                                                    &
     l_rayleigh_sw, l_trans_zen_correction, &
     i_cloud_ice_type_sw, i_cloud_liq_type_sw, &
     i_cloud_ice_type_swinc, i_cloud_liq_type_swinc, &
-    cloud_vertical_decorr
+    cloud_vertical_decorr, topography, topography_flat
   use aerosol_config_mod, only: l_radaer, sulphuric_strat_climatology
   use set_thermodynamic_mod, only: set_thermodynamic
   use set_cloud_field_mod, only: set_cloud_field
@@ -354,7 +356,8 @@ subroutine sw_code(nlayers,                                                    &
     cca, ccw, cloud_drop_no_conc
   real(r_def), dimension(undf_2d), intent(in) :: &
     cos_zenith_angle, lit_fraction, &
-    cos_zenith_angle_rts, lit_fraction_rts, stellar_irradiance_rts
+    cos_zenith_angle_rts, lit_fraction_rts, stellar_irradiance_rts, &
+    orographic_correction_rts
   real(r_def), dimension(undf_tile),  intent(in) :: tile_fraction
   real(r_def), dimension(undf_rtile), intent(in) :: &
     tile_sw_direct_albedo, tile_sw_diffuse_albedo
@@ -388,7 +391,8 @@ subroutine sw_code(nlayers,                                                    &
   integer(i_def) :: tile_1, tile_last, rtile_1, rtile_last
   integer(i_def) :: itile_1, itile_last
   integer(i_def) :: mode_1, mode_last, rmode_1, rmode_last
-  integer(i_def) :: flux_0, flux_nlayers
+  integer(i_def) :: flux_0, flux_nlayers, twod_1, twod_last
+  logical :: l_orog
   real(r_def), dimension(nlayers) :: layer_heat_capacity
     ! Heat capacity for each layer
   real(r_def), dimension(nlayers) :: p_layer, t_layer
@@ -421,6 +425,15 @@ subroutine sw_code(nlayers,                                                    &
   rmode_last = map_rmode(1)+(nlayers+1)*sw_band_mode-1
   flux_0 = map_flux(1)
   flux_nlayers = map_flux(1)+nlayers
+  twod_1 = map_2d(1)
+  twod_last = map_2d(1)
+
+  ! Set logical for the orographic correction
+  if (topography == topography_flat) then
+    l_orog = .false.
+  else
+    l_orog = .true.
+  end if
 
   if (rad_this_tstep .or. rad_inc_this_tstep) then
     ! Set up pressures, temperatures, masses and heat capacities
@@ -434,7 +447,7 @@ subroutine sw_code(nlayers,                                                    &
     call set_cloud_field(nlayers, n_profile, &
       area_fraction(wth_1:wth_nlayers), &
       cca(wth_1:wth_nlayers), ccw(wth_1:wth_nlayers), t_layer, &
-      latitude(map_2d(1):map_2d(1)), longitude(map_2d(1):map_2d(1)), &
+      latitude(twod_1:twod_last), longitude(twod_1:twod_last), &
       i_cloud_representation, i_overlap, i_inhom, i_drop_re, &
       rand_seed, n_cloud_layer, cloud_frac, liq_dim, conv_frac, &
       liq_conv_frac, ice_conv_frac, liq_conv_mmr, ice_conv_mmr, liq_conv_dim)
@@ -457,24 +470,24 @@ subroutine sw_code(nlayers,                                                    &
       sw_up_blue_tile_rts(tile_1:tile_last)
 
     sw_diag%flux_direct_blue_surf(1:1) => &
-      sw_direct_blue_surf_rts(map_2d(1):map_2d(1))
+      sw_direct_blue_surf_rts(twod_1:twod_last)
     sw_diag%flux_down_blue_surf(1:1) => &
-      sw_down_blue_surf_rts(map_2d(1):map_2d(1))
+      sw_down_blue_surf_rts(twod_1:twod_last)
 
     ! Diagnosed on request:
     if (.not. associated(cloud_top_re_rts, empty_real_data) .and. &
         .not. associated(cloud_top_weight_rts, empty_real_data)) then
       sw_diag%cloud_top_liq_dim(1:1) => &
-        cloud_top_re_rts(map_2d(1):map_2d(1))
+        cloud_top_re_rts(twod_1:twod_last)
       sw_diag%cloud_top_liq_weight(1:1) => &
-        cloud_top_weight_rts(map_2d(1):map_2d(1))
+        cloud_top_weight_rts(twod_1:twod_last)
     end if
     if (.not. associated(warm_cloud_top_re_rts, empty_real_data) .and. &
         .not. associated(warm_cloud_top_weight_rts, empty_real_data)) then
       sw_diag%cloud_top_warm_liq_dim(1:1) => &
-        warm_cloud_top_re_rts(map_2d(1):map_2d(1))
+        warm_cloud_top_re_rts(twod_1:twod_last)
       sw_diag%cloud_top_warm_liq_weight(1:1) => &
-        warm_cloud_top_weight_rts(map_2d(1):map_2d(1))
+        warm_cloud_top_weight_rts(twod_1:twod_last)
     end if
 
     ! Aerosol optical depth for SW band 3 is output (505-690nm). Once the
@@ -508,8 +521,10 @@ subroutine sw_code(nlayers,                                                    &
       n2o_mix_ratio          = n2o_mix_ratio,                                  &
       ch4_mix_ratio          = ch4_mix_ratio,                                  &
       o2_mix_ratio           = o2_mix_ratio,                                   &
-      cos_zenith_angle       = cos_zenith_angle_rts(map_2d(1):map_2d(1)),      &
-      solar_irrad            = stellar_irradiance_rts(map_2d(1):map_2d(1)),    &
+      cos_zenith_angle       = cos_zenith_angle_rts(twod_1:twod_last),         &
+      solar_irrad            = stellar_irradiance_rts(twod_1:twod_last),       &
+      l_orog                 = l_orog,                                         &
+      orog_corr              = orographic_correction_rts(twod_1:twod_last),    &
       n_tile                 = n_surf_tile,                                    &
       frac_tile_1d           = tile_fraction(tile_1:tile_last),                &
       albedo_diff_tile_1d    = tile_sw_diffuse_albedo(rtile_1:rtile_last),     &
@@ -560,18 +575,18 @@ subroutine sw_code(nlayers,                                                    &
                                * exner_in_wth(wth_0) / exner_in_wth(wth_1)
 
     ! Set surface and top-of-atmosphere fluxes
-    sw_down_surf_rts(map_2d(1))   = sw_down_rts(flux_0)
-    sw_up_surf_rts(map_2d(1))     = sw_up_rts(flux_0)
-    sw_direct_surf_rts(map_2d(1)) = sw_direct_rts(flux_0)
-    sw_up_toa_rts(map_2d(1))      = sw_up_rts(flux_nlayers)
-    sw_direct_toa_rts(map_2d(1))  = sw_direct_rts(flux_nlayers)
+    sw_down_surf_rts(twod_1)   = sw_down_rts(flux_0)
+    sw_up_surf_rts(twod_1)     = sw_up_rts(flux_0)
+    sw_direct_surf_rts(twod_1) = sw_direct_rts(flux_0)
+    sw_up_toa_rts(twod_1)      = sw_up_rts(flux_nlayers)
+    sw_direct_toa_rts(twod_1)  = sw_direct_rts(flux_nlayers)
 
     if (.not. associated(sw_down_clear_surf_rts, empty_real_data)) &
-      sw_down_clear_surf_rts(map_2d(1)) = sw_down_clear_rts(flux_0)
+      sw_down_clear_surf_rts(twod_1) = sw_down_clear_rts(flux_0)
     if (.not. associated(sw_up_clear_surf_rts, empty_real_data)) &
-      sw_up_clear_surf_rts(map_2d(1)) = sw_up_clear_rts(flux_0)
+      sw_up_clear_surf_rts(twod_1) = sw_up_clear_rts(flux_0)
     if (.not. associated(sw_up_clear_toa_rts, empty_real_data)) &
-      sw_up_clear_toa_rts(map_2d(1)) = sw_up_clear_rts(flux_nlayers)
+      sw_up_clear_toa_rts(twod_1) = sw_up_clear_rts(flux_nlayers)
 
   end if
 
@@ -601,9 +616,9 @@ subroutine sw_code(nlayers,                                                    &
         sw_up_blue_tile_rtsi(tile_1:tile_last)
 
       swinc_diag%flux_direct_blue_surf(1:1) => &
-        sw_direct_blue_surf_rtsi(map_2d(1):map_2d(1))
+        sw_direct_blue_surf_rtsi(twod_1:twod_last)
       swinc_diag%flux_down_blue_surf(1:1) => &
-        sw_down_blue_surf_rtsi(map_2d(1):map_2d(1))
+        sw_down_blue_surf_rtsi(twod_1:twod_last)
     else
       allocate( swinc_diag%heating_rate(1:1,1:nlayers) )
       allocate( swinc_diag%flux_up_tile(1:1,1:n_surf_tile) )
@@ -627,8 +642,10 @@ subroutine sw_code(nlayers,                                                    &
       n2o_mix_ratio          = n2o_mix_ratio,                                  &
       ch4_mix_ratio          = ch4_mix_ratio,                                  &
       o2_mix_ratio           = o2_mix_ratio,                                   &
-      cos_zenith_angle       = cos_zenith_angle_rts(map_2d(1):map_2d(1)),      &
-      solar_irrad            = stellar_irradiance_rts(map_2d(1):map_2d(1)),    &
+      cos_zenith_angle       = cos_zenith_angle_rts(twod_1:twod_last),         &
+      solar_irrad            = stellar_irradiance_rts(twod_1:twod_last),       &
+      l_orog                 = l_orog,                                         &
+      orog_corr              = orographic_correction_rts(twod_1:twod_last),    &
       n_tile                 = n_surf_tile,                                    &
       frac_tile_1d           = tile_fraction(tile_1:tile_last),                &
       albedo_diff_tile_1d    = tile_swinc_diffuse_albedo(itile_1:itile_last),  &
@@ -669,11 +686,11 @@ subroutine sw_code(nlayers,                                                    &
 
     if (rad_this_tstep) then
       ! Set surface and top-of-atmosphere fluxes
-      sw_down_surf_rtsi(map_2d(1))   = swinc_diag%flux_down(1, 0)
-      sw_up_surf_rtsi(map_2d(1))     = swinc_diag%flux_up(1, 0)
-      sw_direct_surf_rtsi(map_2d(1)) = swinc_diag%flux_direct(1, 0)
-      sw_up_toa_rtsi(map_2d(1))      = swinc_diag%flux_up(1, nlayers)
-      sw_direct_toa_rtsi(map_2d(1))  = swinc_diag%flux_direct(1, nlayers)
+      sw_down_surf_rtsi(twod_1)   = swinc_diag%flux_down(1, 0)
+      sw_up_surf_rtsi(twod_1)     = swinc_diag%flux_up(1, 0)
+      sw_direct_surf_rtsi(twod_1) = swinc_diag%flux_direct(1, 0)
+      sw_up_toa_rtsi(twod_1)      = swinc_diag%flux_up(1, nlayers)
+      sw_direct_toa_rtsi(twod_1)  = swinc_diag%flux_direct(1, nlayers)
     else
       ! Apply increments to radiative timestep fluxes and heating rates
       sw_heating_rate_rts(wth_1:wth_nlayers) = max( &
@@ -694,15 +711,15 @@ subroutine sw_code(nlayers,                                                    &
         + swinc_diag%flux_up_blue_tile(1, 1:n_surf_tile), &
         spread(0.0_r_def, 1, n_surf_tile) )
 
-      sw_direct_blue_surf_rts(map_2d(1)) = max( &
-          sw_direct_blue_surf_rts(map_2d(1)) &
-        - sw_direct_blue_surf_rtsi(map_2d(1)) &
+      sw_direct_blue_surf_rts(twod_1) = max( &
+          sw_direct_blue_surf_rts(twod_1) &
+        - sw_direct_blue_surf_rtsi(twod_1) &
         + swinc_diag%flux_direct_blue_surf(1), &
         0.0_r_def )
 
-      sw_down_blue_surf_rts(map_2d(1)) = max( &
-          sw_down_blue_surf_rts(map_2d(1)) &
-        - sw_down_blue_surf_rtsi(map_2d(1)) &
+      sw_down_blue_surf_rts(twod_1) = max( &
+          sw_down_blue_surf_rts(twod_1) &
+        - sw_down_blue_surf_rtsi(twod_1) &
         + swinc_diag%flux_down_blue_surf(1), &
         0.0_r_def )
 
@@ -712,24 +729,24 @@ subroutine sw_code(nlayers,                                                    &
       deallocate( swinc_diag%flux_up_tile )
       deallocate( swinc_diag%heating_rate )
 
-      sw_down_surf_rts(map_2d(1)) = max( sw_down_surf_rts(map_2d(1)) &
-        - sw_down_surf_rtsi(map_2d(1)) + swinc_diag%flux_down(1, 0), &
+      sw_down_surf_rts(twod_1) = max( sw_down_surf_rts(twod_1) &
+        - sw_down_surf_rtsi(twod_1) + swinc_diag%flux_down(1, 0), &
         0.0_r_def )
 
-      sw_up_surf_rts(map_2d(1)) = max( sw_up_surf_rts(map_2d(1)) &
-        - sw_up_surf_rtsi(map_2d(1)) + swinc_diag%flux_up(1, 0), &
+      sw_up_surf_rts(twod_1) = max( sw_up_surf_rts(twod_1) &
+        - sw_up_surf_rtsi(twod_1) + swinc_diag%flux_up(1, 0), &
         0.0_r_def )
 
-      sw_direct_surf_rts(map_2d(1)) = max( sw_direct_surf_rts(map_2d(1)) &
-        - sw_direct_surf_rtsi(map_2d(1)) + swinc_diag%flux_direct(1, 0), &
+      sw_direct_surf_rts(twod_1) = max( sw_direct_surf_rts(twod_1) &
+        - sw_direct_surf_rtsi(twod_1) + swinc_diag%flux_direct(1, 0), &
         0.0_r_def )
 
-      sw_up_toa_rts(map_2d(1)) = max( sw_up_toa_rts(map_2d(1)) &
-        - sw_up_toa_rtsi(map_2d(1)) + swinc_diag%flux_up(1, nlayers), &
+      sw_up_toa_rts(twod_1) = max( sw_up_toa_rts(twod_1) &
+        - sw_up_toa_rtsi(twod_1) + swinc_diag%flux_up(1, nlayers), &
         0.0_r_def )
 
-      sw_direct_toa_rts(map_2d(1)) = max( sw_direct_toa_rts(map_2d(1)) &
-        - sw_direct_toa_rtsi(map_2d(1)) + swinc_diag%flux_direct(1, nlayers), &
+      sw_direct_toa_rts(twod_1) = max( sw_direct_toa_rts(twod_1) &
+        - sw_direct_toa_rtsi(twod_1) + swinc_diag%flux_direct(1, nlayers), &
         0.0_r_def )
     end if
 
@@ -741,13 +758,13 @@ subroutine sw_code(nlayers,                                                    &
   if (n_radstep == 1) then
     ! Radiation timestep = model timestep
     sw_heating_rate(wth_0:wth_nlayers) = sw_heating_rate_rts(wth_0:wth_nlayers)
-    sw_down_surf(map_2d(1))            = sw_down_surf_rts(map_2d(1))
-    sw_up_surf(map_2d(1))              = sw_up_surf_rts(map_2d(1))
-    sw_direct_surf(map_2d(1))          = sw_direct_surf_rts(map_2d(1))
-    sw_up_toa(map_2d(1))               = sw_up_toa_rts(map_2d(1))
-    sw_direct_toa(map_2d(1))           = sw_direct_toa_rts(map_2d(1))
-    sw_down_blue_surf(map_2d(1))       = sw_down_blue_surf_rts(map_2d(1))
-    sw_direct_blue_surf(map_2d(1))     = sw_direct_blue_surf_rts(map_2d(1))
+    sw_down_surf(twod_1)               = sw_down_surf_rts(twod_1)
+    sw_up_surf(twod_1)                 = sw_up_surf_rts(twod_1)
+    sw_direct_surf(twod_1)             = sw_direct_surf_rts(twod_1)
+    sw_up_toa(twod_1)                  = sw_up_toa_rts(twod_1)
+    sw_direct_toa(twod_1)              = sw_direct_toa_rts(twod_1)
+    sw_down_blue_surf(twod_1)          = sw_down_blue_surf_rts(twod_1)
+    sw_direct_blue_surf(twod_1)        = sw_direct_blue_surf_rts(twod_1)
     sw_up_tile(tile_1:tile_last)       = sw_up_tile_rts(tile_1:tile_last)
     sw_up_blue_tile(tile_1:tile_last)  = sw_up_blue_tile_rts(tile_1:tile_last)
   else
@@ -761,31 +778,33 @@ subroutine sw_code(nlayers,                                                    &
     call bones(n_profile, nlayers,                                             &
       n_tile                    = n_surf_tile,                                 &
       l_cos_zen_correction      = .true.,                                      &
-      cos_zen_rts               = cos_zenith_angle_rts(map_2d(1):map_2d(1)),   &
-      lit_frac_rts              = lit_fraction_rts(map_2d(1):map_2d(1)),       &
-      cos_zen_mts               = cos_zenith_angle(map_2d(1):map_2d(1)),       &
-      lit_frac_mts              = lit_fraction(map_2d(1):map_2d(1)),           &
+      cos_zen_rts               = cos_zenith_angle_rts(twod_1:twod_last),      &
+      lit_frac_rts              = lit_fraction_rts(twod_1:twod_last),          &
+      cos_zen_mts               = cos_zenith_angle(twod_1:twod_last),          &
+      lit_frac_mts              = lit_fraction(twod_1:twod_last),              &
       l_trans_zen_correction    = l_trans_zen_correction,                      &
+      l_orog_corr_rts           = l_orog,                                      &
+      orog_corr_rts             = orographic_correction_rts(twod_1:twod_last), &
       heating_rate_1d_rts       = sw_heating_rate_rts(wth_1:wth_nlayers),      &
       flux_up_tile_1d_rts       = sw_up_tile_rts(tile_1:tile_last),            &
       flux_up_blue_tile_1d_rts  = sw_up_blue_tile_rts(tile_1:tile_last),       &
-      flux_direct_toa_rts       = sw_direct_toa_rts(map_2d(1):map_2d(1)),      &
-      flux_up_toa_rts           = sw_up_toa_rts(map_2d(1):map_2d(1)),          &
-      flux_direct_surf_rts      = sw_direct_surf_rts(map_2d(1):map_2d(1)),     &
-      flux_down_surf_rts        = sw_down_surf_rts(map_2d(1):map_2d(1)),       &
-      flux_up_surf_rts          = sw_up_surf_rts(map_2d(1):map_2d(1)),         &
-      flux_direct_blue_surf_rts = sw_direct_blue_surf_rts(map_2d(1):map_2d(1)),&
-      flux_down_blue_surf_rts   = sw_down_blue_surf_rts(map_2d(1):map_2d(1)),  &
+      flux_direct_toa_rts       = sw_direct_toa_rts(twod_1:twod_last),         &
+      flux_up_toa_rts           = sw_up_toa_rts(twod_1:twod_last),             &
+      flux_direct_surf_rts      = sw_direct_surf_rts(twod_1:twod_last),        &
+      flux_down_surf_rts        = sw_down_surf_rts(twod_1:twod_last),          &
+      flux_up_surf_rts          = sw_up_surf_rts(twod_1:twod_last),            &
+      flux_direct_blue_surf_rts = sw_direct_blue_surf_rts(twod_1:twod_last),   &
+      flux_down_blue_surf_rts   = sw_down_blue_surf_rts(twod_1:twod_last),     &
       heating_rate_1d_mts       = sw_heating_rate(wth_1:wth_nlayers),          &
       flux_up_tile_1d_mts       = sw_up_tile(tile_1:tile_last),                &
       flux_up_blue_tile_1d_mts  = sw_up_blue_tile(tile_1:tile_last),           &
-      flux_direct_toa_mts       = sw_direct_toa(map_2d(1):map_2d(1)),          &
-      flux_up_toa_mts           = sw_up_toa(map_2d(1):map_2d(1)),              &
-      flux_direct_surf_mts      = sw_direct_surf(map_2d(1):map_2d(1)),         &
-      flux_down_surf_mts        = sw_down_surf(map_2d(1):map_2d(1)),           &
-      flux_up_surf_mts          = sw_up_surf(map_2d(1):map_2d(1)),             &
-      flux_direct_blue_surf_mts = sw_direct_blue_surf(map_2d(1):map_2d(1)),    &
-      flux_down_blue_surf_mts   = sw_down_blue_surf(map_2d(1):map_2d(1)))
+      flux_direct_toa_mts       = sw_direct_toa(twod_1:twod_last),             &
+      flux_up_toa_mts           = sw_up_toa(twod_1:twod_last),                 &
+      flux_direct_surf_mts      = sw_direct_surf(twod_1:twod_last),            &
+      flux_down_surf_mts        = sw_down_surf(twod_1:twod_last),              &
+      flux_up_surf_mts          = sw_up_surf(twod_1:twod_last),                &
+      flux_direct_blue_surf_mts = sw_direct_blue_surf(twod_1:twod_last),       &
+      flux_down_blue_surf_mts   = sw_down_blue_surf(twod_1:twod_last))
 
     ! Set level 0 increment such that theta increment will equal level 1
     sw_heating_rate(wth_0) = sw_heating_rate(wth_1) &

@@ -6,7 +6,7 @@
 !>@brief Prepares the radiation fields
 module init_radiation_fields_alg_mod
 
-  use constants_mod,                   only: r_def
+  use constants_mod,                   only: r_def, pi
 
   ! Derived Types
   use field_mod,                       only: field_type
@@ -46,6 +46,15 @@ contains
 
     type( field_type ), pointer :: sin_stellar_declination_rts => null()
     type( field_type ), pointer :: stellar_eqn_of_time_rts     => null()
+    type( field_type ), pointer :: orographic_correction_rts   => null()
+
+    type( field_type ), pointer :: slope_angle    => null()
+    type( field_type ), pointer :: slope_aspect   => null()
+    type( field_type ), pointer :: skyview        => null()
+    type( field_type ), pointer :: horizon_angle  => null()
+    type( field_type ), pointer :: horizon_aspect => null()
+
+    real( r_def ), parameter :: pi_by_two = pi / 2.0_r_def
 
     dtheta_rad        => radiation_fields%get_field('dtheta_rad')
     dmv_pc2_rad       => radiation_fields%get_field('dmv_pc2_rad')
@@ -59,10 +68,18 @@ contains
     sw_down_surf      => radiation_fields%get_field('sw_down_surf')
     sw_down_blue_surf => radiation_fields%get_field('sw_down_blue_surf')
 
-    sin_stellar_declination_rts =>                                             &
+    sin_stellar_declination_rts => &
                       radiation_fields%get_field('sin_stellar_declination_rts')
-    stellar_eqn_of_time_rts     =>                                             &
+    stellar_eqn_of_time_rts     => &
                       radiation_fields%get_field('stellar_eqn_of_time_rts')
+    orographic_correction_rts   => &
+                      radiation_fields%get_field('orographic_correction_rts')
+
+    slope_angle    => radiation_fields%get_field('slope_angle')
+    slope_aspect   => radiation_fields%get_field('slope_aspect')
+    skyview        => radiation_fields%get_field('skyview')
+    horizon_angle  => radiation_fields%get_field('horizon_angle')
+    horizon_aspect => radiation_fields%get_field('horizon_aspect')
 
     ! Initialise the increments to 0 for use when the scheme isn't called
     call invoke( setval_c(dtheta_rad,        0.0_r_def),   &
@@ -78,7 +95,13 @@ contains
                  setval_c(sw_down_surf,      640.0_r_def), &
                  setval_c(sw_down_blue_surf, 400.0_r_def), &
                  setval_c(sin_stellar_declination_rts, 0.0_r_def), &
-                 setval_c(stellar_eqn_of_time_rts, 0.0_r_def) )
+                 setval_c(stellar_eqn_of_time_rts, 0.0_r_def), &
+                 setval_c(orographic_correction_rts, 1.0_r_def), &
+                 setval_c(slope_angle,       0.0_r_def), &
+                 setval_c(slope_aspect,      0.0_r_def), &
+                 setval_c(skyview,           1.0_r_def), &
+                 setval_c(horizon_angle,     pi_by_two), &
+                 setval_c(horizon_aspect,    0.0_r_def) )
 
   end subroutine init_radiation_fields_alg
 

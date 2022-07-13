@@ -155,6 +155,7 @@ contains
     type( field_type ), pointer :: conv_snow => null()
     type( field_type ), pointer :: cca_2d    => null()
 
+    type( field_type ), pointer :: skyview      => null()
     type( field_type ), pointer :: lw_down_surf => null()
     type( field_type ), pointer :: sw_down_surf => null()
     type( field_type ), pointer :: sw_up_tile   => null()
@@ -302,6 +303,7 @@ contains
     cca_2d    => convection_fields%get_field('cca_2d')
 
     ! Radiation fields
+    skyview      => radiation_fields%get_field('skyview')
     lw_down_surf => radiation_fields%get_field('lw_down_surf')
     sw_down_surf => radiation_fields%get_field('sw_down_surf')
     sw_up_tile   => radiation_fields%get_field('sw_up_tile')
@@ -459,7 +461,7 @@ contains
                            tile_snow_mass, n_snow_layers,                      &
                            snow_depth, canopy_water, soil_temperature,         &
                            tile_heat_flux, tile_moisture_flux,                 &
-                           sw_up_tile, sw_down_surf, lw_down_surf,             &
+                           sw_up_tile, sw_down_surf, lw_down_surf, skyview,    &
                            snowice_sublimation, surf_heat_flux, canopy_evap,   &
                            water_extraction, snowice_melt,                     &
                            dtheta_bl, diss_u, diss_v, dt_conv,                 &

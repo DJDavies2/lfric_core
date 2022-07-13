@@ -7,7 +7,7 @@
 
 module radiation_diags_mod
 
-  use constants_mod,            only: i_def, l_def
+  use constants_mod,            only: i_def, l_def, r_def
   use field_mod,                only: field_type
   use field_parent_mod,         only: write_interface
   use fs_continuity_mod,        only: W3
@@ -63,6 +63,8 @@ module radiation_diags_mod
   logical( l_def ) :: sw_net_surf_rts_flag
   logical( l_def ) :: lw_net_surf_rts_flag
   logical( l_def ) :: sw_diffuse_surf_rts_flag
+  logical( l_def ) :: sw_direct_orog_incr_rts_flag
+  logical( l_def ) :: lw_net_skyview_incr_flag
 
   integer( i_def ) :: n_levs
 
@@ -162,6 +164,8 @@ subroutine initialise_diags_for_radiation( lw_down_surf, lw_heating_rate, &
   sw_net_surf_rts_flag = .true.
   lw_net_surf_rts_flag = .true.
   sw_diffuse_surf_rts_flag = .true.
+  sw_direct_orog_incr_rts_flag = .true.
+  lw_net_skyview_incr_flag = .true.
 
 
   ! 2D fields
@@ -315,8 +319,9 @@ subroutine output_diags_for_radiation( dtheta_rad, &
   lw_up_surf_rts, sw_up_surf_rts, &
   lw_up_toa_rts, sw_up_toa_rts, sw_direct_toa_rts, &
   sw_heating_rate_rts, lw_heating_rate_rts, &
-  cos_zenith_angle, lit_fraction, &
-  cos_zenith_angle_rts, lit_fraction_rts, stellar_irradiance_rts, &
+  cos_zenith_angle, lit_fraction, skyview, &
+  cos_zenith_angle_rts, lit_fraction_rts, &
+  stellar_irradiance_rts, orographic_correction_rts, &
   sw_up_tile, &
   lw_up_surf, sw_up_surf, lw_up_toa, sw_up_toa, sw_direct_toa, &
   sw_direct_rts, sw_down_rts, sw_up_rts, lw_down_rts, lw_up_rts, &
@@ -346,8 +351,9 @@ subroutine output_diags_for_radiation( dtheta_rad, &
     lw_up_surf_rts, sw_up_surf_rts, &
     lw_up_toa_rts, sw_up_toa_rts, sw_direct_toa_rts, &
     sw_heating_rate_rts, lw_heating_rate_rts, &
-    cos_zenith_angle, lit_fraction, &
-    cos_zenith_angle_rts, lit_fraction_rts, stellar_irradiance_rts, &
+    cos_zenith_angle, lit_fraction, skyview, &
+    cos_zenith_angle_rts, lit_fraction_rts, &
+    stellar_irradiance_rts, orographic_correction_rts, &
     sw_up_tile
 
   ! Diagnostic fields that are always required by the kernels
@@ -375,7 +381,8 @@ subroutine output_diags_for_radiation( dtheta_rad, &
   type( field_type ) :: &
     sw_temperature_incr, lw_temperature_incr, &
     sw_net_surf, lw_net_surf, sw_net_surf_rts, lw_net_surf_rts, &
-    sw_diffuse_surf, sw_diffuse_surf_rts
+    sw_diffuse_surf, sw_diffuse_surf_rts, sw_direct_orog_incr_rts, &
+    lw_net_skyview_incr
 
   if ( subroutine_timers ) call timer("radiation_diags")
 
@@ -408,6 +415,8 @@ subroutine output_diags_for_radiation( dtheta_rad, &
   call cos_zenith_angle_rts%write_field('radiation__cos_zenith_angle_rts')
   call lit_fraction_rts%write_field('radiation__lit_fraction_rts')
   call stellar_irradiance_rts%write_field('radiation__stellar_irradiance_rts')
+  call orographic_correction_rts%write_field( &
+    'radiation__orographic_correction_rts' )
 
   call sw_up_tile%write_field('radiation__sw_up_tile')
 
@@ -441,10 +450,18 @@ subroutine output_diags_for_radiation( dtheta_rad, &
     call invoke( X_minus_Y(sw_net_surf, sw_down_surf, sw_up_surf) )
     call sw_net_surf%write_field('radiation__sw_net_surf')
   end if
-  if ( lw_net_surf_flag ) then
+  if ( lw_net_surf_flag .or. lw_net_skyview_incr_flag ) then
     call lw_down_surf%copy_field_properties(lw_net_surf)
     call invoke( X_minus_Y(lw_net_surf, lw_down_surf, lw_up_surf) )
+  end if
+  if ( lw_net_surf_flag ) then
     call lw_net_surf%write_field('radiation__lw_net_surf')
+  end if
+  if ( lw_net_skyview_incr_flag ) then
+    call lw_down_surf%copy_field_properties(lw_net_skyview_incr)
+    call invoke( X_times_Y(lw_net_skyview_incr, lw_net_surf, skyview) )
+    call invoke( inc_X_minus_Y(lw_net_skyview_incr, lw_net_surf) )
+    call lw_net_skyview_incr%write_field('radiation__lw_net_skyview_incr')
   end if
   if ( sw_diffuse_surf_flag ) then
     call lw_down_surf%copy_field_properties(sw_diffuse_surf)
@@ -466,6 +483,15 @@ subroutine output_diags_for_radiation( dtheta_rad, &
     call invoke( X_minus_Y(sw_diffuse_surf_rts, &
                            sw_down_surf_rts, sw_direct_surf_rts) )
     call sw_diffuse_surf_rts%write_field('radiation__sw_diffuse_surf_rts')
+  end if
+  if ( sw_direct_orog_incr_rts_flag ) then
+    call lw_down_surf%copy_field_properties(sw_direct_orog_incr_rts)
+    call invoke( X_divideby_Y(sw_direct_orog_incr_rts, &
+                              sw_direct_surf_rts, orographic_correction_rts) )
+    call invoke( inc_aX_plus_Y(-1.0_r_def, sw_direct_orog_incr_rts, &
+                               sw_direct_surf_rts) )
+    call sw_direct_orog_incr_rts%write_field( &
+      'radiation__sw_direct_orog_incr_rts' )
   end if
 
 

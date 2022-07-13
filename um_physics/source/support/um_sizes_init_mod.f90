@@ -12,6 +12,7 @@ module um_sizes_init_mod
   use extrusion_config_mod,        only : number_of_layers
   use cloud_config_mod,            only : cld_fsd_hill
   use mixing_config_mod,           only : smagorinsky, leonard_term
+  use radiation_config_mod,        only : topography, topography_horizon
 
   ! Other modules used
   use constants_mod,               only : i_um, r_um, rmdi, i_def, r_def
@@ -55,6 +56,7 @@ contains
          rneutml_sq
     use leonard_incs_mod, only: thetal_inc_leonard, qw_inc_leonard
     use dyn_coriolis_mod, only: f3_at_u
+    use solinc_data, only: sky
 
     implicit none
 
@@ -127,6 +129,12 @@ contains
     if (cld_fsd_hill) then
       if(allocated(f_arr))deallocate(f_arr)
       allocate(f_arr(3, row_length, rows, number_of_layers))
+    end if
+
+    if (topography == topography_horizon) then
+      ! Allocate space for the skyview factor used by JULES
+      if(allocated(sky))deallocate(sky)
+      allocate(sky(row_length, rows), source=rmdi)
     end if
 
     if ( smagorinsky ) then

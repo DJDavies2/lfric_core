@@ -23,6 +23,7 @@ module bl_imp_kernel_mod
   use blayer_config_mod,         only : fric_heating
   use cloud_config_mod,          only : scheme, scheme_smith, scheme_pc2, &
                                         scheme_bimodal
+  use radiation_config_mod,      only : topography, topography_horizon
   use constants_mod,             only : i_def, i_um, r_def, r_um
   use empty_data_mod,            only : empty_real_data
   use fs_continuity_mod,         only : W3, Wtheta
@@ -49,7 +50,7 @@ module bl_imp_kernel_mod
   !>
   type, public, extends(kernel_type) :: bl_imp_kernel_type
     private
-    type(arg_type) :: meta_args(104) = (/                                         &
+    type(arg_type) :: meta_args(105) = (/                                         &
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                &! outer
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      WTHETA),                   &! theta_in_wth
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W3),                       &! wetrho_in_w3
@@ -86,6 +87,7 @@ module bl_imp_kernel_mod
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! sw_up_tile
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_1),&! sw_down_surf
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_1),&! lw_down_surf
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_1),&! skyview
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! snowice_sublimation (kg m-2 s-1)
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! surf_heat_flux (W m-2)
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! canopy_evap (kg m-2 s-1)
@@ -207,6 +209,7 @@ contains
   !> @param[in]     sw_up_tile           Upwelling SW radiation on surface tiles
   !> @param[in]     sw_down_surf         Downwelling SW radiation at surface
   !> @param[in]     lw_down_surf         Downwelling LW radiation at surface
+  !> @param[in]     skyview              Skyview / area enhancement factor
   !> @param[in,out] snowice_sublimation  Sublimation of snow and ice
   !> @param[in,out] surf_heat_flux       Surface heat flux
   !> @param[in,out] canopy_evap          Canopy evaporation from land tiles
@@ -339,6 +342,7 @@ contains
                          sw_up_tile,                         &
                          sw_down_surf,                       &
                          lw_down_surf,                       &
+                         skyview,                            &
                          snowice_sublimation,                &
                          surf_heat_flux,                     &
                          canopy_evap,                        &
@@ -458,6 +462,7 @@ contains
     use level_heights_mod, only: r_theta_levels, r_rho_levels
     use dyn_coriolis_mod, only: f3_at_u
     use leonard_incs_mod, only: thetal_inc_leonard, qw_inc_leonard
+    use solinc_data, only: sky
 
     ! subroutines used
     use bl_diags_mod, only: bl_diag, dealloc_bl_imp, alloc_bl_expl
@@ -596,6 +601,7 @@ contains
     real(kind=r_def), intent(in) :: silhouette_area_orog(undf_2d)
     real(kind=r_def), intent(in) :: sw_down_surf(undf_2d)
     real(kind=r_def), intent(in) :: lw_down_surf(undf_2d)
+    real(kind=r_def), intent(in) :: skyview(undf_2d)
     real(kind=r_def), intent(inout) :: z_lcl(undf_2d)
     real(kind=r_def), intent(in) :: inv_depth(undf_2d)
     real(kind=r_def), intent(in) :: qcl_at_inv_top(undf_2d)
@@ -1098,6 +1104,11 @@ contains
       ! Soil temperature (t_soil_soilt)
       t_soil_soilt(1, i) = real(soil_temperature(map_soil(1)+i-1), r_um)
     end do
+
+    if (topography == topography_horizon) then
+      ! Set skyview factor used internally by JULES
+      sky = real(skyview(map_2d(1)), r_um)
+    end if
 
     ! Downwelling LW radiation at surface
     lw_down = real(lw_down_surf(map_2d(1)), r_um)

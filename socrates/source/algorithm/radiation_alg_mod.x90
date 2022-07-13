@@ -124,6 +124,7 @@ subroutine radiation_alg(dtheta_rad, theta, exner, mr,                        &
   type( field_type ), pointer :: sw_direct_blue_surf => null()
   type( field_type ), pointer :: cos_zenith_angle    => null()
   type( field_type ), pointer :: lit_fraction        => null()
+  type( field_type ), pointer :: skyview             => null()
   type( field_type ), pointer :: sw_heating_rate     => null()
   type( field_type ), pointer :: lw_heating_rate     => null()
   type( field_type ), pointer :: lw_up_tile          => null()
@@ -143,6 +144,7 @@ subroutine radiation_alg(dtheta_rad, theta, exner, mr,                        &
   type( field_type ), pointer :: cos_zenith_angle_rts    => null()
   type( field_type ), pointer :: lit_fraction_rts        => null()
   type( field_type ), pointer :: stellar_irradiance_rts  => null()
+  type( field_type ), pointer :: orographic_correction_rts => null()
   type( field_type ), pointer :: sw_heating_rate_rts     => null()
   type( field_type ), pointer :: lw_heating_rate_rts     => null()
   type( field_type ), pointer :: lw_up_tile_rts          => null()
@@ -203,6 +205,7 @@ subroutine radiation_alg(dtheta_rad, theta, exner, mr,                        &
   sw_direct_blue_surf => radiation_fields%get_field('sw_direct_blue_surf')
   cos_zenith_angle    => radiation_fields%get_field('cos_zenith_angle')
   lit_fraction        => radiation_fields%get_field('lit_fraction')
+  skyview             => radiation_fields%get_field('skyview')
   sw_heating_rate     => radiation_fields%get_field('sw_heating_rate')
   lw_heating_rate     => radiation_fields%get_field('lw_heating_rate')
   lw_up_tile          => radiation_fields%get_field('lw_up_tile')
@@ -222,6 +225,7 @@ subroutine radiation_alg(dtheta_rad, theta, exner, mr,                        &
   cos_zenith_angle_rts    => radiation_fields%get_field('cos_zenith_angle_rts')
   lit_fraction_rts        => radiation_fields%get_field('lit_fraction_rts')
   stellar_irradiance_rts  => radiation_fields%get_field('stellar_irradiance_rts')
+  orographic_correction_rts => radiation_fields%get_field('orographic_correction_rts')
   sw_heating_rate_rts     => radiation_fields%get_field('sw_heating_rate_rts')
   lw_heating_rate_rts     => radiation_fields%get_field('lw_heating_rate_rts')
   lw_up_tile_rts          => radiation_fields%get_field('lw_up_tile_rts')
@@ -320,7 +324,7 @@ subroutine radiation_alg(dtheta_rad, theta, exner, mr,                        &
                  theta, exner, exner_in_wth, rho_in_wth, dz_in_wth,            &
                  cos_zenith_angle, lit_fraction,                               &
                  cos_zenith_angle_rts, lit_fraction_rts,                       &
-                 stellar_irradiance_rts,                                       &
+                 stellar_irradiance_rts, orographic_correction_rts,            &
                  ozone, mr(imr_v), mr(imr_cl), mr(imr_ci),                     &
                  area_fraction, liquid_fraction, frozen_fraction,              &
                  sigma_mc, cca, ccw, cloud_drop_no_conc,                       &
@@ -412,8 +416,9 @@ subroutine radiation_alg(dtheta_rad, theta, exner, mr,                        &
       lw_up_surf_rts, sw_up_surf_rts, &
       lw_up_toa_rts, sw_up_toa_rts, sw_direct_toa_rts, &
       sw_heating_rate_rts, lw_heating_rate_rts, &
-      cos_zenith_angle, lit_fraction, &
-      cos_zenith_angle_rts, lit_fraction_rts, stellar_irradiance_rts, &
+      cos_zenith_angle, lit_fraction, skyview, &
+      cos_zenith_angle_rts, lit_fraction_rts, &
+      stellar_irradiance_rts, orographic_correction_rts, &
       sw_up_tile, &
       lw_up_surf, sw_up_surf, lw_up_toa, sw_up_toa, sw_direct_toa, &
       sw_direct_rts, sw_down_rts, sw_up_rts, lw_down_rts, lw_up_rts, &

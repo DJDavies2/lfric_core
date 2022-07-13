@@ -19,6 +19,8 @@
       <axis id="sea_ice_categories" name="sea_ice_categories" n_glo="1"/>
       <axis id="entrainment_levels" name="entrainment_levels" n_glo="3"/>
       <axis id="dust_divisions" name="dust_divisions" n_glo="6"/>
+      <axis id="horizon_angles" name="horizon_angles" n_glo="16"/>
+      <axis id="horizon_aspects" name="horizon_aspects" n_glo="16"/>
       <axis id="radiation_levels" name="radiation_levels"/>
       <axis id="lbc_axis" name="lbc_axis" n_glo="7"/>
     </axis_definition>
@@ -245,6 +247,12 @@
 	<field id="checkpoint_stellar_irradiance_rts" name="stellar_irradiance_rts" long_name="stellar_irradiance" unit="1" domain_ref="face" />
 	<field id="checkpoint_sin_stellar_declination_rts" name="sin_stellar_declination_rts" long_name="sin_stellar_declination" unit="1" domain_ref="face" />
 	<field id="checkpoint_stellar_eqn_of_time_rts" name="stellar_eqn_of_time_rts" long_name="stellar_equation_of_time" unit="1" domain_ref="face" />
+	<field id="checkpoint_orographic_correction_rts" name="orographic_correction_rts" long_name="orographic_correction_radiative_timestep" unit="1" domain_ref="face" />
+	<field id="checkpoint_slope_angle" name="slope_angle" long_name="slope_angle" unit="radian" domain_ref="face" />
+	<field id="checkpoint_slope_aspect" name="slope_aspect" long_name="slope_aspect" unit="radian" domain_ref="face" />
+	<field id="checkpoint_skyview" name="skyview" long_name="skyview" unit="1" domain_ref="face" />
+	<field id="checkpoint_horizon_angle" name="horizon_angle" long_name="horizon_angle" unit="radian" domain_ref="face" axis_ref="horizon_angles" />
+	<field id="checkpoint_horizon_aspect" name="horizon_aspect" long_name="horizon_aspect" unit="radian" domain_ref="face" axis_ref="horizon_aspects" />
 	<!-- radiation fields for increment timestepping -->
 	<field id="checkpoint_lw_down_surf_rtsi" name="lw_down_surf_rtsi" long_name="surface_downward_longwave_flux" unit="W m-2" domain_ref="face" />
 	<field id="checkpoint_sw_down_surf_rtsi" name="sw_down_surf_rtsi" long_name="surface_downward_shortwave_flux" unit="W m-2" domain_ref="face" />
@@ -721,6 +729,12 @@
 	<field id="radiation__lw_down_surf" name="lw_down_surf" long_name="surface_downward_longwave_flux" unit="W m-2" domain_ref="face" />
 	<field id="radiation__lw_up_surf" name="lw_up_surf" long_name="surface_upward_longwave_flux" unit="W m-2" domain_ref="face" />
 	<field id="radiation__lw_net_surf" name="lw_net_surf" long_name="surface_net_longwave_flux" unit="W m-2" domain_ref="face" />
+	<field id="radiation__lw_net_skyview_incr" name="lw_net_skyview_incr" long_name="surface_net_longwave_skyview_increment" unit="W m-2" domain_ref="face" />
+	<field id="radiation__slope_angle" name="slope_angle" long_name="surface_slope_elevation_angle" unit="radian" domain_ref="face" />
+	<field id="radiation__slope_aspect" name="slope_aspect" long_name="surface_slope_azimuth_angle" unit="radian" domain_ref="face" />
+	<field id="radiation__skyview" name="skyview" long_name="skyview_factor" unit="1" domain_ref="face" />
+	<field id="radiation__horizon_angle" name="horizon_angle" long_name="horizon_zenith_angle" unit="radian" domain_ref="face" axis_ref="horizon_angles" />
+	<field id="radiation__horizon_aspect" name="horizon_aspect" long_name="horizon_azimuth_angle" unit="radian" domain_ref="face" axis_ref="horizon_aspects" />
 	<!-- radiation diagnostics: radiation timesteps -->
 	<field id="radiation__sw_heating_rate_rts" name="sw_heating_rate_rts" long_name="shortwave_heating_rate_radiative_timestep" unit="K s-1" grid_ref="full_level_face_grid" />
 	<field id="radiation__lw_heating_rate_rts" name="lw_heating_rate_rts" long_name="longwave_heating_rate_radiative_timestep" unit="K s-1" grid_ref="full_level_face_grid" />
@@ -729,6 +743,8 @@
 	<field id="radiation__stellar_irradiance_rts" name="stellar_irradiance_rts" long_name="stellar_irradiance_radiative_timestep" unit="1" domain_ref="face" />
 	<field id="radiation__sin_stellar_declination_rts" name="sin_stellar_declination_rts" long_name="sin_stellar_declination_radiative_timestep" unit="1" domain_ref="face" />
 	<field id="radiation__stellar_eqn_of_time_rts" name="stellar_eqn_of_time_rts" long_name="stellar_equation_of_time_radiative_timestep" unit="1" domain_ref="face" />
+	<field id="radiation__orographic_correction_rts" name="orographic_correction_rts" long_name="orographic_correction_radiative_timestep" unit="1" domain_ref="face" />
+	<field id="radiation__sw_direct_orog_incr_rts" name="sw_direct_orog_incr_rts" long_name="surface_direct_shortwave_orographic_increment_radiative_timestep" unit="W m-2" domain_ref="face" />
 	<field id="radiation__sw_direct_toa_rts" name="sw_direct_toa_rts" long_name="toa_direct_shortwave_flux_radiative_timestep" unit="W m-2" domain_ref="face" />
 	<field id="radiation__sw_up_toa_rts" name="sw_up_toa_rts" long_name="toa_upward_shortwave_flux_radiative_timestep" unit="W m-2" domain_ref="face" />
 	<field id="radiation__sw_down_surf_rts" name="sw_down_surf_rts" long_name="surface_downward_shortwave_flux_radiative_timestep" unit="W m-2" domain_ref="face" />
@@ -1093,6 +1109,12 @@
 	<field id="restart_stellar_irradiance_rts" name="stellar_irradiance_rts" long_name="stellar_irradiance" unit="1" operation="instant" domain_ref="face" />
 	<field id="restart_sin_stellar_declination_rts" name="sin_stellar_declination_rts" long_name="sin_stellar_declination" unit="1" operation="instant" domain_ref="face" />
 	<field id="restart_stellar_eqn_of_time_rts" name="stellar_eqn_of_time_rts" long_name="stellar_equation_of_time" unit="1" operation="instant" domain_ref="face" />
+	<field id="restart_orographic_correction_rts" name="orographic_correction_rts" long_name="orographic_correction_radiative_timestep" unit="1" operation="instant" domain_ref="face" />
+	<field id="restart_slope_angle" name="slope_angle" long_name="slope_angle" unit="radian" operation="instant" domain_ref="face" />
+	<field id="restart_slope_aspect" name="slope_aspect" long_name="slope_aspect" unit="radian" operation="instant" domain_ref="face" />
+	<field id="restart_skyview" name="skyview" long_name="skyview" unit="1" operation="instant" domain_ref="face" />
+	<field id="restart_horizon_angle" name="horizon_angle" long_name="horizon_angle" unit="radian" operation="instant" domain_ref="face" axis_ref="horizon_angles" />
+	<field id="restart_horizon_aspect" name="horizon_aspect" long_name="horizon_aspect" unit="radian" operation="instant" domain_ref="face" axis_ref="horizon_aspects" />
 	<!-- radiation fields for increment timestepping -->
 	<field id="restart_lw_down_surf_rtsi" name="lw_down_surf_rtsi" long_name="surface_downward_longwave_flux" unit="W m-2" operation="instant" domain_ref="face" />
 	<field id="restart_sw_down_surf_rtsi" name="sw_down_surf_rtsi" long_name="surface_downward_shortwave_flux" unit="W m-2" operation="instant" domain_ref="face" />
@@ -1241,6 +1263,8 @@
       <file id="orography_ancil" name="orography_ancil" mode="read" output_freq="1ts" convention="UGRID" cyclic="false" enabled=".FALSE.">
 	<field id="surface_altitude" name="surface_altitude" long_name="surface_altitude" unit="m" operation="once" domain_ref="face"/>
 	<field id="sd_orog" name="m01s00i034" long_name="standard_deviation_of_orography" unit="1" operation="once" domain_ref="face"/>
+	<field id="grad_x_orog" name="m01s00i005" long_name="orographic_gradient_X_component" unit="1" operation="once" domain_ref="face"/>
+	<field id="grad_y_orog" name="m01s00i006" long_name="orographic_gradient_Y_component" unit="1" operation="once" domain_ref="face"/>
 	<field id="grad_xx_orog" name="m01s00i035" long_name="orographic_gradient_XX_component" unit="1" operation="once" domain_ref="face"/>
 	<field id="grad_xy_orog" name="m01s00i036" long_name="orographic_gradient_XY_component" unit="1" operation="once" domain_ref="face"/>
 	<field id="grad_yy_orog" name="m01s00i037" long_name="orographic_gradient_YY_component" unit="1" operation="once" domain_ref="face"/>

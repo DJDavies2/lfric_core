@@ -98,6 +98,8 @@ module um_physics_init_mod
                                         mix_factor_in => mix_factor, &
                                         leonard_term
 
+  use radiation_config_mod,      only : topography, topography_horizon
+
   use section_choice_config_mod, only : aerosol,           &
                                         aerosol_um,        &
                                         boundary_layer,    &
@@ -258,6 +260,7 @@ contains
          l_fix_tidy_rainfracs, l_fix_zh, l_fix_incloud_qcf,                 &
          l_fix_mcr_frac_ice, l_fix_gr_autoc, l_improve_cv_cons,             &
          l_pc2_checks_sdfix
+    use solinc_data, only: l_skyview
     use turb_diff_mod, only: l_subfilter_horiz, l_subfilter_vert,        &
          mix_factor, turb_startlev_vert, turb_endlev_vert, l_leonard_term
     use ukca_mode_setup, only: ukca_mode_sussbcocdu_7mode
@@ -465,6 +468,11 @@ contains
       tke_diag_fac  = 1.0_r_def
       l_use_var_fixes = .true.
       zhloc_depth_fac = real(zhloc_depth_fac_in, r_um)
+
+      if (topography == topography_horizon) then
+        ! Set control logical for use of skyview factor in JULES
+        l_skyview = .true.
+      end if
 
     end if
 
