@@ -500,7 +500,44 @@
             }
         }
     },
-
+    'uoe-epic' : {
+        'hostname' : ROSE_ORIG_HOST,
+        'batcher' : 'background',
+        'build_root' : '$CYLC_SUITE_RUN_DIR/share/lfric_build',
+        'update' : 'interupt',
+        'setup' : {
+            'base' : [
+                'umask 0022'
+	    ],
+            'build' : [],
+            'compiler' : {
+                'gnu' : [
+                    '. /home/um/UoEGCC930SWstackBuild/RoseStemSource.sh'
+            ],
+            },
+            'plot' : ['export PATH=/home/um/miniconda3/envs/uoescitools/bin${PATH:+:$PATH}'],
+            'reveal' : ['export'],
+            'tech' : [],
+            'run'  : ['ulimit -s unlimited'],
+        },
+        'teardown' : {
+            'base' : []
+        },
+        'queue' : {
+            'build' : {
+                'launcher' : 'mpiexec',
+                'directives' : {}
+            },
+            'run' : {
+                'launcher' : 'mpiexec',
+                'directives' : {}
+            },
+            'tech' : {
+                'launcher' : 'mpiexec',
+                'directives' : {}
+            }
+        }
+    },
 } -%}
 
 {#- Convenience Macros #}
