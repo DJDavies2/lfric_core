@@ -42,15 +42,22 @@ def do_plot(datapath, plotfield, plotpath='.', plotlevel=0):
         lfric = lfric[-1]
     else:
         lfric = lfric[-1, plotlevel]
-
+    
+    x_coord_name = 'longitude'
+    y_coord_name = 'latitude'
+    mesh_cube = load_cube_by_varname(datapath, lfric.attributes['mesh'])
+    if mesh_cube.attributes['geometry'] == 'planar':
+       x_coord_name = 'projection_x_coordinate'
+       y_coord_name = 'projection_y_coordinate'
+ 
     if plotfield[varname] == 'ls_prec':
        import cf_units
        lfric.units = cf_units.Unit('mm s-1')
        lfric.convert_units('mm h-1')
 
     # Get the x and y co-ordinates
-    x_coord = (np.around(lfric.coord('longitude').points, decimals=5))*10.0
-    y_coord = (np.around(lfric.coord('latitude').points,  decimals=5))*10.0
+    x_coord = (np.around(lfric.coord(x_coord_name).points, decimals=5))*10.0
+    y_coord = (np.around(lfric.coord(y_coord_name).points, decimals=5))*10.0
     t_coord = (np.around(lfric.coord('time').points, decimals=2))/3600.0
 
     # Save the min and max of the data

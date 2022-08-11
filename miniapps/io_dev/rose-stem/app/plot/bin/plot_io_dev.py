@@ -34,7 +34,19 @@ def load_cube_by_varname(filename, var):
 def plot_last_domain(filename, varname, ax):
     '''Plots the last domain of a given field as a 2D scatter'''
 
+    # Set default to lat/lon
     cube_out = load_cube_by_varname(filename, varname)
+    x_coord_name = "longitude"
+    y_coord_name = "latitude"
+
+    # Overwrite for planar UGRID coordinates
+    if not cube_out.attributes['Conventions'] == "CF":
+        mesh_cube = load_cube_by_varname(filename, cube_out.attributes['mesh'])
+
+        if mesh_cube.attributes['geometry'] == 'planar':
+            x_coord_name = "projection_x_coordinate"
+            y_coord_name = "projection_y_coordinate"
+
 
     # Strip out all but the last domain
     data = cube_out.data
@@ -43,15 +55,17 @@ def plot_last_domain(filename, varname, ax):
     elif len(np.shape(data)) == 3:
         data = data[-1][-1]
 
-    long = cube_out.coord('longitude').points
-    lat = cube_out.coord('latitude').points
+    x_coord = cube_out.coord(x_coord_name).points
+    y_coord = cube_out.coord(y_coord_name).points
 
     ax.text(0.9, 0.9, varname, transform=ax.transAxes,
         verticalalignment ='top', horizontalalignment ='right',)
 
-    ax.scatter(long, lat, c=data, cmap='gist_earth')
-    ax.set_xlabel(r"X [$^\circ$]")
-    ax.set_ylabel(r"Y [$^\circ$]", labelpad=-4)
+    ax.scatter(x_coord, y_coord, c=data, cmap='gist_earth')
+    ax.set_xlabel("{0} [{1}]".format(str(x_coord_name).replace("_"," ").title(),
+                                     str(cube_out.coord(x_coord_name).units)))
+    ax.set_ylabel("{0} [{1}]".format(str(y_coord_name).replace("_"," ").title(),
+                                     str(cube_out.coord(y_coord_name).units)))
     print("{0} domain plotted...".format(varname))
 
 
@@ -88,19 +102,22 @@ def create_plots(config, datapath, plot_fields):
 
         xdim = int(np.ceil(np.sqrt(len(plot_fields))))
         ydim = int(np.ceil(len(plot_fields)/xdim))
-        fig, axs = plt.subplots(ydim, xdim, figsize=(4*xdim, 2.5*ydim),
-                                sharex=True, sharey=True)
+
+        fig, axs = plt.subplots(ydim, xdim, sharex=True, sharey=True)
 
         if ydim*xdim > 1:
             axs = axs.ravel()
 
-        for i in range(len(plot_fields)):
-            field = plot_fields[i]
-            plot_last_domain(datapath, field, axs[i])
+        if len(plot_fields) == 1:
+            plot_last_domain(datapath, plot_fields[0], axs)
+        else:
+            for i in range(len(plot_fields)):
+                field = plot_fields[i]
+                plot_last_domain(datapath, field, axs[i])
 
-        remove_axes = np.arange(len(plot_fields)-len(axs), 0)
-        for a in remove_axes:
-            axs[a].set_axis_off()
+            remove_axes = np.arange(len(plot_fields)-len(axs), 0)
+            for a in remove_axes:
+                axs[a].set_axis_off()
 
         fig.suptitle("/".join(datapath.split("/")[-5::]))
 

@@ -7,7 +7,7 @@
 !> @brief  Handler object for NetCDF field data.
 module lfric_ncdf_field_mod
 
-  use constants_mod,       only: r_def, i_def, str_def, str_long
+  use constants_mod,       only: r_def, dp_native, i_def, str_def, str_long
   use lfric_ncdf_file_mod, only: lfric_ncdf_file_type
   use lfric_ncdf_dims_mod, only: lfric_ncdf_dims_type
   use log_mod,             only: log_event, log_scratch_space, LOG_LEVEL_ERROR
@@ -34,8 +34,10 @@ module lfric_ncdf_field_mod
 
     procedure, public :: read_data
     procedure, public :: write_data
-    procedure, public :: set_attribute
-    procedure, public :: get_attribute
+    procedure, public :: set_char_attribute
+    procedure, public :: get_char_attribute
+    procedure, public :: set_real_attribute
+    procedure, public :: get_real_attribute
 
   end type
 
@@ -136,13 +138,13 @@ contains
 
   end subroutine write_data
 
-  !> @brief    Assigns attributes to the NetCDF variables.
-  !> @details  Adds additional information to NetCDF variables such as
-  !!           variable names and descriptions.
+  !> @brief    Assigns character attribute to the NetCDF variable.
+  !> @details  Adds additional information to NetCDF variable in character
+  !!           form.
   !>
   !> @param[in]  attr_name   The name of attribute to be set
   !> @param[in]  attr_value  The value of the attribute
-  subroutine set_attribute(self, attr_name, attr_value)
+  subroutine set_char_attribute(self, attr_name, attr_value)
 
     implicit none
 
@@ -151,7 +153,7 @@ contains
     character(len=*),             intent(in) :: attr_value
 
     integer(kind=i_def)         :: ierr
-    character(len=*), parameter :: routine = 'set_attribute'
+    character(len=*), parameter :: routine = 'set_char_attribute'
     character(len=str_long)     :: cmess = ''
 
     ierr = nf90_put_att(self%file%get_id(), self%ncid, attr_name, &
@@ -163,13 +165,13 @@ contains
 
     return
 
-  end subroutine set_attribute
+  end subroutine set_char_attribute
 
-  !> @brief  Reads a field attribute from the NetCDF file.
+  !> @brief  Reads a field attribute in character form from the NetCDF file.
   !>
   !> @param[in]  attr_name   The name of attribute to be read
   !> @return                 The return value of the attribute
-  function get_attribute(self, attr_name) result(attr_value)
+  function get_char_attribute(self, attr_name) result(attr_value)
 
     implicit none
 
@@ -179,7 +181,7 @@ contains
     character(len=str_long) :: attr_value
 
     integer(kind=i_def)         :: ierr
-    character(len=*), parameter :: routine = 'read_attribute'
+    character(len=*), parameter :: routine = 'get_char_attribute'
     character(len=str_long)     :: cmess = ''
 
     ierr = nf90_get_att(self%file%get_id(), self%ncid, attr_name, attr_value)
@@ -191,7 +193,62 @@ contains
 
     return
 
-  end function get_attribute
+  end function get_char_attribute
+
+  !> @brief    Assigns real number attribute to the NetCDF variable.
+  !> @details  Adds additional information to NetCDF variables in real number
+  !!           form.
+  !>
+  !> @param[in]  attr_name   The name of attribute to be set
+  !> @param[in]  attr_value  The value of the attribute
+  subroutine set_real_attribute(self, attr_name, attr_value)
+
+    implicit none
+
+    class(lfric_ncdf_field_type), intent(in) :: self
+    character(len=*),             intent(in) :: attr_name
+    real(kind=dp_native),         intent(in) :: attr_value
+
+    integer(kind=i_def)         :: ierr
+    character(len=*), parameter :: routine = 'set_real_attribute'
+    character(len=str_long)     :: cmess = ''
+
+    ierr = nf90_put_att(self%file%get_id(), self%ncid, attr_name, attr_value)
+
+    cmess = "Setting NetCDF attribute '" // attr_name // &
+            "' for variable with ID: " // trim(self%name)
+    call check_err(ierr, routine, cmess)
+
+    return
+
+  end subroutine set_real_attribute
+
+  !> @brief  Reads a field attribute in real number form from the NetCDF file.
+  !>
+  !> @param[in]  attr_name   The name of attribute to be read
+  !> @return                 The return value of the attribute
+  function get_real_attribute(self, attr_name) result(attr_value)
+
+    implicit none
+
+    class(lfric_ncdf_field_type), intent(in) :: self
+    character(len=*),             intent(in) :: attr_name
+
+    real(kind=dp_native) :: attr_value
+
+    integer(kind=i_def)         :: ierr
+    character(len=*), parameter :: routine = 'read_attribute'
+    character(len=str_long)     :: cmess = ''
+
+    ierr = nf90_get_att(self%file%get_id(), self%ncid, attr_name, attr_value)
+
+    cmess = "Getting NetCDF attribute '" // attr_name // &
+            "' for variable with ID: " // trim(self%name)
+    call check_err(ierr, routine, cmess)
+
+    return
+
+  end function get_real_attribute
 
   !> @brief    Calls logger on error.
   !> @details  Checks the error code returned by the NetCDF file. If an error is

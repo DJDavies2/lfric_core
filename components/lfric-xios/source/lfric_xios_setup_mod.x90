@@ -28,6 +28,8 @@ module lfric_xios_setup_mod
                                            file_convention_cf
   use lfric_xios_clock_mod,          only: lfric_xios_clock_type
   use lfric_xios_file_mod,           only: lfric_xios_file_type
+  use lfric_xios_process_output_mod, only: set_xios_geometry_planar, &
+                                           xyz_scaling_factor
   use lfric_xios_utils_mod,          only: set_prime_io_mesh
   use log_mod,                       only: log_event, log_level_error
   use mesh_mod,                      only: mesh_type
@@ -245,6 +247,8 @@ contains
       do i = 1,3
         call chi(i)%copy_field(sample_chi(i))
       end do
+      ! Tell downstream output processing that the mesh is planar
+      call set_xios_geometry_planar()
     end if
 
     ! Allocate coordinate arrays
@@ -817,10 +821,6 @@ contains
     ! set as 1.0 for planar mesh
     real(kind=r_def) :: r2d
 
-    ! Scaling factor for XYZ mesh coordinates to circumvent XIOS filter - this
-    ! is a workaround that will be fleshed out in #3110, which depends on the
-    ! output processing capability from #1434
-    real(kind=dp_xios), parameter :: xyz_scaling_factor = 1.0e-4
     if ( mesh%is_geometry_spherical() ) then
       r2d = radians_to_degrees
     else
@@ -925,8 +925,9 @@ contains
     end if
 
     ! Apply scaling factor for XYZ coordinates
-    if ( mesh%is_geometry_planar() .and. &
-         coord_system == coord_system_xyz ) then
+    if ( mesh%is_geometry_planar()        .and. &
+         coord_system == coord_system_xyz .and. &
+         file_convention == file_convention_ugrid ) then
       lat_data = lat_data * xyz_scaling_factor
       lon_data = lon_data * xyz_scaling_factor
       lat_bounds = lat_bounds * xyz_scaling_factor

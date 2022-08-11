@@ -19,7 +19,7 @@ Levels are determined from the data.
 
 import sys
 import numpy as np
-from read_data import read_ugrid_data
+from read_data import read_ugrid_data, load_cube_by_varname
 # Need to set a non-interactive backend for suites
 import matplotlib
 matplotlib.use('Agg')  # noqa: E402
@@ -35,9 +35,14 @@ def make_figure(plotpath, nx, ny, field, timestep=-1):
 
     """  Create a figure for the input field and output to file. """
 
-    # get coordinates
+    # Get coordinates
+    mesh_cube = load_cube_by_varname(datapath, cube.attributes['mesh'])
+    if mesh_cube.attributes['geometry'] == 'planar':
+        y_coord_name = "projection_y_coordinate"
+    else:
+        y_coord_name = "latitude"
 
-    y = np.around(cube.coord('latitude').points)
+    y = np.around(cube.coord(y_coord_name).points)
 
     time = np.around(cube.coord('time').points)[timestep]
 

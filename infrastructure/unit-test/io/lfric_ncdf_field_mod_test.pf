@@ -36,19 +36,21 @@ contains
     character(len=str_def)      :: test_attr, return_attr
 
     real(kind=r_def) :: data_array1(10), data_array2(10), return_array(10)
-    real(kind=r_def) :: tol
+    real(kind=r_def) :: tol, test_attr_real, return_attr_real
 
     tol = 10.0e-8_r_def
 
     data_array1 = (/1.0_r_def, 2.0_r_def, 3.0_r_def, 4.0_r_def, 5.0_r_def, &
                     6.0_r_def, 7.0_r_def, 8.0_r_def, 9.0_r_def, 10.0_r_def/)
     test_attr = "test_attr_value"
+    test_attr_real = 123.4
 
     file1 = lfric_ncdf_file_type("test_field.nc", open_mode=LFRIC_NCDF_CREATE, &
                                   io_mode=LFRIC_NCDF_WRITE)
     dims1 = lfric_ncdf_dims_type("dims1", file1, 10)
     field1 = lfric_ncdf_field_type("test_field", file1, dims1)
-    call field1%set_attribute("test_attr", test_attr)
+    call field1%set_char_attribute("test_attr", test_attr)
+    call field1%set_real_attribute("test_attr_real", test_attr_real)
 
     call file1%close_definition()
 
@@ -74,11 +76,13 @@ contains
     field3 = lfric_ncdf_field_type("test_field", file3, dims3)
 
     call field3%read_data(return_array)
-    return_attr = field3%get_attribute("test_attr")
+    return_attr = field3%get_char_attribute("test_attr")
+    return_attr_real = field3%get_real_attribute("test_attr_real")
     call file3%close_file()
 
     @assertEqual(data_array2, return_array, tol)
     @assertEqual(trim(test_attr), trim(return_attr))
+    @assertEqual(test_attr_real, return_attr_real, tol)
 
   end subroutine test_field
 
