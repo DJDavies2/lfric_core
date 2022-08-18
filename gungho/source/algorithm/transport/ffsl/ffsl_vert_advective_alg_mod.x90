@@ -7,7 +7,7 @@
 
 module ffsl_vert_advective_alg_mod
 
-  use constants_mod,                    only: r_def, LARGE_REAL_NEGATIVE
+  use constants_mod,                    only: r_def
   use ffsl_divergence_alg_mod,          only: ffsl_divergence_alg
   use field_mod,                        only: field_type
   use flux_direction_mod,               only: x_direction, z_direction
@@ -77,7 +77,7 @@ contains
     !
     ! Part 1. Calculate rho_n - dt*div(mass_flux(rho=rho_n))
     !
-    call invoke( setval_c(mass_flux, LARGE_REAL_NEGATIVE) )
+    call invoke( setval_c(mass_flux, 0.0_r_def) )
     call ffsl_vert_conservative_alg(mass_flux, rho, dep_pts, dt)
     call ffsl_divergence_alg(increment, mass_flux, detj_at_w2, &
                              cell_orientation, z_direction)
@@ -87,7 +87,7 @@ contains
     ! Part 2. Calculate (rho=1) - dt*div(mass_flux(rho=1))
     !
                  setval_c(rho_constant_1, 1.0_r_def),     &
-                 setval_c(mass_flux, LARGE_REAL_NEGATIVE) )
+                 setval_c(mass_flux, 0.0_r_def) )
     call ffsl_vert_conservative_alg(mass_flux, rho_constant_1, dep_pts, dt)
     call ffsl_divergence_alg(increment, mass_flux, detj_at_w2, &
                              cell_orientation, z_direction)
