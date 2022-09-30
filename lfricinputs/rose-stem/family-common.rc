@@ -148,14 +148,11 @@
                      module list 2>&1
                      """
 
-    {# TODO: The XC40 platform still uses vn8.4.3 of the Cray Compiler. #}
-    {#       This is being reconsidered in the LFRic ticket             #}
-    {#       https://code.metoffice.gov.uk/trac/lfric/ticket/2664       #}
     [[meto-xc40-crayftn-craycc]]
         inherit = PLATFORM_XC40
         pre-script = """
                      source /data/d03/lfric/modules/setup
-                     module load meto-environment/lfric/cce/8.4.3/3
+                     module load meto-environment/lfric/cce/8.7.0/4
                      module load cray-snplauncher/$CRAY_MPICH2_VER
                      module swap craype-haswell craype-ivybridge
                      module list 2>&1
