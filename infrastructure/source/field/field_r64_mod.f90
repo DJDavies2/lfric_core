@@ -269,6 +269,9 @@ contains
                                ndata_first, &
                                override_data)
 
+    use, intrinsic :: ieee_arithmetic, only: ieee_value, IEEE_SIGNALING_NAN, IEEE_INVALID
+    use, intrinsic :: ieee_exceptions, only: ieee_set_halting_mode, ieee_get_halting_mode
+
     implicit none
 
     class(field_r64_type), intent(inout)           :: self
@@ -278,6 +281,11 @@ contains
     real(real64), target, optional, intent(in)     :: override_data( : )
 
     character(str_def) :: local_name
+
+    ! Defines whether to halt when invalid floating point numbers are experienced
+    logical :: halt_mode
+    ! To be set to an invalid floating point number
+    real(real64) :: NaN
 
     if ( present(name) ) then
       local_name = name
@@ -301,8 +309,25 @@ contains
       self%override_data => override_data
     else
       ! Create space for holding field data
-      allocate( self%data(vector_space%get_last_dof_halo()) )
+
+      ! If run-time checking for NaNs is on then initialise data with NaN
+      call ieee_get_halting_mode(IEEE_INVALID, halt_mode)
+
+      if (halt_mode) then
+        ! Temporarily turn off halting mode to safely set invalid value
+        call ieee_set_halting_mode(IEEE_INVALID, .false.)
+
+        allocate( self%data(vector_space%get_last_dof_halo()), &
+             source=ieee_value(NaN, IEEE_SIGNALING_NAN))
+
+        call ieee_set_halting_mode(IEEE_INVALID, .true.)
+      else
+        ! Normal field allocation
+        allocate( self%data(vector_space%get_last_dof_halo()))
+      end if
+
       self%override_data => null()
+
     end if
 
   end subroutine field_initialiser

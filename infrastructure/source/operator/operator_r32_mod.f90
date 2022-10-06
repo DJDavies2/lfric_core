@@ -74,10 +74,19 @@ contains
   !> @param [in] fs_to the function space that the operator maps to
   !>
   subroutine operator_r32_initialiser( self, fs_to, fs_from )
+
+    use, intrinsic :: ieee_arithmetic, only: ieee_value, IEEE_SIGNALING_NAN, IEEE_INVALID
+    use, intrinsic :: ieee_exceptions, only: ieee_set_halting_mode, ieee_get_halting_mode
+
     implicit none
     class(operator_r32_type),   target, intent(inout) :: self
     class(function_space_type), target, intent(in)    :: fs_to
     class(function_space_type), target, intent(in)    :: fs_from
+
+    ! Defines whether to halt when invalid floating point numbers are experienced
+    logical :: halt_mode
+    ! To be set to an invalid floating point number
+    real(real32) :: NaN
 
     ! initialise the parent
     call self%operator_parent_initialiser( fs_to, fs_from )
@@ -85,7 +94,22 @@ contains
     self%ncell_3d = fs_from%get_ncell() * fs_from%get_nlayers()
     ! allocate the array in memory
     if(allocated(self%local_stencil))deallocate(self%local_stencil)
-    allocate(self%local_stencil( fs_to%get_ndf(),fs_from%get_ndf(), self%ncell_3d ) )
+
+    ! If run-time checking for NaNs is on then initialise data with NaN
+    call ieee_get_halting_mode(IEEE_INVALID, halt_mode)
+
+    if (halt_mode) then
+      ! Temporarily turn off halting mode to safely set invalid value
+      call ieee_set_halting_mode(IEEE_INVALID, .false.)
+
+      allocate(self%local_stencil( fs_to%get_ndf(),fs_from%get_ndf(), self%ncell_3d ), &
+               source=ieee_value(NaN, IEEE_SIGNALING_NAN))
+
+      call ieee_set_halting_mode(IEEE_INVALID, .true.)
+    else
+      ! Normal operator allocation
+      allocate(self%local_stencil( fs_to%get_ndf(),fs_from%get_ndf(), self%ncell_3d ) )
+    end if
 
   end subroutine operator_r32_initialiser
 

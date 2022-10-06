@@ -29,7 +29,7 @@ FFLAGS_RISKY_OPTIMISATION = -O3
 FFLAGS_DEBUG              = -Gfast
 FFLAGS_WARNINGS           = -m 0
 FFLAGS_UNIT_WARNINGS      = -m 0
-FFLAGS_RUNTIME            = -R bcdps
+FFLAGS_RUNTIME            = -R bcdps -Ktrap=fp
 # Option for checking code meets Fortran standards
 FFLAGS_FORTRAN_STANDARD   = -en
 

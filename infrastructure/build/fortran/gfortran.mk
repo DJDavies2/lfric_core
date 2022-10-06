@@ -34,7 +34,7 @@ FFLAGS_UNIT_WARNINGS      = -Wall -Wconversion -Wunused-variable \
                             -Werror=tabs
 FFLAGS_INIT               = -finit-integer=31173 -finit-real=snan \
                             -finit-logical=true -finit-character=85
-FFLAGS_RUNTIME            = -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow
+FFLAGS_RUNTIME            = -fcheck=all -ffpe-trap=invalid,zero,overflow
 # Option for checking code meets Fortran standard - currently 2008
 FFLAGS_FORTRAN_STANDARD   = -std=f2008
 
@@ -45,9 +45,8 @@ FPPFLAGS = -P
 utilities/traceback_mod.o utilities/traceback_mod.mod: export FFLAGS += -fall-intrinsics
 
 # TODO - Remove the -fallow-arguments-mismatch flag when MPICH no longer fails
-#        to build as a result of its mismatched arguments (see ticket summary 
+#        to build as a result of its mismatched arguments (see ticket summary
 #        for #2549 for reasoning).
 ifeq ($(shell test $(GFORTRAN_VERSION) -ge 100000; echo $$?), 0)
 	FFLAGS_COMPILER += -fallow-argument-mismatch
 endif
-
