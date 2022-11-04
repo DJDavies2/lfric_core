@@ -37,8 +37,10 @@ module lfric_xios_read_mod
   use lfric_xios_mock_mod,      only: xios_recv_field,      &
                                       xios_get_domain_attr, &
                                       xios_get_axis_attr,   &
-                                      xios_get_field_attr
+                                      xios_get_field_attr,  &
+                                      lfric_xios_mock_pull_in
 #else
+  use lfric_xios_mock_mod,      only: lfric_xios_mock_pull_in
   use xios,                     only: xios_recv_field,      &
                                       xios_get_domain_attr, &
                                       xios_get_axis_attr,   &

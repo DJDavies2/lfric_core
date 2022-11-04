@@ -80,10 +80,13 @@ contains
             dim = ndiv
       case ('radiation_levels')
             dim = number_of_layers+1
+      case ('')
+            dim = 1 ! ordinary (non-multidata) field
 #endif
       case default
+            dim = 1 ! silence compiler warning
             write(log_scratch_space, '(A, A)')                                 &
-              'Unexpected multidata item:', multidata_item
+              'Unexpected multidata item: ', multidata_item
             call log_event(log_scratch_space, LOG_LEVEL_ERROR)
     end select
 

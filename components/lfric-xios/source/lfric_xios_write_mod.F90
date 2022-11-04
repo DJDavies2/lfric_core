@@ -24,6 +24,8 @@ module lfric_xios_write_mod
   use io_mod,               only: ts_fname
   use integer_field_mod,    only: integer_field_type, integer_field_proxy_type
   use lfric_xios_utils_mod, only: prime_io_mesh_is
+  use lfric_xios_format_mod, &
+                            only: format_field
   use mesh_mod,             only: mesh_type
   use log_mod,              only: log_event,         &
                                   log_scratch_space, &
@@ -33,8 +35,10 @@ module lfric_xios_write_mod
 #ifdef UNIT_TEST
   use lfric_xios_mock_mod,  only: xios_send_field,      &
                                   xios_get_domain_attr, &
-                                  xios_get_axis_attr
+                                  xios_get_axis_attr,   &
+                                  lfric_xios_mock_pull_in
 #else
+  use lfric_xios_mock_mod,  only: lfric_xios_mock_pull_in
   use xios,                 only: xios_send_field,      &
                                   xios_get_domain_attr, &
                                   xios_get_axis_attr
@@ -44,6 +48,7 @@ module lfric_xios_write_mod
 
   private
   public :: checkpoint_write_xios,    &
+            write_field_generic,      &
             write_field_node,         &
             write_field_single_face,  &
             write_field_face,         &
@@ -52,6 +57,50 @@ module lfric_xios_write_mod
             write_checkpoint
 
 contains
+
+!>  @brief  Write field data to UGRIDs via XIOS
+!>
+!>  @param[in]     field_name       Field name (for error reporting only)
+!>  @param[in]     field_proxy      A field proxy to be written
+!>
+subroutine write_field_generic(field_name, field_proxy)
+  implicit none
+
+  character(len=*),               intent(in) :: field_name
+  class(field_parent_proxy_type), intent(in) :: field_proxy
+
+  integer(i_def) :: undf
+  integer(i_def) :: hdim          ! horizontal dimension, domain size
+  integer(i_def) :: vdim          ! vertical dimension
+  real(dp_xios), allocatable :: xios_data(:)
+
+  undf = field_proxy%vspace%get_last_dof_owned() ! total dimension
+
+  ! number of rows = number of levels, length of contiguous vertical columns
+  if (field_proxy%vspace%get_nlayers() == 1) then
+    vdim = field_proxy%vspace%get_ndata()
+  else
+    vdim = size(field_proxy%vspace%get_levels())
+  end if
+  hdim = undf/vdim
+
+  ! sanity check
+  if (.not. (hdim*vdim == undf)) then
+    call log_event('assertion failed for field ' // field_name                &
+      // ': hdim*vdim == undf', log_level_error)
+  end if
+
+  allocate(xios_data(undf))
+
+  call format_field(xios_data, field_name, field_proxy, vdim, hdim)
+
+  call xios_send_field( field_name, reshape(xios_data, (/vdim, hdim/)) )
+  ! The shape is only necessary for the mock implementation, and
+  ! the only thing that matters is the product of the dimensions.
+
+  deallocate(xios_data)
+
+end subroutine write_field_generic
 
 !>  @brief    I/O handler for writing an XIOS netcdf checkpoint
 !>  @details  Note this routine accepts a filename but doesn't use it - this is
@@ -112,72 +161,7 @@ subroutine write_field_node(xios_field_name, field_proxy)
   character(len=*),               intent(in) :: xios_field_name
   class(field_parent_proxy_type), intent(in) :: field_proxy
 
-  integer(i_def) :: i, undf
-  integer(i_def) :: domain_size, axis_size
-  character(str_def) :: domain_id
-  real(dp_xios), allocatable :: send_field(:)
-  type(mesh_type), pointer   :: mesh => null()
-
-  ! Get domain ID from mesh
-  mesh => field_proxy%vspace%get_mesh()
-  if ( prime_io_mesh_is(mesh) ) then
-    domain_id = "node"
-  else
-    domain_id = trim(mesh%get_mesh_name())//"_node"
-  end if
-
-  undf = field_proxy%vspace%get_last_dof_owned()
-
-  ! Get the expected horizontal domain size for the rank
-  call xios_get_domain_attr(trim(domain_id), ni=domain_size)
-  ! Get the expected vertical axis size
-  call xios_get_axis_attr("vert_axis_full_levels", n_glo=axis_size)
-
-  ! Size the arrays to be what is expected
-  allocate(send_field(domain_size*axis_size))
-
-  ! All data are scalar fields
-
-  ! We need to reshape the raw field data to get the correct data layout for UGRID
-  ! At the moment field array data is 1D with levels ordered sequentially
-  ! This is only true for current scalar fields on lowest order fs and may change
-
-  ! Different field kinds are selected to access data, which is arranged into blocks
-  ! based on model level
-  select type(field_proxy)
-
-    type is (field_r32_proxy_type)
-    do i = 0, axis_size-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                 field_proxy%data(i+1:undf:axis_size)
-    end do
-
-    type is (field_r64_proxy_type)
-    do i = 0, axis_size-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                 field_proxy%data(i+1:undf:axis_size)
-    end do
-
-    type is (integer_field_proxy_type)
-    if ( any( abs(field_proxy%data(1:undf)) > xios_max_int) ) then
-      call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                      '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
-    end if
-    do i = 0, axis_size-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                 real( field_proxy%data(i+1:undf:axis_size), dp_xios )
-    end do
-
-    class default
-      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
-
-  end select
-
-  ! Reshape into 2D horizontal + vertical levels for output
-  call xios_send_field(xios_field_name, &
-                      reshape (send_field, (/domain_size, axis_size/) ))
-
-  deallocate(send_field)
+  call write_field_generic(xios_field_name, field_proxy)
 
 end subroutine write_field_node
 
@@ -193,73 +177,7 @@ subroutine write_field_edge(xios_field_name, field_proxy)
   character(len=*),               intent(in) :: xios_field_name
   class(field_parent_proxy_type), intent(in) :: field_proxy
 
-  integer(i_def) :: i, undf
-  integer(i_def) :: domain_size, axis_size
-  character(str_def) :: domain_id
-  real(dp_xios), allocatable :: send_field(:)
-  type(mesh_type), pointer   :: mesh => null()
-
-  ! Get domain ID from mesh
-  mesh => field_proxy%vspace%get_mesh()
-  if ( prime_io_mesh_is(mesh) ) then
-    domain_id = "edge"
-  else
-    domain_id = trim(mesh%get_mesh_name())//"_edge"
-  end if
-
-
-  undf = field_proxy%vspace%get_last_dof_owned()
-
-  ! Get the expected horizontal and vertical axis size
-  call xios_get_domain_attr(trim(domain_id), ni=domain_size)
-  call xios_get_axis_attr("vert_axis_half_levels", n_glo=axis_size)
-
-  ! Size the arrays to be what is expected
-  allocate(send_field(domain_size*axis_size))
-
-  ! All data are scalar fields
-
-  ! We need to reshape the raw field data to get the correct data layout for UGRID
-  ! At the moment field array data is 1D with levels ordered sequentially
-  ! This is only true for current scalar fields on lowest order fs and may change
-
-  ! Different field kinds are selected to access data, which is arranged into blocks
-  ! based on model level
-
-  select type(field_proxy)
-
-    type is (field_r32_proxy_type)
-    do i = 0, axis_size-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                 field_proxy%data(i+1:undf:axis_size)
-    end do
-
-    type is (field_r64_proxy_type)
-    do i = 0, axis_size-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                 field_proxy%data(i+1:undf:axis_size)
-    end do
-
-    type is (integer_field_proxy_type)
-    if ( any( abs(field_proxy%data(1:undf)) > xios_max_int) ) then
-      call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                      '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
-    end if
-    do i = 0, axis_size-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                 real( field_proxy%data(i+1:undf:axis_size), dp_xios )
-    end do
-
-    class default
-      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
-
-  end select
-
-  ! Reshape into 2D horizontal + vertical levels for output
-  call xios_send_field( xios_field_name, &
-                        reshape( send_field, (/domain_size, axis_size/) ) )
-
-  deallocate(send_field)
+  call write_field_generic(xios_field_name, field_proxy)
 
 end subroutine write_field_edge
 
@@ -275,72 +193,7 @@ subroutine write_field_single_face(xios_field_name, field_proxy)
   character(len=*),               intent(in) :: xios_field_name
   class(field_parent_proxy_type), intent(in) :: field_proxy
 
-  integer(i_def) :: i, undf, ndata
-  integer(i_def) :: domain_size
-  character(str_def) :: domain_id, mesh_name
-  real(dp_xios), allocatable :: send_field(:)
-  type(mesh_type), pointer   :: mesh => null()
-
-  ! Get domain ID from mesh
-  mesh => field_proxy%vspace%get_mesh()
-  if ( prime_io_mesh_is(mesh) ) then
-    domain_id = "face"
-  else
-    ! Mesh is 2D so remove tag from name
-    mesh_name = trim(mesh%get_mesh_name())
-    domain_id =  mesh_name(1:len(trim(mesh_name))-3)//"_face"
-  end if
-
-  undf = field_proxy%vspace%get_last_dof_owned()
-  ndata = field_proxy%vspace%get_ndata()
-
-  ! Get the expected horizontal size
-  ! all 2D fields are nominally in W3, hence half levels
-  call xios_get_domain_attr(trim(domain_id), ni=domain_size)
-
-  ! Size the array to be what is expected
-  allocate(send_field(domain_size*ndata))
-
-  ! If the fields do not have the same size, then exit with error
-  if ( size(send_field) /= undf ) then
-    call log_event( "Global size of model field /= size of field from file", &
-                    LOG_LEVEL_ERROR )
-  end if
-
-  ! Different field kinds are selected to access data - data is re-ordered into
-  ! slabs according to ndata
-  select type(field_proxy)
-
-    type is (field_r32_proxy_type)
-    do i = 0, ndata-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
-    end do
-
-    type is (field_r64_proxy_type)
-    do i = 0, ndata-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
-    end do
-
-    type is (integer_field_proxy_type)
-    if ( any( abs(field_proxy%data(1:undf)) > xios_max_int) ) then
-      call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                      '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
-    end if
-    do i = 0, ndata-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
-    end do
-
-    class default
-      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
-
-  end select
-
-  call xios_send_field(xios_field_name, reshape(send_field, (/1, domain_size*ndata/)))
-
-  deallocate(send_field)
+  call write_field_generic(xios_field_name, field_proxy)
 
 end subroutine write_field_single_face
 
@@ -357,91 +210,7 @@ subroutine write_field_face(xios_field_name, field_proxy)
   character(len=*),               intent(in) :: xios_field_name
   class(field_parent_proxy_type), intent(in) :: field_proxy
 
-  integer(i_def) :: i, undf
-  integer(i_def) :: fs_id
-  integer(i_def) :: domain_size, axis_size
-  character(str_def) :: domain_id
-  real(dp_xios), allocatable :: send_field(:)
-  type(mesh_type), pointer   :: mesh => null()
-
-  ! Get domain ID from mesh
-  mesh => field_proxy%vspace%get_mesh()
-  if ( prime_io_mesh_is(mesh) ) then
-    domain_id = "face"
-  else
-    domain_id = trim(mesh%get_mesh_name())//"_face"
-  end if
-
-  ! Field must be cast to kind to get function space ID
-  select type(field_proxy)
-    type is (field_r32_proxy_type)
-    fs_id = field_proxy%vspace%which()
-
-    type is (field_r64_proxy_type)
-    fs_id = field_proxy%vspace%which()
-
-    type is (integer_field_proxy_type)
-    fs_id = field_proxy%vspace%which()
-
-    class default
-    call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
-
-  end select
-
-  ! Size the arrays to be what is expected
-  undf = field_proxy%vspace%get_last_dof_owned()
-
-  ! Get the expected horizontal and vertical axis size
-  if ( fs_id == W3 ) then
-    call xios_get_domain_attr(trim(domain_id), ni=domain_size)
-    call xios_get_axis_attr("vert_axis_half_levels", n_glo=axis_size)
-  else
-    call xios_get_domain_attr(trim(domain_id), ni=domain_size)
-    call xios_get_axis_attr("vert_axis_full_levels", n_glo=axis_size)
-  end if
-
-  allocate(send_field(domain_size*axis_size))
-
-  ! We need to reshape the raw field data to get the correct data layout for UGRID
-  ! At the moment field array data is 1D with levels ordered sequentially
-  ! This is only true for current scalar fields on lowest order fs and may change
-
-  ! Different field kinds are selected to access data, which is arranged into blocks
-  ! based on model level
-  select type(field_proxy)
-
-    type is (field_r32_proxy_type)
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   field_proxy%data(i+1:undf:axis_size)
-      end do
-
-    type is (field_r64_proxy_type)
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   field_proxy%data(i+1:undf:axis_size)
-      end do
-
-    type is (integer_field_proxy_type)
-      if ( any( abs(field_proxy%data(1:undf)) > xios_max_int) ) then
-        call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                        '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
-      end if
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   real( field_proxy%data(i+1:undf:axis_size), dp_xios )
-      end do
-
-    class default
-      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
-
-  end select
-
-  ! Reshape into 2D horizontal + vertical levels for output
-  call xios_send_field(xios_field_name, &
-                       reshape (send_field, (/domain_size, axis_size/) ))
-
-  deallocate(send_field)
+  call write_field_generic(xios_field_name, field_proxy)
 
 end subroutine write_field_face
 

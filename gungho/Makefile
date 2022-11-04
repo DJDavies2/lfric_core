@@ -154,6 +154,7 @@ unit-tests/%: export ADDITIONAL_EXTRACTION = $(ROOT_DIR)/infrastructure/source  
                                              $(ROOT_DIR)/components/science/source \
                                              $(ROOT_DIR)/components/lfric-xios/source
 unit-tests/%: export BIN_DIR      ?= $(PROJECT_DIR)/test
+unit-tests/%: export FFLAGS += -D UNIT_TEST
 unit-tests/%: export CXX_LINK      = true
 unit-tests/%: export META_FILE_DIR = rose-meta/lfric-gungho/HEAD
 unit-tests/%: export PROGRAMS      = gungho_unit_tests
