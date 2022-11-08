@@ -214,7 +214,7 @@ module tl_mol_conservative_alg_mod
 
         else if (.not. final_rk_stage) then
           ! Advective-then-flux form but not last stage: just advective
-          call advective_increment_alg(adv_inc, rhs_field,               &
+          call advective_increment_alg(adv_inc, rhs_field, ls_field_n,   &
                                        ls_advecting_wind, dt_substep,    &
                                        direction, transport_metadata,    &
                                        final_rk_stage )
@@ -223,8 +223,8 @@ module tl_mol_conservative_alg_mod
         else if ( (.not. final_split_step) .or. (.not. final_substep) ) then
           ! Advective-then-flux form and last stage: both advective and flux
           call invoke( setval_c(flux_step, 0.0_r_def) )
-          call advective_and_flux_alg(flux_step, adv_inc, rhs_field, &
-                                      ls_advecting_wind, direction,  &
+          call advective_and_flux_alg(flux_step, adv_inc, rhs_field, ls_field_n, &
+                                      ls_advecting_wind, dt_substep, direction,  &
                                       transport_metadata, final_rk_stage)
           ! Compute: rhs = div(F) and update field: f = f^n - dt_substep*rhs
           call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div), &

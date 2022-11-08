@@ -113,9 +113,9 @@ contains
         end do
 
         ! Compute update: rhs = u.grad(rhs_field)
-        call advective_increment_alg(rhs, rhs_field,                   &
-                                     advecting_wind, dt_substep,       &
-                                     direction, transport_metadata,    &
+        call advective_increment_alg(rhs, rhs_field, field_n,       &
+                                     advecting_wind, dt_substep,    &
+                                     direction, transport_metadata, &
                                      final_rk_stage )
 
         ! Update field: f = f^n - dt_substep*rhs

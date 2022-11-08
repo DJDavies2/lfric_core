@@ -21,12 +21,14 @@ contains
   !!          and wind u.
   !> @param[in,out] advective_increment Increment wind.grad(field)
   !> @param[in]     field               Field to compute the adevctive increment
+  !> @param[in]     field_n             Field at start of substep, used in the
+  !!                                    simple monotonicity calculation
   !> @param[in]     wind                Advecting wind
   !> @param[in]     dt                  Advection time step
   !> @param[in]     direction           Direction to perform the advective update
   !> @param[in]     transport_metadata  Contains transport configuration options
   !> @param[in]     final_rk_stage      Whether this is the last Runge-Kutta stage
-  subroutine advective_increment_alg(advective_increment, field, wind,  &
+  subroutine advective_increment_alg(advective_increment, field, field_n, wind,  &
                                      dt, direction, transport_metadata, &
                                      final_rk_stage)
 
@@ -57,7 +59,7 @@ contains
     implicit none
 
     type(field_type),              intent(inout) :: advective_increment
-    type(field_type),              intent(in)    :: field, wind
+    type(field_type),              intent(in)    :: field, field_n, wind
     real(kind=r_def),              intent(in)    :: dt
     integer(kind=i_def),           intent(in)    :: direction
     type(transport_metadata_type), intent(in)    :: transport_metadata
@@ -66,8 +68,8 @@ contains
     type(field_type)             :: field_new
     type(operator_type), pointer :: m3_inv => null()
     integer(kind=i_def)          :: mono_stencil
-    logical(kind=l_def)          :: do_horizontal_monotone, &
-                                    do_vertical_monotone
+    logical(kind=l_def)          :: do_horizontal_monotone
+    logical(kind=l_def)          :: do_vertical_monotone
 
     select case ( field%which_function_space() )
 
@@ -103,28 +105,31 @@ contains
 
     end select
 
-    ! Apply monotonicity (using the substepped timestep)
-    do_horizontal_monotone = .false.
-    if ( (direction == direction_h .or. direction == direction_3d ) .and. &
-         transport_metadata%get_horizontal_monotone() == horizontal_monotone_clipping ) &
+    ! Apply monotonicity (using the substepped timestep) at the final RK stage
+    if ( final_rk_stage ) then
+      do_horizontal_monotone = .false.
+      if ( (direction == direction_h .or. direction == direction_3d ) .and.               &
+           transport_metadata%get_horizontal_monotone() == horizontal_monotone_clipping ) &
       do_horizontal_monotone = .true.
-    do_vertical_monotone = .false.
-    if ( (direction == direction_v .or. direction == direction_3d ) .and. &
-         transport_metadata%get_vertical_monotone() == vertical_monotone_clipping ) &
+
+      do_vertical_monotone = .false.
+      if ( (direction == direction_v .or. direction == direction_3d ) .and.           &
+           transport_metadata%get_vertical_monotone() == vertical_monotone_clipping ) &
       do_vertical_monotone = .true.
 
-    if ( do_horizontal_monotone .or. do_vertical_monotone ) then
-      if ( operators == operators_fem ) then
-        mono_stencil = 1_i_def
-      else
-        mono_stencil = fv_horizontal_order / 2_i_def
+      if ( do_horizontal_monotone .or. do_vertical_monotone ) then
+        if ( operators == operators_fem ) then
+          mono_stencil = 1
+        else
+          mono_stencil = fv_horizontal_order / 2
+        end if
+        call invoke( monotonic_update_kernel_type(advective_increment,    &
+                                                  field_n,                &
+                                                  mono_stencil,           &
+                                                  dt,                     &
+                                                  do_horizontal_monotone, &
+                                                  do_vertical_monotone ) )
       end if
-      call invoke( monotonic_update_kernel_type(advective_increment,     &
-                                                field,                   &
-                                                mono_stencil,            &
-                                                dt,                      &
-                                                do_horizontal_monotone,  &
-                                                do_vertical_monotone ) )
     end if
 
   end subroutine advective_increment_alg

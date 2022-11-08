@@ -8,16 +8,22 @@
 
 module advective_and_flux_alg_mod
 
-  use constants_mod,                   only: i_def, l_def
+  use constants_mod,                   only: i_def, r_def, l_def
   use fem_constants_mod,               only: get_inverse_w3_mass_matrix
   use field_mod,                       only: field_type
   use fs_continuity_mod,               only: W2, W2h, W2v
   use log_mod,                         only: log_event, LOG_LEVEL_ERROR
+  use monotonic_update_kernel_mod,     only: monotonic_update_kernel_type
   use operator_mod,                    only: operator_type
   use reconstruct_w3_field_alg_mod,    only: reconstruct_w3_field_alg
-  use transport_enumerated_types_mod,  only: direction_3d, &
-                                             direction_h,  &
-                                             direction_v
+  use transport_config_mod,            only: operators,           &
+                                             fv_horizontal_order, &
+                                             operators_fem
+  use transport_enumerated_types_mod,  only: direction_3d,                 &
+                                             direction_h,                  &
+                                             direction_v,                  &
+                                             horizontal_monotone_clipping, &
+                                             vertical_monotone_clipping
   use transport_metadata_mod,          only: transport_metadata_type
   use w3_advective_update_kernel_mod,  only: w3_advective_update_kernel_type
   use w3h_advective_update_kernel_mod, only: w3h_advective_update_kernel_type
@@ -38,17 +44,21 @@ contains
   !> @param[in,out] mass_flux           Mass flux field: f = density*wind
   !> @param[in,out] adv_inc             Advective increment: wind.grad(density)
   !> @param[in]     density             Field to advect
+  !> @param[in]     density_n           Field at start of substep, used in the
+  !!                                    simple monotonicity calculation
   !> @param[in]     wind                Advecting wind field
+  !> @param[in]     dt                  Advection time step
   !> @param[in]     direction           Direction of the transport
   !> @param[in]     transport_metadata  Contains transport configuration options
   !> @param[in]     final_rk_stage      Whether this is the last Runge-Kutta stage
-  subroutine advective_and_flux_alg(mass_flux, adv_inc, density, wind, &
-                                    direction, transport_metadata, final_rk_stage)
+  subroutine advective_and_flux_alg(mass_flux, adv_inc, density, density_n, wind, &
+                                    dt, direction, transport_metadata, final_rk_stage)
 
     implicit none
 
-    type(field_type),              intent(in)    :: density, wind
+    type(field_type),              intent(in)    :: density, density_n, wind
     type(field_type),              intent(inout) :: mass_flux, adv_inc
+    real(kind=r_def),              intent(in)    :: dt
     integer(kind=i_def),           intent(in)    :: direction
     type(transport_metadata_type), intent(in)    :: transport_metadata
     logical(kind=l_def),           intent(in)    :: final_rk_stage
@@ -56,6 +66,9 @@ contains
     ! Internal variables
     type(field_type)             :: w2_recon
     type(operator_type), pointer :: m3_inv => null()
+    integer(kind=i_def)          :: mono_stencil
+    logical(kind=l_def)          :: do_horizontal_monotone
+    logical(kind=l_def)          :: do_vertical_monotone
 
     ! Reconstruct W3 variable in W2
     call w2_recon%initialise( wind%get_function_space() )
@@ -83,6 +96,36 @@ contains
     case default
       call log_event("Advective update only on W2, W2h and W2v spaces", LOG_LEVEL_ERROR)
     end select
+
+    ! Apply monotonicity (using the substepped timestep) at the final RK stage
+    ! for the advective update
+    if ( final_rk_stage ) then
+      do_horizontal_monotone = .false.
+      if ( (direction == direction_h .or. direction == direction_3d ) .and.               &
+           transport_metadata%get_horizontal_monotone() == horizontal_monotone_clipping ) &
+      do_horizontal_monotone = .true.
+
+      do_vertical_monotone = .false.
+      if ( (direction == direction_v .or. direction == direction_3d ) .and.           &
+           transport_metadata%get_vertical_monotone() == vertical_monotone_clipping ) &
+      do_vertical_monotone = .true.
+
+      if ( do_horizontal_monotone .or. do_vertical_monotone ) then
+        if ( operators == operators_fem ) then
+          mono_stencil = 1
+        else
+          mono_stencil = fv_horizontal_order / 2
+        end if
+        call invoke( monotonic_update_kernel_type(adv_inc,                &
+                                                  density_n,              &
+                                                  mono_stencil,           &
+                                                  dt,                     &
+                                                  do_horizontal_monotone, &
+                                                  do_vertical_monotone ) )
+      end if
+    end if
+
+
 
   end subroutine advective_and_flux_alg
 

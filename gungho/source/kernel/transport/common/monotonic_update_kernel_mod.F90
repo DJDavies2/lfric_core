@@ -105,7 +105,7 @@ subroutine monotonic_update_code( nlayers,              &
   nl = (nlayers - 1) + (ndf - 1)
 
   ! Enforce monotonicity of the advective update across the stencil
-  do k = 0, nlayers
+  do k = 0, nl
     field0    = field(stencil_map(1,1)+k)
     field_max = field(stencil_map(1,1)+k)
     field_min = field(stencil_map(1,1)+k)

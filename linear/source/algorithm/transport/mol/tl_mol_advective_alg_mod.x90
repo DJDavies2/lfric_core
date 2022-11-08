@@ -130,7 +130,7 @@ contains
         end do
 
         ! Compute update: rhs = u.grad(rhs_field)
-        call advective_increment_alg(rhs, rhs_field,                   &
+        call advective_increment_alg(rhs, rhs_field, ls_field_n,          &
                                      ls_advecting_wind, dt_substep,       &
                                      direction, transport_metadata,       &
                                      final_rk_stage )
