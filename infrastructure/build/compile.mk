@@ -58,11 +58,11 @@ ALL_OBJECTS = $(foreach proj, $(shell echo $(PROGRAMS) | tr a-z A-Z), $($(proj)_
 -include $(COMPILE_OPTIONS)
 
 .PHONY: applications
-applications: FFLAGS += $(foreach group, $(FFLAG_GROUPS), $(FFLAGS_$(group)))
+applications: FFLAGS_BASE = $(FFLAGS) $(foreach group, $(FFLAG_GROUPS), $(FFLAGS_$(group)))
 applications: $(addprefix $(BIN_DIR)/, $(PROGRAMS))
 
 .PHONY: libraries
-libraries: FFLAGS += $(foreach group, $(FFLAG_GROUPS), $(FFLAGS_$(group)))
+libraries: FFLAGS_BASE = $(FFLAGS) $(foreach group, $(FFLAG_GROUPS), $(FFLAGS_$(group)))
 libraries: $(addsuffix .a, $(addprefix $(LIB_DIR)/lib, $(PROGRAMS)))
 
 ##############################################################################
@@ -125,14 +125,14 @@ $(LIB_DIR)/lib%.a: $$($$(shell basename $$* | tr a-z A-Z)_OBJS) | $(LIB_DIR)
 .PRECIOUS: %.o
 %.o: %.f90 | $(MOD_DIR)
 	$(call MESSAGE,Compile,$<)
-	$(Q)$(FC) $(FFLAGS) \
+	$(Q)$(FC) $(FFLAGS_BASE) $(FFLAGS_EXTRA)\
 	          $(MODULE_DESTINATION_ARGUMENT) \
 	          $(MODULE_SOURCE_ARGUMENT) \
 	          $(INCLUDE_ARGS) -c -o $(basename $@).o $<
 
 %.o: %.F90 | $(MOD_DIR)
 	$(call MESSAGE,Pre-process and compile,$<)
-	$(Q)$(FC) $(FFLAGS) \
+	$(Q)$(FC) $(FFLAGS_BASE) $(FFLAGS_EXTRA) \
 	          $(MODULE_DESTINATION_ARGUMENT) \
 	          $(MODULE_SOURCE_ARGUMENT) \
 	          $(INCLUDE_ARGS) $(MACRO_ARGS) -c -o $(basename $@).o $<

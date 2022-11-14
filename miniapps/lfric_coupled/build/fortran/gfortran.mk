@@ -19,7 +19,7 @@ FFLAGS_WARNINGS          = -Wall -Werror=character-truncation -Werror=unused-val
 # But, we can apply full lfric infrastructure checking to socrates
 FFLAGS_SOCRATES_WARNINGS = -Werror=conversion -Werror=unused-variable
 
-science/src/socrates/%.o science/src/socrates/%.mod: export FFLAGS += $(FFLAGS_SOCRATES_WARNINGS)
+science/src/socrates/%.o science/src/socrates/%.mod: private export FFLAGS_EXTRA += $(FFLAGS_SOCRATES_WARNINGS)
 
 # We remove bounds checking (applied by -fcheck=all) and underflow checking. The 
 # latter is due to regular permitting of exponents going to zero for small numbers

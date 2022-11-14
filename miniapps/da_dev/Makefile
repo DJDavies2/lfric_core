@@ -149,15 +149,16 @@ build: ALWAYS
 	$(call MESSAGE,=========================================================)
 	$(call MESSAGE,Archiving $(PROJECT))
 	$(call MESSAGE,=========================================================)
-	$Q$(MAKE) libraries $(QUIET_ARG) -C $(WORKING_DIR) -f \
-			$(LFRIC_BUILD)/compile.mk LIB_DIR=$(LIB_DIR) MOD_DIR=$(MOD_DIR) \
-			PROGRAMS="$(PROGRAMS)"
+	$Q$(MAKE) libraries $(QUIET_ARG) -C $(WORKING_DIR) \
+	          -f $(LFRIC_BUILD)/compile.mk \
+	          LIB_DIR=$(LIB_DIR) MOD_DIR=$(MOD_DIR) \
+	          PROGRAMS="$(PROGRAMS)"
 	$(call MESSAGE,=========================================================)
 	$(call MESSAGE,Compiling $(PROJECT))
 	$(call MESSAGE,=========================================================)
-	$Q$(MAKE) applications $(QUIET_ARG) -C $(WORKING_DIR) -f \
-			$(LFRIC_BUILD)/compile.mk LIB_DIR=$(LIB_DIR) MOD_DIR=$(MOD_DIR) \
-			PROGRAMS="$(PROGRAMS)"
+	$Q$(MAKE) applications $(QUIET_ARG) -C $(WORKING_DIR) \
+	          -f $(LFRIC_BUILD)/compile.mk \
+	          BIN_DIR=$(BIN_DIR) PROGRAMS="$(PROGRAMS)"
 
 
 ##############################################################################

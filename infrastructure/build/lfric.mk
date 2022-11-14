@@ -41,9 +41,20 @@
 # Ensure make offers the features we need...
 #
 $(info ** Make version $(MAKE_VERSION))
-ifeq ($(filter else-if,$(value .FEATURES)),)
-  $(error The build system requires else-if support from GMake)
+REQUIRED_FEATURES = else-if order-only second-expansion target-specific
+ifneq ("x$(filter-out $(value .FEATURES), $(REQUIRED_FEATURES))", "x")
+  $(error The build system requires support for the following from GMake: $(REQUIRED_FEATURES))
 endif
+#
+# But of course one of the features is not covered by the .FEATURES list...
+#
+INT_MAKE_VERSION := $(shell echo $(MAKE_VERSION) \
+                    | awk -F . '{ for (i=1; i<NF+1; ++i) if (i == 1) printf "%i", $$i; else printf "%02i", $$i }')
+MAKE_AGE := $(shell if [[ "$(INT_MAKE_VERSION)" -lt "382" ]]; then echo old; fi )
+ifneq ("x$(MAKE_AGE)", "x")
+  $(error The build system requires at least GMake 3.82)
+endif
+
 
 # Default variables...
 #

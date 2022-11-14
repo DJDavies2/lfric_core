@@ -123,7 +123,8 @@
         'setup' : {
             'base' : [
                 'umask 0022',
-                'source /data/d03/lfric/modules/setup'
+                'source /data/d03/lfric/modules/setup',
+                'export PATH=/critical/ukmo/unsupported/gmake/3.8.2/bin:$PATH'
             ],
             'build' : [
             ],
@@ -149,7 +150,7 @@
             'build' : {
                 'launcher' : 'mpiexec',
                 'directives' : [
-                    '-l select=1:ncpus=6:mem=6GB:tmpsize=4GB',
+                    '-l select=1:ncpus=6:mem=12GB:tmpsize=4GB',
                     '-l walltime=01:00:00',
                     '-q=shared'
                 ]
@@ -181,7 +182,8 @@
         'setup' : {
             'base' : [
                 'umask 0022',
-                'module use /common/lfric/modules/modulefiles'
+                'module use /common/lfric/modules/modulefiles',
+                'export PATH=/critical/ukmo/unsupported/gmake/3.8.2/bin:$PATH'
             ],
             'build' : [
             ],
@@ -239,7 +241,8 @@
         'setup' : {
             'base' : [
                 'umask 0022',
-                'module use /common/lfric/modules/modulefiles'
+                'module use /common/lfric/modules/modulefiles',
+                'export PATH=/critical/ukmo/unsupported/gmake/3.8.2/bin:$PATH'
             ],
             'build' : [
             ],

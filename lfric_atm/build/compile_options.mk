@@ -13,4 +13,5 @@ $(info UM physics specific compile options)
 
 include $(PROJECT_DIR)/build/fortran/$(FORTRAN_COMPILER).mk
 
-science/%.o science/%.mod: export FFLAGS += $(FFLAGS_UM_PHYSICS)
+science/%.o science/%.mod: private FFLAGS_EXTRA = $(FFLAGS_UM_PHYSICS)
+%/limited_area_constants_mod.o: private FFLAGS_EXTRA = $(FFLAGS_INTEL_FIX_ARG)
