@@ -268,8 +268,8 @@
             'build' : {
                 'launcher' : 'mpiexec',
                 'directives' : [
-                    '-A=' + get_accountname(),
-                    '-P=' + get_accountname(),
+                    '-A="' + get_accountname() + '"',
+                    '-P="' + get_accountname() + '"',
                     '-l select=1:ncpus=6:mem=6GB:tmpsize=3GB',
                     '-l walltime=00:45:00',
                     '-q=shared'
@@ -278,8 +278,8 @@
             'run' : {
                 'launcher': 'aprun',
                 'directives' : [
-                    '-A=' + get_accountname(),
-                    '-P=' + get_accountname(),
+                    '-A="' + get_accountname() + '"',
+                    '-P="' + get_accountname() + '"',
                     '-l select=1',
                     '-l walltime=00:10:00',
                     '-q=normal'
@@ -288,8 +288,8 @@
             'tech' : {
                 'launcher' : 'mpiexec',
                 'directives' : [
-                    '-A=' + get_accountname(),
-                    '-P=' + get_accountname(),
+                    '-A="' + get_accountname() + '"',
+                    '-P="' + get_accountname() + '"',
                     '-l select=1:ncpus=1:mem=3GB',
                     '-l walltime=00:20:00',
                     '-q=shared'
