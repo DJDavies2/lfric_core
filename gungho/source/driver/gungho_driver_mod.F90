@@ -62,7 +62,7 @@ module gungho_driver_mod
 
   ! Model run working data set
   type(model_data_type) :: model_data
-  type(model_clock_type) :: model_clock
+  type(model_clock_type), allocatable :: model_clock
 
   type(mesh_type), pointer :: mesh              => null()
   type(mesh_type), pointer :: twod_mesh         => null()

@@ -9,11 +9,10 @@ class model_clock_type {
   -seconds_per_step: Float
   -initialisation_phase: Boolean
   -starting: Boolean
-  -calendar: calendar_type <<allocatable>>
   -last_spinup_step: Integer
   -spinup_fraction: Float
 
-  +initialise(calendar: calendar_type, first: String, last: String, seconds_per_step: Float, spinup_period: Float)
+  +initialise(first: String, last: String, seconds_per_step: Float, spinup_period: Float)
   +tick(): Boolean
   +get_first_step(): Integer
   +get_step(): Integer
@@ -22,7 +21,6 @@ class model_clock_type {
   +seconds_from_step(period: Integer): Float
   +is_initialisation(): Boolean
   +is_running(): Boolean
-  +get_calendar(): <<pointer>>calendar_type
   +get_spinup_fraction(): Float
   +is_spinning_up(): Boolean
   -calculate_spinup_fraction(): Float

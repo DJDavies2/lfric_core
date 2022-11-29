@@ -9,13 +9,11 @@
 module shallow_water_driver_mod
 
   use constants_mod,                 only: i_def, i_native, imdi, r_def
-  use driver_io_mod,                 only: get_io_context
   use field_mod,                     only: field_type
   use field_collection_mod,          only: field_collection_type
   use io_config_mod,                 only: write_diag,           &
                                            diagnostic_frequency, &
                                            nodal_output_on_w3
-  use io_context_mod,                only: io_context_type
   use log_mod,                       only: log_event,         &
                                            log_scratch_space, &
                                            log_level_error,   &
@@ -48,8 +46,8 @@ module shallow_water_driver_mod
             finalise
 
   ! Model run working data set
-  type(model_data_type)  :: model_data
-  type(model_clock_type) :: model_clock
+  type(model_data_type)               :: model_data
+  type(model_clock_type), allocatable :: model_clock
 
   ! Coordinate field
   type(field_type), target :: chi(3)
@@ -57,8 +55,6 @@ module shallow_water_driver_mod
   ! Mesh
   integer(i_def) :: mesh_id = imdi
   type(mesh_type), pointer :: mesh => null()
-
-  class(io_context_type), pointer :: io_context => null()
 
 contains
 
@@ -70,19 +66,10 @@ contains
   !!
   subroutine initialise()
 
-    use clock_mod,               only : clock_type
-    use constants_mod,           only : r_second
-    use lfric_xios_context_mod,  only : lfric_xios_context_type
-    use step_calendar_mod,       only : step_calendar_type
-    use time_config_mod,         only : timestep_start, timestep_end
-    use timestepping_config_mod, only : dt, spinup_period
-
     implicit none
 
     type(mesh_type),   pointer :: twod_mesh => null()
     type(field_type)           :: panel_id
-    class(clock_type), pointer :: io_clock => null()
-    type(step_calendar_type)   :: step_calendar
 
     call log_event( 'Initialising Infrastructure ...', LOG_LEVEL_INFO )
     ! Initialise infrastructure (from shallow_water_model_mod.F90) and setup constants
@@ -90,23 +77,8 @@ contains
                                     mesh,         &
                                     twod_mesh,    &
                                     chi,          &
-                                    panel_id )
-
-    io_context => get_io_context()
-    select type (io_context)
-    class is (lfric_xios_context_type)
-      io_clock => io_context%get_clock()
-      model_clock = model_clock_type( io_clock%get_first_step(),       &
-                                      io_clock%get_last_step(),        &
-                                      io_clock%get_seconds_per_step(), &
-                                      spinup_period )
-      call model_clock%add_clock( io_clock )
-    class default
-      model_clock = model_clock_type(                   &
-        step_calendar%parse_instance( timestep_start ), &
-        step_calendar%parse_instance( timestep_end ),   &
-        real(dt, r_second), real(spinup_period, r_second) )
-    end select
+                                    panel_id,     &
+                                    model_clock )
 
     !-------------------------------------------------------------------------
     ! Setup constants

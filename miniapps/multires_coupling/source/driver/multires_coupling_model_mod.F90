@@ -11,13 +11,13 @@ module multires_coupling_model_mod
   use assign_orography_field_mod, only : assign_orography_field
   use checksum_alg_mod,           only : checksum_alg
   use cli_mod,                    only : get_initial_filename
-  use clock_mod,                  only : clock_type
   use driver_comm_mod,            only : init_comm, final_comm
   use driver_fem_mod,             only : init_fem, final_fem
   use driver_mesh_mod,            only : init_mesh, final_mesh
   use driver_log_mod,             only : init_logger, final_logger
   use driver_io_mod,              only : init_io, final_io, &
                                          filelist_populator
+  use driver_time_mod,            only : init_time, get_calendar
   use configuration_mod,          only : final_configuration
   use conservation_algorithm_mod, only : conservation_algorithm
   use constants_mod,              only : i_def, i_native,          &
@@ -52,7 +52,6 @@ module multires_coupling_model_mod
                                          write_minmax_tseries,    &
                                          timer_output_path,       &
                                          counter_output_suffix
-  use io_context_mod,             only : io_context_type
   use linked_list_mod,            only : linked_list_type
   use log_mod,                    only : log_event,          &
                                          log_scratch_space,  &
@@ -124,10 +123,6 @@ contains
                                         model_clock )
 
     use check_configuration_mod, only: get_required_stencil_depth
-    use driver_io_mod,           only: get_io_context
-    use io_context_mod,          only: io_context_type
-    use lfric_xios_clock_mod,    only: lfric_xios_clock_type
-    use lfric_xios_context_mod,  only: lfric_xios_context_type
 
     implicit none
 
@@ -136,16 +131,13 @@ contains
     type(mesh_type),        intent(inout), pointer   :: twod_mesh
     type(mesh_type),        intent(inout), pointer   :: double_level_mesh
     type(mesh_type),        intent(inout), pointer   :: shifted_mesh
-    type(model_clock_type), intent(out)              :: model_clock
+    type(model_clock_type), intent(out), allocatable :: model_clock
 
     procedure(filelist_populator), pointer :: files_init_ptr
 
     integer(i_def) :: i
 
     integer(i_native) :: communicator
-
-    class(io_context_type), pointer :: io_context => null()
-    class(clock_type),      pointer :: io_clock => null()
 
     type(field_type) :: surface_altitude
 
@@ -215,6 +207,8 @@ contains
       call halo_calls%counter(program_name)
     end if
 
+    call init_time( model_clock )
+
     !-------------------------------------------------------------------------
     ! Initialise aspects of the grid
     !-------------------------------------------------------------------------
@@ -282,6 +276,7 @@ contains
                   communicator,                    &
                   dynamics_chi,                    &
                   dynamics_panel_id,               &
+                  model_clock, get_calendar(),     &
                   populate_filelist=files_init_ptr )
 
     ! Set up surface altitude field - this will be used to generate orography
@@ -301,21 +296,6 @@ contains
       call mg_orography_alg( multigrid_mesh_ids, multigrid_2D_mesh_ids, &
                              chi_mg, panel_id_mg, surface_altitude )
     end if
-
-    ! Initialise model time
-    !
-    io_context => get_io_context()
-    select type(io_context)
-    class is (lfric_xios_context_type)
-      io_clock => io_context%get_clock()
-      model_clock = model_clock_type( io_clock%get_first_step(),       &
-                                      io_clock%get_last_step(),        &
-                                      io_clock%get_seconds_per_step(), &
-                                      0.0_r_second )
-      call model_clock%add_clock( io_clock )
-    class default
-      call log_event( "XIOS context needed", log_level_error )
-    end select
 
     !-------------------------------------------------------------------------
     ! Setup constants

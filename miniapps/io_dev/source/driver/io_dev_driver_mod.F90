@@ -19,10 +19,12 @@ module io_dev_driver_mod
   use convert_to_upper_mod,       only: convert_to_upper
   use driver_comm_mod,            only: init_comm, final_comm
   use driver_log_mod,             only: init_logger, final_logger
+  use driver_time_mod,            only: init_time, get_calendar
   use driver_mesh_mod,            only: init_mesh, final_mesh
   use driver_fem_mod,             only: init_fem, final_fem
   use driver_io_mod,              only: init_io, final_io, &
-                                        get_io_context, filelist_populator
+                                        filelist_populator, &
+                                        get_io_context
   use field_mod,                  only: field_type
   use io_dev_config_mod,          only: multi_mesh, alt_mesh_name
   use io_config_mod,              only: write_diag, diagnostic_frequency, &
@@ -66,8 +68,8 @@ module io_dev_driver_mod
 
   type(field_type), target, dimension(3) :: chi
   type(field_type), target               :: panel_id
-  type( mesh_type ), pointer             :: mesh      => null()
-  type( mesh_type ), pointer             :: twod_mesh => null()
+  type(mesh_type), pointer               :: mesh      => null()
+  type(mesh_type), pointer               :: twod_mesh => null()
 
   contains
 
@@ -89,9 +91,6 @@ module io_dev_driver_mod
     type(field_type), pointer :: alt_io_coords(:,:) => null()
     type(field_type), pointer :: alt_io_panel_ids(:) => null()
     type(mesh_type),  pointer :: alt_mesh => null()
-
-    class(clock_type),        pointer     :: io_clock => null()
-    class(io_context_type),   pointer     :: io_context => null()
 
     procedure(filelist_populator), pointer :: files_init_ptr => null()
 
@@ -116,6 +115,9 @@ module io_dev_driver_mod
     ! Model init
     !-------------------------------------------------------------------------
     call log_event( 'Initialising '//program_name//' ...', LOG_LEVEL_ALWAYS )
+
+    ! Initialise model clock and calendar
+    call init_time( model_clock )
 
     ! Create the meshes used to test multi-mesh output
     multires_mesh_tags = [alt_mesh_name]
@@ -145,6 +147,7 @@ module io_dev_driver_mod
                               twod_mesh,  &
                               alt_mesh )
       call init_io( program_name, communicator, chi, panel_id, &
+                    model_clock, get_calendar(),               &
                     populate_filelist = files_init_ptr,        &
                     model_data = model_data,                   &
                     alt_coords = alt_io_coords,                &
@@ -155,31 +158,18 @@ module io_dev_driver_mod
                               mesh,       &
                               twod_mesh )
       call init_io( program_name, communicator, chi, panel_id, &
+                    model_clock, get_calendar(),               &
                     populate_filelist = files_init_ptr,        &
                     model_data = model_data )
     end if
 
-    ! Set up temporary driver layer to account for current clock and calendar
-    ! design - this will be fixed by #3500
-    io_context => get_io_context()
-    select type (io_context)
-    ! This miniapp only works with XIOS so need for a class default
-    type is (lfric_xios_context_type)
-      io_clock => io_context%get_clock()
-      model_clock = model_clock_type( io_clock%get_first_step(),       &
-                                      io_clock%get_last_step(),        &
-                                      io_clock%get_seconds_per_step(), &
-                                      0.0_r_second )
-    end select
-
     ! Initialise the fields stored in the model_data
     call initialise_model_data( model_data, model_clock, chi, panel_id )
 
-    ! Call initial step
-    select type (io_clock)
-    type is (lfric_xios_clock_type)
-        call io_clock%initial_step()
-    end select
+    ! Now we gut some of the time infrastructure to allow IO_Dev to run
+    ! without an XIOS clock
+    deallocate(model_clock)
+    call init_time( model_clock )
 
   end subroutine initialise
 
@@ -194,18 +184,26 @@ module io_dev_driver_mod
     write(log_scratch_space,'(A)') 'Running '//program_name//' ...'
     call log_event( log_scratch_space, LOG_LEVEL_ALWAYS )
 
-    call output_model_data( model_data, model_clock )
-
+    ! Write initial output
     io_context => get_io_context()
-
-    ! Model step
-    do while( model_clock%tick() )
-
-      ! The advancing of the I/O context will be attached to the model clock in future
+    if (model_clock%is_initialisation()) then
       select type (io_context)
       type is (lfric_xios_context_type)
           call io_context%advance(model_clock)
       end select
+    end if
+
+    ! Model step
+    do while( model_clock%tick() )
+
+      ! The advancing of the I/O context will be attached to the model clock
+      ! in a future ticket
+      if (.not. model_clock%is_initialisation()) then
+        select type (io_context)
+        type is (lfric_xios_context_type)
+            call io_context%advance(model_clock)
+        end select
+      end if
 
       ! Update fields
       call update_model_data( model_data, model_clock )

@@ -60,8 +60,6 @@ module linked_list_mod
      module procedure linked_list_constructor
   end interface linked_list_type
 
-
-
 contains
 
 !> Linked list constructor

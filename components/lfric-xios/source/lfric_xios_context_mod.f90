@@ -7,7 +7,7 @@
 !>
 module lfric_xios_context_mod
 
-  use clock_mod,            only : clock_type
+  use calendar_mod,         only : calendar_type
   use constants_mod,        only : i_native, &
                                    r_second, &
                                    l_def
@@ -18,13 +18,13 @@ module lfric_xios_context_mod
   use log_mod,              only : log_event,       &
                                    log_level_error, &
                                    log_level_info
-  use step_calendar_mod,    only : step_calendar_type
-  use lfric_xios_clock_mod, only : lfric_xios_clock_type
   use lfric_xios_setup_mod, only : init_xios_dimensions, &
                                    setup_xios_files
+  use lfric_xios_clock_mod, only : lfric_xios_clock_type
   use lfric_xios_file_mod,  only : lfric_xios_file_type
   use lfric_xios_utils_mod, only : parse_date_as_xios
   use linked_list_mod,      only : linked_list_type, linked_list_item_type
+  use model_clock_mod,      only : model_clock_type
   use xios,                 only : xios_context,                  &
                                    xios_context_initialize,       &
                                    xios_close_context_definition, &
@@ -35,6 +35,10 @@ module lfric_xios_context_mod
                                    xios_set_current_context,      &
                                    xios_update_calendar
   use mod_wait,             only : init_wait
+
+  !>@todo This information should be obtained from the calendar in the future
+  use time_config_mod, only: type_of_calendar => calendar_type, &
+                             key_from_calendar_type
 
   implicit none
 
@@ -68,40 +72,29 @@ contains
   !> @param [in]     communicator      MPI communicator used by context.
   !> @param [in]     chi               Array of coordinate fields
   !> @param [in]     panel_id          Panel ID field
-  !> @param [in]     start_time        Time of first step.
-  !> @param [in]     finish_time       Time of last step.
-  !> @param [in]     spinup_period     Number of seconds in spinup period.
-  !> @param [in]     seconds_per_step  Number of seconds in a time step.
-  !> @param [in]     calendar_start    Start date for calendar
-  !> @param [in]     calendar_type     Type of calendar.
+  !> @param [in]     model_clock       The model clock.
+  !> @param [in]     calendar          The model calendar.
   !> @param [in]     alt_coords        Array of coordinate fields for alternative meshes
   !> @param [in]     alt_panel_ids     Panel ID fields for alternative meshes
   subroutine initialise( this, id, communicator,          &
                          chi, panel_id,                   &
-                         start_time, finish_time,         &
-                         spinup_period, seconds_per_step, &
-                         calendar_start, calendar_type,   &
+                         model_clock, calendar,           &
                          alt_coords, alt_panel_ids )
 
     implicit none
 
-    class(lfric_xios_context_type),   intent(inout) :: this
-    character(*),                     intent(in)    :: id
-    integer(i_native),                intent(in)    :: communicator
-    class(field_type),                intent(in)    :: chi(:)
-    class(field_type),                intent(in)    :: panel_id
-    character(*),                     intent(in)    :: start_time
-    character(*),                     intent(in)    :: finish_time
-    real(r_second),                   intent(in)    :: spinup_period
-    real(r_second),                   intent(in)    :: seconds_per_step
-    character(*),                     intent(in)    :: calendar_start
-    character(*),                     intent(in)    :: calendar_type
-    type(field_type),       optional, intent(in)    :: alt_coords(:,:)
-    type(field_type),       optional, intent(in)    :: alt_panel_ids(:)
+    class(lfric_xios_context_type), intent(inout) :: this
+    character(*),                   intent(in)    :: id
+    integer(i_native),              intent(in)    :: communicator
+    class(field_type),              intent(in)    :: chi(:)
+    class(field_type),              intent(in)    :: panel_id
+    type(model_clock_type),         intent(inout) :: model_clock
+    class(calendar_type),           intent(in)    :: calendar
+    type(field_type),     optional, intent(in)    :: alt_coords(:,:)
+    type(field_type),     optional, intent(in)    :: alt_panel_ids(:)
 
-    type(step_calendar_type), allocatable :: calendar
-    integer(i_native)                     :: rc
-    type(xios_date)                       :: calendar_start_xios
+    type(xios_date)   :: calendar_start_xios
+    integer(i_native) :: rc
 
     type(linked_list_item_type), pointer :: loop => null()
     type(lfric_xios_file_type),  pointer :: file => null()
@@ -111,25 +104,23 @@ contains
     call xios_set_current_context( this%handle )
 
     ! Calendar start is adjusted when clock is initialised
-    calendar_start_xios = parse_date_as_xios(trim(adjustl(calendar_start)))
-    call xios_define_calendar( type=calendar_type,              &
-                               time_origin=calendar_start_xios, &
+    calendar_start_xios = parse_date_as_xios(trim(adjustl(calendar%get_origin())))
+    call xios_define_calendar( type=key_from_calendar_type(type_of_calendar), &
+                               time_origin=calendar_start_xios,               &
                                start_date=calendar_start_xios )
 
-    allocate( calendar, stat=rc )
-    if (rc /= 0) then
-      call log_event( "Unable to allocate calendar", log_level_error )
-    end if
-
-    allocate( this%clock,                                            &
-              source=lfric_xios_clock_type( calendar,                &
-                                            start_time, finish_time, &
-                                            seconds_per_step,        &
-                                            this%uses_timers ),      &
+    allocate( this%clock,                                                       &
+              source=lfric_xios_clock_type( calendar,                           &
+                                            calendar%format_instance(model_clock%get_first_step()),       &
+                                            calendar%format_instance(model_clock%get_last_step()),        &
+                                            model_clock%get_seconds_per_step(), &
+                                            this%uses_timers ),                 &
               stat=rc )
     if (rc /= 0) then
       call log_event( "Unable to allocate clock", log_level_error )
     end if
+
+    call model_clock%add_clock( this%clock )
 
     ! Run XIOS setup routines
     call init_xios_dimensions(chi, panel_id, alt_coords, alt_panel_ids)
@@ -208,13 +199,13 @@ contains
   !> expected by XIOS at the end and beginning of the current and subsequent
   !> timesteps.
   !>
-  !> @param[in] clock The model's clock
-  subroutine advance(this, clock)
+  !> @param[in] model_clock The model's clock
+  subroutine advance(this, model_clock)
 
     implicit none
 
     class(lfric_xios_context_type), intent(inout) :: this
-    class(clock_type),              intent(in)    :: clock
+    type(model_clock_type),         intent(in)    :: model_clock
 
     type(linked_list_item_type), pointer :: loop => null()
     type(lfric_xios_file_type),  pointer :: file => null()
@@ -233,7 +224,7 @@ contains
     end if
 
     ! Update XIOS calendar
-    call xios_update_calendar( clock%get_step() - clock%get_first_step() + 1 )
+    call xios_update_calendar( model_clock%get_step() - model_clock%get_first_step() + 1 )
 
     ! Read all files that need to be read from
     if (this%filelist%get_length() > 0) then
@@ -261,7 +252,7 @@ contains
     implicit none
 
     class(lfric_xios_context_type), intent(in), target :: this
-    class(clock_type), pointer :: clock
+    type(lfric_xios_clock_type), pointer :: clock
 
     clock => this%clock
 

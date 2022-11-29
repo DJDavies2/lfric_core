@@ -17,6 +17,7 @@ module skeleton_driver_mod
   use convert_to_upper_mod,       only : convert_to_upper
   use driver_comm_mod,            only : init_comm, final_comm
   use driver_log_mod,             only : init_logger, final_logger
+  use driver_time_mod,            only : init_time, get_calendar
   use driver_mesh_mod,            only : init_mesh, final_mesh
   use driver_fem_mod,             only : init_fem, final_fem
   use driver_io_mod,              only : init_io, final_io
@@ -39,7 +40,7 @@ module skeleton_driver_mod
 
   character(*), parameter :: program_name = "skeleton"
 
-  type(model_clock_type) :: model_clock
+  type(model_clock_type), allocatable :: model_clock
 
   ! Prognostic fields
   type( field_type ) :: field_1
@@ -57,18 +58,12 @@ contains
   !>
   subroutine initialise()
 
-    use step_calendar_mod,       only : step_calendar_type
-    use time_config_mod,         only : timestep_start, timestep_end
-    use timestepping_config_mod, only : dt
-
     implicit none
 
     character(:), allocatable :: filename
     integer(i_native) :: model_communicator
 
-    type(step_calendar_type) :: calendar
-
-    real(r_def)                     :: dt_model
+    real(r_def) :: dt_model
 
     call init_comm("skeleton", model_communicator)
 
@@ -87,6 +82,10 @@ contains
     !-------------------------------------------------------------------------
     call log_event( 'Initialising '//program_name//' ...', LOG_LEVEL_ALWAYS )
 
+    ! Initialise clock
+    call init_time( model_clock )
+    dt_model = real(model_clock%get_seconds_per_step(), r_def)
+
     ! Create the mesh
     call init_mesh( get_comm_rank(), get_comm_size(), mesh, twod_mesh = twod_mesh )
 
@@ -94,17 +93,11 @@ contains
     call init_fem( mesh, chi, panel_id )
 
     ! Initialise I/O context
-    call init_io( program_name, model_communicator, chi, panel_id )
-
-    ! Initialise clock
-    model_clock = model_clock_type( calendar%parse_instance(timestep_start), &
-                                    calendar%parse_instance(timestep_end), &
-                                    dt, 0.0_r_second)
-
-    dt_model = real(model_clock%get_seconds_per_step(), r_def)
+    call init_io( program_name, model_communicator, chi, panel_id, &
+                  model_clock, get_calendar() )
 
     ! Create and initialise prognostic fields
-    call init_skeleton(mesh, chi, panel_id, dt_model, field_1)
+    call init_skeleton( mesh, chi, panel_id, dt_model, field_1 )
 
   end subroutine initialise
 
@@ -115,7 +108,7 @@ contains
 
     implicit none
 
-    logical                         :: running
+    logical :: running
 
     running = model_clock%tick()
 

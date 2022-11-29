@@ -18,6 +18,7 @@ module da_dev_driver_mod
   use driver_comm_mod,          only: init_comm, final_comm
   use driver_model_data_mod,    only: model_data_type
   use driver_log_mod,           only: init_logger, final_logger
+  use driver_time_mod,          only: init_time, get_calendar
   use driver_mesh_mod,          only: init_mesh, final_mesh
   use driver_fem_mod,           only: init_fem, final_fem
   use driver_io_mod,            only: init_io, final_io, filelist_populator, &
@@ -49,7 +50,7 @@ module da_dev_driver_mod
   character(*), parameter :: program_name = "da_dev"
 
   type(model_data_type)  :: model_data
-  type(model_clock_type) :: model_clock
+  type(model_clock_type), allocatable :: model_clock
 
   ! Coordinate field
   type(field_type), target, dimension(3) :: chi
@@ -64,15 +65,10 @@ contains
   !>
   subroutine initialise()
 
-    use step_calendar_mod,       only : step_calendar_type
-    use time_config_mod,         only : timestep_start, timestep_end
-    use timestepping_config_mod, only : dt, spinup_period
-
     implicit none
 
     character(:), allocatable              :: filename
     integer(i_native)                      :: model_communicator
-    type(step_calendar_type)               :: calendar
     procedure(filelist_populator), pointer :: fl_populator => null()
 
     call init_comm( program_name, model_communicator )
@@ -92,6 +88,9 @@ contains
     !-------------------------------------------------------------------------
     call log_event( 'Initialising '//program_name//' ...', LOG_LEVEL_ALWAYS )
 
+    ! Create model clock and calendar
+    call init_time( model_clock )
+
     ! Create the mesh
     call init_mesh( get_comm_rank(), get_comm_size(), mesh, &
                     twod_mesh = twod_mesh )
@@ -101,12 +100,8 @@ contains
 
     ! Initialise I/O context
     fl_populator => init_da_dev_files
-    call init_io( program_name, model_communicator, chi, panel_id, populate_filelist=fl_populator )
-
-    !Initialise model clock
-    model_clock = model_clock_type( calendar%parse_instance(timestep_start), &
-                                    calendar%parse_instance(timestep_end),   &
-                                    dt, spinup_period )
+    call init_io( program_name, model_communicator, chi, panel_id, &
+                  model_clock, get_calendar(), populate_filelist=fl_populator )
 
     ! Initialise DA may eventually go here
 
@@ -119,20 +114,8 @@ contains
   !> Performs time steps.
   !>
   subroutine run()
+
     implicit none
-
-    class(clock_type), pointer :: io_clock => null()
-    class(io_context_type), pointer :: io_context => null()
-    logical :: dummy
-
-    io_context => get_io_context()
-    select type (io_context)
-    class is (lfric_xios_context_type)
-      io_clock => io_context%get_clock()
-      dummy = io_clock%tick()
-    end select
-
-    call model_clock%add_clock(io_clock)
 
     call log_event(program_name//": Run begins", LOG_LEVEL_INFO)
 
@@ -141,6 +124,7 @@ contains
     end do
 
     call log_event(program_name//": Run ends", LOG_LEVEL_INFO)
+
   end subroutine run
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -10,32 +10,28 @@
 !>
 module driver_io_mod
 
-  use clock_mod,               only: clock_type
+  use calendar_mod,            only: calendar_type
   use constants_mod,           only: i_native
   use driver_model_data_mod,   only: model_data_type
   use field_mod,               only: field_type
   use file_mod,                only: file_type
   use io_context_mod,          only: io_context_type
   use io_config_mod,           only: use_xios_io, subroutine_timers
+  use log_mod,                 only: log_event, log_level_error, &
+                                     log_level_trace
   use linked_list_mod,         only: linked_list_type
-  use log_mod,                 only: log_event, log_level_error
-  use time_config_mod,         only: timestep_end, timestep_start,  &
-                                     calendar_start, calendar_type, &
-                                     key_from_calendar_type
-  use timestepping_config_mod, only: dt, spinup_period
-  use simple_io_context_mod,   only: simple_io_context_type
+  use model_clock_mod,         only: model_clock_type
 #ifdef USE_XIOS
-  use lfric_xios_clock_mod,    only: lfric_xios_clock_type
   use lfric_xios_context_mod,  only: lfric_xios_context_type
   use lfric_xios_file_mod,     only: lfric_xios_file_type
 #endif
 
   implicit none
 
+  private
   public :: init_io, final_io,  &
             get_io_context,     &
             filelist_populator
-  private
 
   class(io_context_type), allocatable, target :: context
 
@@ -56,30 +52,34 @@ contains
   !> @param[in] chi               The model coordinate field
   !> @param[in] panel_id          Field containing the panel ID for each mesh
   !!                              vertex
+  !> @param[in] model_clock       The model clock.
+  !> @param[in] calendar          The model calendar.
   !> @param[in] populate_filelist Optional procedure for creating a list of
   !!                              file descriptions used by the model I/O
   !> @param[in] model_data        Optional Model data object
   !> @param[in] alt_coords        Optional array of coordinate fields
   !!                              for alternative meshes
   !> @param[in] alt_panel_ids     Optional panel ID fields for alternative meshes
-  subroutine init_io( id, communicator,  &
-                      chi, panel_id,     &
-                      populate_filelist, &
-                      model_data,        &
-                      alt_coords,        &
-                      alt_panel_ids )
+  subroutine init_io( id, communicator,      &
+                      chi, panel_id,         &
+                      model_clock, calendar, &
+                      populate_filelist,     &
+                      model_data,            &
+                      alt_coords, alt_panel_ids )
 
     implicit none
 
-    character(*),                     intent(in) :: id
-    integer(i_native),                intent(in) :: communicator
-    class(field_type),                intent(in) :: chi(:)
-    class(field_type),                intent(in) :: panel_id
+    character(*),                     intent(in)    :: id
+    integer(i_native),                intent(in)    :: communicator
+    class(field_type),                intent(in)    :: chi(:)
+    class(field_type),                intent(in)    :: panel_id
+    type(model_clock_type),           intent(inout) :: model_clock
+    class(calendar_type),             intent(in)    :: calendar
     procedure(filelist_populator), &
-                   optional, pointer, intent(in) :: populate_filelist
-    class(model_data_type), optional, intent(in) :: model_data
-    type(field_type),       optional, intent(in) :: alt_coords(:,:)
-    type(field_type),       optional, intent(in) :: alt_panel_ids(:)
+                   optional, pointer, intent(in)    :: populate_filelist
+    class(model_data_type), optional, intent(in)    :: model_data
+    type(field_type), optional,       intent(in)    :: alt_coords(:,:)
+    type(field_type), optional,       intent(in)    :: alt_panel_ids(:)
 
     type(linked_list_type), pointer :: file_list
     integer(i_native) :: rc
@@ -93,45 +93,28 @@ contains
                         log_level_error )
       end if
 
-      ! Populate list of files if present and intialise context object
-      if (present(populate_filelist)) then
-        ! Populate filelist before context initialisation
-        file_list => context%get_filelist()
-        call populate_filelist(file_list, model_data)
-      end if
-
+      ! Set up context
       select type(context)
       type is (lfric_xios_context_type)
-        ! Set subroutine timer switch
+
+        ! Populate list of I/O files if procedure passed through
+        if (present(populate_filelist)) then
+          file_list => context%get_filelist()
+          call populate_filelist(file_list, model_data)
+        end if
         call context%set_timer_flag(subroutine_timers)
-        ! Initialise I/O context
-        call context%initialise( id, communicator,                      &
-                                 chi, panel_id,                         &
-                                 timestep_start,                        &
-                                 timestep_end,                          &
-                                 spinup_period, dt,                     &
-                                 calendar_start,                        &
-                                 key_from_calendar_type(calendar_type), &
-                                 alt_coords=alt_coords,                 &
-                                 alt_panel_ids=alt_panel_ids )
+        call context%initialise( id, communicator,      &
+                                 chi, panel_id,         &
+                                 model_clock, calendar, &
+                                 alt_coords, alt_panel_ids )
       end select
 #else
-      call log_event( "Cannot use XIOS I/O: application has not been " // &
-                      "built with XIOS enabled", log_level_error )
+    call log_event( "Cannot use XIOS I/O: model has not been built with " // &
+                    "enabled", log_level_error )
 #endif
-    else
-      allocate( simple_io_context_type::context, stat=rc )
-      if (rc /= 0) then
-        call log_event( "Unable to allocate simple I/O context object", &
-                        log_level_error )
-      end if
-
-      select type(context)
-      class is (simple_io_context_type)
-        call context%initialise( id, communicator, &
-                                 chi, panel_id )
-      end select
-
+      call log_event( "No I/O context to be set up for this run", &
+                      log_level_trace )
+      return
     end if
 
   end subroutine init_io
@@ -141,7 +124,7 @@ contains
 
     implicit none
 
-    deallocate(context)
+    if (allocated(context)) deallocate(context)
 
   end subroutine final_io
 

@@ -15,10 +15,10 @@ module gungho_model_mod
   use driver_comm_mod,            only : init_comm, final_comm
   use driver_fem_mod,             only : init_fem, final_fem
   use driver_io_mod,              only : init_io, final_io,  &
-                                         filelist_populator, &
-                                         get_io_context
+                                         filelist_populator
   use driver_mesh_mod,            only : init_mesh, final_mesh
   use driver_log_mod,             only : init_logger, final_logger
+  use driver_time_mod,            only : init_time, get_calendar
   use configuration_mod,          only : final_configuration
   use check_configuration_mod,    only : get_required_stencil_depth
   use conservation_algorithm_mod, only : conservation_algorithm
@@ -50,7 +50,6 @@ module gungho_model_mod
                                          write_minmax_tseries,    &
                                          timer_output_path,       &
                                          counter_output_suffix
-  use io_context_mod,             only : io_context_type
   use lfric_xios_context_mod,     only : lfric_xios_context_type
   use linked_list_mod,            only : linked_list_type
   use log_mod,                    only : log_event,          &
@@ -80,7 +79,6 @@ module gungho_model_mod
   use section_choice_config_mod,  only : radiation,         &
                                          radiation_socrates,&
                                          surface, surface_jules
-  use step_calendar_mod,          only : step_calendar_type
   use time_config_mod,            only : timestep_end, timestep_start
   use timer_mod,                  only : timer, output_timer, init_timer
   use timestepping_config_mod,    only : dt,                     &
@@ -159,8 +157,8 @@ contains
     type(mesh_type), intent(inout), pointer :: twod_mesh
     type(mesh_type), intent(inout), pointer :: double_level_mesh
 
-    type(model_data_type),  intent(out) :: model_data
-    type(model_clock_type), intent(out) :: model_clock
+    type(model_data_type),               intent(out) :: model_data
+    type(model_clock_type), allocatable, intent(out) :: model_clock
 
     character(len=*), parameter :: io_context_name = "gungho_atm"
 
@@ -182,10 +180,6 @@ contains
     integer(i_def),   allocatable :: multigrid_2d_mesh_ids(:)
     type(field_type), allocatable :: chi_mg(:,:)
     type(field_type), allocatable :: panel_id_mg(:)
-
-    class(io_context_type), pointer :: io_context => null()
-    class(clock_type),      pointer :: io_clock => null()
-    type(step_calendar_type) :: step_calendar
 
 #ifdef UM_PHYSICS
     integer(i_def) :: ncells
@@ -222,6 +216,8 @@ contains
       allocate(halo_calls, source=count_type('halo_calls'))
       call halo_calls%counter(program_name)
     end if
+
+    call init_time( model_clock )
 
     !-------------------------------------------------------------------------
     ! Initialise aspects of the grid
@@ -282,6 +278,7 @@ contains
     files_init_ptr => init_gungho_files
     call init_io( io_context_name, communicator, &
                   chi, panel_id,                 &
+                  model_clock, get_calendar(),   &
                   populate_filelist=files_init_ptr )
 
     ! Set up surface altitude field - this will be used to generate orography
@@ -300,26 +297,6 @@ contains
       call mg_orography_alg(multigrid_mesh_ids, multigrid_2D_mesh_ids, &
                             chi_mg, panel_id_mg, surface_altitude)
     end if
-
-    !-------------------------------------------------------------------------
-    ! Setup clock
-    !-------------------------------------------------------------------------
-
-    io_context => get_io_context()
-    select type (io_context)
-    class is (lfric_xios_context_type)
-      io_clock => io_context%get_clock()
-      model_clock = model_clock_type( io_clock%get_first_step(),       &
-                                      io_clock%get_last_step(),        &
-                                      io_clock%get_seconds_per_step(), &
-                                      real(spinup_period, r_second) )
-      call model_clock%add_clock( io_clock )
-    class default
-      model_clock = model_clock_type(                   &
-        step_calendar%parse_instance( timestep_start ), &
-        step_calendar%parse_instance( timestep_end ),   &
-        real( dt, r_second), real( spinup_period, r_second ) )
-    end select
 
     !-------------------------------------------------------------------------
     ! Setup constants

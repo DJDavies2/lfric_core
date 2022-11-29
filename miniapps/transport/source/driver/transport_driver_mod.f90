@@ -11,7 +11,6 @@ module transport_driver_mod
   use checksum_alg_mod,                 only: checksum_alg
   use check_configuration_mod,          only: get_required_stencil_depth
   use cli_mod,                          only: get_initial_filename
-  use clock_mod,                        only: clock_type
   use configuration_mod,                only: final_configuration
   use constants_mod,                    only: i_def, i_native, r_def, r_second
   use driver_comm_mod,                  only: init_comm, final_comm
@@ -19,6 +18,7 @@ module transport_driver_mod
   use driver_io_mod,                    only: init_io, final_io
   use driver_mesh_mod,                  only: init_mesh
   use driver_log_mod,                   only: init_logger, final_logger
+  use driver_time_mod,                  only: init_time, get_calendar
   use derived_config_mod,               only: set_derived_config
   use diagnostics_io_mod,               only: write_scalar_diagnostic, &
                                               write_vector_diagnostic
@@ -69,7 +69,7 @@ module transport_driver_mod
 
   public :: initialise_transport, run_transport, finalise_transport
 
-  type(model_clock_type) :: model_clock
+  type(model_clock_type), allocatable :: model_clock
 
   ! Prognostic fields
   type(field_type) :: wind
@@ -106,10 +106,6 @@ contains
   !!
   subroutine initialise_transport()
 
-    use io_context_mod,         only : io_context_type
-    use driver_io_mod,          only : get_io_context
-    use lfric_xios_context_mod, only : lfric_xios_context_type
-
     implicit none
 
     character(len=*), parameter :: xios_ctx  = "transport"
@@ -117,18 +113,10 @@ contains
 
     integer(i_native) :: model_communicator
 
-    class(io_context_type), pointer :: io_context
-    class(clock_type),      pointer :: io_clock
-
     integer(kind=i_def), allocatable :: multigrid_mesh_ids(:)
     integer(kind=i_def), allocatable :: multigrid_2d_mesh_ids(:)
     integer(kind=i_def), allocatable :: local_mesh_ids(:)
     type(local_mesh_type),   pointer :: local_mesh => null()
-
-    !class(clock_type), pointer :: io_clock => null()
-    type(step_calendar_type) :: calendar
-
-    logical :: dummy
 
     call init_comm( program_name, model_communicator )
 
@@ -153,6 +141,8 @@ contains
       call init_timer(timer_output_path)
       call timer( program_name )
     end if
+
+    call init_time( model_clock )
 
     ! Create the mesh
     call init_mesh( get_comm_rank(), get_comm_size(),                &
@@ -205,23 +195,8 @@ contains
     ! I/O initialisation
     call init_io( xios_ctx,           &
                   model_communicator, &
-                  chi,                &
-                  panel_id )
-
-    ! Initialise model clock
-    calendar = step_calendar_type()
-    model_clock = model_clock_type(calendar%parse_instance(timestep_start), &
-                                   calendar%parse_instance(timestep_end),   &
-                                   dt, 0.0_r_second )
-
-    ! Call initial clock step for XIOS before initial conditions output
-    io_context => get_io_context()
-    select type(io_context)
-    class is (lfric_xios_context_type)
-      io_clock => io_context%get_clock()
-      dummy = io_clock%tick()
-      call model_clock%add_clock( io_clock )
-    end select
+                  chi, panel_id,      &
+                  model_clock, get_calendar() )
 
     ! Output initial conditions
     if (model_clock%is_initialisation() .and. write_diag) then

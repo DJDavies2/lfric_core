@@ -10,7 +10,6 @@ module gravity_wave_infrastructure_mod
 
   use check_configuration_mod,    only : get_required_stencil_depth
   use cli_mod,                    only : get_initial_filename
-  use clock_mod,                  only : clock_type
   use configuration_mod,          only : final_configuration
   use constants_mod,              only : i_def, i_native, &
                                          PRECISION_REAL,  &
@@ -18,7 +17,6 @@ module gravity_wave_infrastructure_mod
   use convert_to_upper_mod,       only : convert_to_upper
   use derived_config_mod,         only : set_derived_config
   use gravity_wave_mod,           only : load_configuration, program_name
-  use lfric_xios_clock_mod,       only : lfric_xios_clock_type
   use log_mod,                    only : log_event,          &
                                          log_scratch_space,  &
                                          LOG_LEVEL_ALWAYS,   &
@@ -26,14 +24,13 @@ module gravity_wave_infrastructure_mod
   use mesh_mod,                   only : mesh_type
   use model_clock_mod,            only : model_clock_type
   use mpi_mod,                    only : get_comm_size, get_comm_rank
-  use io_context_mod,             only : io_context_type
-  use io_context_mod,             only : io_context_type
   use field_mod,                  only : field_type
   use driver_comm_mod,            only : init_comm, final_comm
   use driver_fem_mod,             only : init_fem
-  use driver_io_mod,              only : init_io, final_io, get_io_context
+  use driver_io_mod,              only : init_io, final_io
   use driver_mesh_mod,            only : init_mesh
   use driver_log_mod,             only : init_logger, final_logger
+  use driver_time_mod,            only : init_time, get_calendar
   use runtime_constants_mod,      only : create_runtime_constants
   use formulation_config_mod,     only : l_multigrid
 
@@ -55,7 +52,6 @@ contains
                                         twod_mesh,    &
                                         model_clock )
 
-    use lfric_xios_context_mod,  only : lfric_xios_context_type
     use log_mod,                 only : log_level_error
     use step_calendar_mod,       only : step_calendar_type
     use time_config_mod,         only : timestep_start, timestep_end
@@ -66,11 +62,7 @@ contains
     character(*),           intent(in) :: program_name
     type(mesh_type),        intent(inout), pointer :: mesh
     type(mesh_type),        intent(inout), pointer :: twod_mesh
-    type(model_clock_type), intent(out)            :: model_clock
-
-    class(io_context_type), pointer :: io_context => null()
-    class(clock_type),      pointer :: io_clock => null()
-    type(step_calendar_type)        :: step_calendar
+    type(model_clock_type), intent(out), allocatable :: model_clock
 
     type(field_type), target :: chi(3)
     type(field_type), target :: panel_id
@@ -99,6 +91,8 @@ contains
 
     call set_derived_config( .false. )
 
+    call init_time( model_clock )
+
     !-------------------------------------------------------------------------
     ! Initialise aspects of the grid
     !-------------------------------------------------------------------------
@@ -121,26 +115,7 @@ contains
     !-------------------------------------------------------------------------
     ! Initialise aspects of output
     !-------------------------------------------------------------------------
-    call init_io( xios_ctx, comm, chi, panel_id )
-
-    ! Initialise clock
-    !
-    io_context => get_io_context()
-    select type(io_context)
-    class is (lfric_xios_context_type)
-      io_clock => io_context%get_clock()
-      model_clock = model_clock_type( io_clock%get_first_step(),       &
-                                      io_clock%get_last_step(),        &
-                                      io_clock%get_Seconds_per_step(), &
-                                      0.0_r_second )
-      call model_clock%add_clock( io_clock )
-    class default
-      model_clock = model_clock_type(                     &
-        step_calendar%parse_instance( timestep_start ),   &
-        step_calendar%parse_instance( timestep_end ),     &
-        real(dt, r_second), real(spinup_period, r_second) &
-      )
-    end select
+    call init_io( xios_ctx, comm, chi, panel_id, model_clock, get_calendar() )
 
     !-------------------------------------------------------------------------
     ! Setup constants

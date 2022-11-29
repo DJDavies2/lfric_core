@@ -55,18 +55,14 @@ contains
     logical(l_def),           intent(in) :: nodal_output_on_w3
 
 #ifdef USE_XIOS
-    class(clock_type), pointer :: io_clock => null()
+    type(lfric_xios_clock_type), pointer :: io_clock => null()
 
     ! Call clock initial step before initial conditions output
     if (model_clock%is_initialisation()) then
       select type (io_context)
       class is (lfric_xios_context_type)
         io_clock => io_context%get_clock()
-        select type (io_clock)
-        class is (lfric_xios_clock_type)
-          call io_clock%initial_step()
-        ! No need for default clause as we know what type XIOS context returns
-        end select
+        call io_clock%initial_step()
       end select
     end if
 #endif

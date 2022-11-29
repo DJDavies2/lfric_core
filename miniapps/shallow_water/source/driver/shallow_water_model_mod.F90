@@ -23,6 +23,7 @@ module shallow_water_model_mod
   use driver_io_mod,                  only: init_io, final_io, &
                                             filelist_populator
   use driver_mesh_mod,                only: init_mesh, final_mesh
+  use driver_time_mod,                only: init_time, get_calendar
   use field_mod,                      only: field_type
   use field_parent_mod,               only: write_interface
   use field_collection_mod,           only: field_collection_type
@@ -78,15 +79,17 @@ module shallow_water_model_mod
                                        mesh,         &
                                        twod_mesh,    &
                                        chi,          &
-                                       panel_id )
+                                       panel_id,     &
+                                       model_clock )
 
     implicit none
 
-    character(*),     intent(in)             :: program_name
-    type(mesh_type),  intent(inout), pointer :: mesh
-    type(mesh_type),  intent(out),   pointer :: twod_mesh
-    type(field_type), intent(inout)          :: chi(3)
-    type(field_type), intent(out),   target  :: panel_id
+    character(*),           intent(in)             :: program_name
+    type(mesh_type),        intent(inout), pointer :: mesh
+    type(mesh_type),        intent(out),   pointer :: twod_mesh
+    type(field_type),       intent(inout)          :: chi(3)
+    type(field_type),       intent(out),   target  :: panel_id
+    type(model_clock_type), intent(out), allocatable :: model_clock
 
     procedure(filelist_populator), pointer :: files_init_ptr => null()
 
@@ -129,6 +132,8 @@ module shallow_water_model_mod
       call halo_calls%counter(program_name)
     end if
 
+    call init_time( model_clock )
+
     !-------------------------------------------------------------------------
     ! Initialise aspects of the grid
     !-------------------------------------------------------------------------
@@ -151,6 +156,7 @@ module shallow_water_model_mod
     files_init_ptr => init_shallow_water_files
     call init_io( io_context_name, communicator, &
                   chi, panel_id,                 &
+                  model_clock, get_calendar(),   &
                   populate_filelist=files_init_ptr )
 
   end subroutine initialise_infrastructure

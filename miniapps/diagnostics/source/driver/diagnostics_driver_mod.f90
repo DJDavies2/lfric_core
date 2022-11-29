@@ -15,8 +15,9 @@ module diagnostics_driver_mod
   use diagnostics_configuration_mod, only : load_configuration, program_name
   use driver_comm_mod,               only : init_comm, final_comm
   use driver_fem_mod,                only : init_fem
-  use driver_io_mod,                 only : init_io, final_io, get_io_context
+  use driver_io_mod,                 only : init_io, final_io
   use driver_mesh_mod,               only : init_mesh
+  use driver_time_mod,               only : init_time, get_calendar
   use field_mod,                     only : field_type
   use field_parent_mod,              only : field_parent_type
   use field_collection_mod,          only : field_collection_type
@@ -24,8 +25,6 @@ module diagnostics_driver_mod
   use driver_model_data_mod,         only : model_data_type
   use io_config_mod,                 only : write_diag, &
                                             use_xios_io
-  use io_context_mod,                only : io_context_type
-  use lfric_xios_context_mod,        only : lfric_xios_context_type
   use log_mod,                       only : log_event,         &
                                             log_scratch_space, &
                                             log_level_error,   &
@@ -43,8 +42,8 @@ module diagnostics_driver_mod
   public initialise, run, finalise
 
   ! Model run working data set
-  type(model_data_type), target :: model_data
-  type(model_clock_type)        :: model_clock
+  type(model_data_type), target       :: model_data
+  type(model_clock_type), allocatable :: model_clock
 
   ! Coordinate field
   type(field_type), target, dimension(3) :: chi
@@ -72,7 +71,6 @@ contains
     use driver_log_mod,             only : init_logger
     use fieldspec_xml_parser_mod,   only : populate_fieldspec_collection
     use init_diagnostics_mod,       only : init_diagnostics
-    use io_context_mod,             only : io_context_type
     use mod_wait,                   only : init_wait
     use seed_diagnostics_mod,       only : seed_diagnostics
     use timestepping_config_mod,    only : spinup_period
@@ -82,9 +80,6 @@ contains
 
     character(len = *), parameter :: program_name = "diagnostics"
     character(:), allocatable     :: filename
-
-    class(io_context_type), pointer :: io_context
-    class(clock_type),      pointer :: io_clock
 
     integer(i_native) :: model_communicator
 
@@ -100,6 +95,9 @@ contains
     !----------------------------------------------------------------------
     call log_event( 'Initialising ' // program_name // ' ...', &
                     LOG_LEVEL_ALWAYS )
+
+    ! Initialise model clock and calendar
+    call init_time( model_clock )
 
     ! Create the mesh
     call init_mesh( get_comm_rank(), get_comm_size(), mesh, twod_mesh=twod_mesh )
@@ -117,19 +115,9 @@ contains
     call init_io( xios_ctx,           &
                   model_communicator, &
                   chi,                &
-                  panel_id )
-
-    io_context => get_io_context()
-    select type(io_context)
-    class is (lfric_xios_context_type)
-      io_clock => io_context%get_clock()
-      model_clock = model_clock_type( io_clock%get_first_step(),       &
-                                      io_clock%get_last_step(),        &
-                                      io_clock%get_seconds_per_step(), &
-                                      spinup_period )
-    class default
-      call log_event( "Requires XIOS context", log_level_error )
-    end select
+                  panel_id,           &
+                  model_clock,        &
+                  get_calendar() )
 
     ! Create and initialise prognostic fields
     call init_diagnostics( mesh, twod_mesh,                    &

@@ -52,7 +52,7 @@ module multires_coupling_driver_mod
   private
   public initialise, run, finalise
 
-  type(model_clock_type) :: model_clock
+  type(model_clock_type), allocatable :: model_clock
 
   ! Model run working data set
   type (model_data_type) :: dynamics_mesh_model_data

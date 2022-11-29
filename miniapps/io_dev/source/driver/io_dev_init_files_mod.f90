@@ -82,7 +82,8 @@ module io_dev_init_files_mod
                                 xios_id="io_dev_initial", &
                                 io_mode=FILE_MODE_WRITE,  &
                                 freq=1,                   &
-                                operation=OPERATION_ONCE ) )
+                                operation=OPERATION_ONCE, &
+                                fields_in_file=io_dev_data%dump_fields ) )
 
       ! Setup temporary diagnostic file information - we need this information
       ! to be able to process the files: in the future we would wish to obtain

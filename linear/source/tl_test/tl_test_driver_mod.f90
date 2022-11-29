@@ -63,8 +63,8 @@ module tl_test_driver_mod
          run_semi_imp_alg,            &
          run_transport_control
 
-  type(model_data_type)  :: model_data
-  type(model_clock_type) :: model_clock
+  type(model_data_type)               :: model_data
+  type(model_clock_type), allocatable :: model_clock
 
   type(mesh_type), pointer :: mesh              => null()
   type(mesh_type), pointer :: twod_mesh         => null()

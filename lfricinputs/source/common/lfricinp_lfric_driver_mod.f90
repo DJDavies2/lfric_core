@@ -21,13 +21,13 @@ USE field_mod,                  ONLY: field_type
 USE gungho_extrusion_mod,       ONLY: create_extrusion
 USE halo_comms_mod,             ONLY: initialise_halo_comms
 USE mod_wait,                   ONLY: init_wait
+USE model_clock_mod,            ONLY: model_clock_type
 USE lfric_xios_context_mod,     ONLY: lfric_xios_context_type
 USE lfricinp_setup_io_mod,      ONLY: init_lfricinp_files
 USE linked_list_mod,            ONLY: linked_list_type
 USE mesh_mod,                   ONLY: mesh_type
-USE time_config_mod,            ONLY: calendar_start, calendar_type, &
-                                      key_from_calendar_type
 USE lfricinp_runtime_constants_mod, ONLY: lfricinp_create_runtime_constants
+USE step_calendar_mod,          ONLY: step_calendar_type
 
 ! Interface to mpi
 USE mpi_mod,                    ONLY: initialise_comm, store_comm,             &
@@ -92,8 +92,10 @@ REAL(r_second),      INTENT(IN) :: seconds_per_step
 
 CHARACTER(LEN=10) :: char_first_step, char_last_step
 
-CLASS(extrusion_type), ALLOCATABLE :: extrusion
-TYPE(linked_list_type), POINTER    :: file_list => null()
+CLASS(extrusion_type),    ALLOCATABLE :: extrusion
+TYPE(step_calendar_type), ALLOCATABLE :: model_calendar
+TYPE(model_clock_type),   ALLOCATABLE :: model_clock
+TYPE(linked_list_type),   POINTER     :: file_list => null()
 
 ! Set module variables
 program_name = program_name_arg
@@ -141,21 +143,14 @@ CALL log_event('Creating function spaces and chi', LOG_LEVEL_INFO)
 CALL init_fem(mesh, chi, panel_id)
 
 ! XIOS domain initialisation
-WRITE(char_first_step,'(I8)') first_step
-WRITE(char_last_step,'(I8)') last_step
+model_calendar = step_calendar_type(time_origin)
+model_clock = model_clock_type( first_step, last_step, seconds_per_step, &
+                                spinup_period )
 
 file_list => io_context%get_filelist()
 CALL init_lfricinp_files(file_list)
-CALL io_context%initialise( xios_ctx,                                          &
-                            comm,                                              &
-                            chi,                                               &
-                            panel_id,                                          &
-                            TRIM(ADJUSTL(char_first_step)),                    &
-                            TRIM(ADJUSTL(char_last_step)),                     &
-                            spinup_period,                                     &
-                            seconds_per_step,                                  &
-                            calendar_start,                                    &
-                            key_from_calendar_type(calendar_type) )
+CALL io_context%initialise( xios_ctx, comm, chi, panel_id, model_clock, &
+                            model_calendar )
 
 ! Initialise runtime constants
 CALL log_event('Initialising runtime constants', LOG_LEVEL_INFO)

@@ -58,7 +58,7 @@ module gravity_wave_driver_mod
 
   public initialise, run, finalise
 
-  type(model_clock_type) :: model_clock
+  type(model_clock_type), allocatable :: model_clock
 
   ! The prognostic fields
   type( field_type ), target :: wind
