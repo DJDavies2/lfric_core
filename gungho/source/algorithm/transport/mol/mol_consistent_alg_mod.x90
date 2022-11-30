@@ -7,13 +7,12 @@
 
 module mol_consistent_alg_mod
 
-  use advective_increment_alg_mod,    only: advective_increment_alg
   use constants_mod,                  only: r_def, i_def, l_def
   use dg_matrix_vector_kernel_mod,    only: dg_matrix_vector_kernel_type
   use enforce_lower_bound_kernel_mod, only: enforce_lower_bound_kernel_type
   use extrusion_mod,                  only: SHIFTED
   use fem_constants_mod,              only: get_directional_im3_div
-  use flux_alg_mod,                   only: flux_alg
+  use advective_and_flux_alg_mod,     only: advective_and_flux_alg
   use field_mod,                      only: field_type
   use finite_element_config_mod,      only: element_order
   use fs_continuity_mod,              only: W3
@@ -105,7 +104,9 @@ module mol_consistent_alg_mod
     type(field_type),      allocatable :: rk_field(:)
     type(mesh_type),           pointer :: prime_extrusion_mesh => null()
     type(mesh_type),           pointer :: shifted_mesh => null()
-    type(transport_runtime_type), pointer :: transport_runtime => null()
+    type(transport_runtime_type), pointer &
+                                       :: transport_runtime => null()
+    type(field_type)                   :: dummy
 
     ! ------------------------------------------------------------------------ !
     if ( subroutine_timers ) call timer('mol_consistent_alg')
@@ -210,10 +211,10 @@ module mol_consistent_alg_mod
         end do
 
         ! Compute update: rhs_adv = u.grad(rhs_field)
-        call advective_increment_alg(rhs_adv, rhs_field, mr_wt_n,      &
-                                     prime_advecting_wind, dt_substep, &
-                                     direction, transport_metadata,    &
-                                     final_rk_stage)
+        call advective_and_flux_alg(dummy, rhs_adv, rhs_field, mr_wt_n, &
+                                    prime_advecting_wind, direction,    &
+                                    transport_metadata, final_rk_stage, &
+                                    dt_substep, .false., .true.)
 
         ! Update field: f = f^n - dt_substep*rhs
         call invoke( X_minus_bY(mr_wt_np1, mr_wt_n, dt_substep, rhs_adv) )
@@ -265,8 +266,9 @@ module mol_consistent_alg_mod
                  setval_c(flux_X, 0.0_r_def) )
 
     ! In all cases, compute flux to rho_X
-    call flux_alg(flux_X, mr_sh_w3_for_flux, dry_flux, &
-                  direction, transport_metadata, final_rk_stage)
+    call advective_and_flux_alg(flux_X, dummy, mr_sh_w3_for_flux, dummy, &
+                                dry_flux, direction, transport_metadata, &
+                                final_rk_stage, dt_substep, .true., .false.)
 
     ! Enforce a minimum value by modifying the fluxes
     if ( enforce_min_value ) then

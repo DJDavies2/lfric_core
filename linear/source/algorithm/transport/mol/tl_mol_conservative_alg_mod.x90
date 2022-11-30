@@ -18,10 +18,6 @@ module tl_mol_conservative_alg_mod
   use fem_constants_mod,              only: get_directional_im3_div
   use dg_matrix_vector_kernel_mod,    only: dg_matrix_vector_kernel_type
   use transport_metadata_mod,         only: transport_metadata_type
-  use flux_alg_mod,                   only: flux_alg
-  use tl_flux_alg_mod,                only: tl_flux_alg
-  use advective_increment_alg_mod,    only: advective_increment_alg
-  use tl_advective_increment_alg_mod, only: tl_advective_increment_alg
   use advective_and_flux_alg_mod,     only: advective_and_flux_alg
   use tl_advective_and_flux_alg_mod,  only: tl_advective_and_flux_alg
   use mesh_mod,                       only: mesh_type
@@ -95,6 +91,8 @@ module tl_mol_conservative_alg_mod
     logical(l_def)                :: final_rk_stage
     logical(l_def)                :: final_substep
     logical(l_def)                :: final_split_step
+    logical(l_def)                :: do_flux
+    logical(l_def)                :: do_advective
 
     if ( subroutine_timers ) call timer('tl_mol_conservative_alg')
 
@@ -205,38 +203,38 @@ module tl_mol_conservative_alg_mod
         ! -------------------------------------------------------------------- !
         if (.not. advective_then_flux) then
           ! Old behaviour: entirely conservative form of equation
-          call invoke( setval_c(flux_step, 0.0_r_def) )
-          call flux_alg(flux_step, rhs_field, ls_advecting_wind, direction, &
-                        transport_metadata, final_rk_stage)
-          ! Compute: rhs = div(F) and update field: f = f^n - dt_substep*rhs
-          call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div), &
-                       X_minus_bY(ls_field_np1, ls_field_n, dt_substep, rhs) )
+          do_flux = .true.
+          do_advective = .false.
 
         else if (.not. final_rk_stage) then
           ! Advective-then-flux form but not last stage: just advective
-          call advective_increment_alg(adv_inc, rhs_field, ls_field_n,   &
-                                       ls_advecting_wind, dt_substep,    &
-                                       direction, transport_metadata,    &
-                                       final_rk_stage )
-          call invoke( X_minus_bY(ls_field_np1, ls_field_n, dt_substep, adv_inc) )
+          do_flux = .false.
+          do_advective = .true.
 
         else if ( (.not. final_split_step) .or. (.not. final_substep) ) then
           ! Advective-then-flux form and last stage: both advective and flux
-          call invoke( setval_c(flux_step, 0.0_r_def) )
-          call advective_and_flux_alg(flux_step, adv_inc, rhs_field, ls_field_n, &
-                                      ls_advecting_wind, dt_substep, direction,  &
-                                      transport_metadata, final_rk_stage)
-          ! Compute: rhs = div(F) and update field: f = f^n - dt_substep*rhs
-          call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div), &
-                       X_minus_bY(ls_field_np1, ls_field_n, dt_substep, adv_inc) )
-        else
-          ! Last stage of last substep of last split step: just flux form
-          call invoke( setval_c(flux_step, 0.0_r_def) )
-          call flux_alg(flux_step, rhs_field, ls_advecting_wind, &
-                        direction, transport_metadata, final_rk_stage)
-          ! Compute: rhs = div(F)
-          call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div) )
+          do_flux = .true.
+          do_advective = .true.
 
+        else
+          ! Last stage of last substep for either 3D MoL or last step of split scheme
+          ! Just use flux form
+          do_flux = .true.
+          do_advective = .false.
+
+        end if
+
+        call advective_and_flux_alg(flux_step, adv_inc, rhs_field, ls_field_n, &
+                                    ls_advecting_wind, direction,              &
+                                    transport_metadata, final_rk_stage,        &
+                                    dt_substep, do_flux, do_advective)
+
+        if ( do_flux ) then
+          call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div), &
+                       X_minus_bY(ls_field_np1, ls_field_n, dt_substep, rhs) )
+        end if
+        if ( do_advective ) then
+          call invoke( X_minus_bY(ls_field_np1, ls_field_n, dt_substep, adv_inc) )
         end if
 
         ! -------------------------------------------------------------------- !
@@ -332,43 +330,39 @@ module tl_mol_conservative_alg_mod
         ! -------------------------------------------------------------------- !
         if (.not. advective_then_flux) then
           ! Old behaviour: entirely conservative form of equation
-          call invoke( setval_c( flux_step, 0.0_r_def ) )
-          call tl_flux_alg(flux_step, rhs_field, advecting_wind,              &
-                           stored_ls_field(substep,stage), ls_advecting_wind, &
-                           direction, transport_metadata, final_rk_stage)
-          ! Compute: div(F) and update field: f = f^n - dt_substep*rhs
-          call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div), &
-                       X_minus_bY(field_np1, field_n, dt_substep, rhs) )
+          do_flux = .true.
+          do_advective = .false.
 
         else if (.not. final_rk_stage) then
           ! Advective-then-flux form but not last stage: just advective
-          call tl_advective_increment_alg(adv_inc, rhs_field,               &
-                                          advecting_wind,                   &
-                                          stored_ls_field(substep,stage),   &
-                                          ls_advecting_wind, dt_substep,    &
-                                          direction, transport_metadata,    &
-                                          final_rk_stage )
-          call invoke( X_minus_bY(field_np1, field_n, dt_substep, adv_inc) )
+          do_flux = .false.
+          do_advective = .true.
 
         else if ( (.not. final_split_step) .or. (.not. final_substep) ) then
           ! Advective-then-flux form and last stage: both advective and flux
-          call invoke( setval_c(flux_step, 0.0_r_def) )
-          call tl_advective_and_flux_alg(flux_step, adv_inc, rhs_field,  &
-                                         advecting_wind,                 &
-                                         stored_ls_field(substep,stage), &
-                                         ls_advecting_wind, direction,   &
-                                         transport_metadata, final_rk_stage)
-          ! Compute: rhs = div(F) and update field: f = f^n - dt_substep*rhs
-          call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div), &
-                       X_minus_bY(field_np1, field_n, dt_substep, adv_inc) )
-        else
-          ! Last stage of last substep of last split step: just flux form
-          call invoke( setval_c(flux_step, 0.0_r_def) )
-          call flux_alg(flux_step, rhs_field, advecting_wind, &
-                        direction, transport_metadata, final_rk_stage)
-          ! Compute: rhs = div(F)
-          call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div) )
+          do_flux = .true.
+          do_advective = .true.
 
+        else
+          ! Last stage of last substep for either 3D MoL or last step of split scheme
+          ! Just use flux form
+          do_flux = .true.
+          do_advective = .false.
+
+        end if
+        call tl_advective_and_flux_alg(flux_step, adv_inc, rhs_field,  &
+                                       advecting_wind,                 &
+                                       stored_ls_field(substep,stage), &
+                                       ls_advecting_wind, direction,   &
+                                       transport_metadata, final_rk_stage, &
+                                       dt_substep, do_flux, do_advective)
+
+        if ( do_flux ) then
+          call invoke( dg_matrix_vector_kernel_type(rhs, flux_step, div), &
+                       X_minus_bY(field_np1, field_n, dt_substep, rhs) )
+        end if
+        if ( do_advective ) then
+          call invoke( X_minus_bY(field_np1, field_n, dt_substep, adv_inc) )
         end if
 
         ! -------------------------------------------------------------------- !

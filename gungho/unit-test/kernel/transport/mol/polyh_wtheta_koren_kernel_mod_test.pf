@@ -29,8 +29,6 @@ contains
 
     use, intrinsic :: iso_fortran_env, only: real64
     use polyh_wtheta_koren_kernel_mod, only: polyh_wtheta_koren_code
-    use get_unit_test_planar_mesh_mod, &
-                                     only: get_outward_normals_to_horizontal_faces
 
     implicit none
 
@@ -40,56 +38,29 @@ contains
     real(r_def)            :: answer, use_tol
 
     integer(i_def), parameter                      :: nlayers = 3
-    integer(i_def), parameter                      :: ndf_w1 = 8
-    integer(i_def), parameter                      :: ndf_w2h = 4
+    integer(i_def), parameter                      :: ndf_md = 1
     integer(i_def), parameter                      :: ndf_wt = 2
     integer(i_def), parameter                      :: ndf_c  = 2
     integer(i_def), parameter                      :: nfaces_h = 4
-    integer(i_def), parameter                      :: undf_w1 = nfaces_h*(nlayers+1)
-    integer(i_def), parameter                      :: undf_w2h = ndf_w2h*nlayers
-    integer(i_def), dimension(ndf_w1)              :: map_w1
-    integer(i_def), dimension(ndf_w2h)             :: map_w2h
+    integer(i_def), parameter                      :: undf_md = 4*ndf_md*(nlayers+1)
+    integer(i_def), dimension(ndf_md)              :: map_md
     integer(i_def), parameter                      :: stencil_size = 5
     integer(i_def), dimension(ndf_wt,stencil_size) :: stencil_map
     integer(i_def), parameter                      :: undf_wt = (nlayers+1)*stencil_size
-    real(r_def), dimension(3,ndf_w2h,ndf_w1)       :: basis_w2h
     integer(i_def), parameter                      :: order = 2
     integer(i_def), parameter                      :: ndata = (order+1)*nfaces_h
     integer(i_def), parameter                      :: undf_c = ndata*(nlayers+1)
-    real(r_def), allocatable, dimension(:,:)       :: outward_normals_to_horizontal_faces
 
-    real(r_def), dimension(undf_w1)  :: reconstruction
-    real(r_def), dimension(undf_w2h) :: wind
+    real(r_def), dimension(undf_md)  :: reconstruction
     real(r_def), dimension(undf_wt)  :: tracer
 
     integer(i_def) :: i
 
-    do i = 1,ndf_w2h
-      map_w2h(i) = 1 + (i-1)*nlayers
-    end do
-    do i = 1,nfaces_h
-      map_w1(i) = 1 + (i-1)*(nlayers+1)
-      map_w1(i+nfaces_h) = map_w1(i) + 1
-    end do
+    map_md(1) = 1
     do i = 1,stencil_size
       stencil_map(1,i) = 1 + (i-1)*(nlayers+1)
       stencil_map(2,i) = 2 + (i-1)*(nlayers+1)
     end do
-
-    ! Get canned information for the reference cube
-    call get_outward_normals_to_horizontal_faces(outward_normals_to_horizontal_faces)
-
-    basis_w2h = 0.0_r_def
-    basis_w2h(1,1,1) = 1.0_r_def
-    basis_w2h(1,1,5) = 1.0_r_def
-    basis_w2h(2,2,2) = -1.0_r_def
-    basis_w2h(2,2,6) = -1.0_r_def
-    basis_w2h(1,3,3) = 1.0_r_def
-    basis_w2h(1,3,7) = 1.0_r_def
-    basis_w2h(2,4,4) = -1.0_r_def
-    basis_w2h(2,4,8) = -1.0_r_def
-
-    wind(:) = 1.0_r_def
 
     ! Set up tracer field so that d(tracer)/dx = 10
     tracer(:) = 300.0_r_def
@@ -100,36 +71,31 @@ contains
     end do
    reconstruction = 0.0_r_def
 
-    reconstruction = 0.0_r_def
-
-    call polyh_wtheta_koren_code( nlayers,              &
-                                  reconstruction,       &
-                                  wind,                 &
-                                  tracer,               &
-                                  stencil_size,         &
-                                  stencil_map,          &
-                                  ndata,                &
-                                  ndf_w1,               &
-                                  undf_w1,              &
-                                  map_w1,               &
-                                  ndf_w2h,              &
-                                  undf_w2h,             &
-                                  map_w2h,              &
-                                  basis_w2h,            &
-                                  ndf_wt,               &
-                                  undf_wt,              &
-                                  stencil_map(:,1),     &
-                                  nfaces_h,             &
-                                  outward_normals_to_horizontal_faces )
+    call polyh_wtheta_koren_code( nlayers,        &
+                                  reconstruction, &
+                                  tracer,         &
+                                  stencil_size,   &
+                                  stencil_map,    &
+                                  ndata,          &
+                                  ndf_md,         &
+                                  undf_md,        &
+                                  map_md,         &
+                                  ndf_wt,         &
+                                  undf_wt,        &
+                                  stencil_map(:,1) )
 
    if ( r_def == real64 ) then
       use_tol = tol
     else
       use_tol = 10.0_r_def*spacing(maxval(reconstruction))
     end if
+    answer = 295.0_r_def
+    do i = 1,nlayers
+      @assertEqual(answer, reconstruction(map_md(1)+i), use_tol)
+    end do
     answer = 305.0_r_def
     do i = 1,nlayers
-      @assertEqual(answer, reconstruction(map_w1(3)+i), use_tol)
+      @assertEqual(answer, reconstruction(map_md(1)+i+2*(nlayers+1)), use_tol)
     end do
 
   end subroutine test_all

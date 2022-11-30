@@ -24,14 +24,13 @@ module wt_advective_update_alg_mod
                                                 get_panel_id,                   &
                                                 get_height
   use fem_constants_mod,                  only: get_mass_matrix_diagonal,       &
-                                                get_inverse_lumped_mass_matrix, &
-                                                get_rmultiplicity
+                                                get_inverse_lumped_mass_matrix
   use field_mod,                          only: field_type
   use finite_element_config_mod,          only: element_order,          &
                                                 nqp_exact,              &
                                                 coord_system,           &
                                                 coord_system_xyz
-  use fs_continuity_mod,                  only: W1, W3, Wtheta
+  use fs_continuity_mod,                  only: W3, Wtheta
   use function_space_mod,                 only: function_space_type
   use function_space_collection_mod,      only: function_space_collection
   use quadrature_rule_gauss_lobatto_mod,  only: quadrature_rule_gauss_lobatto_type
@@ -51,12 +50,12 @@ module wt_advective_update_alg_mod
                                                 LOG_LEVEL_INFO
   use mesh_collection_mod,                only: mesh_collection
   use mesh_mod,                           only: mesh_type
-  use poly1d_adv_recon_kernel_mod,        only: poly1d_adv_recon_kernel_type
+  use poly1d_reconstruction_kernel_mod,   only: poly1d_reconstruction_kernel_type
   use poly1d_vert_adv_coeffs_kernel_mod,  only: poly1d_vert_adv_coeffs_kernel_type
   use poly1d_advective_coeffs_kernel_mod, only: poly1d_advective_coeffs_kernel_type
   use poly2d_advective_coeffs_kernel_mod, only: poly2d_advective_coeffs_kernel_type
-  use poly2d_adv_recon_kernel_mod,        only: poly2d_adv_recon_kernel_type
-  use poly_advective_kernel_mod,          only: poly_advective_kernel_type
+  use poly2d_reconstruction_kernel_mod,   only: poly2d_reconstruction_kernel_type
+  use poly_adv_update_kernel_mod,         only: poly_adv_update_kernel_type
   use runtime_tools_mod,                  only: find_mesh_index, &
                                                 check_initialised_field
   use transport_enumerated_types_mod,     only: direction_v,                  &
@@ -73,6 +72,8 @@ module wt_advective_update_alg_mod
   use transport_runtime_collection_mod,   only: get_transport_runtime
   use polyh_wtheta_koren_kernel_mod,      only: polyh_wtheta_koren_kernel_type
   use polyv_wtheta_koren_kernel_mod,      only: polyv_wtheta_koren_kernel_type
+  use io_config_mod,                      only: subroutine_timers
+  use timer_mod,                          only: timer
 
   implicit none
 
@@ -175,7 +176,6 @@ contains
 
     type(quadrature_xyoz_type)             :: qr
     type(quadrature_edge_type)             :: qre
-    type(function_space_type),     pointer :: w1_fs => null()
     type(function_space_type),     pointer :: wt_fs => null()
     type(field_type)                       :: wt_field
     class(reference_element_type), pointer :: reference_element => null()
@@ -199,7 +199,6 @@ contains
     twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
     nlayers = mesh%get_nlayers()
 
-    w1_fs => function_space_collection%get_fs( mesh, element_order, W1 )
     wt_fs => function_space_collection%get_fs( mesh, element_order, Wtheta )
 
     if ( operators == operators_fv ) then
@@ -239,7 +238,8 @@ contains
         ndata_h = nfaces_re_h*adv_stencil_size
         ndata_h_list(mesh_index) = ndata_h
         multidata_fs => function_space_collection%get_fs( twod_mesh, element_order, W3, ndata_h )
-        call adv_coeffs_list(mesh_index)%initialise( vector_space = multidata_fs, ndata_first = .false. )
+        call adv_coeffs_list(mesh_index)%initialise( &
+            vector_space = multidata_fs, ndata_first = .false. )
 
         chi => get_coordinates(mesh%get_id())
         panel_id => get_panel_id(mesh%get_id())
@@ -325,7 +325,8 @@ contains
           ndata_v = nfaces_re_v*(vertical_order + 1_i_def)
           reversible_ndata_v_list(mesh_index) = ndata_v
           multidata_fs => function_space_collection%get_fs( mesh, element_order, Wtheta, ndata_v )
-          call reversible_vert_adv_coeffs_list(mesh_index)%initialise( vector_space = multidata_fs, ndata_first = .true. )
+          call reversible_vert_adv_coeffs_list(mesh_index)%initialise( &
+              vector_space = multidata_fs, ndata_first = .true. )
           height => get_height(Wtheta, mesh%get_id())
           call invoke( poly1d_vert_adv_coeffs_kernel_type(                                  &
                                               reversible_vert_adv_coeffs_list(mesh_index),  &
@@ -342,7 +343,7 @@ contains
     adv_stencil_extent_list(mesh_index) = adv_stencil_extent
     adv_2d_stencil_size_list(mesh_index) = adv_2d_stencil_size
 
-    nullify( chi, panel_id, md_wt, wt_fs, w1_fs, reference_element, height, twod_mesh )
+    nullify( chi, panel_id, md_wt, wt_fs, reference_element, height, twod_mesh )
 
   end subroutine wt_advective_update_alg_init
 
@@ -371,8 +372,6 @@ contains
   !> @param[in]     transport_metadata  Contains transport configuration options
   subroutine hori_wt_update_alg(u_grad_f, wind, field, transport_metadata)
 
-    use integer_field_mod,       only: integer_field_type
-
     implicit none
 
     type(field_type),              intent(in)    :: field, wind
@@ -381,81 +380,79 @@ contains
 
     type(field_type)          :: h_reconstruction
     type(field_type), pointer :: adv_coeffs => null()
-    type(field_type), pointer :: w1_rmultiplicity => null()
 
     type(mesh_type),           pointer :: mesh => null()
-    type(function_space_type), pointer :: w1_fs => null()
+    type(function_space_type), pointer :: multidata_fs => null()
 
     integer(kind=i_def)          :: mesh_index
-    integer(kind=i_def), pointer :: adv_stencil_extent => null()
+    integer(kind=i_def), pointer :: adv_stencil_extent
+    integer(kind=i_def)          :: stencil_extent
     integer(kind=i_def), pointer :: adv_2d_stencil_size => null()
     integer(kind=i_def), pointer :: ndata_h => null()
 
-    type( integer_field_type ) :: reconstruction_done
+    if ( subroutine_timers ) call timer('Wt horizontal recon')
 
     mesh => wind%get_mesh()
     mesh_index = find_mesh_index(mesh%get_id())
     adv_stencil_extent => adv_stencil_extent_list(mesh_index)
+    stencil_extent = 1_i_def
     adv_2d_stencil_size => adv_2d_stencil_size_list(mesh_index)
     ndata_h => ndata_h_list(mesh_index)
     adv_coeffs => adv_coeffs_list(mesh_index)
-    w1_rmultiplicity => get_rmultiplicity(W1, mesh%get_id())
 
-    ! Set default value (for h_reconstruction)
-    ! to be 0 and then update using an upwind reconstruction
-    w1_fs => function_space_collection%get_fs( mesh, element_order, W1 )
-    call h_reconstruction%initialise( w1_fs )
-    call reconstruction_done%initialise( w1_fs )
-    call invoke( setval_c(h_reconstruction, 0.0_r_def), &
-                 int_setval_c(reconstruction_done, 0_i_def) )
+    ! Compute reconstruction on a Wtheta multidata field
+    ! each Wt point contains 4 values assigned to each edge,
+    ! in the order (W,S,E,N) which is the same order as a W2 field
+    multidata_fs => &
+      function_space_collection%get_fs( mesh, element_order, Wtheta, 4 )
+    call h_reconstruction%initialise( multidata_fs, ndata_first=.false. )
 
     if ( transport_metadata%get_horizontal_monotone() == horizontal_monotone_koren ) then
-      call invoke( polyh_wtheta_koren_kernel_type(                &
-                                            h_reconstruction,     &
-                                            wind,                 &
-                                            field,                &
-                                            adv_stencil_extent,   &
-                                            ndata_h),             &
-                   poly_advective_kernel_type(                    &
-                                            u_grad_f,             &
-                                            wind,                 &
-                                            h_reconstruction) )
+      call invoke( name="wt_koren",                             &
+                   polyh_wtheta_koren_kernel_type(              &
+                                            h_reconstruction,   &
+                                            field,              &
+                                            adv_stencil_extent, &
+                                            ndata_h))
+
     else
       if ( oned_reconstruction ) then
         ! Use 1d reconstruction
-        call invoke( poly1d_adv_recon_kernel_type(                  &
-                                              h_reconstruction,     &
-                                              reconstruction_done,  &
-                                              wind, field,          &
-                                              adv_stencil_extent,   &
-                                              adv_coeffs,           &
-                                              ndata_h,              &
-                                              fv_horizontal_order), &
-                     poly_advective_kernel_type(                    &
-                                              u_grad_f,             &
-                                              wind,                 &
-                                              h_reconstruction) )
+        call invoke( name="wt_1d_recon",                          &
+                     poly1d_reconstruction_kernel_type(           &
+                                              h_reconstruction,   &
+                                              field,              &
+                                              adv_stencil_extent, &
+                                              adv_coeffs,         &
+                                              ndata_h,            &
+                                              fv_horizontal_order ) )
       else
         ! Use 2d reconstruction
-        call invoke( poly2d_adv_recon_kernel_type(                  &
-                                              h_reconstruction,     &
-                                              reconstruction_done,  &
-                                              wind, field,          &
-                                              adv_stencil_extent,   &
-                                              adv_coeffs,           &
-                                              ndata_h,              &
-                                              adv_2d_stencil_size), &
-                     poly_advective_kernel_type(                    &
-                                              u_grad_f,             &
-                                              wind,                 &
-                                              h_reconstruction) )
+        call invoke( name="wt_2d_recon",                          &
+                     poly2d_reconstruction_kernel_type(           &
+                                              h_reconstruction,   &
+                                              field,              &
+                                              adv_stencil_extent, &
+                                              adv_coeffs,         &
+                                              ndata_h,            &
+                                              adv_2d_stencil_size) )
       end if
+
     end if
 
-    nullify( adv_coeffs, w1_fs,           &
-             w1_rmultiplicity, ndata_h,   &
+
+     call invoke( name="poly_update",                           &
+                  poly_adv_update_kernel_type(u_grad_f,         &
+                                              h_reconstruction, &
+                                              stencil_extent,   &
+                                              wind, stencil_extent))
+
+    nullify( adv_coeffs, multidata_fs,    &
+             ndata_h,                     &
              adv_stencil_extent,          &
              adv_2d_stencil_size, mesh )
+
+    if ( subroutine_timers ) call timer('Wt horizontal recon')
 
   end subroutine hori_wt_update_alg
 
@@ -486,6 +483,8 @@ contains
     logical(kind=l_def)          :: logspace
     logical(kind=l_def)          :: reversible
     integer(kind=i_def)          :: monotonicity
+
+    if ( subroutine_timers ) call timer('Wt vertical recon')
 
     reversible = ( transport_metadata%get_reversible() .and. final_rk_stage )
     logspace = transport_metadata%get_log_space()
@@ -525,6 +524,8 @@ contains
 
     nullify( vert_adv_coeffs, ndata_v )
 
+    if ( subroutine_timers ) call timer('Wt vertical recon')
+
   end subroutine vert_wt_update_alg
 
   !=============================================================================
@@ -534,11 +535,10 @@ contains
   !> @param[in,out] rhs                 Advective increment
   !> @param[in]     adv_field           Field to advect
   !> @param[in]     wind                Advecting wind field
-  !> @param[in]     dt                  Timestep
   !> @param[in]     reversible          Use the reversible reconstruction
   !> @param[in]     transport_metadata  Contains transport configuration options
   !> @param[in]     final_rk_stage      Whether this is the last Runge-Kutta stage
-  subroutine wt_advective_update_alg(rhs, adv_field, wind, dt, direction, &
+  subroutine wt_advective_update_alg(rhs, adv_field, wind, direction, &
                                      transport_metadata, final_rk_stage)
 
     use consistent_wind_kernel_mod,     only: consistent_wind_kernel_type
@@ -552,7 +552,6 @@ contains
 
     type(field_type),              intent(in)    :: adv_field, wind
     type(field_type),              intent(inout) :: rhs
-    real(kind=r_def),              intent(in)    :: dt
     integer(kind=i_def),           intent(in)    :: direction
     type(transport_metadata_type), intent(in)    :: transport_metadata
     logical(kind=l_def),           intent(in)    :: final_rk_stage

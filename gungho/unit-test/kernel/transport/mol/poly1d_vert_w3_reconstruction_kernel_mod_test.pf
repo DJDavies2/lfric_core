@@ -29,10 +29,9 @@ contains
   subroutine test_all( this )
 
     use, intrinsic :: iso_fortran_env, only: real64
-    use poly1d_vert_w3_reconstruction_kernel_mod,   only: poly1d_vert_w3_reconstruction_code
-
-    use get_unit_test_planar_mesh_mod, &
-                                     only: get_outward_normals_to_vertical_faces
+    use poly1d_vert_w3_reconstruction_kernel_mod, only: poly1d_vert_w3_reconstruction_code, &
+                                                        poly1d_vert_w3_reconstruction_init, &
+                                                        poly1d_vert_w3_reconstruction_final
 
     implicit none
 
@@ -45,32 +44,29 @@ contains
     integer(i_def), parameter :: nlayers = 5
     integer(i_def), parameter :: mol_order = 2
     integer(i_def), parameter :: ndata = (mol_order+1)*nfaces_v
-    integer(i_def), parameter :: ndf_w2v = 2
+    integer(i_def), parameter :: ndf_md = 1
     integer(i_def), parameter :: ndf_w3 = 1
     integer(i_def), parameter :: ndf_c  = 1
-    integer(i_def), parameter :: undf_w2v = nlayers+1
+    integer(i_def), parameter :: undf_md = 2*ndf_md*nlayers
     integer(i_def), parameter :: undf_w3 = ndf_w3*nlayers
     integer(i_def), parameter :: undf_c  = ndata*(nlayers+1)
 
-    integer(i_def), dimension(ndf_w2v) :: map_w2v
+    integer(i_def), dimension(ndf_md) :: map_md
     integer(i_def), dimension(ndf_w3) :: map_w3
     integer(i_def), dimension(ndf_c)  :: map_c
 
 
-    real(r_def), dimension(undf_w2v) :: reconstruction
-    real(r_def), dimension(undf_w2v) :: reconstruct_answer
-    real(r_def), dimension(undf_w2v) :: wind
-    real(r_def), dimension(undf_w3)  :: density
-    real(r_def), dimension(undf_c)   :: coeff
+    real(r_def), dimension(undf_md) :: reconstruction
+    real(r_def), dimension(undf_md) :: reconstruct_answer
+    real(r_def), dimension(undf_w3) :: density
+    real(r_def), dimension(undf_c)  :: coeff
 
     integer(i_def) :: df, k, f
     logical(l_def) :: logspace
 
     map_w3(1) = 1
     map_c(1) = 1
-    map_w2v(:) = (/1, 2/)
-
-    wind(:) = 1.0_r_def
+    map_md(1) = 1
 
     do k = 1,nlayers
       density(k) = real(k,r_def) - 0.5_r_def
@@ -84,48 +80,57 @@ contains
       coeff( df:2+df) = (/-1.0_r_def, 5.0_r_def, 2.0_r_def/)/6.0_r_def
     end do
     ! Downwinding near boundaries
-    k = 1
-    df = (mol_order+1) +  k*ndata + map_c(1)
+    k = 0
+    df = (mol_order+1) + k*ndata + map_c(1)
     coeff( df:2+df) = (/2.0_r_def, 5.0_r_def, -1.0_r_def/)/6.0_r_def
     k = nlayers-1
     df = k*ndata + map_c(1)
     coeff( df:2+df) = (/-1.0_r_def, 5.0_r_def, 2.0_r_def/)/6.0_r_def
-    ! Extrapolation on boundaries
-    k = nlayers
-    do f = 0, 1
-      df = f*(mol_order+1) + map_c(1)
-      coeff( df:2+df ) = (/ 15.0_r_def, -10.0_r_def, 3.0_r_def/)/8.0_r_def
-      df = f*(mol_order+1) + k*ndata + map_c(1)
-      coeff( df:2+df ) = (/ 3.0_r_def, -10.0_r_def, 15.0_r_def/)/8.0_r_def
-    end do
+
+    ! Boundary cells
+    ! Extrapolation to bottom boundary
+    df = map_c(1)
+    coeff( df:2+df ) = (/ 15.0_r_def, -10.0_r_def, 3.0_r_def/)/8.0_r_def
+
+    ! Extrapolation to top boundary
+    k = nlayers-1
+    df = (mol_order+1) + k*ndata + map_c(1)
+    coeff( df:2+df ) = (/ 3.0_r_def, -10.0_r_def, 15.0_r_def/)/8.0_r_def
+
+    ! Set up stencil
+    call poly1d_vert_w3_reconstruction_init( mol_order, &
+                                             nlayers )
+
     ! First test standard polynomial interpolation
     logspace = .false.
-    call poly1d_vert_w3_reconstruction_code( nlayers,                           &
-                                             reconstruction,                    &
-                                             wind,                              &
-                                             density,                           &
-                                             coeff,                             &
-                                             ndata,                             &
-                                             mol_order,                         &
-                                             logspace,                          &
-                                             ndf_w2v,                           &
-                                             undf_w2v,                          &
-                                             map_w2v,                           &
-                                             ndf_w3,                            &
-                                             undf_w3,                           &
-                                             map_w3,                            &
-                                             ndf_c,                             &
-                                             undf_c,                            &
-                                             map_c)
+    call poly1d_vert_w3_reconstruction_code( nlayers,        &
+                                             reconstruction, &
+                                             density,        &
+                                             coeff,          &
+                                             ndata,          &
+                                             mol_order,      &
+                                             logspace,       &
+                                             ndf_md,         &
+                                             undf_md,        &
+                                             map_md,         &
+                                             ndf_w3,         &
+                                             undf_w3,        &
+                                             map_w3,         &
+                                             ndf_c,          &
+                                             undf_c,         &
+                                             map_c )
     if ( r_def == real64 ) then
       use_tol = tol
     else
-      use_tol = 10.0_r_def*spacing( reconstruction(map_w2v(1)+1) )
-    endif
+      use_tol = 10.0_r_def*spacing( reconstruction(map_md(1)+1) )
+    end if
+    k=1
     answer = 1.0_r_def
-    @assertEqual(answer, reconstruction(map_w2v(1)+1) , use_tol)
+    @assertEqual(answer, reconstruction(map_md(1)+k) , use_tol)
+    @assertEqual(answer, reconstruction(map_md(1)+k-1+nlayers) , use_tol)
     answer = 2.0_r_def
-    @assertEqual(answer, reconstruction(map_w2v(1)+2) , tol)
+    @assertEqual(answer, reconstruction(map_md(1)+k+1) , use_tol)
+    @assertEqual(answer, reconstruction(map_md(1)+k+nlayers) , use_tol)
 
     ! Next test standard polynomial interpolation in log-space
 
@@ -133,32 +138,34 @@ contains
       density(k) = exp(-real(k,r_def)+0.5_r_def)
     end do
     logspace = .true.
-    call poly1d_vert_w3_reconstruction_code( nlayers,                           &
-                                             reconstruction,                    &
-                                             wind,                              &
-                                             density,                           &
-                                             coeff,                             &
-                                             ndata,                             &
-                                             mol_order,                         &
-                                             logspace,                          &
-                                             ndf_w2v,                           &
-                                             undf_w2v,                          &
-                                             map_w2v,                           &
-                                             ndf_w3,                            &
-                                             undf_w3,                           &
-                                             map_w3,                            &
-                                             ndf_c,                             &
-                                             undf_c,                            &
-                                             map_c)
+    call poly1d_vert_w3_reconstruction_code( nlayers,        &
+                                             reconstruction, &
+                                             density,        &
+                                             coeff,          &
+                                             ndata,          &
+                                             mol_order,      &
+                                             logspace,       &
+                                             ndf_md,         &
+                                             undf_md,        &
+                                             map_md,         &
+                                             ndf_w3,         &
+                                             undf_w3,        &
+                                             map_w3,         &
+                                             ndf_c,          &
+                                             undf_c,         &
+                                             map_c )
+
     if ( r_def == real64 ) then
       use_tol = tol
     else
-      use_tol = 10.0_r_def*spacing( reconstruction(map_w2v(1)+1) )
+      use_tol = 10.0_r_def*spacing( reconstruction(map_md(1)+1) )
     endif
     answer = exp(-1.0_r_def)
-    @assertEqual(answer, reconstruction(map_w2v(1)+1), use_tol)
+    @assertEqual(answer, reconstruction(map_md(1)+1) , use_tol)
+    @assertEqual(answer, reconstruction(map_md(1)+0+nlayers) , use_tol)
     answer = exp(-2.0_r_def)
-    @assertEqual(answer, reconstruction(map_w2v(1)+2), use_tol)
+    @assertEqual(answer, reconstruction(map_md(1)+2) , use_tol)
+    @assertEqual(answer, reconstruction(map_md(1)+1+nlayers) , use_tol)
 
     ! ------------------------------------------------------------------------ !
     ! Test that zero values don't cause blow up
@@ -167,46 +174,47 @@ contains
     ! Do reconstruction with zero density
     density(:) = 0.0_r_def
     reconstruction(:) = 0.0_r_def
-    call poly1d_vert_w3_reconstruction_code( nlayers,                          &
-                                             reconstruction,                   &
-                                             wind,                             &
-                                             density,                          &
-                                             coeff,                            &
-                                             ndata,                            &
-                                             mol_order,                        &
-                                             logspace,                         &
-                                             ndf_w2v,                          &
-                                             undf_w2v,                         &
-                                             map_w2v,                          &
-                                             ndf_w3,                           &
-                                             undf_w3,                          &
-                                             map_w3,                           &
-                                             ndf_c,                            &
-                                             undf_c,                           &
+    call poly1d_vert_w3_reconstruction_code( nlayers,        &
+                                             reconstruction, &
+                                             density,        &
+                                             coeff,          &
+                                             ndata,          &
+                                             mol_order,      &
+                                             logspace,       &
+                                             ndf_md,         &
+                                             undf_md,        &
+                                             map_md,         &
+                                             ndf_w3,         &
+                                             undf_w3,        &
+                                             map_w3,         &
+                                             ndf_c,          &
+                                             undf_c,         &
                                              map_c)
 
     ! Now do reconstruction with tiny density as a control
     density(:) = EPS
     reconstruct_answer(:) = 0.0_r_def
-    call poly1d_vert_w3_reconstruction_code( nlayers,                          &
-                                             reconstruct_answer,               &
-                                             wind,                             &
-                                             density,                          &
-                                             coeff,                            &
-                                             ndata,                            &
-                                             mol_order,                        &
-                                             logspace,                         &
-                                             ndf_w2v,                          &
-                                             undf_w2v,                         &
-                                             map_w2v,                          &
-                                             ndf_w3,                           &
-                                             undf_w3,                          &
-                                             map_w3,                           &
-                                             ndf_c,                            &
-                                             undf_c,                           &
+    call poly1d_vert_w3_reconstruction_code( nlayers,            &
+                                             reconstruct_answer, &
+                                             density,            &
+                                             coeff,              &
+                                             ndata,              &
+                                             mol_order,          &
+                                             logspace,           &
+                                             ndf_md,             &
+                                             undf_md,            &
+                                             map_md,             &
+                                             ndf_w3,             &
+                                             undf_w3,            &
+                                             map_w3,             &
+                                             ndf_c,              &
+                                             undf_c,             &
                                              map_c)
 
     @assertEqual(reconstruction, reconstruct_answer, use_tol)
+
+    ! Deallocate stencil
+    call poly1d_vert_w3_reconstruction_final()
 
   end subroutine test_all
 

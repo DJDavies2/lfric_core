@@ -50,11 +50,17 @@ contains
     integer(kind=i_def), parameter          :: ndf_wv  = 2_i_def
     integer(kind=i_def), parameter          :: undf_wv = nlayers + 1
     integer(kind=i_def), dimension(ndf_wv)  :: map_wv
-    real(kind=r_def),    dimension(undf_wv) :: wind, wind_recon
+    real(kind=r_def),    dimension(undf_wv) :: wind
+    ! Multidata Space
+    integer(kind=i_def), parameter          :: ndf_md  = 1_i_def
+    integer(kind=i_def), parameter          :: undf_md = 4_i_def*nlayers
+    integer(kind=i_def), dimension(ndf_md)  :: map_md
+    real(kind=r_def),    dimension(undf_md) :: wind_recon
 
     integer(kind=i_def) :: k, df
 
     map_ws = (/ 1 /)
+    map_md = (/ 1 /)
     map_wv(1) = 1
     map_wv(2) = 2
 
@@ -62,8 +68,8 @@ contains
     do k = 0,nlayers - 1
       wind(map_wv(1)+k) = real(k,r_def)
       wind(map_wv(2)+k) = real(k+1,r_def)
-      wind_recon(map_wv(1)+k) = 21.0_r_def + 3.52_r_def*real(k,r_def)
-      wind_recon(map_wv(2)+k) = 21.0_r_def + 3.52_r_def*real(k+1,r_def)
+      wind_recon(map_md(1)+k) = 21.0_r_def + 3.52_r_def*real(k,r_def)
+      wind_recon(map_md(1)+k+nlayers) = 21.0_r_def + 3.52_r_def*real(k+1,r_def)
     end do
 
     m3_inv(:,:,:) = 0.1_r_def
@@ -75,6 +81,7 @@ contains
                                    wind,                    &
                                    ncell_3d, m3_inv,        &
                                    ndf_ws, undf_ws, map_ws, &
+                                   ndf_md, undf_md, map_md, &
                                    ndf_wv, undf_wv, map_wv  &
                                   )
 

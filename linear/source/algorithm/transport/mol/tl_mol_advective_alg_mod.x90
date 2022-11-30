@@ -12,8 +12,8 @@ module tl_mol_advective_alg_mod
   use runge_kutta_init_mod,           only: get_rk_transport_weights
   use log_mod,                        only: log_event, LOG_LEVEL_ERROR
   use mesh_mod,                       only: mesh_type
-  use advective_increment_alg_mod,    only: advective_increment_alg
-  use tl_advective_increment_alg_mod, only: tl_advective_increment_alg
+  use advective_and_flux_alg_mod,     only: advective_and_flux_alg
+  use tl_advective_and_flux_alg_mod,  only: tl_advective_and_flux_alg
   use transport_metadata_mod,         only: transport_metadata_type
   use transport_runtime_alg_mod,      only: transport_runtime_type
   use transport_runtime_collection_mod, &
@@ -61,7 +61,8 @@ contains
     real(r_def),      allocatable :: rk_weights(:,:)
     type(mesh_type),  pointer     :: mesh => null()
     type(transport_runtime_type), pointer :: transport_runtime => null()
-    type(field_type)              :: rhs_field
+    type(field_type)              :: rhs_field, &
+                                     dummy
 
     integer(i_def) :: number_substeps
     real(r_def)    :: dt_substep
@@ -130,10 +131,10 @@ contains
         end do
 
         ! Compute update: rhs = u.grad(rhs_field)
-        call advective_increment_alg(rhs, rhs_field, ls_field_n,          &
-                                     ls_advecting_wind, dt_substep,       &
-                                     direction, transport_metadata,       &
-                                     final_rk_stage )
+        call advective_and_flux_alg(dummy, rhs, rhs_field, ls_field_n,  &
+                                    ls_advecting_wind, direction,       &
+                                    transport_metadata, final_rk_stage, &
+                                    dt_substep, .false., .true. )
 
         ! Update field: f = f^n - dt_substep*rhs
         call invoke( X_minus_bY(ls_field_np1, ls_field_n, dt_substep, rhs) )
@@ -174,11 +175,12 @@ contains
         end do
 
         ! Compute update: rhs = u.grad(rhs_field)
-        call tl_advective_increment_alg(rhs, rhs_field, advecting_wind,   &
-                                        stored_ls_field(substep, stage),  &
-                                        ls_advecting_wind, dt_substep,    &
-                                        direction, transport_metadata,    &
-                                        final_rk_stage )
+        call tl_advective_and_flux_alg(dummy, rhs, rhs_field, advecting_wind, &
+                                       stored_ls_field(substep, stage),       &
+                                       ls_advecting_wind,                     &
+                                       direction, transport_metadata,         &
+                                       final_rk_stage, dt_substep,            &
+                                       .false., .true. )
 
         ! Update field: f = f^n - dt_substep*rhs
         call invoke( X_minus_bY(field_np1, field_n, dt_substep, rhs) )

@@ -1,0 +1,95 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2022 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+module combine_multidata_field_kernel_mod_test
+
+  use constants_mod,                      only: i_def, r_def, l_def
+  use combine_multidata_field_kernel_mod, only: combine_multidata_field_code
+  use pFUnit_Mod
+
+  implicit none
+
+  private
+
+  public :: combine_multidata_field_kernel_test_type, test_all
+
+  @TestCase
+  type, extends(TestCase) :: combine_multidata_field_kernel_test_type
+    private
+  contains
+    procedure test_all
+  end type combine_multidata_field_kernel_test_type
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @Test
+  subroutine test_all( this)
+
+    implicit none
+
+    class(combine_multidata_field_kernel_test_type), intent(inout) :: this
+
+    integer(kind=i_def), parameter      :: n1 = 2
+    integer(kind=i_def), parameter      :: n2 = 4
+    integer(kind=i_def), parameter      :: n = n1 + n2
+    integer(kind=i_def), parameter      :: ndf = 1
+    integer(kind=i_def), parameter      :: nlayers = 10
+    integer(kind=i_def), parameter      :: undf  = nlayers*ndf*n
+    integer(kind=i_def), parameter      :: undf1 = nlayers*ndf*n1
+    integer(kind=i_def), parameter      :: undf2 = nlayers*ndf*n2
+    integer(kind=i_def), dimension(ndf) :: map
+
+    logical(kind=l_def) :: ndata_first
+
+    real(kind=r_def), dimension(undf)  :: field_out
+    real(kind=r_def), dimension(undf1) :: field1_in
+    real(kind=r_def), dimension(undf2) :: field2_in
+
+    real(kind=r_def), parameter :: tol = 1.0e-12_r_def
+
+    integer(kind=i_def) :: k, df
+
+    map(1) = 1
+
+    call random_number(field1_in)
+    call random_number(field2_in)
+
+    ndata_first = .true.
+    call combine_multidata_field_code(nlayers,          &
+                                      field_out, n,     &
+                                      field1_in, n1,    &
+                                      field2_in, n2,    &
+                                      ndata_first,      &
+                                      ndf, undf, map,   &
+                                      ndf, undf1, map,  &
+                                      ndf, undf2, map )
+
+  do k = 0, nlayers - 1
+    @assertEqual(field_out(1 + k*n),      field1_in(1+k*n1), tol)
+    @assertEqual(field_out(1 + k*n + n1), field2_in(1+k*n2), tol)
+  end do
+
+    ndata_first = .false.
+    call combine_multidata_field_code(nlayers,          &
+                                      field_out, n,     &
+                                      field1_in, n1,    &
+                                      field2_in, n2,    &
+                                      ndata_first,      &
+                                      ndf, undf, map,   &
+                                      ndf, undf1, map,  &
+                                      ndf, undf2, map )
+
+  df = 2
+  do k = 0, nlayers - 1
+    @assertEqual(field_out(1 + nlayers + k),        field1_in(1+nlayers + k), tol)
+    @assertEqual(field_out(1 + (n1+1)*nlayers + k), field2_in(1+nlayers + k), tol)
+  end do
+
+
+  end subroutine test_all
+
+end module combine_multidata_field_kernel_mod_test

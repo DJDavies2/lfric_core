@@ -11,21 +11,16 @@ module advective_and_flux_alg_mod
   use constants_mod,                   only: i_def, r_def, l_def
   use fem_constants_mod,               only: get_inverse_w3_mass_matrix
   use field_mod,                       only: field_type
-  use fs_continuity_mod,               only: W2, W2h, W2v
   use log_mod,                         only: log_event, LOG_LEVEL_ERROR
   use monotonic_update_kernel_mod,     only: monotonic_update_kernel_type
   use operator_mod,                    only: operator_type
   use reconstruct_w3_field_alg_mod,    only: reconstruct_w3_field_alg
-  use transport_config_mod,            only: operators,           &
-                                             fv_horizontal_order, &
-                                             operators_fem
   use transport_enumerated_types_mod,  only: direction_3d,                 &
                                              direction_h,                  &
                                              direction_v,                  &
                                              horizontal_monotone_clipping, &
                                              vertical_monotone_clipping
   use transport_metadata_mod,          only: transport_metadata_type
-  use w3_advective_update_kernel_mod,  only: w3_advective_update_kernel_type
   use w3h_advective_update_kernel_mod, only: w3h_advective_update_kernel_type
   use w3v_advective_update_kernel_mod, only: w3v_advective_update_kernel_type
 
@@ -51,70 +46,178 @@ contains
   !> @param[in]     direction           Direction of the transport
   !> @param[in]     transport_metadata  Contains transport configuration options
   !> @param[in]     final_rk_stage      Whether this is the last Runge-Kutta stage
-  subroutine advective_and_flux_alg(mass_flux, adv_inc, density, density_n, wind, &
-                                    dt, direction, transport_metadata, final_rk_stage)
+  !> @param[in]     dt                  Advection time step
+  !> @param[in]     do_flux             Flag to compute mass_flux = wind*density
+  !> @param[in]     do_advective        Flag to compute adv_inc = wind.grad(density)
+  subroutine advective_and_flux_alg(mass_flux, adv_inc, density, density_n, wind,  &
+                                    direction, transport_metadata, final_rk_stage, &
+                                    dt, do_flux, do_advective)
+
+    use function_space_collection_mod,   only: function_space_collection
+    use function_space_mod,              only: function_space_type
+    use horizontal_mass_flux_kernel_mod, only: horizontal_mass_flux_kernel_type
+    use vertical_mass_flux_kernel_mod,   only: vertical_mass_flux_kernel_type
+    use fs_continuity_mod,               only: W3, W2, W2h, W2v, Wtheta
+    use mesh_mod,                        only: mesh_type
+    use finite_element_config_mod,       only: element_order
+    use fem_constants_mod,               only: get_rmultiplicity
+    use sample_field_kernel_mod,         only: sample_field_kernel_type
+    use transport_config_mod,            only: operators,     &
+                                               operators_fv,  &
+                                               operators_fem, &
+                                               fv_horizontal_order
+    use wt_advective_update_alg_mod,     only: wt_advective_update_alg
+    use monotonic_update_kernel_mod,     only: monotonic_update_kernel_type
 
     implicit none
 
     type(field_type),              intent(in)    :: density, density_n, wind
     type(field_type),              intent(inout) :: mass_flux, adv_inc
-    real(kind=r_def),              intent(in)    :: dt
     integer(kind=i_def),           intent(in)    :: direction
     type(transport_metadata_type), intent(in)    :: transport_metadata
     logical(kind=l_def),           intent(in)    :: final_rk_stage
+    real(kind=r_def),              intent(in)    :: dt
+    logical(kind=l_def),           intent(in)    :: do_flux
+    logical(kind=l_def),           intent(in)    :: do_advective
 
     ! Internal variables
-    type(field_type)             :: w2_recon
-    type(operator_type), pointer :: m3_inv => null()
-    integer(kind=i_def)          :: mono_stencil
-    logical(kind=l_def)          :: do_horizontal_monotone
-    logical(kind=l_def)          :: do_vertical_monotone
+    integer(kind=i_def)                :: ndata
+    type(function_space_type), pointer :: recon_fs => null()
+    type(field_type)                   :: reconstruction_field
+    logical(kind=l_def)                :: do_horizontal
+    logical(kind=l_def)                :: do_vertical
+    type(operator_type), pointer       :: m3_inv => null()
+    integer(kind=i_def), parameter     :: stencil_depth = 1
+    type(mesh_type),           pointer :: mesh => null()
+    integer(kind=i_def)                :: recon_space
+    type(field_type), pointer          :: rmultiplicity => null()
+    integer(kind=i_def)                :: mono_stencil
+    logical(kind=l_def)                :: do_horizontal_monotone, &
+                                          do_vertical_monotone
 
-    ! Reconstruct W3 variable in W2
-    call w2_recon%initialise( wind%get_function_space() )
-    call reconstruct_w3_field_alg(w2_recon, density, wind, direction, &
-                                  transport_metadata, final_rk_stage)
+    mesh => density%get_mesh()
 
-    ! Obtain mass flux by multiplying by the wind
-    call invoke( X_times_Y(mass_flux, w2_recon, wind), &
-    ! Prepare to obtain advective increment
-                 setval_c(adv_inc, 0.0_r_def) )
+    select case ( density%which_function_space() )
+      case ( W3 )
 
-    m3_inv => get_inverse_w3_mass_matrix( density%get_mesh_id() )
+        select case (operators)
+          case default
+            call log_event( "Gungho: Unrecognized option for operator.", LOG_LEVEL_ERROR )
 
-    ! Different advective update kernel dependent on direction
-    select case( direction )
-    case ( direction_3d )
-      call invoke( w3_advective_update_kernel_type(adv_inc, w2_recon,  &
-                                                   wind, m3_inv) )
-    case ( direction_h )
-      call invoke( w3h_advective_update_kernel_type(adv_inc, w2_recon, &
-                                                    wind, m3_inv) )
-    case ( direction_v )
-      call invoke( w3v_advective_update_kernel_type(adv_inc, w2_recon, &
-                                                    wind, m3_inv) )
-    case default
-      call log_event("Advective update only on W2, W2h and W2v spaces", LOG_LEVEL_ERROR)
+          case(operators_fem)
+            ! Reconstruct density at staggered points
+            select case ( direction )
+              case ( direction_3d )
+                recon_space = W2
+              case ( direction_h )
+                recon_space = W2h
+              case ( direction_v )
+                recon_space = W2v
+              case default
+                call log_event('W3 reconstruction at W2: direction not recognised', LOG_LEVEL_ERROR)
+            end select
+            recon_fs => function_space_collection%get_fs( mesh, element_order, recon_space )
+            call reconstruction_field%initialise( vector_space=recon_fs, ndata_first = .false. )
+            rmultiplicity => get_rmultiplicity(recon_space, mesh%get_id())
+            call invoke( setval_c(reconstruction_field, 0.0_r_def), &
+                         sample_field_kernel_type(reconstruction_field, rmultiplicity, density) )
+            if ( do_flux ) then
+              call invoke( X_times_Y(mass_flux, reconstruction_field, wind) )
+            end if
+            if ( do_advective ) then
+              call log_event('W3 advective form with FEM operators not supported', LOG_LEVEL_ERROR)
+            end if
+
+          case(operators_fv)
+            ! Reconstruct W3 variable on a W3 multidata field
+            ! each W3 point contains 2, 4 or 6 values.
+            ! For vertical only reconstructions these are the (Bottom, Top) faces
+            ! which is the same order as a W2v field
+            ! For horizontal only reconstructions these are the (West, South, East,
+            ! North) faces  which is the same order as a W2h field
+            ! For 3D reconstructions these are the (West, South, East,
+            ! North, Bottom, Top) faces which is the same order as a W2 field
+            select case ( direction )
+              case ( direction_3d )
+                ndata = 6
+                do_horizontal = .true.
+                do_vertical   = .true.
+              case ( direction_h )
+                ndata = 4
+                do_horizontal = .true.
+                do_vertical   = .false.
+              case ( direction_v )
+                ndata = 2
+                do_horizontal = .false.
+                do_vertical   = .true.
+              case default
+                call log_event('W3 reconstruction at W2: direction not recognised', LOG_LEVEL_ERROR)
+            end select
+            recon_fs => function_space_collection%get_fs( mesh, element_order, W3, ndata )
+            call reconstruction_field%initialise( vector_space=recon_fs, ndata_first = .false. )
+            call reconstruct_w3_field_alg(reconstruction_field, density, direction, &
+                                          transport_metadata, final_rk_stage)
+
+            ! Obtain unique mass flux from reconstucted data at each edge multiplied by the wind
+            if ( do_flux ) then
+              call invoke( setval_c(mass_flux, 0.0_r_def) )
+              if ( do_horizontal ) then
+                call invoke( horizontal_mass_flux_kernel_type(mass_flux, wind, &
+                                                              reconstruction_field) )
+              end if
+              if ( do_vertical ) then
+                call invoke( vertical_mass_flux_kernel_type(mass_flux, wind, reconstruction_field) )
+              end if
+            end if
+
+            ! Compute the advective update m3_inv * u.grad(density)
+            if ( do_advective ) then
+              m3_inv => get_inverse_w3_mass_matrix( density%get_mesh_id() )
+              call invoke( setval_c( adv_inc, 0.0_r_def ) )
+              ! Different advective update kernel dependent on direction
+              if ( do_horizontal ) then
+                call invoke( w3h_advective_update_kernel_type(adv_inc, reconstruction_field, stencil_depth, &
+                                                              wind, stencil_depth, m3_inv) )
+              end if
+              if ( do_vertical ) then
+                call invoke( w3v_advective_update_kernel_type(adv_inc, reconstruction_field, &
+                                                              wind, m3_inv) )
+              end if
+            end if
+        end select
+
+      case ( Wtheta )
+        if ( do_advective ) then
+          call wt_advective_update_alg(adv_inc, density, wind, &
+                                       direction, transport_metadata, final_rk_stage)
+        end if
+        if ( do_flux ) then
+          call log_event('Wtheta flux is undefined', LOG_LEVEL_ERROR)
+        end if
+
+      case default
+        call log_event( "Transport increments only valid for W3 & Wtheta spaces", LOG_LEVEL_ERROR )
+
     end select
 
     ! Apply monotonicity (using the substepped timestep) at the final RK stage
     ! for the advective update
-    if ( final_rk_stage ) then
+    if ( final_rk_stage .and. do_advective ) then
       do_horizontal_monotone = .false.
-      if ( (direction == direction_h .or. direction == direction_3d ) .and.               &
-           transport_metadata%get_horizontal_monotone() == horizontal_monotone_clipping ) &
-      do_horizontal_monotone = .true.
+      if ( (direction == direction_h .or. direction == direction_3d ) .and. &
+            transport_metadata%get_horizontal_monotone() == horizontal_monotone_clipping ) &
+        do_horizontal_monotone = .true.
 
       do_vertical_monotone = .false.
-      if ( (direction == direction_v .or. direction == direction_3d ) .and.           &
-           transport_metadata%get_vertical_monotone() == vertical_monotone_clipping ) &
-      do_vertical_monotone = .true.
+      if ( (direction == direction_v .or. direction == direction_3d ) .and. &
+            transport_metadata%get_vertical_monotone() == vertical_monotone_clipping ) &
+        do_vertical_monotone = .true.
 
       if ( do_horizontal_monotone .or. do_vertical_monotone ) then
         if ( operators == operators_fem ) then
-          mono_stencil = 1
+          mono_stencil = 1_i_def
         else
-          mono_stencil = fv_horizontal_order / 2
+          mono_stencil = fv_horizontal_order / 2_i_def
         end if
         call invoke( monotonic_update_kernel_type(adv_inc,                &
                                                   density_n,              &
@@ -125,7 +228,7 @@ contains
       end if
     end if
 
-
+    nullify( recon_fs, m3_inv, mesh, rmultiplicity)
 
   end subroutine advective_and_flux_alg
 

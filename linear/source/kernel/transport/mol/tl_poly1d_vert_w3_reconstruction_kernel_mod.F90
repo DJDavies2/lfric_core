@@ -20,9 +20,10 @@ use argument_mod,      only : arg_type, func_type,         &
                               GH_LOGICAL,                  &
                               GH_WRITE, GH_READ, GH_BASIS, &
                               CELL_COLUMN,                 &
-                              ANY_DISCONTINUOUS_SPACE_1
+                              ANY_DISCONTINUOUS_SPACE_1,   &
+                              ANY_DISCONTINUOUS_SPACE_2
 use constants_mod,     only : r_def, i_def, l_def, EPS
-use fs_continuity_mod, only : W2v, W3
+use fs_continuity_mod, only : W3
 use kernel_mod,        only : kernel_type
 
 implicit none
@@ -35,12 +36,11 @@ private
 !> The type declaration for the kernel. Contains the metadata needed by the PSy layer
 type, public, extends(kernel_type) :: tl_poly1d_vert_w3_reconstruction_kernel_type
   private
-  type(arg_type) :: meta_args(8) = (/                                        &
-       arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, W2v),                       &
+  type(arg_type) :: meta_args(7) = (/                                        &
+       arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), &
        arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W3),                        &
-       arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2v),                       &
        arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W3),                        &
-       arg_type(GH_FIELD,  GH_REAL,    GH_READ,  ANY_DISCONTINUOUS_SPACE_1), &
+       arg_type(GH_FIELD,  GH_REAL,    GH_READ,  ANY_DISCONTINUOUS_SPACE_2), &
        arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                             &
        arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                             &
        arg_type(GH_SCALAR, GH_LOGICAL, GH_READ)                              &
@@ -53,7 +53,11 @@ end type
 !-------------------------------------------------------------------------------
 ! Contained functions/subroutines
 !-------------------------------------------------------------------------------
-public tl_poly1d_vert_w3_reconstruction_code
+public :: tl_poly1d_vert_w3_reconstruction_code
+public :: tl_poly1d_vert_w3_reconstruction_init
+public :: tl_poly1d_vert_w3_reconstruction_final
+
+integer(kind=i_def), private, allocatable, dimension(:,:,:) :: stencil
 
 contains
 
@@ -61,16 +65,15 @@ contains
 !! @param[in]  nlayers      Number of layers
 !! @param[in,out] reconstruction  ACTIVE Change in mass reconstruction field
 !! @param[in]  tracer       ACTIVE Change in tracer
-!! @param[in]  ls_wind      Linearisation state wind field
 !! @param[in]  ls_tracer    Linearisation state tracer tracer
 !! @param[in]  coeff        Array of polynomial coefficients for interpolation
 !! @param[in]  ndata        Number of data points per dof location
 !! @param[in]  global_order Desired order of polynomial reconstruction
 !! @param[in]  logspace     If true perform interpolation in log space
-!! @param[in]  ndf_w2v      Number of degrees of freedom per cell
-!! @param[in]  undf_w2v     Number of unique degrees of freedom for the
+!! @param[in]  ndf_md      Number of degrees of freedom per cell
+!! @param[in]  undf_md     Number of unique degrees of freedom for the
 !!                          reconstruction & wind fields
-!! @param[in]  map_w2v      Dofmap for the cell at the base of the column
+!! @param[in]  map_md      Dofmap for the cell at the base of the column
 !! @param[in]  ndf_w3       Number of degrees of freedom per cell
 !! @param[in]  undf_w3      Number of unique degrees of freedom for tracer
 !! @param[in]  map_w3       Cell dofmaps for the tracer space
@@ -79,128 +82,188 @@ contains
 !! @param[in]  undf_c       Total number of degrees of freedom for the
 !!                          coeff space
 !! @param[in]  map_c        Dofmap for the coeff space
-subroutine tl_poly1d_vert_w3_reconstruction_code(                      &
-                                     nlayers,                          &
-                                     reconstruction,                   &
-                                     tracer,                           &
-                                     ls_wind,                          &
-                                     ls_tracer,                        &
-                                     coeff,                            &
-                                     ndata,                            &
-                                     global_order,                     &
-                                     logspace,                         &
-                                     ndf_w2v,                          &
-                                     undf_w2v,                         &
-                                     map_w2v,                          &
-                                     ndf_w3,                           &
-                                     undf_w3,                          &
-                                     map_w3,                           &
-                                     ndf_c,                            &
-                                     undf_c,                           &
-                                     map_c )
+subroutine tl_poly1d_vert_w3_reconstruction_code(                &
+                                                 nlayers,        &
+                                                 reconstruction, &
+                                                 tracer,         &
+                                                 ls_tracer,      &
+                                                 coeff,          &
+                                                 ndata,          &
+                                                 global_order,   &
+                                                 logspace,       &
+                                                 ndf_md,         &
+                                                 undf_md,        &
+                                                 map_md,         &
+                                                 ndf_w3,         &
+                                                 undf_w3,        &
+                                                 map_w3,         &
+                                                 ndf_c,          &
+                                                 undf_c,         &
+                                                 map_c )
 
   implicit none
 
   ! Arguments
-  integer(kind=i_def), intent(in)                     :: nlayers
-  integer(kind=i_def), intent(in)                     :: ndata
-  integer(kind=i_def), intent(in)                     :: ndf_w3
-  integer(kind=i_def), intent(in)                     :: undf_w3
-  integer(kind=i_def), intent(in)                     :: ndf_w2v
-  integer(kind=i_def), intent(in)                     :: undf_w2v
-  integer(kind=i_def), intent(in)                     :: ndf_c
-  integer(kind=i_def), intent(in)                     :: undf_c
-  integer(kind=i_def), dimension(ndf_w2v), intent(in) :: map_w2v
-  integer(kind=i_def), dimension(ndf_c),   intent(in) :: map_c
-  integer(kind=i_def), dimension(ndf_w3),  intent(in) :: map_w3
-  integer(kind=i_def), intent(in)                     :: global_order
-  real(kind=r_def), dimension(undf_w2v), intent(out)  :: reconstruction
-  real(kind=r_def), dimension(undf_w3),  intent(in)   :: tracer
-  real(kind=r_def), dimension(undf_w2v), intent(in)   :: ls_wind
-  real(kind=r_def), dimension(undf_w3),  intent(in)   :: ls_tracer
-  real(kind=r_def), dimension(undf_c),   intent(in)   :: coeff
+  integer(kind=i_def), intent(in)                    :: nlayers
+  integer(kind=i_def), intent(in)                    :: ndata
+  integer(kind=i_def), intent(in)                    :: ndf_w3
+  integer(kind=i_def), intent(in)                    :: undf_w3
+  integer(kind=i_def), intent(in)                    :: ndf_md
+  integer(kind=i_def), intent(in)                    :: undf_md
+  integer(kind=i_def), intent(in)                    :: ndf_c
+  integer(kind=i_def), intent(in)                    :: undf_c
+  integer(kind=i_def), dimension(ndf_md), intent(in) :: map_md
+  integer(kind=i_def), dimension(ndf_c),  intent(in) :: map_c
+  integer(kind=i_def), dimension(ndf_w3), intent(in) :: map_w3
+  integer(kind=i_def), intent(in)                    :: global_order
+  real(kind=r_def), dimension(undf_md), intent(out)  :: reconstruction
+  real(kind=r_def), dimension(undf_w3), intent(in)   :: tracer
+  real(kind=r_def), dimension(undf_w3), intent(in)   :: ls_tracer
+  real(kind=r_def), dimension(undf_c),  intent(in)   :: coeff
 
   logical(kind=l_def), intent(in) :: logspace
 
   ! Internal variables
-  integer(kind=i_def) :: k, kmin, kmax, ij, ik, p
-  integer(kind=i_def) :: vertical_order, use_upwind, upwind_offset, upwind
+  integer(kind=i_def) :: k, ij, ik, p, f
+  integer(kind=i_def) :: vertical_order
 
-  integer(kind=i_def), dimension(global_order+1) :: stencil
-
-  real(kind=r_def) :: polynomial_tracer
-  real(kind=r_def) :: ls_polynomial_tracer
+  real(kind=r_def) :: new_tracer
+  real(kind=r_def) :: ls_new_tracer
 
   ! Ensure that we reduce the order if there are only a few layers
   vertical_order = min(global_order, nlayers-1)
 
+  ij = map_w3(1)
+
+  if ( logspace ) then
+
+    ! Loop over bottom (f=0) and top (f=1) faces
+    do f = 0, 1
+      ! Field is reconstructed on a layer-first W3 multidata field
+      ! so the index on the bottom face (face=0) is: map_md(1) + 0*nlayers + k
+      ! so the index on the top    face (face=1) is: map_md(1) + 1*nlayers + k
+      ! i.e for face f index is map_md(1) + f*nlayers + k
+      do k = 0, nlayers-1
+        ! Compute the tracer reconstructed at W2v points
+        ! Interpolate log(tracer)
+        ! I.e. polynomial = exp(c_1*log(tracer_1) + c_2*log(tracer_2) + ...)
+        !                 = tracer_1**c_1*tracer_2**c_2...
+        ! Note that we further take the absolute value before raising to the
+        ! fractional power. This code should only be used for a positive
+        ! quantity, but adding in the abs ensures no errors are thrown
+        ! if negative numbers are passed through in redundant calculations
+        ! in the haloes
+        new_tracer = 0.0_r_def
+        ls_new_tracer = 1.0_r_def
+        do p = 1, vertical_order + 1
+          ik = p + f*(global_order+1) + k*ndata + map_c(1) - 1
+          new_tracer = new_tracer &
+            + coeff(ik)*tracer(ij + stencil(p,k,f)) / &
+              sign(max(EPS,ls_tracer(ij + stencil(p,k,f))),ls_tracer(ij + stencil(p,k,f)))
+
+          ls_new_tracer = ls_new_tracer * &
+              max(EPS,abs(ls_tracer(ij + stencil(p,k,f))))**coeff(ik)
+        end do
+
+        reconstruction(map_md(1) + f*nlayers + k) = new_tracer * ls_new_tracer
+
+      end do
+    end do
+
+  else
+
+    ! Loop over bottom (f=0) and top (f=1) faces
+    do f = 0, 1
+      ! Field is reconstructed on a layer-first W3 multidata field
+      ! so the index on the bottom face (face=0) is: map_md(1) + 0*nlayers + k
+      ! so the index on the top    face (face=1) is: map_md(1) + 1*nlayers + k
+      ! i.e for face f index is map_md(1) + f*nlayers + k
+      do k = 0, nlayers-1
+
+        ! Compute the tracer reconstructed at W2v points
+        new_tracer = 0.0_r_def
+        do p = 1, vertical_order + 1
+          ik = p + f*(global_order+1) + k*ndata + map_c(1) - 1
+          new_tracer = new_tracer + coeff(ik)*tracer(ij + stencil(p,k,f))
+        end do
+        reconstruction(map_md(1) + f*nlayers + k) = new_tracer
+      end do
+    end do
+
+  end if
+
+end subroutine tl_poly1d_vert_w3_reconstruction_code
+
+!> @brief Computes the offset stencil needed for vertical reconstructions.
+!> @param[in] global_order Desired order of reconstruction
+!> @param[in] nlayers      Number of layers in the mesh
+subroutine tl_poly1d_vert_w3_reconstruction_init(global_order, &
+                                                 nlayers)
+
+  implicit none
+
+  integer(kind=i_def), intent(in) :: global_order
+  integer(kind=i_def), intent(in) :: nlayers
+
+  integer(kind=i_def) :: k, kmin, kmax, f, p
+  integer(kind=i_def) :: vertical_order, use_upwind
+
+  integer(kind=i_def), dimension(global_order+1) :: offset
+
+
+  ! Ensure that we reduce the order if there are only a few layers
+  vertical_order = min(global_order, nlayers-1)
+
+  allocate( stencil(vertical_order+1, 0:nlayers-1, 0:1) )
+
+  ! Compute the stencil offset of points required
+  ! For vertical_order = 2 => offset = (-1,0,+1)
+  ! For vertical_order = 3 => offset = (-2,-1,0,+1)
+  do p = 0, vertical_order
+    offset(p+1) = - floor(real(vertical_order+1_i_def,r_def)/2.0_r_def) + p
+  end do
+
+
   ! If order is even then we are using an upwind stencil -> use_upwind = 1
   ! For odd orders it is zero
   use_upwind = mod(vertical_order+1_i_def, 2_i_def)
-  ij = map_w3(1)
 
-  ! Compute dtracer/dz using precomputed weights
-  do k = 0, nlayers
+  ! Loop over bottom (f=0) and top (f=1) faces
+  do f = 0, 1
 
-    ! Compute the stencil of points required
-    ! For vertical_order = 2 => stencil = (k-1,k,k+1)
-    ! For vertical_order = 3 => stencil = (k-2,k-1,k,k+1)
-    do p = 0, vertical_order
-      stencil(p+1) = k - floor(real(vertical_order+1_i_def,r_def)/2.0_r_def) + p
+    ! Field is reconstructed on a layer-first W3 multidata field
+    ! so the index on the bottom face (face=0) is: map_md(1) + 0*nlayers + k
+    ! so the index on the top    face (face=1) is: map_md(1) + 1*nlayers + k
+    ! i.e for face f index is map_md(1) + f*nlayers + k
+    do k = 0, nlayers-1
+
+      ! Compute the stencil of points required
+      ! For vertical_order = 2 => stencil = (k-1,k,k+1)
+      ! For vertical_order = 3 => stencil = (k-2,k-1,k,k+1)
+      ! For centred scheme shift to (k-1, k, k+1, k+2) for top face
+      ! (when f = 1 and use_upwind = 0)
+      do p = 1, vertical_order+1
+        stencil(p,k,f) = k + offset(p) + f*(1_i_def-use_upwind)
+      end do
+
+      ! Adjust stencil near boundaries to avoid going out of bounds
+      kmin = minval(stencil(1:vertical_order+1,k,f))
+      if ( kmin < 0 ) stencil(:,k,f) = stencil(:,k,f) - kmin
+      kmax = maxval(stencil(1:vertical_order+1,k,f)) - (nlayers-1)
+      if ( kmax > 0 ) stencil(:,k,f) = stencil(:,k,f) - kmax
     end do
-
-    ! Adjust the stencil based upon the wind sign for upwind (even order)
-    ! reconstructions only.
-    ! if wind > 0 -> upwind_offset = 1
-    ! if wind < 0 -> upwind_offset = 0
-    upwind = int(0.5_r_def*(1.0_r_def + sign(1.0_r_def,ls_wind(map_w2v(1)+k))),i_def)
-    upwind_offset = use_upwind*upwind
-
-    ! Adjust the stencil in the upwind direction unless at the top boundary
-    if ( k < nlayers ) stencil = stencil - upwind_offset
-
-    ! Adjust stencil near boundaries to avoid going out of bounds
-    kmin = minval(stencil(1:vertical_order+1))
-    if ( kmin < 0 ) stencil = stencil - kmin
-    kmax = maxval(stencil(1:vertical_order+1)) - (nlayers-1)
-    if ( kmax > 0 ) stencil = stencil - kmax
-
-    ! Compute the tracer reconstructed at W2 points
-    if ( logspace ) then
-      ! Linearisation state
-      ! Interpolate log(tracer)
-      ! I.e. polynomial = exp(c_1*log(tracer_1) + c_2*log(tracer_2) + ...)
-      !                 = tracer_1**c_1*tracer_2**c_2...
-      ! Note that we further take the absolute value before raising to the
-      ! fractional power. This code should only be used for a positive
-      ! quantity, but adding in the abs ensures no errors are thrown
-      ! if negative numbers are passed through in redundant calculations
-      ! in the haloes
-      polynomial_tracer = 0.0_r_def
-      ls_polynomial_tracer = 1.0_r_def
-      do p = 1, vertical_order + 1
-        ik = p + upwind_offset*(global_order+1) + k*ndata + map_c(1) - 1
-        polynomial_tracer = polynomial_tracer &
-          + coeff(ik)*tracer(ij + stencil(p)) / &
-            sign(max(EPS,ls_tracer(ij + stencil(p))),ls_tracer(ij + stencil(p)))
-
-        ls_polynomial_tracer = ls_polynomial_tracer * &
-            max(EPS,abs(ls_tracer(ij + stencil(p))))**coeff(ik)
-      end do
-      polynomial_tracer = polynomial_tracer * ls_polynomial_tracer
-
-    else
-      polynomial_tracer = 0.0_r_def
-      do p = 1, vertical_order + 1
-        ik = p + upwind_offset*(global_order+1) + k*ndata + map_c(1) - 1
-        polynomial_tracer = polynomial_tracer + coeff(ik)*tracer(ij + stencil(p))
-      end do
-    end if
-
-    reconstruction(map_w2v(1)+k) = polynomial_tracer
-
   end do
 
-end subroutine tl_poly1d_vert_w3_reconstruction_code
+
+end subroutine tl_poly1d_vert_w3_reconstruction_init
+
+!> @brief Frees up the memory for the stencil array.
+subroutine tl_poly1d_vert_w3_reconstruction_final()
+
+  implicit none
+
+  if ( allocated(stencil) ) deallocate(stencil)
+
+end subroutine tl_poly1d_vert_w3_reconstruction_final
 
 end module tl_poly1d_vert_w3_reconstruction_kernel_mod

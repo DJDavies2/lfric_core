@@ -20,8 +20,9 @@ use argument_mod,      only : arg_type, func_type,         &
                               GH_FIELD, GH_SCALAR,         &
                               GH_REAL, GH_INTEGER,         &
                               GH_LOGICAL, GH_WRITE,        &
+                              ANY_DISCONTINUOUS_SPACE_1,   &
                               GH_READ, CELL_COLUMN
-use fs_continuity_mod, only : W2v, W3
+use fs_continuity_mod, only : W3
 use constants_mod,     only : r_def, i_def, l_def, tiny_eps, EPS
 use kernel_mod,        only : kernel_type
 
@@ -35,9 +36,8 @@ private
 !> The type declaration for the kernel. Contains the metadata needed by the PSy layer
 type, public, extends(kernel_type) :: polyv_w3_koren_kernel_type
   private
-  type(arg_type) :: meta_args(6) = (/                                        &
-       arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, W2v),                       &
-       arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2v),                       &
+  type(arg_type) :: meta_args(5) = (/                                        &
+       arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), &
        arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W3),                        &
        arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                             &
        arg_type(GH_SCALAR, GH_LOGICAL, GH_READ),                             &
@@ -58,29 +58,27 @@ contains
 !> @brief Computes the vertical reconstructions for a tracer.
 !> @param[in]     nlayers        Number of layers
 !> @param[in,out] reconstruction Mass reconstruction field to compute
-!> @param[in]     wind           Wind field
 !> @param[in]     tracer         Tracer field
 !> @param[in]     ndata          Number of data points per dof location
 !> @param[in]     reversible     Use the reversible scheme
 !> @param[in]     logspace       Perform interpolation in log space;
-!> @param[in]     ndf_w2v        Number of degrees of freedom per cell
-!> @param[in]     undf_w2v       Number of unique degrees of freedom for the
-!!                               reconstrution and wind fields
-!> @param[in]     map_w2v        Dofmap for the cell at the base of the column
+!> @param[in]     ndf_md         Number of degrees of freedom per cell
+!> @param[in]     undf_md        Number of unique degrees of freedom for the
+!!                               reconstrution
+!> @param[in]     map_md         Dofmap for the cell at the base of the column
 !> @param[in]     ndf_w3         Number of degrees of freedom per cell
 !> @param[in]     undf_w3        Number of unique degrees of freedom for the tracer field
 !> @param[in]     map_w3         Cell dofmaps for the tracer space
 
 subroutine polyv_w3_koren_code( nlayers,                           &
                                 reconstruction,                    &
-                                wind,                              &
                                 tracer,                            &
                                 ndata,                             &
                                 reversible,                        &
                                 logspace,                          &
-                                ndf_w2v,                            &
-                                undf_w2v,                           &
-                                map_w2v,                            &
+                                ndf_md,                            &
+                                undf_md,                           &
+                                map_md,                            &
                                 ndf_w3,                            &
                                 undf_w3,                           &
                                 map_w3                             )
@@ -92,13 +90,12 @@ subroutine polyv_w3_koren_code( nlayers,                           &
   integer(kind=i_def), intent(in)                     :: ndata
   integer(kind=i_def), intent(in)                     :: ndf_w3
   integer(kind=i_def), intent(in)                     :: undf_w3
-  integer(kind=i_def), intent(in)                     :: ndf_w2v
-  integer(kind=i_def), intent(in)                     :: undf_w2v
-  integer(kind=i_def), dimension(ndf_w2v), intent(in) :: map_w2v
+  integer(kind=i_def), intent(in)                     :: ndf_md
+  integer(kind=i_def), intent(in)                     :: undf_md
+  integer(kind=i_def), dimension(ndf_md),  intent(in) :: map_md
   integer(kind=i_def), dimension(ndf_w3),  intent(in) :: map_w3
 
-  real(kind=r_def), dimension(undf_w2v), intent(inout) :: reconstruction
-  real(kind=r_def), dimension(undf_w2v), intent(in)    :: wind
+  real(kind=r_def), dimension(undf_md),  intent(inout) :: reconstruction
   real(kind=r_def), dimension(undf_w3),  intent(in)    :: tracer
   logical(kind=l_def), intent(in)                      :: reversible
   logical(kind=l_def), intent(in)                      :: logspace
@@ -107,13 +104,10 @@ subroutine polyv_w3_koren_code( nlayers,                           &
   integer(kind=i_def)                             :: k, k1, k2, k3
   real(kind=r_def)                                :: x, y, r, r1, r2, phi
   integer(kind=i_def), parameter                  :: ext = 2
-  real(kind=r_def), dimension(nlayers+1)          :: wind_1d, tracer_edge
+  real(kind=r_def), dimension(2, nlayers)         :: tracer_edge
   real(kind=r_def), dimension(1-ext:nlayers+ext)  :: tracer_1d
 
   ! Extract the global data into 1d-array
-  do k = 0,nlayers
-    wind_1d(k+1) = wind(map_w2v(1)+k)
-  end do
   do k = 0,nlayers - 1
     tracer_1d(k+1) = tracer(map_w3(1)+k)
   end do
@@ -139,42 +133,50 @@ subroutine polyv_w3_koren_code( nlayers,                           &
   end if
 
   if (reversible) then !The reversible is the koren-scheme with phi=r
-    do k = 1, nlayers + 1
-      k3 = k
-      k2 = k3 - 1_i_def
-      x = tracer_1d(k2) + tracer_1d(k3)
-      tracer_edge(k) = 0.5_r_def*x
+    do k = 1, nlayers
+      ! Bottom edge of cell
+      tracer_edge(1,k) = 0.5_r_def*(tracer_1d(k-1) + tracer_1d(k))
+      ! Top edge of cell
+      tracer_edge(2,k) = 0.5_r_def*(tracer_1d(k) + tracer_1d(k+1))
     end do
   else
-    do k = 1, nlayers + 1
-      if ( wind_1d(k) > 0.0_r_def ) then
-        k3 = k
-        k2 = k3 - 1_i_def
-        k1 = k3 - 2_i_def
-      else
-        k3 = k  - 1_i_def
-        k2 = k3 + 1_i_def
-        k1 = k3 + 2_i_def
-      end if
+    do k = 1, nlayers
+      ! Bottom edge
+        k3 = k - 1
+        k2 = k
+        k1 = k + 1
+        x = tracer_1d(k2) - tracer_1d(k1)
+        y = tracer_1d(k3) - tracer_1d(k2)
+        r = (y + tiny_eps)/(x + tiny_eps)
+        r1 = 2.0_r_def*r
+        r2 = (1.0_r_def + r1)/3.0_r_def
+        phi = max(0.0_r_def, min(r1,r2,2.0_r_def))
+        tracer_edge(1,k) = tracer_1d(k2) + 0.5_r_def*phi*x
 
-      x = tracer_1d(k2) - tracer_1d(k1)
-      y = tracer_1d(k3) - tracer_1d(k2)
-      r = (y + tiny_eps)/(x + tiny_eps)
-      r1 = 2.0_r_def*r
-      r2 = (1.0_r_def + r1)/3.0_r_def
-      phi = max(0.0_r_def, min(r1,r2,2.0_r_def))
-      tracer_edge(k) = tracer_1d(k2) + 0.5_r_def*phi*x
+      ! Top edge
+        k3 = k + 1
+        k2 = k
+        k1 = k - 1
+        x = tracer_1d(k2) - tracer_1d(k1)
+        y = tracer_1d(k3) - tracer_1d(k2)
+        r = (y + tiny_eps)/(x + tiny_eps)
+        r1 = 2.0_r_def*r
+        r2 = (1.0_r_def + r1)/3.0_r_def
+        phi = max(0.0_r_def, min(r1,r2,2.0_r_def))
+        tracer_edge(2,k) = tracer_1d(k2) + 0.5_r_def*phi*x
     end do
   end if
 
   if (logspace) then
-      do k=1,nlayers+1
-         tracer_edge(k) = exp(tracer_edge(k))
+      do k=1,nlayers
+         tracer_edge(1,k) = exp(tracer_edge(1,k))
+         tracer_edge(2,k) = exp(tracer_edge(2,k))
       end do
   end if
 
-  do k = 0, nlayers
-     reconstruction(map_w2v(1) + k ) =  tracer_edge(k+1)
+  do k = 0, nlayers-1
+     reconstruction(map_md(1) + k )           =  tracer_edge(1,k+1)
+     reconstruction(map_md(1) + nlayers + k ) =  tracer_edge(2,k+1)
   end do
 
 end subroutine polyv_w3_koren_code

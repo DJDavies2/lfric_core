@@ -104,18 +104,14 @@ subroutine polyv_wtheta_koren_code( nlayers,              &
 
   !Internal variables
   real(kind=r_def), dimension(nlayers+1)   :: wind_1d, dtracerdz
-  real(kind=r_def), dimension(nlayers)     :: tracer_w3, wind_w3
   real(kind=r_def), dimension(0:nlayers+2) :: tracer_1d
-  integer(kind=i_def) :: k, k1, k2, k3
-  real(kind=r_def)    :: x, y, r, r1, r2, phi
+  integer(kind=i_def) :: k, k1, k2, k3, km, kp
+  real(kind=r_def)    :: x, y, r, r1, r2, phi, tracer_p, tracer_m
 
   !Extract vertical 1d-arrays from global data
   do k=0,nlayers
-        wind_1d(k+1) = wind(map_w2v(1)+k)
+      wind_1d(k+1) = wind(map_w2v(1)+k)
       tracer_1d(k+1) = tracer(map_wt(1)+k)
-  end do
-  do k = 1,nlayers
-     wind_w3(k) = 0.5_r_def *( wind_1d(k) + wind_1d(k+1))
   end do
 
   ! Add 2 extra points for tracer_1d array outside the boundaries
@@ -139,24 +135,23 @@ subroutine polyv_wtheta_koren_code( nlayers,              &
     end do
   end if
 
-  ! Compute tracers at w3-points (edges of cells centred around theta-points)
-  if (reversible) then !The reversible is the koren-scheme with phi=r
-    do k = 1, nlayers
-      k3 = k + 1_i_def
-      k2 = k3 - 1_i_def
-      x = tracer_1d(k2) + tracer_1d(k3)
-      tracer_w3(k) = 0.5_r_def*x
-    end do
-  else
-    do k = 1, nlayers
-      if ( wind_w3(k) > 0.0_r_def ) then
-        k3 = k + 1_i_def
-        k2 = k3 - 1_i_def
-        k1 = k3 - 2_i_def
+  do k = 2, nlayers
+    if ( reversible ) then
+      tracer_m = 0.5_r_def*(tracer_1d(k-1) + tracer_1d(k))
+      tracer_p = 0.5_r_def*(tracer_1d(k)   + tracer_1d(k+1))
+    else
+      ! Cell below
+      km = k - 1
+      if ( wind_1d(k) > 0.0_r_def ) then
+        ! (k, k-1, k-2)
+        k3 = km + 1_i_def
+        k2 = km
+        k1 = km - 1_i_def
       else
-        k3 = k
-        k2 = k3 + 1_i_def
-        k1 = k3 + 2_i_def
+        ! (k-1, k, k+1)
+        k3 = km
+        k2 = km + 1_i_def
+        k1 = km + 2_i_def
       end if
       x = tracer_1d(k2) - tracer_1d(k1)
       y = tracer_1d(k3) - tracer_1d(k2)
@@ -164,18 +159,35 @@ subroutine polyv_wtheta_koren_code( nlayers,              &
       r1 = 2.0_r_def*r
       r2 = (1.0_r_def + r1)/3.0_r_def
       phi = max(0.0_r_def, min(r1,r2,2.0_r_def))
-      tracer_w3(k) = tracer_1d(k2) + 0.5_r_def*phi*x
-    end do
-  end if
-  ! Revert from log of tracer_w3 if required
-  if (logspace) then
-    do k = 1, nlayers
-      tracer_w3(k) = exp(tracer_w3(k))
-    end do
-  end if
+      tracer_m = tracer_1d(k2) + 0.5_r_def*phi*x
 
-  do k = 2, nlayers
-    dtracerdz(k) = tracer_w3(k) - tracer_w3(k-1)
+      ! Cell above
+      kp = k
+      if ( wind_1d(k) > 0.0_r_def ) then
+        ! (k+1, k, k-1)
+        k3 = kp + 1_i_def
+        k2 = kp
+        k1 = kp - 1_i_def
+      else
+        ! (k, k+1, k+2)
+        k3 = kp
+        k2 = kp + 1_i_def
+        k1 = kp + 2_i_def
+      end if
+      x = tracer_1d(k2) - tracer_1d(k1)
+      y = tracer_1d(k3) - tracer_1d(k2)
+      r = (y + tiny_eps)/(x + tiny_eps)
+      r1 = 2.0_r_def*r
+      r2 = (1.0_r_def + r1)/3.0_r_def
+      phi = max(0.0_r_def, min(r1,r2,2.0_r_def))
+      tracer_p = tracer_1d(k2) + 0.5_r_def*phi*x
+
+    end if
+    if ( logspace ) then
+      tracer_m = exp(tracer_m)
+      tracer_p = exp(tracer_p)
+    end if
+    dtracerdz(k) = tracer_p - tracer_m
   end do
 
   do k = 1, nlayers - 1

@@ -254,7 +254,7 @@ module tl_test_semi_imp_alg_mod
     if ( moisture_formulation == moisture_formulation_dry ) then
       gamma_mr = 0.0_r_def
     else
-      gamma_mr = 1.e-1_r_def
+      gamma_mr = 1.e-2_r_def
     end if
 
     do n=1,2

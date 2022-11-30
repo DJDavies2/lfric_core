@@ -16,15 +16,14 @@
 module polyh_w3_koren_kernel_mod
 
 use argument_mod,      only : arg_type, func_type,         &
-                              reference_element_data_type, &
                               GH_FIELD, GH_SCALAR,         &
                               GH_REAL, GH_INTEGER,         &
-                              GH_INC, GH_READ,             &
+                              GH_READWRITE, GH_READ,       &
                               STENCIL, CROSS, GH_BASIS,    &
                               CELL_COLUMN, GH_EVALUATOR,   &
-                              outward_normals_to_horizontal_faces
+                              ANY_DISCONTINUOUS_SPACE_1
 use constants_mod,     only : r_def, i_def, l_def, tiny_eps
-use fs_continuity_mod, only : W2h, W3
+use fs_continuity_mod, only : W3
 use kernel_mod,        only : kernel_type
 
 implicit none
@@ -37,20 +36,12 @@ private
 !> The type declaration for the kernel. Contains the metadata needed by the PSy layer
 type, public, extends(kernel_type) :: polyh_w3_koren_kernel_type
   private
-  type(arg_type) :: meta_args(4) = (/                                        &
-       arg_type(GH_FIELD,  GH_REAL,    GH_INC,   W2h),                       & ! Flux
-       arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2h),                       & ! Wind
+  type(arg_type) :: meta_args(3) = (/                                        &
+       arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! Reconstruction
        arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W3, STENCIL(CROSS)),        & ! Density
        arg_type(GH_SCALAR, GH_INTEGER, GH_READ)                              & ! ndata
        /)
-  type(func_type) :: meta_funcs(1) = (/                                   &
-       func_type(W2h, GH_BASIS)                                           &
-       /)
-  type(reference_element_data_type) :: meta_reference_element(1) = (/     &
-       reference_element_data_type( outward_normals_to_horizontal_faces ) &
-       /)
   integer :: operates_on = CELL_COLUMN
-  integer :: gh_shape = GH_EVALUATOR
 contains
   procedure, nopass :: polyh_w3_koren_code
 end type
@@ -65,39 +56,29 @@ contains
 !> @brief Computes the horizontal reconstruction for a tracer field.
 !> @param[in]     nlayers        Number of layers
 !> @param[in,out] reconstruction Reconstructed W2h field to compute
-!> @param[in]     wind           Wind field
 !> @param[in]     tracer         Tracer field
 !> @param[in]     stencil_size   Size of the stencil (number of cells)
 !> @param[in]     stencil_map    Dofmaps for the stencil
 !> @param[in]     ndata          Number of data points per dof location
-!> @param[in]     ndf_w2h        Number of degrees of freedom per cell
-!> @param[in]     undf_w2h       Number of unique degrees of freedom for the
+!> @param[in]     ndf_md         Number of degrees of freedom per cell
+!> @param[in]     undf_md        Number of unique degrees of freedom for the
 !!                               reconstruction & wind fields
-!> @param[in]     map_w2h        Dofmap for the cell at the base of the column
-!> @param[in]     basis_w2h      Basis function array evaluated at w2h nodes
+!> @param[in]     map_md         Dofmap for the cell at the base of the column
 !> @param[in]     ndf_w3         Number of degrees of freedom per cell
 !> @param[in]     undf_w3        Number of unique degrees of freedom for the tracer field
 !> @param[in]     map_w3         Dofmap for the cell at the base of the column for the tracer field
-!> @param[in]     nfaces_re_h    Number of horizontal neighbours
-!> @param[in]     outward_normals_to_horizontal_faces Vector of normals to the
-!!                                                    reference element horizontal
-!!                                                    "outward faces"
 subroutine polyh_w3_koren_code( nlayers,              &
                                 reconstruction,       &
-                                wind,                 &
                                 tracer,               &
                                 stencil_size,         &
                                 stencil_map,          &
                                 ndata,                &
-                                ndf_w2h,              &
-                                undf_w2h,             &
-                                map_w2h,              &
-                                basis_w2h,            &
+                                ndf_md,               &
+                                undf_md,              &
+                                map_md,               &
                                 ndf_w3,               &
                                 undf_w3,              &
-                                map_w3,               &
-                                nfaces_re_h,          &
-                                outward_normals_to_horizontal_faces )
+                                map_w3 )
 
   implicit none
 
@@ -106,25 +87,20 @@ subroutine polyh_w3_koren_code( nlayers,              &
   integer(kind=i_def), intent(in)                     :: ndf_w3
   integer(kind=i_def), intent(in)                     :: undf_w3
   integer(kind=i_def), dimension(ndf_w3),  intent(in) :: map_w3
-  integer(kind=i_def), intent(in)                     :: ndf_w2h
-  integer(kind=i_def), intent(in)                     :: undf_w2h
-  integer(kind=i_def), dimension(ndf_w2h), intent(in) :: map_w2h
+  integer(kind=i_def), intent(in)                     :: ndf_md
+  integer(kind=i_def), intent(in)                     :: undf_md
+  integer(kind=i_def), dimension(ndf_md),  intent(in) :: map_md
   integer(kind=i_def), intent(in)                     :: ndata
   integer(kind=i_def), intent(in)                     :: stencil_size
-  integer(kind=i_def), intent(in)                     :: nfaces_re_h
 
-  real(kind=r_def), dimension(undf_w2h), intent(inout) :: reconstruction
-  real(kind=r_def), dimension(undf_w2h), intent(in)    :: wind
+  real(kind=r_def), dimension(undf_md),  intent(inout) :: reconstruction
   real(kind=r_def), dimension(undf_w3),  intent(in)    :: tracer
-  real(kind=r_def), dimension(3,ndf_w2h,ndf_w2h), intent(in) :: basis_w2h
   integer(kind=i_def), dimension(ndf_w3,stencil_size), intent(in) :: stencil_map
-  real(kind=r_def), intent(in) :: outward_normals_to_horizontal_faces(3,nfaces_re_h)
 
   ! Internal variables
-  integer(kind=i_def)                      :: k, df
-  real(kind=r_def)                         :: direction
-  real(kind=r_def), dimension(nfaces_re_h) :: v_dot_n
-  real(kind=r_def)                         :: edge_tracer
+  integer(kind=i_def), parameter      :: nfaces = 4
+  integer(kind=i_def)                 :: k, df
+  real(kind=r_def)                    :: edge_tracer
   integer(kind=i_def), dimension(3,4) :: point=reshape((/4,1,2,5,1,3,2,1,4,3,1,5/),shape(point))
   real(kind=r_def)                    :: x, y, r, phi, r1, r2
 
@@ -132,25 +108,16 @@ subroutine polyh_w3_koren_code( nlayers,              &
   !      | 5 |
   !  | 2 | 1 | 4 |
   !      | 3 |
-
-  do df = 1,nfaces_re_h
-    v_dot_n(df) =  dot_product(basis_w2h(:,df,df),outward_normals_to_horizontal_faces(:,df))
-  end do
-
-  do df = 1,nfaces_re_h
+  do df = 1,nfaces
     do k = 0, nlayers - 1
-      ! Check if this is the upwind cell
-      direction = wind(map_w2h(df) + k )*v_dot_n(df)
-      if ( direction > 0.0_r_def ) then
-          x = tracer(stencil_map(1,point(2,df))+k) - tracer(stencil_map(1,point(1,df))+k)
-          y = tracer(stencil_map(1,point(3,df))+k) - tracer(stencil_map(1,point(2,df))+k)
-          r = (y + tiny_eps)/(x + tiny_eps)
-          r1 = 2.0_r_def*r
-          r2 = ( 1.0_r_def + r1 )/ 3.0_r_def
-          phi = max (0.0_r_def, min(r1,r2,2.0_r_def))
-          edge_tracer = tracer(stencil_map(1,point(2,df))+k) + 0.5_r_def*phi*x
-          reconstruction(map_w2h(df) + k ) = edge_tracer
-      end if
+      x = tracer(stencil_map(1,point(2,df))+k) - tracer(stencil_map(1,point(1,df))+k)
+      y = tracer(stencil_map(1,point(3,df))+k) - tracer(stencil_map(1,point(2,df))+k)
+      r = (y + tiny_eps)/(x + tiny_eps)
+      r1 = 2.0_r_def*r
+      r2 = ( 1.0_r_def + r1 )/ 3.0_r_def
+      phi = max (0.0_r_def, min(r1,r2,2.0_r_def))
+      edge_tracer = tracer(stencil_map(1,point(2,df))+k) + 0.5_r_def*phi*x
+      reconstruction(map_md(1) + (df-1)*nlayers + k ) = edge_tracer
     end do
   end do
 
