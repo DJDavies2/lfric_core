@@ -70,7 +70,7 @@
 {%- set canned_configurations = ['lfric_atm'] %}
 
 {%- set groups = {
- 'rce': [
+  'rce': [
     'run_application("lfric_atm", "basic_rce", checkkgo=False,
                      resolutions=[("BiP64x64-100x100_MG",5.0)],
                      env={"crun":12, "nrun":720,
@@ -78,6 +78,14 @@
                                                    "threads":1,
                                                    "wallclock":"00:20:00"} } },
                      plotstr="plot_rce.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")'],
+  'cbl': [
+    'run_application("lfric_atm", "cbl", checkkgo=False,
+                     resolutions=[("BiP64x64-100x100_MG",5.0),("BiP64x64-250x250_MG",5.0),("BiP64x64-500x500_MG",5.0)],
+                     env={"crun":6, "nrun":720,
+                          "directives":{"default":{"mpi_parts":64,
+                                                   "threads":1,
+                                                   "wallclock":"00:20:00"}, } },)'],
+
   'developer': [
     'validate_rose_meta_graph("lfric_atm",appName="lfric_atm")',
     'check_style_graph()',

@@ -28,9 +28,11 @@ module jules_exp_kernel_mod
   use kernel_mod,             only : kernel_type
   use blayer_config_mod,      only : fixed_flux_e, fixed_flux_h
   use radiation_config_mod,   only : topography, topography_horizon
-  use surface_config_mod,     only : albedo_obs, sea_surf_alg, &
-                                     sea_surf_alg_fixed_roughness, &
-                                     buddy_sea, buddy_sea_on, &
+  use surface_config_mod,     only : albedo_obs, sea_surf_alg,           &
+                                     sea_surf_alg_specified_roughness,   &
+                                     z0m_specified_nml => z0m_specified, &
+                                     z0h_specified_nml => z0h_specified, &
+                                     buddy_sea, buddy_sea_on,            &
                                      emis_method_soil, emis_method_soil_fixed
   use water_constants_mod,     only: tfs
 
@@ -676,8 +678,8 @@ contains
     ! single level real fields
     real(r_um), dimension(seg_len,1) ::                                      &
          bulk_cloud_fraction, temperature, fqw, ftl, rhokh, ddmfx,           &
-         z0h_scm, z0m_scm, soil_clay, t1_sd, q1_sd, fb_surf, rib_gb,         &
-         vshr, ustargbm, photosynth_act_rad, tstar_land, dtstar_sea,         &
+         z0h_specified, z0m_specified, soil_clay, t1_sd, q1_sd, fb_surf,     &
+         rib_gb, vshr, ustargbm, photosynth_act_rad, tstar_land, dtstar_sea, &
          tstar_sice, alpha1_sea, ashtf_prime_sea, chr1p5m_sice, rhokh_sea,   &
          z0hssi, z0mssi, bt_blend, bq_blend, z1_uv_top, z1_tq_top, rhostar,  &
          recip_l_mo_sea
@@ -852,10 +854,10 @@ contains
     ! other logicals
     l_aero_classic=.false.
     ! surface forcing
-    if ( sea_surf_alg == sea_surf_alg_fixed_roughness ) then
+    if ( sea_surf_alg == sea_surf_alg_specified_roughness ) then
       l_spec_z0 = .true.
-      z0m_scm = 0.01_r_um
-      z0h_scm = 0.001_r_um
+      z0m_specified = z0m_specified_nml
+      z0h_specified = z0h_specified_nml
     else
       l_spec_z0 = .false.
     end if
@@ -1374,7 +1376,7 @@ contains
       !IN
       1, 1, z1_uv_top, z1_tq_top, ddmfx,                                       &
       !3 IN, 1 OUT requiring STASH flag
-      l_aero_classic, z0m_scm, z0h_scm,                                        &
+      l_aero_classic, z0m_specified, z0h_specified,                            &
       !OUT not requiring STASH flag
       recip_l_mo_sea, rib_gb,                                                  &
       !OUT 2 message passing, 1 soil moisture nudging, rest of BL
