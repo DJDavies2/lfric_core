@@ -464,7 +464,11 @@ contains
                      inc_X_plus_Y(self%rhs_p, rhs_p) )
       end if
       if ( eliminate_variables == eliminate_variables_none ) then
-        call invoke( matrix_vector_kernel_type(self%rhs_p, self%rhs_t, p3theta) )
+        ! Name argument required as otherwise PSyclone-generated name
+        ! breaches Intel internal symbol length limit
+        call invoke( name = "mv_rhs_p",                            &
+                     dg_inc_matrix_vector_kernel_type(             &
+                          self%rhs_p, self%rhs_t, p3theta) )
       end if
     end if
     if ( subroutine_timers ) call timer('mixed_schur rhs:helm_rx')
