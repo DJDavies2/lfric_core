@@ -62,7 +62,7 @@
                      plotstr="plot_swe.py ' + plotStemName + ' $NODAL_DATA_DIR P:32:1 geopot 50:200 $PLOT_DIR")',
     'run_application("shallow_water", "gaussian",
                      resolutions=[("BiP32x32-1x1",0.001)],
-                     env={"crun":1,"nrun":200,
+                     env={"crun":2,"nrun":100,
                           "directives":{"default":{"mpi_parts":1,"threads":1,
                                                    "wallclock":"00:40:00",
                                                    "use_xios":"False"} } },

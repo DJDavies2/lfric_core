@@ -30,7 +30,8 @@ module shallow_water_model_data_mod
                                                   write_state
   use mesh_mod,                             only: mesh_type
   use create_shallow_water_prognostics_mod, only: create_shallow_water_prognostics
-  use swe_init_fields_alg_mod,              only: swe_init_fields_alg
+  use swe_init_fields_alg_mod,              only: swe_init_fields_alg, &
+                                                  swe_init_surface_alg
   use linked_list_mod,                      only: linked_list_type
   use variable_fields_mod,                  only: init_variable_fields
 
@@ -104,15 +105,17 @@ contains
     type(mesh_type), pointer, intent(in) :: mesh
     class(clock_type),        intent(in) :: clock
 
+    ! Initialise the surface geopotential
+    call swe_init_surface_alg(model_data%s_geopot)
+
     ! Initialise prognostic fields
     if (checkpoint_read) then                 ! Recorded check point to start from
       call read_checkpoint(model_data%depository, &
                            clock%get_first_step() - 1, checkpoint_stem_name)
-
     else                                      ! No check point to start from
-      call swe_init_fields_alg(mesh,                         &
-                               model_data%prognostic_fields, &
-                               model_data%s_geopot)
+      call swe_init_fields_alg(mesh,                &
+                               model_data%s_geopot, &
+                               model_data%prognostic_fields)
     end if
 
   end subroutine initialise_model_data
