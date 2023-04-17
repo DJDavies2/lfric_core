@@ -315,7 +315,8 @@ subroutine radaer_code( nlayers,                                               &
                                                mode_acc_insol, mode_cor_insol, &
                                                cp_su,  cp_bc, cp_oc,           &
                                                cp_cl,  cp_du, cp_so,           &
-                                               cp_no3, cp_nn, cp_nh4
+                                               cp_no3, cp_nn, cp_nh4,          &
+                                               i_ukca_bc_tuned
 
   use ukca_radaer_band_average_mod,      only: ukca_radaer_band_average
 
@@ -500,8 +501,8 @@ subroutine radaer_code( nlayers,                                               &
   real(r_um),dimension( row_length*rows, nlayers, n_aer_mode, n_sw_band ) ::   &
                                                            aer_sw_asymmetry_um
 
-  integer, parameter :: i_ukca_tune_bc = 0
-  integer, parameter :: i_glomap_clim_tune_bc = 0
+  integer, parameter :: i_ukca_tune_bc = i_ukca_bc_tuned
+  integer, parameter :: i_glomap_clim_tune_bc = i_ukca_bc_tuned
   logical, parameter :: l_nitrate = .false. ! Make this a namelist option later
   logical, parameter :: l_sustrat = .true.  ! Make this a namelist option later
                                             ! l_sustrat=.true. for ga9

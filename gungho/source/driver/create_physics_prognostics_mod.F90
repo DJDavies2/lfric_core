@@ -1612,10 +1612,15 @@ contains
       'emiss_so2_nat', wtheta_space, checkpoint_flag=checkpoint_flag )
     end if
 
-    ! Nucleation mode is currently unused - the logic should be the same
-    ! as the fields below if it is ever used
-    checkpoint_flag = .false.
-    advection_flag = .false.
+    ! 3D fields, might need checkpointing and/or advecting
+    ! Nucleation mode is only used with UKCA
+    if ( aerosol == aerosol_um .and. glomap_mode == glomap_mode_ukca ) then
+      checkpoint_flag = .true.
+      advection_flag = .true.
+    else
+      checkpoint_flag = .false.
+      advection_flag = .false.
+    end if
     ! Nucleation soluble mode number mixing ratio
     call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
       adv_fields_last_outer, &

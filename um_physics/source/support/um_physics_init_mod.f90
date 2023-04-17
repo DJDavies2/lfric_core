@@ -297,13 +297,12 @@ contains
     use solinc_data, only: l_skyview
     use turb_diff_mod, only: l_subfilter_horiz, l_subfilter_vert,        &
          mix_factor, turb_startlev_vert, turb_endlev_vert, l_leonard_term
-    use ukca_mode_setup, only: ukca_mode_sussbcocdu_7mode
+    use ukca_mode_setup, only: ukca_mode_sussbcocdu_7mode, i_ukca_bc_tuned
     use glomap_clim_mode_setup_interface_mod, only:                            &
         glomap_clim_mode_setup_interface
     use ukca_config_specification_mod, only: i_sussbcocdu_7mode
     use ukca_option_mod, only: l_ukca, l_ukca_plume_scav, mode_aitsol_cvscav
     use ukca_scavenging_mod, only: ukca_mode_scavcoeff
-
 
     implicit none
 
@@ -340,8 +339,8 @@ contains
           ! Set up the correct mode and components for GLOMAP-mode:
           ! 5 mode with SU SS OM BC components
           i_glomap_clim_setup = i_sussbcocdu_7mode
-          l_fix_nacl_density = .false.
-          i_glomap_clim_tune_bc = 0
+          l_fix_nacl_density = .true.
+          i_glomap_clim_tune_bc = i_ukca_bc_tuned
           call glomap_clim_mode_setup_interface( i_glomap_clim_setup,          &
                                                  l_radaer,                     &
                                                  i_glomap_clim_tune_bc,        &
@@ -355,8 +354,8 @@ contains
           ! Set up the correct mode and components for RADAER:
           ! 7 mode with SU SS OM BC DU components
           i_glomap_clim_setup = i_sussbcocdu_7mode
-          l_fix_nacl_density = .false.
-          i_glomap_clim_tune_bc = 0
+          l_fix_nacl_density = .true.
+          i_glomap_clim_tune_bc = i_ukca_bc_tuned
           call glomap_clim_mode_setup_interface( i_glomap_clim_setup,          &
                                                  l_radaer,                     &
                                                  i_glomap_clim_tune_bc,        &

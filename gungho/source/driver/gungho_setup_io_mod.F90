@@ -282,7 +282,8 @@ module gungho_setup_io_mod
     end if
 
     if (glomap_mode == glomap_mode_climatology .and. &
-         ancil_option == ancil_option_fixed) then
+         (ancil_option == ancil_option_fixed .or. &
+          ancil_option == ancil_option_updating) ) then
       ! Set aerosol ancil filename from namelist
       write(ancil_fname,'(A)') trim(ancil_directory)//'/'// &
                                trim(aerosols_ancil_path)

@@ -430,7 +430,7 @@ contains
     use ukca_nmspec_mod, only: nm_spec_active, nmspec_len
     use ukca_option_mod, only: i_mode_nucscav, l_ukca_plume_scav
     use ukca_scavenging_mod, only: ukca_set_conv_indices, tracer_info
-
+    use ukca_mode_setup, only: i_ukca_bc_tuned
 
     implicit none
 
@@ -581,7 +581,7 @@ contains
            biom_aer_ems_scaling=2.0_r_um,                                      &
            ! GLOMAP feedback configuration options
            l_ukca_radaer=.true.,                                               &
-           i_ukca_tune_bc=0,                                                   &
+           i_ukca_tune_bc=i_ukca_bc_tuned,                                     &
            i_ukca_activation_scheme=ukca_activation_arg,                       &
            i_ukca_nwbins=20,                                                   &
            ! Callback procedures
