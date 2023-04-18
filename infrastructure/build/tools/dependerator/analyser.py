@@ -264,10 +264,10 @@ class FortranAnalyser(Analyser):
                     elif state == 'code':
                         ##############################################
                         if character == '"':  # String opened with double quote
-                            state == 'double'
+                            state = 'double'
                         elif character == "'":  # String opened with single
                             # quote
-                            state == 'single'
+                            state = 'single'
                         elif character == '&':  # Line continues on next line
                             code_end = index
                             continuing = True
@@ -281,10 +281,20 @@ class FortranAnalyser(Analyser):
                         ############################################
                         if character == '"':  # Quoted string has ended
                             state = 'code'
+                        elif character == '&':  # Line continues on next line
+                            code_end = index
+                            continuing = True
+                            continuation = True
+                            state = 'continue'
                     elif state == 'single':
                         ############################################
                         if character == "'":  # Quoted string has ended
                             state = 'code'
+                        elif character == '&':  # Line continues on next line
+                            code_end = index
+                            continuing = True
+                            continuation = True
+                            state = 'continue'
                     elif state == 'continue':
                         ##########################################
                         if character == '!':  # There is a comment after the
