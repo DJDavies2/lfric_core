@@ -138,10 +138,12 @@ contains
     class(gw_mixed_diag_preconditioner_type), intent(out) :: dest
 
     ! Deep copy of the contents of the pressure_operator_type
-    call source%mm_diagonal_p%copy_field(dest%mm_diagonal_p)
-    call source%mm_diagonal_u%copy_field(dest%mm_diagonal_u)
-    call source%mm_diagonal_b%copy_field(dest%mm_diagonal_b)
-
+    call source%mm_diagonal_p%copy_field_properties(dest%mm_diagonal_p)
+    call source%mm_diagonal_u%copy_field_properties(dest%mm_diagonal_u)
+    call source%mm_diagonal_b%copy_field_properties(dest%mm_diagonal_b)
+    call invoke( setval_X(dest%mm_diagonal_p, source%mm_diagonal_p), &
+                 setval_X(dest%mm_diagonal_u, source%mm_diagonal_u), &
+                 setval_X(dest%mm_diagonal_b, source%mm_diagonal_b) )
   end subroutine gw_mixed_diag_preconditioner_assign
 
   !> @brief Apply the preconditioner to calculate \f$y = P.x\f$ for the

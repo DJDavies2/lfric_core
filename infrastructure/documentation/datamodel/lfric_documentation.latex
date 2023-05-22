@@ -1760,7 +1760,8 @@ logical checks to check which particular configuration of the {\tt
 
 \begin{verbatim}
     if ( preconditioner == preconditioner_tridiagonal ) then
-       call tri_precon(1,level)%copy_field(Helm_diag(level))
+       call tri_precon(1,level)%copy_field_properties(Helm_diag(level))
+       call invoke( setval_X(Helm_diag(level), tri_precon(1,level)) )
        ...
     end if
  \end{verbatim}

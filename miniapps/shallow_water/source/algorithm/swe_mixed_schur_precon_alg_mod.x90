@@ -233,8 +233,8 @@ contains
                  X_divideby_Y( self%Mb_lumped_inv, ones, M_lumped ) )
 
     ! Set \f$ \tilde{H}_b^{-1}\f$
-    call Hb_lumped_inv%copy_field(self%Hb_lumped_inv)
-
+    call Hb_lumped_inv%copy_field_properties(self%Hb_lumped_inv)
+    call invoke( setval_X(self%Hb_lumped_inv, Hb_lumped_inv) )
     ! Set geopotential solver
     self%swe_geopot_solver => geopot_solver
 

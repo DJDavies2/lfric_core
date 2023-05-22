@@ -306,9 +306,9 @@ contains
       mesh_counter = 1
       do i = 2, SIZE(multires_coupling_mesh_ids)
         do j =1,3
-          call chi_mrc(j,i)%copy_field(chi_xios(mesh_counter,j))
+          call chi_mrc(j,i)%copy_field_serial(chi_xios(mesh_counter,j))
         end do
-        call panel_id_mrc(i)%copy_field(panel_id_xios(mesh_counter))
+        call panel_id_mrc(i)%copy_field_serial(panel_id_xios(mesh_counter))
         mesh_counter = mesh_counter + 1
       end do
       files_init_ptr => init_gungho_files

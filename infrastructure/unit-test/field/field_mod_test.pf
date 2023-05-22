@@ -173,7 +173,7 @@ contains
     @assertTrue( associated(this%mesh, mesh) )
 
     ! Copy field operator tests follow...
-    call f1%copy_field(f2)
+    call f1%copy_field_serial(f2)
     f2_p = f2%get_proxy()
 
     ! Check that contained vector_space pointers point to same address
@@ -218,7 +218,7 @@ contains
     @assertEqual ( 32, test_integer )
 
     ! Test copy_field with an optional name
-    call f1%copy_field(f2, name='f2')
+    call f1%copy_field_serial(f2, name='f2')
     name = f2%get_name()
     @assertEqual( 'f2', trim(name) )
 

@@ -322,7 +322,7 @@ contains
     else
       ! For planar geometries just re-use existing chi which are already (X,Y,Z)
       do i = 1,3
-        call chi(i)%copy_field(sample_chi(i))
+        call chi(i)%copy_field_serial(sample_chi(i))
       end do
       ! Tell downstream output processing that the mesh is planar
       call set_xios_geometry_planar()

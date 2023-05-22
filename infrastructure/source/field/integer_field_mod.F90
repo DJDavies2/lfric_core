@@ -69,7 +69,7 @@ module integer_field_mod
     procedure, public :: initialise => field_initialiser
 
     ! Routine to return a deep copy of a field including all its data
-    procedure, public :: copy_field
+    procedure, public :: copy_field_serial
 
     ! Routine to return a deep, but empty copy of a field
     procedure, public :: copy_field_properties
@@ -320,7 +320,7 @@ contains
   !>
   !> @param[out] dest   field object into which the copy will be made
   !> @param[in]  name   An optional argument that provides an identifying name
-  subroutine copy_field(self, dest, name)
+  subroutine copy_field_serial(self, dest, name)
     use log_mod,         only : log_event, &
                                 LOG_LEVEL_ERROR
 
@@ -330,7 +330,7 @@ contains
     character(*), optional, intent(in)             :: name
 
     if ( .not. allocated(self%data) ) then
-      call log_event( 'Error: copy_field: Copied field must have field data', &
+      call log_event( 'Error: copy_field_serial: Copied field must have field data', &
            LOG_LEVEL_ERROR )
     end if
 
@@ -343,7 +343,7 @@ contains
     dest%data(:) = self%data(:)
     call self%copy_field_parent(dest)
 
-  end subroutine copy_field
+  end subroutine copy_field_serial
 
   !> Create a new empty field that inherits the properties of the source field.
   !>
@@ -394,7 +394,7 @@ contains
 
     write(log_scratch_space,'(A,A)')&
               '"field2=field1" syntax no longer supported. '// &
-              'Use "call field1%copy_field(field2)". Field: ', &
+              'Use "setval_X(field2, field1)". Field: ', &
               source%get_name()
     call log_event(log_scratch_space,LOG_LEVEL_INFO )
     allocate(dest%data(1))   ! allocate the same memory twice, to force

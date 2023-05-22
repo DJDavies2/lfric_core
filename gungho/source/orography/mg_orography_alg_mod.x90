@@ -61,8 +61,8 @@ contains
     type(field_type), allocatable :: surface_altitude_mg(:)
 
     allocate(surface_altitude_mg(SIZE(multigrid_mesh_ids)))
-    call surface_altitude%copy_field(surface_altitude_mg(1))
-
+    call surface_altitude%copy_field_properties(surface_altitude_mg(1))
+    call invoke( setval_X(surface_altitude_mg(1), surface_altitude) )
 
     surface_order = surface_altitude%get_element_order()
 

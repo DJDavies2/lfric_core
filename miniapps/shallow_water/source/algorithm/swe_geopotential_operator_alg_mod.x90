@@ -144,7 +144,8 @@ contains
     implicit none
     class(swe_geopot_operator_type), intent(in) :: self
     type(field_type) :: Hb_lumped_inv
-    call self%Hb_lumped_inv%copy_field(Hb_lumped_inv)
+    call self%Hb_lumped_inv%copy_field_properties(Hb_lumped_inv)
+    call invoke( setval_X(Hb_lumped_inv, self%Hb_lumped_inv))
   end function get_Hb_lumped_inv
 
   !> @details Performs a deep copy between swe_operator_type pairs
@@ -160,9 +161,12 @@ contains
     class(swe_geopot_operator_type), intent(out) :: dest
 
     ! Deep copy of the contents of the swe_operator_type
-    call source%grad_p%copy_field(dest%grad_p)
-    call source%div_grad_p%copy_field(dest%div_grad_p)
-    call source%Hb_lumped_inv%copy_field(dest%Hb_lumped_inv)
+    call source%grad_p%copy_field_properties(dest%grad_p)
+    call source%div_grad_p%copy_field_properties(dest%div_grad_p)
+    call source%Hb_lumped_inv%copy_field_properties(dest%Hb_lumped_inv)
+    call invoke( setval_X(dest%grad_p, source%grad_p), &
+                 setval_X(dest%div_grad_p, source%div_grad_p), &
+                 setval_X(dest%Hb_lumped_inv, source%Hb_lumped_inv) )
   end subroutine swe_geopot_operator_assign
 
   !> @brief Apply Helmholtz operator to a geopotential field to obtain \f$y=Hx\f$.

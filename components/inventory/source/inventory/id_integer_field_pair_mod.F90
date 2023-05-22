@@ -48,7 +48,7 @@ contains
     integer(kind=i_def),           intent(in)    :: id
 
     call self%field_%initialise( vector_space=field%get_function_space() )
-    call field%copy_field(self%field_)
+    call field%copy_field_serial(self%field_)
     call self%set_id(id)
 
   end subroutine initialise

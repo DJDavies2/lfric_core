@@ -272,7 +272,8 @@ contains
     call invoke( compute_q_operator_type(self%Q, qr) )
 
     ! Set \f$ \tilde{H}_b^{-1}\f$
-    call hb_lumped_inv%copy_field(self%hb_lumped_inv)
+    call hb_lumped_inv%copy_field_properties(self%hb_lumped_inv)
+    call invoke( setval_X(self%hb_lumped_inv, hb_lumped_inv) )
 
     ! Set pressure solver
     self%gw_pressure_solver => pressure_solver
@@ -298,19 +299,30 @@ contains
     ! Deep copy of the contents of the pressure_operator_type
     dest%alpha = source%alpha
     dest%Q = source%Q
-    call source%p_inc%copy_field(dest%p_inc)
-    call source%b_inc%copy_field(dest%b_inc)
-    call source%u_inc%copy_field(dest%u_inc)
-    call source%rhs_p_tmp%copy_field(dest%rhs_p_tmp)
-    call source%rhs_u%copy_field(dest%rhs_u)
-    call source%rhs_p%copy_field(dest%rhs_p)
+    call source%p_inc%copy_field_properties(dest%p_inc)
+    call source%b_inc%copy_field_properties(dest%b_inc)
+    call source%u_inc%copy_field_properties(dest%u_inc)
+    call source%rhs_p_tmp%copy_field_properties(dest%rhs_p_tmp)
+    call source%rhs_u%copy_field_properties(dest%rhs_u)
+    call source%rhs_p%copy_field_properties(dest%rhs_p)
     dest%pressure_b = source%pressure_b
     dest%pressure_x = source%pressure_x
-    call source%hb_ru%copy_field(dest%hb_ru)
-    call source%mb_rb%copy_field(dest%mb_rb)
-    call source%Mb_lumped_inv%copy_field(dest%Mb_lumped_inv)
-    call source%Hb_lumped_inv%copy_field(dest%Hb_lumped_inv)
+    call source%hb_ru%copy_field_properties(dest%hb_ru)
+    call source%mb_rb%copy_field_properties(dest%mb_rb)
+    call source%Mb_lumped_inv%copy_field_properties(dest%Mb_lumped_inv)
+    call source%Hb_lumped_inv%copy_field_properties(dest%Hb_lumped_inv)
     dest%gw_pressure_solver => source%gw_pressure_solver
+
+    call invoke( setval_X(dest%p_inc, source%p_inc), &
+                 setval_X(dest%b_inc, source%b_inc), &
+                 setval_X(dest%u_inc, source%u_inc), &
+                 setval_X(dest%rhs_p_tmp, source%rhs_p_tmp), &
+                 setval_X(dest%rhs_u, source%rhs_u), &
+                 setval_X(dest%rhs_p, source%rhs_p), &
+                 setval_X(dest%hb_ru, source%hb_ru), &
+                 setval_X(dest%mb_rb, source%mb_rb), &
+                 setval_X(dest%Mb_lumped_inv, source%Mb_lumped_inv), &
+                 setval_X(dest%Hb_lumped_inv, source%Hb_lumped_inv) )
 
   end subroutine gw_mixed_schur_preconditioner_assign
 

@@ -71,7 +71,8 @@ contains
       call mass_matrix_solver_alg(advected_u, u)
     else
       ! Advect u
-      call u%copy_field(advected_u)
+      call u%copy_field_properties(advected_u)
+      call invoke( setval_X(advected_u, u) )
     end if
 
     if ( present(w1_flag) ) then

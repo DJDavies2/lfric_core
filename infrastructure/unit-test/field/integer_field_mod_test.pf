@@ -168,7 +168,7 @@ contains
     @assertTrue( associated(this%mesh, mesh_out) )
 
     ! Copy field operator tests follow...
-    call f1%copy_field(f2)
+    call f1%copy_field_serial(f2)
     f2_p = f2%get_proxy()
 
     ! Check that contained vector_space pointers point to same address

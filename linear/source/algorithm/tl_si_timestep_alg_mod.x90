@@ -221,10 +221,15 @@ contains
     ! Initialise internal state field objects
     !--------------------------------------------------------------------
 
-    call u%copy_field( state(igh_u) )
-    call theta%copy_field( state(igh_t) )
-    call rho%copy_field( state(igh_d) )
-    call exner%copy_field( state(igh_p) )
+    call u%copy_field_properties( state(igh_u) )
+    call theta%copy_field_properties( state(igh_t) )
+    call rho%copy_field_properties( state(igh_d) )
+    call exner%copy_field_properties( state(igh_p) )
+
+    call invoke( setval_X(state(igh_u), u), &
+                 setval_X(state(igh_t), theta), &
+                 setval_X(state(igh_d), rho), &
+                 setval_X(state(igh_p), exner) )
 
     call clone_bundle(state, state_n,          bundle_size)
     call clone_bundle(state, state_after_slow, bundle_size)

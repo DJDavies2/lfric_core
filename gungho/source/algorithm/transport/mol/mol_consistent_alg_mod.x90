@@ -136,8 +136,11 @@ module mol_consistent_alg_mod
     end do
 
     ! Set initial values of Wtheta mixing ratios
-    call mr_wt_in%copy_field(mr_wt_n)
-    call mr_wt_in%copy_field(mr_wt_np1)
+    call mr_wt_in%copy_field_properties(mr_wt_n)
+    call mr_wt_in%copy_field_properties(mr_wt_np1)
+
+    call invoke( setval_X(mr_wt_n, mr_wt_in),  &
+                 setval_X(mr_wt_np1, mr_wt_in) )
 
     ! Get transport runtime settings
     number_substeps = transport_runtime%get_number_substeps(prime_extrusion_mesh_id,direction,transport_metadata%get_splitting())
@@ -165,8 +168,9 @@ module mol_consistent_alg_mod
       end if
 
       ! Set initial value for mr used in flux calculation
-      call mr_wt_np1%copy_field(mr_wt_n)
-      call invoke( inc_X_plus_bY(mr_wt_for_flux, rk_weights(nstage, 1), mr_wt_n) )
+      call mr_wt_np1%copy_field_properties(mr_wt_n)
+      call invoke( setval_X(mr_wt_n, mr_wt_np1), &
+                   inc_X_plus_bY(mr_wt_for_flux, rk_weights(nstage, 1), mr_wt_n) )
 
       stage_loop: do stage = 1, nstage_this_substep
 

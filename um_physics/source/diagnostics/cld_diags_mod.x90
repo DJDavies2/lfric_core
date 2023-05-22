@@ -298,10 +298,11 @@ contains
 
       call derived_fields%get_field('w_in_wth', w_wind)
 
-      call theta%copy_field(theta_updated)
+      call theta%copy_field_properties(theta_updated)
       call theta%copy_field_properties(icing_condensate)
 
-      call invoke( inc_X_plus_Y( theta_updated, theta_inc ),                   &
+      call invoke( setval_X(theta_updated, theta),                             &
+                   inc_X_plus_Y( theta_updated, theta_inc ),                   &
                    ! Having found the current value of theta
                    X_plus_Y( icing_condensate, mr(imr_cl), mr(imr_ci) ) )
                    ! add the cloud liquid and ice water contents together.

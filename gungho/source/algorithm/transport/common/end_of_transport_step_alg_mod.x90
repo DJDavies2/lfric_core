@@ -189,7 +189,10 @@ contains
       ! ---------------------------------------------------------------------- !
 
       if ( enforce_min_value ) then
-        if (is_dry_field) call sum_flux%copy_field(dry_flux_before_adjustment)
+        if (is_dry_field) then
+          call sum_flux%copy_field_properties(dry_flux_before_adjustment)
+          call invoke( setval_X(dry_flux_before_adjustment, sum_flux) )
+        end if
 
         min_value = transport_metadata%get_min_value()
         acceptable_min = real(min_val_abs_tol, r_tran)

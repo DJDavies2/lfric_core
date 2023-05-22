@@ -246,9 +246,6 @@ contains
     class(reference_element_type), pointer :: reference_element =>null()
     type(mesh_type),               pointer :: mesh => null()
 
-    ! Temporary items
-    type( field_type )    :: diagnostic_field
-
     ! Temps for retrieving things from runtime_constants
     type(field_type),    pointer :: geopotential => null()
     type( field_type ),  pointer :: chi(:) => null()
@@ -461,14 +458,10 @@ contains
                           ls_moist_dyn(gas_law), chi,                &
                           panel_id, m3_inv, qr ) )
       ! Diagnostics
-      call inc(igh_t)%copy_field(diagnostic_field)
-      call diagnostic_field%log_minmax(LOG_LEVEL_TRACE, 'theta_inc')
-      call inc(igh_u)%copy_field(diagnostic_field)
-      call diagnostic_field%log_minmax(LOG_LEVEL_TRACE, 'u_inc')
-      call inc(igh_d)%copy_field(diagnostic_field)
-      call diagnostic_field%log_minmax(LOG_LEVEL_TRACE, 'rho_inc')
-      call inc(igh_p)%copy_field(diagnostic_field)
-      call diagnostic_field%log_minmax(LOG_LEVEL_TRACE, 'exner_inc')
+      call inc(igh_t)%log_minmax(LOG_LEVEL_TRACE, 'theta_inc')
+      call inc(igh_u)%log_minmax(LOG_LEVEL_TRACE, 'u_inc')
+      call inc(igh_d)%log_minmax(LOG_LEVEL_TRACE, 'rho_inc')
+      call inc(igh_p)%log_minmax(LOG_LEVEL_TRACE, 'exner_inc')
 
     end do
 

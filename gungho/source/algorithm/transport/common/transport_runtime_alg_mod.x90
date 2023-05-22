@@ -615,9 +615,13 @@ contains
     ! Copy across fields for prime extrusion mesh
     ! ------------------------------------------------------------------------ !
 
-    call rho_d_n%copy_field(self%rho_d_n(1,self%dry_step_ctr))
-    call rho_d_np1%copy_field(self%rho_d_np1(1,self%dry_step_ctr))
-    call dry_flux%copy_field(self%dry_flux(1,self%dry_step_ctr))
+    call rho_d_n%copy_field_properties(self%rho_d_n(1,self%dry_step_ctr))
+    call rho_d_np1%copy_field_properties(self%rho_d_np1(1,self%dry_step_ctr))
+    call dry_flux%copy_field_properties(self%dry_flux(1,self%dry_step_ctr))
+
+    call invoke( setval_X(self%rho_d_n(1,self%dry_step_ctr), rho_d_n), &
+                 setval_X(self%rho_d_np1(1,self%dry_step_ctr), rho_d_np1), &
+                 setval_X(self%dry_flux(1,self%dry_step_ctr), dry_flux) )
 
     ! ------------------------------------------------------------------------ !
     ! Shift variables if required
@@ -689,7 +693,8 @@ contains
     integer(kind=i_def) :: idx
 
     idx = self%idx_from_mesh_id(field_n%get_mesh_id())
-    call field_n%copy_field(self%field_n(idx))
+    call field_n%copy_field_properties(self%field_n(idx))
+    call invoke( setval_X(self%field_n(idx), field_n) )
 
   end subroutine set_field_n
 
@@ -706,7 +711,8 @@ contains
     integer(kind=i_def) :: idx
 
     idx = self%idx_from_mesh_id(flux%get_mesh_id())
-    call flux%copy_field(self%flux(idx,self%tracer_step_ctr))
+    call flux%copy_field_properties(self%flux(idx,self%tracer_step_ctr))
+    call invoke( setval_X(self%flux(idx,self%tracer_step_ctr), flux) )
 
   end subroutine set_flux
 

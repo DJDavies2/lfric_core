@@ -113,8 +113,9 @@ module mol_conservative_alg_mod
     call adv_inc%initialise(field%get_function_space())
     call sum_flux%initialise(advecting_wind%get_function_space())
 
-    call invoke( setval_c(sum_flux, 0.0_r_tran) )
-    call field%copy_field(field_np1)
+    call field%copy_field_properties(field_np1)
+    call invoke( setval_X(field_np1, field), &
+                 setval_c(sum_flux, 0.0_r_tran) )
 
     ! Get the div-term if required
     ! In this case we are solving: d(rho)/dt + div(div_factor*rho u) = 0
@@ -131,7 +132,8 @@ module mol_conservative_alg_mod
       final_substep = ( substep == number_substeps )
 
       ! Reset field_n ready for the this substep
-      call field_np1%copy_field(field_n)
+      call field_np1%copy_field_properties(field_n)
+      call invoke( setval_X(field_n, field_np1) )
 
       stage_loop: do stage = 1, nstage
 

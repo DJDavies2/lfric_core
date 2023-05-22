@@ -303,7 +303,8 @@ contains
     end if
     self%vector_set=.true.
 
-    call field%copy_field(self%vector(position))
+    call field%copy_field_properties(self%vector(position))
+    call invoke( setval_X(self%vector(position), field) )
   end subroutine import_field
 
   ! Copy a r_def field into the field vector
@@ -342,7 +343,8 @@ contains
        call log_event(log_scratch_space,LOG_LEVEL_ERROR)
     end if
 
-    call self%vector(position)%copy_field(field)
+    call self%vector(position)%copy_field_properties(field)
+    call invoke( setval_X(field, self%vector(position)) )
   end subroutine export_field
 
   ! Copy a field into the field vector
@@ -432,7 +434,8 @@ contains
        if (source%vector_set) then
           nfctr = size(self%vector)
           do pos = 1, nfctr
-             call source%vector(pos)%copy_field(self%vector(pos))
+             call source%vector(pos)%copy_field_properties(self%vector(pos))
+             call invoke( setval_X(self%vector(pos), source%vector(pos)) )
           end do
           self%vector_set=.true.
        end if

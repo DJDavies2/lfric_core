@@ -135,27 +135,27 @@ contains
     mesh_counter = 1_i_def
     label_list(mesh_counter)   = primary_mesh_label
     mesh_id_list(mesh_counter) = mesh%get_id()
-    call panel_id%copy_field(panel_id_list(mesh_counter))
+    call panel_id%copy_field_serial(panel_id_list(mesh_counter))
     do j = 1, 3
-      call chi(j)%copy_field(chi_list(j, mesh_counter))
+      call chi(j)%copy_field_serial(chi_list(j, mesh_counter))
     end do
 
     ! Primary 2D mesh
     mesh_counter = mesh_counter + 1_i_def
     label_list(mesh_counter) = twod_mesh_label
     mesh_id_list(mesh_counter) = twod_mesh%get_id()
-    call panel_id%copy_field(panel_id_list(mesh_counter))
+    call panel_id%copy_field_serial(panel_id_list(mesh_counter))
     do j = 1, 3
-      call chi(j)%copy_field(chi_list(j, mesh_counter))
+      call chi(j)%copy_field_serial(chi_list(j, mesh_counter))
     end do
 
     if ( present(shifted_mesh) .and. present(shifted_chi) ) then
       mesh_counter = mesh_counter + 1_i_def
       label_list(mesh_counter) = shifted_mesh_label
       mesh_id_list(mesh_counter) = shifted_mesh%get_id()
-      call panel_id%copy_field(panel_id_list(mesh_counter)) ! Same as for primary mesh
+      call panel_id%copy_field_serial(panel_id_list(mesh_counter)) ! Same as for primary mesh
       do j = 1, 3
-        call shifted_chi(j)%copy_field(chi_list(j, mesh_counter))
+        call shifted_chi(j)%copy_field_serial(chi_list(j, mesh_counter))
       end do
     end if
 
@@ -163,9 +163,9 @@ contains
       mesh_counter = mesh_counter + 1_i_def
       label_list(mesh_counter) = double_level_mesh_label
       mesh_id_list(mesh_counter) = double_level_mesh%get_id()
-      call panel_id%copy_field(panel_id_list(mesh_counter)) ! Same as for primary mesh
+      call panel_id%copy_field_serial(panel_id_list(mesh_counter)) ! Same as for primary mesh
       do j = 1, 3
-        call double_level_chi(j)%copy_field(chi_list(j, mesh_counter))
+        call double_level_chi(j)%copy_field_serial(chi_list(j, mesh_counter))
       end do
     end if
 
@@ -174,9 +174,9 @@ contains
         mesh_counter = mesh_counter + 1_i_def
         label_list(mesh_counter) = multigrid_mesh_label
         mesh_id_list(mesh_counter) = mg_mesh_ids(i)
-        call panel_id_mg(i)%copy_field(panel_id_list(mesh_counter))
+        call panel_id_mg(i)%copy_field_serial(panel_id_list(mesh_counter))
         do j = 1, 3
-          call chi_mg(j,i)%copy_field(chi_list(j, mesh_counter))
+          call chi_mg(j,i)%copy_field_serial(chi_list(j, mesh_counter))
         end do
       end do
     end if
@@ -186,9 +186,9 @@ contains
         mesh_counter = mesh_counter + 1_i_def
         label_list(mesh_counter) = twod_mesh_label
         mesh_id_list(mesh_counter) = mg_2D_mesh_ids(i)
-        call panel_id_mg(i)%copy_field(panel_id_list(mesh_counter))
+        call panel_id_mg(i)%copy_field_serial(panel_id_list(mesh_counter))
         do j = 1, 3
-          call chi_mg(j,i)%copy_field(chi_list(j, mesh_counter))
+          call chi_mg(j,i)%copy_field_serial(chi_list(j, mesh_counter))
         end do
       end do
     end if
@@ -198,9 +198,9 @@ contains
         mesh_counter = mesh_counter + 1_i_def
         label_list(mesh_counter) = extra_mesh_label
         mesh_id_list(mesh_counter) = extra_mesh_ids(i)
-        call panel_id_extra(i)%copy_field(panel_id_list(mesh_counter))
+        call panel_id_extra(i)%copy_field_serial(panel_id_list(mesh_counter))
         do j = 1, 3
-          call chi_extra(j,i)%copy_field(chi_list(j, mesh_counter))
+          call chi_extra(j,i)%copy_field_serial(chi_list(j, mesh_counter))
         end do
       end do
     end if
@@ -210,9 +210,9 @@ contains
         mesh_counter = mesh_counter + 1_i_def
         label_list(mesh_counter) = twod_mesh_label
         mesh_id_list(mesh_counter) = extra_2D_mesh_ids(i)
-        call panel_id_extra(i)%copy_field(panel_id_list(mesh_counter))
+        call panel_id_extra(i)%copy_field_serial(panel_id_list(mesh_counter))
         do j = 1, 3
-          call chi_extra(j,i)%copy_field(chi_list(j, mesh_counter))
+          call chi_extra(j,i)%copy_field_serial(chi_list(j, mesh_counter))
         end do
       end do
     end if

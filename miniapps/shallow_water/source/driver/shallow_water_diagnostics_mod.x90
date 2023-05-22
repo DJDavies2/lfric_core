@@ -80,8 +80,9 @@ contains
 
     ! Calculation and output of diagnostics
     call total_geopot%initialise( vector_space=geopot%get_function_space() )
-    call model_data%s_geopot%copy_field(s_geopot)
-    call invoke( X_plus_Y(total_geopot, geopot, s_geopot) )
+    call model_data%s_geopot%copy_field_properties(s_geopot)
+    call invoke( setval_X(s_geopot,model_data%s_geopot), &
+                 X_plus_Y(total_geopot, geopot, s_geopot) )
 
     if (initial_flag == 1) then
 

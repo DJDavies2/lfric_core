@@ -96,7 +96,8 @@ contains
     ! ------------------------------------------------------------------------ !
 
     do imr = nummr_to_transport + 1, nummr
-      call mr_in(imr)%copy_field(mr_out(imr))
+      call mr_in(imr)%copy_field_properties(mr_out(imr))
+      call invoke( setval_X(mr_out(imr), mr_in(imr)) )
     end do
 
     if ( subroutine_timers ) call timer('tl moist mixing ratio transport')

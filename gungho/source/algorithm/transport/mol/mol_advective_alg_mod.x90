@@ -82,7 +82,8 @@ contains
     call rhs%initialise(field%get_function_space())
     call field_n%initialise(field%get_function_space())
 
-    call field%copy_field(field_np1)
+    call field%copy_field_properties(field_np1)
+    call invoke( setval_X(field_np1, field) )
 
     call get_rk_transport_weights(nstage, rk_weights, runge_kutta_method)
     allocate( rk_field(nstage) )
@@ -96,7 +97,8 @@ contains
     substep_loop: do substeps = 1, number_substeps
 
       ! Reset field_n ready for the this substep
-      call field_np1%copy_field(field_n)
+      call field_np1%copy_field_properties(field_n)
+      call invoke( setval_X(field_n, field_np1) )
 
       stage_loop: do stage = 1, nstage
 

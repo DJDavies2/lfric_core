@@ -280,9 +280,9 @@ contains
       allocate(panel_id_mg(size(multigrid_mesh_ids)))
 
       do i = 1, 3
-         call chi(i)%copy_field(chi_mg(i,1))
+         call chi(i)%copy_field_serial(chi_mg(i,1))
       end do
-      call panel_id%copy_field(panel_id_mg(1))
+      call panel_id%copy_field_serial(panel_id_mg(1))
 
       write(log_scratch_space,'(A,I1,A)')                      &
           'Initialising MultiGrid ', size(multigrid_mesh_ids), &

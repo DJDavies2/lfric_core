@@ -197,12 +197,19 @@ contains
     mesh_index = find_mesh_index(primary_mesh%get_id())
 
     ! Store initial values for computing errors
-    call rho%copy_field(rho0(mesh_index))
-    call theta%copy_field(theta0(mesh_index))
-    call tracer_con%copy_field(tracer_con0(mesh_index))
-    call tracer_adv%copy_field(tracer_adv0(mesh_index))
-    call constant%copy_field(constant0(mesh_index))
-    call mr(1)%copy_field(mr0(1,mesh_index))
+    call rho%copy_field_properties(rho0(mesh_index))
+    call theta%copy_field_properties(theta0(mesh_index))
+    call tracer_con%copy_field_properties(tracer_con0(mesh_index))
+    call tracer_adv%copy_field_properties(tracer_adv0(mesh_index))
+    call constant%copy_field_properties(constant0(mesh_index))
+    call mr(1)%copy_field_properties(mr0(1,mesh_index))
+
+    call invoke( setval_X(rho0(mesh_index), rho), &
+                 setval_X(theta0(mesh_index), theta), &
+                 setval_X(tracer_con0(mesh_index), tracer_con), &
+                 setval_X(tracer_adv0(mesh_index), tracer_adv), &
+                 setval_X(constant0(mesh_index), constant), &
+                 setval_X(mr0(1,mesh_index), mr(1)) )
 
     ! Initialise any necessary transport fields or coefficients
     call reconstruct_w3_field_alg_init(primary_mesh)
@@ -293,33 +300,38 @@ contains
     ! Transport dry density
     call log_event( "Transporting density...", LOG_LEVEL_INFO)
     transport_metadata => transport_metadata_collection%get_transport_metadata('rho')
-    call rho%copy_field(rho_n)
+    call rho%copy_field_properties(rho_n)
+    call invoke( setval_X(rho_n, rho) )
     call transport_field( rho, rho_n, cast_dt, transport_metadata )
 
     ! Transport potential temperature
     call log_event( "Transporting potential temperature...", LOG_LEVEL_INFO)
     transport_metadata => transport_metadata_collection%get_transport_metadata('theta')
-    call theta%copy_field(theta_n)
+    call theta%copy_field_properties(theta_n)
+    call invoke( setval_X(theta_n, theta) )
     call transport_field( theta, theta_n, cast_dt, transport_metadata )
 
     ! Transport conservative W3 tracer
     call log_event( "Transporting conservative tracer...", LOG_LEVEL_INFO)
     transport_metadata => transport_metadata_collection%get_transport_metadata('tracer_con')
-    call tracer_con%copy_field(tracer_con_n)
+    call tracer_con%copy_field_properties(tracer_con_n)
+    call invoke( setval_X(tracer_con_n, tracer_con) )
     call transport_field( tracer_con, tracer_con_n, &
                           cast_dt, transport_metadata )
 
     ! Transport advective W3 tracer
     call log_event( "Transporting advective tracer...", LOG_LEVEL_INFO)
     transport_metadata => transport_metadata_collection%get_transport_metadata('tracer_adv')
-    call tracer_adv%copy_field(tracer_adv_n)
+    call tracer_adv%copy_field_properties(tracer_adv_n)
+    call invoke( setval_X(tracer_adv_n, tracer_adv) )
     call transport_field( tracer_adv, tracer_adv_n, &
                           cast_dt, transport_metadata )
 
     ! Transport constant W3 tracer
     call log_event( "Transporting constant tracer...", LOG_LEVEL_INFO)
     transport_metadata => transport_metadata_collection%get_transport_metadata('constant')
-    call constant%copy_field(constant_n)
+    call constant%copy_field_properties(constant_n)
+    call invoke( setval_X(constant_n, constant) )
     call transport_field( constant, constant_n, &
                           cast_dt, transport_metadata )
 

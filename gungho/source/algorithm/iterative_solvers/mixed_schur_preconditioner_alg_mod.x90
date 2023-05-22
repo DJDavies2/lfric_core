@@ -306,7 +306,8 @@ contains
 
          ! Copy out solution to r_solver field
          call exner_inc%initialise( vector_space = y%vector(isol_p)%get_function_space() )
-         call self%pressure_x%vector(1)%copy_field(exner_inc)
+         call self%pressure_x%vector(1)%copy_field_properties(exner_inc)
+         call invoke( setval_X(exner_inc, self%pressure_x%vector(1)) )
          if ( subroutine_timers ) call timer('mixed_schur solve')
 
           ! STEP 3: Back substitute to obtain other fields

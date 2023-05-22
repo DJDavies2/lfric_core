@@ -531,7 +531,8 @@ contains
 
       if (microphysics_casim) then
         call cloud_fields%get_field('liquid_fraction', cfl)
-        call cfl%copy_field( cfl_after_adv )
+        call cfl%copy_field_properties( cfl_after_adv )
+        call invoke( setval_X(cfl_after_adv, cfl) )
       end if
 
       if (use_physics) then
@@ -878,7 +879,8 @@ contains
         if ( l_copy ) then
 
           ! We copy the field we want to save into a new field
-          call single_generic_field%copy_field(copied_generic_field)
+          call single_generic_field%copy_field_properties(copied_generic_field)
+          call invoke( setval_X(copied_generic_field, single_generic_field) )
 
           ! We add it to the field collection passed in
           call generic_fields_copied%add_field(copied_generic_field)

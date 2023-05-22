@@ -183,7 +183,8 @@ contains
       ncells = mesh%get_last_edge_cell()
       call um_sizes_init(ncells)
 
-      call mr(imr_ci)%copy_field(mr_ice)
+      call mr(imr_ci)%copy_field_properties(mr_ice)
+      call invoke( setval_X(mr_ice, mr(imr_ci)) )
       if (microphysics_casim) then
         ! Temporary value of ice to be updated with to
         ! be total ice including any snow.
@@ -220,7 +221,8 @@ contains
       ncells = mesh%get_last_edge_cell()
       call um_sizes_init(ncells)
 
-     call mr(imr_ci)%copy_field(mr_ice)
+     call mr(imr_ci)%copy_field_properties(mr_ice)
+     call invoke( setval_X(mr_ice, mr(imr_ci)) )
       if (microphysics_casim) then
         ! Temporary value of ice to be updated with to
         ! be total ice including any snow.
@@ -248,9 +250,10 @@ contains
 
       ! Temporary value of theta to be updated with increment from
       ! pressure forcing for use as input for initiation.
-      call theta%copy_field(theta_updated)
+      call theta%copy_field_properties(theta_updated)
 
-      call invoke( inc_X_plus_Y(theta_updated, dtheta_pc2_inc_pres) )
+      call invoke( setval_X(theta_updated, theta),                             &
+                   inc_X_plus_Y(theta_updated, dtheta_pc2_inc_pres) )
 
       ! Now do PC2 initiation (and checks)
       call pc2_initiation_alg( mr,                  & ! INOUT Current

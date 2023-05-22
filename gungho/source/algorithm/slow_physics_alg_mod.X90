@@ -803,8 +803,9 @@ contains
 
         ! Construct the latest estimate of theta and call PC2 checks with
         ! this and the latest cloud and mr fields
-        call theta%copy_field(theta_updated)
+        call theta%copy_field_properties(theta_updated)
         call invoke(name="estimate_theta_at_end_of_slow_before_check", &
+                    setval_X(theta_updated, theta),                    &
                     inc_X_plus_Y(theta_updated,dtheta) )
         call pc2_checks_alg( mr,                & ! Current state IN
                              theta_updated,     & ! Current state IN

@@ -56,18 +56,18 @@ SUBROUTINE lfricinp_create_runtime_constants(mesh, twod_mesh, &
     mesh_counter = 1_i_def
     label_list(mesh_counter) = primary_mesh_label
     mesh_id_list(mesh_counter) = mesh%get_id()
-    call panel_id%copy_field(panel_id_list(mesh_counter))
+    call panel_id%copy_field_serial(panel_id_list(mesh_counter))
     do j = 1, 3
-      call chi(j)%copy_field(chi_list(j, mesh_counter))
+      call chi(j)%copy_field_serial(chi_list(j, mesh_counter))
     end do
 
     ! Primary 2D mesh
     mesh_counter = mesh_counter + 1_i_def
     label_list(mesh_counter) = twod_mesh_label
     mesh_id_list(mesh_counter) = twod_mesh%get_id()
-    call panel_id%copy_field(panel_id_list(mesh_counter))
+    call panel_id%copy_field_serial(panel_id_list(mesh_counter))
     do j = 1, 3
-      call chi(j)%copy_field(chi_list(j, mesh_counter))
+      call chi(j)%copy_field_serial(chi_list(j, mesh_counter))
     end do
 
 

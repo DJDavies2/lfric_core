@@ -100,8 +100,10 @@ contains
     end do
     call rhs_field%initialise( field%get_function_space() )
 
-    call field%copy_field(field_np1)
-    call ls_field%copy_field(ls_field_np1)
+    call field%copy_field_properties(field_np1)
+    call ls_field%copy_field_properties(ls_field_np1)
+    call invoke( setval_X(field_np1, field), &
+                 setval_X(ls_field_np1, ls_field) )
 
     !--------------------------------------------------------------------------!
     !                    Linearisation state
@@ -114,7 +116,8 @@ contains
     do substep = 1, number_substeps
 
       ! Reset field_n ready for the this substep
-      call ls_field_np1%copy_field(ls_field_n)
+      call ls_field_np1%copy_field_properties(ls_field_n)
+      call invoke( setval_X(ls_field_n, ls_field_np1) )
 
       do stage = 1, nstage
         ! Store values for use in the perturbation code. This is done before
@@ -158,7 +161,8 @@ contains
     do substep = 1, number_substeps
 
       ! Reset field_n ready for the this substep
-      call field_np1%copy_field(field_n)
+      call field_np1%copy_field_properties(field_n)
+      call invoke( setval_X(field_n, field_np1) )
 
       do stage = 1, nstage
 

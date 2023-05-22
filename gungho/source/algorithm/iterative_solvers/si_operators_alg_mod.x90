@@ -719,8 +719,9 @@ contains
        end if
        if ( normalise .and. &
             preconditioner == preconditioner_tridiagonal ) then
-          call Helmholtz_operator(helmholtz_k,level)%copy_field(Helm_diag(level))
-          call invoke( inc_X_powint_n(Helm_diag(level), imone) )
+          call Helmholtz_operator(helmholtz_k,level)%copy_field_properties(Helm_diag(level))
+          call invoke( setval_X( Helm_diag(level), Helmholtz_operator(helmholtz_k,level)), &
+                       inc_X_powint_n(Helm_diag(level), imone) )
           do i = 1,helmholtz_stencil_size
             call invoke(inc_X_times_Y(Helmholtz_operator(i,level), Helm_diag(level)) )
           end do
@@ -742,7 +743,8 @@ contains
              call log_event(log_scratch_space,LOG_LEVEL_INFO)
 
              ! copy current field to coarse field
-             call theta%copy_field(coarse_field)
+             call theta%copy_field_properties(coarse_field)
+             call invoke( setval_X(coarse_field, theta) )
              ! set the fs to the next (fine)
              wt_fs=>wtheta_multigrid_function_space_chain%get_next()
              call theta%initialise(vector_space = wt_fs)
@@ -750,7 +752,8 @@ contains
              call invoke( restrict_scalar_unweighted_kernel_type(theta, coarse_field) )
 
              ! copy current field to coarse field
-             call rho%copy_field(coarse_field)
+             call rho%copy_field_properties(coarse_field)
+             call invoke( setval_X(coarse_field, rho) )
              ! set the fs to the next (fine)
              w3_fs=>multigrid_function_space_chain%get_next()
              call rho%initialise(vector_space = w3_fs )
@@ -758,7 +761,8 @@ contains
              call invoke( restrict_scalar_unweighted_kernel_type(rho, coarse_field) )
 
              ! copy current field to coarse field
-             call exner%copy_field(coarse_field)
+             call exner%copy_field_properties(coarse_field)
+             call invoke( setval_X(coarse_field, exner) )
              ! fs already set fine
              call exner%initialise(vector_space = w3_fs )
              ! call restrict

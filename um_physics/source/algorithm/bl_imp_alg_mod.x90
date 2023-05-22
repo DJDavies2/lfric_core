@@ -479,9 +479,13 @@ contains
     call zh%copy_field_properties(ct_ctq1)
     call heat_flux_bl%copy_field_properties(ftl_star)
     call moist_flux_bl%copy_field_properties(fqw_star)
-    call heat_flux_bl%copy_field(ftl)
-    call moist_flux_bl%copy_field(fqw)
-    call rhokh_bl%copy_field(rhokh)
+    call heat_flux_bl%copy_field_properties(ftl)
+    call moist_flux_bl%copy_field_properties(fqw)
+    call rhokh_bl%copy_field_properties(rhokh)
+
+    call invoke( setval_X(ftl, heat_flux_bl), &
+                 setval_X(fqw, moist_flux_bl), &
+                 setval_X(rhokh, rhokh_bl) )
 
     ncells = mesh%get_last_edge_cell()
     call um_sizes_init(ncells)
@@ -571,18 +575,22 @@ contains
         call zh%copy_field_properties(w10m)
         call map_physics_winds(u10m, v10m, w10m, wind10m_w2)
         ! Calculate the 10m windspeed
-        call u10m%copy_field(u10m2)
-        call v10m%copy_field(v10m2)
-        call invoke(inc_X_powint_n(u10m2, 2_i_def),                            &
+        call u10m%copy_field_properties(u10m2)
+        call v10m%copy_field_properties(v10m2)
+        call invoke(setval_X(u10m2, u10m),                                     &
+                    setval_X(v10m2, v10m),                                     &
+                    inc_X_powint_n(u10m2, 2_i_def),                            &
                     inc_X_powint_n(v10m2, 2_i_def),                            &
                     X_plus_Y(wspd10m,u10m2,v10m2),                             &
                     inc_X_powreal_a(wspd10m, 0.5_r_def) )
         call zh%copy_field_properties(w10m_neut)
         call map_physics_winds(u10m_neut, v10m_neut, w10m_neut, wind10m_neut_w2)
       ! Calculate the neutral 10m windspeed
-        call u10m_neut%copy_field(u10m2)
-        call v10m_neut%copy_field(v10m2)
-        call invoke(inc_X_powint_n(u10m2, 2_i_def),                            &
+        call u10m_neut%copy_field_properties(u10m2)
+        call v10m_neut%copy_field_properties(v10m2)
+        call invoke(setval_X(u10m2, u10m_neut),                                &
+                    setval_X(v10m2, v10m_neut),                                &
+                    inc_X_powint_n(u10m2, 2_i_def),                            &
                     inc_X_powint_n(v10m2, 2_i_def),                            &
                     X_plus_Y(wspd10m_neut,u10m2,v10m2),                        &
                     inc_X_powreal_a(wspd10m_neut, 0.5_r_def) )

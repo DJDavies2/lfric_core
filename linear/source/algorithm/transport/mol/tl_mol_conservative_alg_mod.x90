@@ -125,12 +125,15 @@ module tl_mol_conservative_alg_mod
     call sum_flux%initialise(advecting_wind%get_function_space())
     call ls_sum_flux%initialise(advecting_wind%get_function_space())
 
-    call field%copy_field(field_np1)
-    call field%copy_field(field_n)
-    call ls_field%copy_field(ls_field_np1)
+    call field%copy_field_properties(field_np1)
+    call field%copy_field_properties(field_n)
+    call ls_field%copy_field_properties(ls_field_np1)
 
-    call invoke( setval_c(sum_flux, 0.0_r_def) )
-    call invoke( setval_c(ls_sum_flux, 0.0_r_def) )
+    call invoke( setval_X(field_np1, field), &
+                 setval_X(field_n, field), &
+                 setval_X(ls_field_np1, ls_field), &
+                 setval_c(sum_flux, 0.0_r_def), &
+                 setval_c(ls_sum_flux, 0.0_r_def) )
 
     ! Can use either transport_runtime or tl_transport_runtime to determine this
     ! as both should give the same value
@@ -152,7 +155,8 @@ module tl_mol_conservative_alg_mod
       final_substep = ( substep == number_substeps )
 
       ! Reset field_n ready for the this substep
-      call ls_field_np1%copy_field(ls_field_n)
+      call ls_field_np1%copy_field_properties(ls_field_n)
+      call invoke( setval_X(ls_field_n, ls_field_np1) )
 
       ls_stage_loop: do stage = 1, nstage
 
@@ -256,7 +260,8 @@ module tl_mol_conservative_alg_mod
       final_substep = ( substep == number_substeps )
 
       ! Reset field_n ready for the this substep
-      call field_np1%copy_field(field_n)
+      call field_np1%copy_field_properties(field_n)
+      call invoke( setval_X(field_n, field_np1) )
 
       stage_loop: do stage = 1, nstage
 

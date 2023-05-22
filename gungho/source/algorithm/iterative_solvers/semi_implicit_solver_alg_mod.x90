@@ -595,7 +595,8 @@ contains
       call inc_uv_rsol%log_minmax(LOG_LEVEL_INFO, 'uv_inc')
       call inc_w_rsol%log_minmax(LOG_LEVEL_INFO, 'w_inc')
     else
-      call vector_inc%vector(isol_u)%copy_field(inc_uvw_rsol)
+      call vector_inc%vector(isol_u)%copy_field_properties(inc_uvw_rsol)
+      call invoke( setval_X(inc_uvw_rsol, vector_inc%vector(isol_u)) )
       call inc_uvw_rsol%log_minmax(LOG_LEVEL_INFO, 'uvw_inc')
     end if
 
@@ -604,8 +605,10 @@ contains
     call inc_rho_rsol%initialise( vector_space = rhs_rsol(igh_d)%get_function_space() )
     if ( eliminate_variables == eliminate_variables_none ) then
       ! Copy them from the solver vector increment
-      call vector_inc%vector(isol_d)%copy_field(inc_rho_rsol)
-      call vector_inc%vector(isol_t)%copy_field(inc_theta_rsol)
+      call vector_inc%vector(isol_d)%copy_field_properties(inc_rho_rsol)
+      call vector_inc%vector(isol_t)%copy_field_properties(inc_theta_rsol)
+      call invoke( setval_X(inc_rho_rsol, vector_inc%vector(isol_d)),   &
+                   setval_X(inc_theta_rsol, vector_inc%vector(isol_t)) )
     else
       ! Compute rho increment since solver does not provide one
       div       => get_div_r_solver(mesh_id)

@@ -200,7 +200,8 @@ contains
     ! ------------------------------------------------------------------------ !
 
     do imr = nummr_to_transport + 1, nummr
-      call mr_in_rdef(imr)%copy_field(mr_out_rdef(imr))
+      call mr_in_rdef(imr)%copy_field_properties(mr_out_rdef(imr))
+      call invoke( setval_X(mr_out_rdef(imr), mr_in_rdef(imr)) )
     end do
 
     if ( subroutine_timers ) call timer('moist mixing ratio transport')

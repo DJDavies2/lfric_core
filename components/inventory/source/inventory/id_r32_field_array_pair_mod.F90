@@ -53,7 +53,7 @@ contains
 
     do i = 1, size(field_array)
       call self%field_array_(i)%initialise( vector_space=field_array(i)%get_function_space() )
-      call field_array(i)%copy_field(self%field_array_(i))
+      call field_array(i)%copy_field_serial(self%field_array_(i))
     end do
 
     call self%set_id(id)

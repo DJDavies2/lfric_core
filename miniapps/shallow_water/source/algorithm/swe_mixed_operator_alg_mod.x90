@@ -134,8 +134,10 @@ contains
     class(swe_mixed_operator_type), intent(out) :: dest
 
     ! Deep copy of the contents of the swe_operator_type
-    call source%lhs_u%copy_field(dest%lhs_u)
-    call source%lhs_g%copy_field(dest%lhs_g)
+    call source%lhs_u%copy_field_properties(dest%lhs_u)
+    call source%lhs_g%copy_field_properties(dest%lhs_g)
+    call invoke( setval_X(dest%lhs_u, source%lhs_u), &
+                 setval_X(dest%lhs_g, source%lhs_g) )
 
   end subroutine swe_mixed_operator_assign
 
