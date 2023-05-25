@@ -210,7 +210,7 @@
                      plotstr="plot_zonal.py $NODAL_DATA_DIR/lfric_averages.nc $PLOT_DIR earth-like uniform 32 33",
                      publish=True )',
     'run_application("gungho_model", "tidally-locked-earth",
-                     resolutions=[("C24_MG",3600.0)],
+                     resolutions=[("C24_MG",3600.0), ("C24s_rot_MG",3600.0)],
                      env={"crun":2, "nrun": {"default":240,},
                           "directives":{"default":{"mpi_parts":6, "threads":1, "wallclock":"00:10:00"} } },
                      plotstr="plot_zonal.py $NODAL_DATA_DIR/lfric_averages.nc $PLOT_DIR earth-like uniform 32 33",

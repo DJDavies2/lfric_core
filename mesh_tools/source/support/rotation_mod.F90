@@ -187,7 +187,7 @@ module rotation_mod
     real(kind=r_def) :: get_target_null_island(2)
 
     ! Set the target pole
-    if (north_pole(2) > 0.0_r_def ) then
+    if (north_pole(2) >= 0.0_r_def) then
       ! null island will be offset by 180 degrees longitude
       null_island(1) = north_pole(1) - 180.0_r_def
       null_island(2) = 90.0_r_def - north_pole(2)
