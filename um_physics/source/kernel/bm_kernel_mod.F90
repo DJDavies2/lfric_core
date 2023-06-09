@@ -43,7 +43,7 @@ module bm_kernel_mod
          arg_type(GH_FIELD, GH_INTEGER, GH_READ,   ANY_DISCONTINUOUS_SPACE_9), & ! bl_type_ind
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA), & ! m_v
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA), & ! m_cl
-         arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA), & ! m_ci
+         arg_type(GH_FIELD, GH_REAL, GH_READ,      WTHETA), & ! m_ci
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA), & ! cf_area
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA), & ! cf_ice
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA), & ! cf_liq
@@ -85,7 +85,7 @@ contains
   !> @param[in]     bl_type_ind   Diagnosed BL types
   !> @param[in,out] m_v           Vapour mixing ratio in wth
   !> @param[in,out] m_cl          Cloud liquid mixing ratio in wth
-  !> @param[in,out] m_ci          Ice liquid mixing ratio in wth
+  !> @param[in]     m_ci          Ice liquid mixing ratio in wth
   !> @param[in,out] cf_area       Area cloud fraction
   !> @param[in,out] cf_ice        Ice cloud fraction
   !> @param[in,out] cf_liq        Liquid cloud fraction
@@ -183,7 +183,7 @@ contains
     real(kind=r_def),    intent(in),    dimension(undf_wth) :: height_wth
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_v
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_cl
-    real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_ci
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: m_ci
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_area
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_ice
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_liq

@@ -407,7 +407,7 @@
  		                             "threads":1,
                                              "xios_nodes":9,
                                              "mpi_parts_xios":162,
- 		                             "wallclock":"00:30:00"} } },
+ 		                             "wallclock":"00:35:00"} } },
 		     plotstr="plot_map.py -ral $NODAL_DATA_DIR/lfric_ral_diagnostics.nc  $PLOT_DIR")',
    'run_application("lfric_atm", "clim_gal9_mg", checkkgo=False,
                      resolutions=[("C48_MG",  1800.)],

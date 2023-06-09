@@ -30,7 +30,7 @@ private
 
 type, public, extends(kernel_type) :: casim_kernel_type
   private
-  type(arg_type) :: meta_args(33) = (/                                      &
+  type(arg_type) :: meta_args(32) = (/                                      &
        arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA),                       & ! mv_wth
        arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA),                       & ! ml_wth
        arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA),                       & ! mi_wth
@@ -51,17 +51,16 @@ type, public, extends(kernel_type) :: casim_kernel_type
        arg_type(GH_FIELD, GH_REAL, GH_READ,  W3),                           & ! dry_rho_in_w3
        arg_type(GH_FIELD, GH_REAL, GH_READ,  W3),                           & ! height_w3
        arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA),                       & ! height_wth
-       arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                   & ! dmv_wth
-       arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                   & ! dml_wth
-       arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                   & ! dmi_wth
+       arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! dmv_wth
+       arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! dml_wth
+       arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! dmi_wth
        arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! dmr_wth
        arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! dmg_wth
        arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! dms_wth
        arg_type(GH_FIELD, GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1),    & ! ls_rain_2d
        arg_type(GH_FIELD, GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1),    & ! ls_snow_2d
-       arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                   & ! theta_inc
-       arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                   & ! dcfl_wth
-       arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                   & ! dcff_wth
+       arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! theta_inc
+       arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! cloud_drop_no_conc
        arg_type(GH_FIELD, GH_REAL, GH_WRITE, WTHETA),                       & ! refl_tot
        arg_type(GH_FIELD, GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1)     & ! refl_1km
        /)
@@ -112,8 +111,7 @@ contains
 !> @param[in,out] ls_rain_2d          Large scale rain from twod_fields
 !> @param[in,out] ls_snow_2d          Large scale snow from twod_fields
 !> @param[in,out] theta_inc           Increment to theta
-!> @param[in,out] dcfl_wth            Increment to liquid cloud fraction
-!> @param[in,out] dcff_wth            Increment to ice cloud fraction
+!> @param[in,out] cloud_drop_no_conc  In-cloud drop number for radiation
 !> @param[in,out] refl_tot            Total radar reflectivity for diagnostic
 !!                                     on all levels (dBZ)
 !> @param[in,out] refl_1km            Radar reflectivity (dBZ) at 1km above the
@@ -152,7 +150,7 @@ subroutine casim_code( nlayers,                     &
                        dmr_wth,  dmg_wth,  dms_wth, &
                        ls_rain_2d, ls_snow_2d,      &
                        theta_inc,                   &
-                       dcfl_wth, dcff_wth,          &
+                       cloud_drop_no_conc,          &
                        refl_tot, refl_1km,          &
                        ndf_wth, undf_wth, map_wth,  &
                        ndf_w3,  undf_w3,  map_w3,   &
@@ -164,7 +162,6 @@ subroutine casim_code( nlayers,                     &
     ! UM modules
     !---------------------------------------
 
-    use nlsizes_namelist_mod,       only: row_length, rows, model_levels
     use timestep_mod,               only: timestep
 
     use atm_fields_bounds_mod,      only: pdims
@@ -177,7 +174,8 @@ subroutine casim_code( nlayers,                     &
     use generic_diagnostic_variables, only: allocate_diagnostic_space,         &
                                         deallocate_diagnostic_space,           &
                                         casdiags
-    use mphys_air_density_mod, ONLY: mphys_air_density
+    use number_droplet_mod, only: min_cdnc_sea_ice
+    use mphys_air_density_mod, only: mphys_air_density
     use mphys_radar_mod,       only: ref_lim
     use variable_precision,    only: wp
 
@@ -218,8 +216,7 @@ subroutine casim_code( nlayers,                     &
     real(kind=r_def), intent(inout), dimension(undf_2d)  :: ls_rain_2d
     real(kind=r_def), intent(inout), dimension(undf_2d)  :: ls_snow_2d
     real(kind=r_def), intent(inout), dimension(undf_wth) :: theta_inc
-    real(kind=r_def), intent(inout), dimension(undf_wth) :: dcfl_wth
-    real(kind=r_def), intent(inout), dimension(undf_wth) :: dcff_wth
+    real(kind=r_def), intent(inout), dimension(undf_wth) :: cloud_drop_no_conc
 
     real(kind=r_def), pointer, intent(inout) :: refl_tot(:)
     real(kind=r_def), pointer, intent(inout) :: refl_1km(:)
@@ -229,7 +226,7 @@ subroutine casim_code( nlayers,                     &
     integer(kind=i_def), intent(in), dimension(ndf_2d)  :: map_2d
 
     ! Local variables for the kernel
-    real(wp), dimension(model_levels,row_length,rows) ::                       &
+    real(wp), dimension(nlayers,1,1) ::                                        &
          qv_casim, qc_casim, qr_casim, nc_casim, nr_casim,                     &
          m3r_casim, qi_casim, qs_casim, qg_casim, ni_casim,                    &
          ns_casim, ng_casim, m3s_casim, m3g_casim,                             &
@@ -262,75 +259,46 @@ subroutine casim_code( nlayers,                     &
 
 
     ! Local variables for the kernel
-
-    real(r_um), dimension(row_length,rows,model_levels) ::                     &
-         q_work, qcl_work, qcf_work, deltaz,                                   &
-         rhodz_dry, rhodz_moist, rho_r2, dry_rho, r_rho_levels
-    real(r_um), dimension(row_length,rows,0:model_levels) :: r_theta_levels
-
-    real(r_um), dimension(:,:,:), allocatable :: qrain_work, qcf2_work,        &
-                                                 qgraup_work
-
     real(r_um), parameter :: alt_1km = 1000.0 ! metres
-
-    integer(i_um) :: i,j,k
-
     logical :: l_refl_tot, l_refl_1km
+
+    real(r_um), dimension(1,1,nlayers) ::                     &
+         q_work, qcl_work, qcf_work, qrain_work, qcf2_work, qgraup_work,       &
+         deltaz, rhodz_dry, rhodz_moist, rho_r2, dry_rho, r_rho_levels
+    real(r_um), dimension(1,1,0:nlayers) :: r_theta_levels
+
+    integer(i_um) :: k
+
+    ! Set CDNC for radiation here as we need the start of timestep value
+    do k = 0, nlayers
+      if (cfl_wth(map_wth(1) + k) > 0.001_r_def) then
+        cloud_drop_no_conc(map_wth(1) + k) = max(nl_mphys(map_wth(1) + k) / &
+                                                 cfl_wth(map_wth(1) + k), &
+                                                 min_cdnc_sea_ice)
+      else
+        cloud_drop_no_conc(map_wth(1) + k) = min_cdnc_sea_ice
+      end if
+    end do
 
     !-----------------------------------------------------------------------
     ! Initialisation of non-prognostic variables and arrays
     !-----------------------------------------------------------------------
-
-    ! These must be set as below to match the declarations above
-
-    deltaz(:,:,:)           = 0.0_r_um
-    rhodz_dry(:,:,:)        = 0.0_r_um
-    rhodz_moist(:,:,:)      = 0.0_r_um
-    do k = 1, model_levels
-      do j = 1, rows
-        do i = 1, row_length
-          ! height of levels from centre of planet
-          r_rho_levels(i,j,k)   = height_w3(map_w3(1) + k-1) + planet_radius
-          r_theta_levels(i,j,k) = height_wth(map_wth(1) + k) + planet_radius
-
-          rho_r2(i,j,k)  = wetrho_in_w3(map_w3(1) + k-1) *                     &
-                            ( r_rho_levels(i,j,k)**2 )
-          dry_rho(i,j,k) = dry_rho_in_w3(map_w3(1) + k-1)
-          ! Compulsory moist prognostics
-          q_work(i,j,k)    = mv_wth(map_wth(1) + k) + dmv_wth(map_wth(1) + k)
-          qcl_work(i,j,k)  = ml_wth(map_wth(1) + k) + dml_wth(map_wth(1) + k)
-          qcf_work(i,j,k)  = ms_wth(map_wth(1) + k) + dms_wth(map_wth(1) + k)
-        end do ! i
-      end do   ! j
-    end do     ! k
     r_theta_levels(1,1,0) = height_wth(map_wth(1))+planet_radius
-    ! Perform allocation of the qcf2 variable as it is required in the CASIM
-    ! microphysics
-    allocate (qcf2_work(row_length, rows, model_levels))
-    do k = 1, model_levels
-      do j = 1, rows
-        do i = 1, row_length
-          qcf2_work(i,j,k) = mi_wth(map_wth(1) + k) + dmi_wth(map_wth(1) + k)
-        end do ! i
-      end do   ! j
-    end do     ! k
+    do k = 1, nlayers
+      ! height of levels from centre of planet
+      r_rho_levels(1,1,k)   = height_w3(map_w3(1) + k-1) + planet_radius
+      r_theta_levels(1,1,k) = height_wth(map_wth(1) + k) + planet_radius
 
-    allocate (qrain_work (row_length, rows, model_levels))
-    do k = 1, model_levels
-      do j = 1, rows
-        do i = 1, row_length
-          qrain_work(i,j,k) = mr_wth(map_wth(1) + k)
-        end do ! i
-      end do   ! j
-    end do     ! k
-
-    allocate (qgraup_work (row_length, rows, model_levels))
-    do k = 1, model_levels
-      do j = 1, rows
-        do i = 1, row_length
-          qgraup_work(i,j,k) = mg_wth(map_wth(1) + k)
-        end do ! i
-      end do   ! j
+      rho_r2(1,1,k)  = wetrho_in_w3(map_w3(1) + k-1) *                     &
+                            ( r_rho_levels(1,1,k)**2 )
+      dry_rho(1,1,k) = dry_rho_in_w3(map_w3(1) + k-1)
+      ! Compulsory moist prognostics
+      q_work(1,1,k)    = mv_wth(map_wth(1) + k)
+      qcl_work(1,1,k)  = ml_wth(map_wth(1) + k)
+      qcf_work(1,1,k)  = ms_wth(map_wth(1) + k)
+      qcf2_work(1,1,k) = mi_wth(map_wth(1) + k)
+      qrain_work(1,1,k) = mr_wth(map_wth(1) + k)
+      qgraup_work(1,1,k) = mg_wth(map_wth(1) + k)
     end do     ! k
 
     ! calculate air density rhodz
@@ -340,107 +308,96 @@ subroutine casim_code( nlayers,                     &
                         qrain_work, qgraup_work,                               &
                         rhodz_dry, rhodz_moist, deltaz )
 
-    do k = 1, model_levels
-      do j = 1, rows
-        do i = 1, row_length
-          qv_casim(k,i,j) = mv_wth(map_wth(1) + k) + dmv_wth(map_wth(1) + k)
-          qc_casim(k,i,j) = ml_wth(map_wth(1) + k) + dml_wth(map_wth(1) + k)
-          qr_casim(k,i,j) = mr_wth(map_wth(1) + k)
-          nc_casim(k,i,j) = nl_mphys(map_wth(1) + k)
-          nr_casim(k,i,j) = nr_mphys(map_wth(1) + k)
-          m3r_casim(k,i,j) = 0.0_wp
-          qi_casim(k,i,j) = mi_wth(map_wth(1) + k) + dmi_wth(map_wth(1) + k)
-          qs_casim(k,i,j) = ms_wth(map_wth(1) + k) + dms_wth(map_wth(1) + k)
-          qg_casim(k,i,j) = mg_wth(map_wth(1) + k)
-          ni_casim(k,i,j) = ni_mphys(map_wth(1) + k)
-          ns_casim(k,i,j) = ns_mphys(map_wth(1) + k)
-          ng_casim(k,i,j) = ng_mphys(map_wth(1) + k)
-          m3s_casim(k,i,j) = 0.0_wp
-          m3g_casim(k,i,j) = 0.0_wp
-          th_casim(k,i,j) = theta_in_wth(map_wth(1) + k)
-          aitken_sol_mass(k,i,j) = 0.0_wp
-          aitken_sol_number(k,i,j) = 0.0_wp
-          accum_sol_mass(k,i,j) =  0.0_wp
-          accum_sol_number(k,i,j) = 0.0_wp
-          coarse_sol_mass(k,i,j) = 0.0_wp
-          coarse_sol_number(k,i,j) =  0.0_wp
-          act_sol_liq_casim(k,i,j) = 0.0_wp
-          act_sol_rain_casim(k,i,j) = 0.0_wp
-          coarse_dust_mass(k,i,j) =  0.0_wp
-          coarse_dust_number(k,i,j) = 0.0_wp
-          act_insol_ice_casim(k,i,j) = 0.0_wp
-          act_sol_ice_casim(k,i,j) = 0.0_wp
-          act_insol_liq_casim(k,i,j) = 0.0_wp
-          accum_dust_mass(k,i,j) =  0.0_wp
-          accum_dust_number(k,i,j) =  0.0_wp
-          act_sol_number_casim(k,i,j) =   0.0_wp
-          act_insol_number_casim(k,i,j) = 0.0_wp
-          aitken_sol_bk(k,i,j) = 0.0_wp
-          accum_sol_bk(k,i,j) =   0.0_wp
-          coarse_sol_bk(k,i,j) = 0.0_wp
-          pii_casim(k,i,j) = exner_in_wth(map_wth(1) + k)
-          p_casim(k,i,j) = p_zero*(exner_in_wth(map_wth(1) + k))               &
+    do k = 1, nlayers
+      qv_casim(k,1,1) = mv_wth(map_wth(1) + k)
+      qc_casim(k,1,1) = ml_wth(map_wth(1) + k)
+      qr_casim(k,1,1) = mr_wth(map_wth(1) + k)
+      nc_casim(k,1,1) = nl_mphys(map_wth(1) + k)
+      nr_casim(k,1,1) = nr_mphys(map_wth(1) + k)
+      m3r_casim(k,1,1) = 0.0_wp
+      qi_casim(k,1,1) = mi_wth(map_wth(1) + k)
+      qs_casim(k,1,1) = ms_wth(map_wth(1) + k)
+      qg_casim(k,1,1) = mg_wth(map_wth(1) + k)
+      ni_casim(k,1,1) = ni_mphys(map_wth(1) + k)
+      ns_casim(k,1,1) = ns_mphys(map_wth(1) + k)
+      ng_casim(k,1,1) = ng_mphys(map_wth(1) + k)
+      m3s_casim(k,1,1) = 0.0_wp
+      m3g_casim(k,1,1) = 0.0_wp
+      th_casim(k,1,1) = theta_in_wth(map_wth(1) + k)
+      aitken_sol_mass(k,1,1) = 0.0_wp
+      aitken_sol_number(k,1,1) = 0.0_wp
+      accum_sol_mass(k,1,1) =  0.0_wp
+      accum_sol_number(k,1,1) = 0.0_wp
+      coarse_sol_mass(k,1,1) = 0.0_wp
+      coarse_sol_number(k,1,1) =  0.0_wp
+      act_sol_liq_casim(k,1,1) = 0.0_wp
+      act_sol_rain_casim(k,1,1) = 0.0_wp
+      coarse_dust_mass(k,1,1) =  0.0_wp
+      coarse_dust_number(k,1,1) = 0.0_wp
+      act_insol_ice_casim(k,1,1) = 0.0_wp
+      act_sol_ice_casim(k,1,1) = 0.0_wp
+      act_insol_liq_casim(k,1,1) = 0.0_wp
+      accum_dust_mass(k,1,1) =  0.0_wp
+      accum_dust_number(k,1,1) =  0.0_wp
+      act_sol_number_casim(k,1,1) =   0.0_wp
+      act_insol_number_casim(k,1,1) = 0.0_wp
+      aitken_sol_bk(k,1,1) = 0.0_wp
+      accum_sol_bk(k,1,1) =   0.0_wp
+      coarse_sol_bk(k,1,1) = 0.0_wp
+      pii_casim(k,1,1) = exner_in_wth(map_wth(1) + k)
+      p_casim(k,1,1) = p_zero*(exner_in_wth(map_wth(1) + k))               &
                                           **(1.0_wp/kappa)
-          dz_casim(k,i,j)  = deltaz(i,j,k)
-          rho_casim(k,i,j) = rhodz_dry(i,j,k) / dz_casim(k,i,j)
-          w_casim(k,i,j) = w_phys(map_wth(1) + k)
-          tke_casim(k,i,j) = 0.1_wp
-          height_rho(k,i,j) = 0.0_wp
-          height(k,i,j) =  0.0_wp
-          cfliq_casim(k,i,j) = cfl_wth(map_wth(1) + k)                         &
-                                 + dcfl_wth( map_wth(1) + k)
-          cfsnow_casim(k,i,j) = cff_wth(map_wth(1) + k)                        &
-                                 + dcff_wth( map_wth(1) + k)
-          cfice_casim(k,i,j) = cfsnow_casim(k,i,j)
-          dqv_casim(k,i,j) = dmv_wth(map_wth(1) + k)
-          dqc_casim(k,i,j) = dml_wth(map_wth(1) + k)
-          dqr_casim(k,i,j) = 0.0_wp
-          dnc_casim(k,i,j)  = 0.0_wp
-          dnr_casim(k,i,j)  = 0.0_wp
-          dm3r_casim(k,i,j) = 0.0_wp
-          dqi_casim(k,i,j) = dmi_wth(map_wth(1) + k)
-          dqs_casim(k,i,j) = dms_wth(map_wth(1) + k)
-          dqg_casim(k,i,j)  = 0.0_wp
-          dni_casim(k,i,j) = 0.0_wp
-          dns_casim(k,i,j)  = 0.0_wp
-          dng_casim(k,i,j)  = 0.0_wp
-          dm3s_casim(k,i,j) = 0.0_wp
-          dm3g_casim(k,i,j) = 0.0_wp
-          dth_casim(k,i,j) = theta_inc(map_wth(1) + k)
+      dz_casim(k,1,1)  = deltaz(1,1,k)
+      rho_casim(k,1,1) = rhodz_dry(1,1,k) / dz_casim(k,1,1)
+      w_casim(k,1,1) = w_phys(map_wth(1) + k)
+      tke_casim(k,1,1) = 0.1_wp
+      height_rho(k,1,1) = 0.0_wp
+      height(k,1,1) =  0.0_wp
+      cfliq_casim(k,1,1) = cfl_wth(map_wth(1) + k)
+      cfsnow_casim(k,1,1) = cff_wth(map_wth(1) + k)
+      cfice_casim(k,1,1) = cfsnow_casim(k,1,1)
 
-          daitken_sol_mass(k,i,j) = 0.0_wp
-          daitken_sol_number(k,i,j) = 0.0_wp
-          daccum_sol_mass(k,i,j) = 0.0_wp
-          daccum_sol_number(k,i,j) = 0.0_wp
-          dcoarse_sol_mass(k,i,j) = 0.0_wp
-          dcoarse_sol_number(k,i,j) = 0.0_wp
-          dact_sol_liq_casim(k,i,j) = 0.0_wp
-          dact_sol_rain_casim(k,i,j) = 0.0_wp
-          dcoarse_dust_mass(k,i,j) = 0.0_wp
-          dcoarse_dust_number(k,i,j) = 0.0_wp
-          dact_insol_ice_casim(k,i,j) = 0.0_wp
-          dact_sol_ice_casim(k,i,j) = 0.0_wp
-          dact_insol_liq_casim(k,i,j) = 0.0_wp
-          daccum_dust_mass(k,i,j) = 0.0_wp
-          daccum_dust_number(k,i,j) = 0.0_wp
-          dact_sol_number_casim(k,i,j) = 0.0_wp
-          dact_insol_number_casim(k,i,j) = 0.0_wp
-        end do ! i
-      end do   ! j
+      dqv_casim(k,1,1) = 0.0_wp
+      dqc_casim(k,1,1) = 0.0_wp
+      dqr_casim(k,1,1) = 0.0_wp
+      dnc_casim(k,1,1)  = 0.0_wp
+      dnr_casim(k,1,1)  = 0.0_wp
+      dm3r_casim(k,1,1) = 0.0_wp
+      dqi_casim(k,1,1) = 0.0_wp
+      dqs_casim(k,1,1) = 0.0_wp
+      dqg_casim(k,1,1)  = 0.0_wp
+      dni_casim(k,1,1) = 0.0_wp
+      dns_casim(k,1,1)  = 0.0_wp
+      dng_casim(k,1,1)  = 0.0_wp
+      dm3s_casim(k,1,1) = 0.0_wp
+      dm3g_casim(k,1,1) = 0.0_wp
+      dth_casim(k,1,1) = 0.0_wp
+      daitken_sol_mass(k,1,1) = 0.0_wp
+      daitken_sol_number(k,1,1) = 0.0_wp
+      daccum_sol_mass(k,1,1) = 0.0_wp
+      daccum_sol_number(k,1,1) = 0.0_wp
+      dcoarse_sol_mass(k,1,1) = 0.0_wp
+      dcoarse_sol_number(k,1,1) = 0.0_wp
+      dact_sol_liq_casim(k,1,1) = 0.0_wp
+      dact_sol_rain_casim(k,1,1) = 0.0_wp
+      dcoarse_dust_mass(k,1,1) = 0.0_wp
+      dcoarse_dust_number(k,1,1) = 0.0_wp
+      dact_insol_ice_casim(k,1,1) = 0.0_wp
+      dact_sol_ice_casim(k,1,1) = 0.0_wp
+      dact_insol_liq_casim(k,1,1) = 0.0_wp
+      daccum_dust_mass(k,1,1) = 0.0_wp
+      daccum_dust_number(k,1,1) = 0.0_wp
+      dact_sol_number_casim(k,1,1) = 0.0_wp
+      dact_insol_number_casim(k,1,1) = 0.0_wp
     end do     ! k
 
-    cfrain_casim(model_levels,:,:)=0.0_wp
-    cfgr_casim(model_levels,:,:)=0.0_wp
-
-    do k =  model_levels-1, 1, -1
-      do j = 1, rows
-        do i = 1, row_length
-          !make cfrain the max of cfl in column
-          cfrain_casim(k,i,j)=max(cfrain_casim(k+1,i,j),cfliq_casim(k,i,j))
-          !make graupel fraction
-          cfgr_casim(k,i,j)=cfrain_casim(k,i,j)
-        end do
-      end do
+    cfrain_casim(nlayers,:,:)=0.0_wp
+    cfgr_casim(nlayers,:,:)=0.0_wp
+    do k =  nlayers-1, 1, -1
+      !make cfrain the max of cfl in column
+      cfrain_casim(k,1,1)=max(cfrain_casim(k+1,1,1),cfliq_casim(k,1,1),cfsnow_casim(k,1,1))
+      !make graupel fraction
+      cfgr_casim(k,1,1)=cfrain_casim(k,1,1)
     end do
 
     ! Set up diagnostic flags for CASIM
@@ -464,7 +421,7 @@ subroutine casim_code( nlayers,                     &
                             accum_sol_mass,                                   &
                             accum_sol_number, coarse_sol_mass,                &
                             coarse_sol_number,                                &
-                            act_sol_liq_casim, act_sol_rain_casim,           &
+                            act_sol_liq_casim, act_sol_rain_casim,            &
                             coarse_dust_mass,                                 &
                             coarse_dust_number, act_insol_ice_casim,          &
                             act_sol_ice_casim, act_insol_liq_casim,           &
@@ -493,20 +450,8 @@ subroutine casim_code( nlayers,                     &
                             dact_insol_number_casim,                          &
                             ils, ile,  jls, jle )
 
-    do k = 1, model_levels
-      do j = 1, rows
-        do i = 1, row_length
-          nc_casim(k,i,j) = nc_casim(k,i,j) +dnc_casim(k,i,j)
-          nr_casim(k,i,j) = nr_casim(k,i,j) +dnr_casim(k,i,j)
-          ni_casim(k,i,j) = ni_casim(k,i,j) +dni_casim(k,i,j)
-          ns_casim(k,i,j) = ns_casim(k,i,j) +dns_casim(k,i,j)
-          ng_casim(k,i,j) = ng_casim(k,i,j) +dng_casim(k,i,j)
-        end do
-      end do
-    end do
-
     ! CASIM Update theta and compulsory prognostic variables
-    do k = 1, model_levels
+    do k = 1, nlayers
       theta_inc(map_wth(1) + k) = dth_casim(k,1,1)
       dmv_wth(map_wth(1) + k ) = dqv_casim(k,1,1)
       dml_wth(map_wth(1) + k ) = dqc_casim(k,1,1)
@@ -514,12 +459,12 @@ subroutine casim_code( nlayers,                     &
       dms_wth(map_wth(1) + k ) = dqs_casim(k,1,1)
       dmr_wth( map_wth(1) + k) = dqr_casim(k,1,1)
       dmg_wth( map_wth(1) + k) = dqg_casim(k,1,1)
-      nl_mphys( map_wth(1) + k) = nc_casim(k,1,1)
-      nr_mphys( map_wth(1) + k) = nr_casim(k,1,1)
-      ni_mphys( map_wth(1) + k) = ni_casim(k,1,1)
-      ns_mphys( map_wth(1) + k) = ns_casim(k,1,1)
-      ng_mphys( map_wth(1) + k) = ng_casim(k,1,1)
-    end do ! k (model_levels)
+      nl_mphys( map_wth(1) + k) = nc_casim(k,1,1) +dnc_casim(k,1,1)
+      nr_mphys( map_wth(1) + k) = nr_casim(k,1,1) +dnr_casim(k,1,1)
+      ni_mphys( map_wth(1) + k) = ni_casim(k,1,1) +dni_casim(k,1,1)
+      ns_mphys( map_wth(1) + k) = ns_casim(k,1,1) +dns_casim(k,1,1)
+      ng_mphys( map_wth(1) + k) = ng_casim(k,1,1) +dng_casim(k,1,1)
+    end do ! k (nlayers)
 
     ! Increment level 0 the same as level 1
     !  (as done in the UM)
@@ -544,7 +489,7 @@ subroutine casim_code( nlayers,                     &
       do k = 1, nlayers
         ! Select the first altitude above 1km (following what the UM does).
         if (height_wth(map_wth(1) + k) >= alt_1km ) then
-          refl_1km(map_2d(1)) = casdiags % dbz_tot(i,j,k)
+          refl_1km(map_2d(1)) = casdiags % dbz_tot(1,1,k)
           exit
         end if
       end do
@@ -553,16 +498,13 @@ subroutine casim_code( nlayers,                     &
     if (l_refl_tot) then
       refl_tot(map_wth(1)) = ref_lim ! Set 0 level to -35 dBZ.
       do k = 1, nlayers
-        refl_tot(map_wth(1) + k) = casdiags % dbz_tot(i,j,k)
+        refl_tot(map_wth(1) + k) = casdiags % dbz_tot(1,1,k)
       end do
     end if
 
     ! CASIM deallocate diagnostics
     call deallocate_diagnostic_space()
     ! (The above subroutine call sets casdiags % l_radar = .false.)
-    deallocate( qgraup_work )
-    deallocate( qrain_work  )
-    deallocate( qcf2_work   )
 
 end subroutine casim_code
 

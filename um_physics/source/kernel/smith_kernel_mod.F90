@@ -34,7 +34,7 @@ module smith_kernel_mod
          arg_type(GH_FIELD, GH_INTEGER, GH_READ,   ANY_DISCONTINUOUS_SPACE_1), & ! cumulus_2d
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                    & ! m_v
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                    & ! m_cl
-         arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                    & ! m_ci
+         arg_type(GH_FIELD, GH_REAL, GH_READ,      WTHETA),                    & ! m_ci
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                    & ! cf_area
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                    & ! cf_ice
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, WTHETA),                    & ! cf_liq
@@ -65,7 +65,7 @@ contains
   !> @param[in]     cumulus_2d    Cumulus flag
   !> @param[in,out] m_v           Vapour mixing ratio in wth
   !> @param[in,out] m_cl          Cloud liquid mixing ratio in wth
-  !> @param[in,out] m_ci          Total ice mixing ratio incl snow in wth
+  !> @param[in]     m_ci          Total ice mixing ratio incl snow in wth
   !> @param[in,out] cf_area       Area cloud fraction
   !> @param[in,out] cf_ice        Ice cloud fraction
   !> @param[in,out] cf_liq        Liquid cloud fraction
@@ -138,7 +138,7 @@ contains
     integer(kind=i_def), intent(in),    dimension(undf_2d)  :: ntml_2d, cumulus_2d
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_v
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_cl
-    real(kind=r_def),    intent(inout), dimension(undf_wth) :: m_ci
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: m_ci
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_area
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_ice
     real(kind=r_def),    intent(inout), dimension(undf_wth) :: cf_liq
@@ -167,14 +167,10 @@ contains
     integer(i_um), dimension(seg_len,1) :: ntml
     integer(i_um) :: errorstatus, large_levels, levels_per_level
 
-    logical :: l_mcr_qcf2
-
     ! Determine number of sublevels for vertical gradient area cloud
     ! Want an odd number of sublevels per level: 3 is hardwired in do loops
     levels_per_level = 3
     large_levels = ((nlayers - 2)* levels_per_level) + 2
-
-    l_mcr_qcf2 = .false.
 
     do i = 1, seg_len
       cumulus(i,1) = (cumulus_2d(map_2d(1,i)) == 1_i_def)

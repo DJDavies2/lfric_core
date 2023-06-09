@@ -101,7 +101,8 @@ module um_physics_init_mod
                                         mixing_method => method,     &
                                         method_3d_smag,              &
                                         method_2d_smag,              &
-                                        method_blending,             &
+                                        method_blend_smag_fa,        &
+                                        method_blend_1dbl_fa,        &
                                         mix_factor_in => mix_factor, &
                                         leonard_term
 
@@ -198,7 +199,7 @@ contains
          var_diags_opt, i_interp_local, i_interp_local_gradients,          &
          split_tke_and_inv, l_noice_in_turb, l_use_var_fixes,              &
          i_interp_local_cf_dbdz, tke_diag_fac, a_ent_2, dec_thres_cloud,   &
-         dec_thres_cu, near_neut_z_on_l
+         dec_thres_cu, near_neut_z_on_l, blend_gridindep_fa
     use cloud_inputs_mod, only: i_cld_vn, forced_cu, i_rhcpt, i_cld_area,  &
          rhcrit, ice_fraction_method,falliceshear_method, cff_spread_rate, &
          l_subgrid_qv, ice_width, min_liq_overlap, i_eacf, not_mixph,      &
@@ -277,8 +278,9 @@ contains
         iopt_inuc, iopt_act, process_level, l_separate_rain, &
         l_ukca_casim, l_abelshipway, l_warm,                 &
         l_cfrac_casim_diag_scheme, l_prf_cfrac
-    use casim_switches, only: its, ite, jts, jte, kts, kte,                  &
+    use casim_switches, only: its, ite, jts, jte, kts, kte,              &
                               ils, ile, jls, jle, kls, kle,              &
+                              irs, ire, jrs, jre, krs, kre,              &
                               casim_moments_option, n_casim_tracers,     &
                               l_casim_warm_only,                         &
                               l_ukca_aerosol, no_aerosol_modes
@@ -838,57 +840,63 @@ contains
         call log_event( log_scratch_space, LOG_LEVEL_ERROR )
       end if
 
-      select case (graupel_scheme)
+      l_mcr_qrain    = .true.
+      l_mphys_nonshallow = .true.
+      l_rain         = .true.
+
+      ! Domain top used in microphysics - contained in mphys_bypass_mod
+      mphys_mod_top  = real(domain_top, r_um)
+
+      ! Options only relevent to old microphysics scheme
+      if (.not. microphysics_casim) then
+
+        select case (graupel_scheme)
         case (graupel_scheme_none)
           graupel_option = no_graupel
         case (graupel_scheme_modified)
           graupel_option = gr_srcols
           nummr_to_transport = 5_i_def
-      end select
+        end select
 
-      a_ratio_exp    = real(a_ratio_exp_in, r_um)
-      a_ratio_fac    = real(a_ratio_fac_in, r_um)
-      ar             = 1.00_r_um
-      c_r_correl     = 0.9_r_um
-      ci_input       = 14.3_r_um
-      cic_input      = 1024.0_r_um
-      di_input       = 0.416_r_um
-      dic_input      = 1.0_r_um
-      i_mcr_iter     = i_mcr_iter_tstep
-      l_diff_icevt   = .true.
-      l_droplet_tpr  = droplet_tpr
-      l_fsd_generator= cld_fsd_hill
-      l_mcr_qrain    = .true.
-      l_mphys_nonshallow = .true.
-      l_psd          = .true.
-      l_rain         = .true.
-      l_shape_rime   = shape_rime
-      l_subgrid_qcl_mp = turb_gen_mixph
-      l_warm_new     = .true.
-      mp_dz_scal     = 2.0_r_um
-      ndrop_surf     = real(ndrop_surf_in, r_um)
-      qclrime        = real(qcl_rime, r_um)
-      sediment_loc   = all_sed_start
-      timestep_mp_in = 120
-      z_surf         = real(z_surf_in, r_um)
-      aut_qc         = 2.47_r_um
-!     Needed by the Seeder Feeder scheme
-      l_orograin     = orog_rain
-      l_orogrime     = orog_rime
-      l_orograin_block = orog_block
-      nsigmasf       = real(nsigmasf_in, r_um)
-      nscalesf       = real(nscalesf_in, r_um)
-      fcrit          = real(fcrit_in, r_um)
+        a_ratio_exp    = real(a_ratio_exp_in, r_um)
+        a_ratio_fac    = real(a_ratio_fac_in, r_um)
+        ar             = 1.00_r_um
+        c_r_correl     = 0.9_r_um
+        ci_input       = 14.3_r_um
+        cic_input      = 1024.0_r_um
+        di_input       = 0.416_r_um
+        dic_input      = 1.0_r_um
+        i_mcr_iter     = i_mcr_iter_tstep
+        l_diff_icevt   = .true.
+        l_droplet_tpr  = droplet_tpr
+        l_fsd_generator= cld_fsd_hill
+        l_psd          = .true.
+        l_shape_rime   = shape_rime
+        l_subgrid_qcl_mp = turb_gen_mixph
+        l_warm_new     = .true.
+        mp_dz_scal     = 2.0_r_um
+        ndrop_surf     = real(ndrop_surf_in, r_um)
+        qclrime        = real(qcl_rime, r_um)
+        sediment_loc   = all_sed_start
+        timestep_mp_in = 120
+        z_surf         = real(z_surf_in, r_um)
+        aut_qc         = 2.47_r_um
+        !     Needed by the Seeder Feeder scheme
+        l_orograin     = orog_rain
+        l_orogrime     = orog_rime
+        l_orograin_block = orog_block
+        nsigmasf       = real(nsigmasf_in, r_um)
+        nscalesf       = real(nscalesf_in, r_um)
+        fcrit          = real(fcrit_in, r_um)
 
-      ! Domain top used in microphysics - contained in mphys_bypass_mod
-      mphys_mod_top  = real(domain_top, r_um)
+      end if
 
       ! UM options needed if CASIM is being used
       if (microphysics_casim) then
 
         l_casim = .true.
         l_psd          = .false.
-        graupel_option = 1_i_um
+        graupel_option = 2_i_um
         l_mcr_qcf2 = .true.
         l_mcr_qgraup = .true.
         wvarfac = 1.0_r_um
@@ -954,7 +962,7 @@ contains
         l_cfrac_casim_diag_scheme = .false.
 
         ! Set up cloud fraction scheme coupling (Smith or PC2)
-        if ( i_cld_vn == i_cld_smith .or. i_cld_vn == i_cld_pc2                  &
+        if ( i_cld_vn == i_cld_smith .or. i_cld_vn == i_cld_pc2                &
                                      .or. i_cld_vn == i_cld_bimodal) then
           l_prf_cfrac   = .true.
           l_abelshipway = .true.
@@ -967,8 +975,40 @@ contains
         !---------------------------------------------------------------------
         ! Initialise and allocate the space required (CASIM repository)
         !---------------------------------------------------------------------
-        CALL mphys_init( its, ite, jts, jte, kts, kte,                           &
-                         ils, ile, jls, jle, kls, kle,                           &
+        ! Casim is written k-first
+        its = 1_i_um
+        ite = 1_i_um
+        jts = 1_i_um
+        jte = 1_i_um
+        kts = 1_i_um
+        kte = number_of_layers
+
+        ils = its
+        ile = ite
+        jls = jts
+        jle = jte
+        kls = kts
+        if ( i_cld_vn == i_cld_smith .or. i_cld_vn == i_cld_pc2                &
+                                     .or. i_cld_vn == i_cld_bimodal) then
+          kle = kte
+        else
+          kle = kte - 2
+        end if ! i_cld_vn
+
+        irs = its
+        ire = ite
+        jrs = jts
+        jre = jte
+        krs = kts
+        if ( i_cld_vn == i_cld_smith .or. i_cld_vn == i_cld_pc2                &
+                                     .or. i_cld_vn == i_cld_bimodal) then
+          kre = kte
+        else
+          kre = kte - 2
+        end if
+
+        call mphys_init( its, ite, jts, jte, kts, kte,                         &
+                         ils, ile, jls, jle, kls, kle,                         &
                          l_tendency=.false. )
 
       end if ! microphysics_casim
@@ -1109,10 +1149,14 @@ contains
         l_subfilter_horiz = .true.
         l_subfilter_vert  = .false.
         blending_option   = off
-      case( method_blending )
+      case( method_blend_smag_fa )
         l_subfilter_horiz = .true.
         l_subfilter_vert  = .true.
         blending_option   = blend_allpoints
+      case( method_blend_1dbl_fa )
+        l_subfilter_horiz = .true.
+        l_subfilter_vert  = .true.
+        blending_option   = blend_gridindep_fa
       end select
 
     else ! not Smagorinsky

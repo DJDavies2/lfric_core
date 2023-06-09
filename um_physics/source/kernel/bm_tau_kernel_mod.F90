@@ -23,11 +23,12 @@ module bm_tau_kernel_mod
   !>
   type, public, extends(kernel_type) :: bm_tau_kernel_type
     private
-    type(arg_type) :: meta_args(14) = (/                &
+    type(arg_type) :: meta_args(15) = (/                &
          arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA), & ! m_v
          arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA), & ! theta_in_wth
          arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA), & ! exner_in_wth
          arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA), & ! m_ci
+         arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA), & ! m_s
          arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA), & ! ns_mphys
          arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA), & ! ni_mphys
          arg_type(GH_FIELD, GH_REAL, GH_READ,  WTHETA), & ! cf_ice
@@ -58,6 +59,7 @@ contains
   !> @param[in]     theta_in_wth  Predicted theta in its native space
   !> @param[in]     exner_in_wth  Exner Pressure in the theta space
   !> @param[in]     m_ci          Cloud ice mixing ratio in wth
+  !> @param[in]     m_s           Snow mixing ratio in wth
   !> @param[in]     ns_mphys      Cloud ice number mixing ratio in wth
   !> @param[in]     ni_mphys      Snow number mixing ratio in wth
   !> @param[in]     cf_ice        Ice cloud fraction
@@ -78,6 +80,7 @@ contains
                          theta_in_wth,  &
                          exner_in_wth,  &
                          m_ci,          &
+                         m_s,           &
                          ns_mphys,      &
                          ni_mphys,      &
                          cf_ice,        &
@@ -120,6 +123,7 @@ contains
     real(kind=r_def),    intent(in),    dimension(undf_wth) :: theta_in_wth
     real(kind=r_def),    intent(in),    dimension(undf_wth) :: m_v
     real(kind=r_def),    intent(in),    dimension(undf_wth) :: m_ci
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: m_s
     real(kind=r_def),    intent(in),    dimension(undf_wth) :: ns_mphys
     real(kind=r_def),    intent(in),    dimension(undf_wth) :: ni_mphys
     real(kind=r_def),    intent(in),    dimension(undf_wth) :: cf_ice
@@ -156,6 +160,7 @@ contains
         exner_theta_levels(i,1,k) = exner_in_wth(map_wth(1,i)+ k)
         q(i,1,k) =  m_v(map_wth(1,i) + k)
         qcf(i,1,k) = m_ci(map_wth(1,i) + k)
+        qcf2(i,1,k) = m_s(map_wth(1,i) + k)
         ! cloud fields
         cff(i,1,k) = cf_ice(map_wth(1,i) + k)
         ! turbulence fields
@@ -164,7 +169,6 @@ contains
         wvar_in(i,1,k)     = wvar(map_wth(1,i) + k)
       end do
     end do
-    qcf2= 0.0_r_um  !dummy variable to pass to bm_calc_tau
 
     do i = 1, seg_len
       do k = 2, bl_levels

@@ -74,6 +74,7 @@ module create_physics_prognostics_mod
                                              l_conv_prog_dq,                   &
                                              adv_conv_prog_dtheta,             &
                                              adv_conv_prog_dq
+  use mphys_inputs_mod, only: casim_iopt_act
 #endif
 
   implicit none
@@ -629,20 +630,21 @@ contains
     advection_flag = microphysics_casim
 
     call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'nl_mphys', wtheta_space, checkpoint_flag=checkpoint_flag )
+      adv_fields_last_outer, 'nl_mphys', wtheta_space, &
+      checkpoint_flag=checkpoint_flag, &
+      advection_flag=(advection_flag .and. casim_iopt_act /= 0_i_def) )
     call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'nr_mphys', wtheta_space, checkpoint_flag=checkpoint_flag )
+      adv_fields_last_outer, 'nr_mphys', wtheta_space, &
+      checkpoint_flag=checkpoint_flag, advection_flag=advection_flag )
     call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'ni_mphys', wtheta_space, checkpoint_flag=checkpoint_flag )
+      adv_fields_last_outer, 'ni_mphys', wtheta_space, &
+      checkpoint_flag=checkpoint_flag, advection_flag=advection_flag )
     call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'ns_mphys', wtheta_space, checkpoint_flag=checkpoint_flag )
+      adv_fields_last_outer, 'ns_mphys', wtheta_space, &
+      checkpoint_flag=checkpoint_flag, advection_flag=advection_flag )
     call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'ng_mphys', wtheta_space, checkpoint_flag=checkpoint_flag )
+      adv_fields_last_outer, 'ng_mphys', wtheta_space, &
+      checkpoint_flag=checkpoint_flag, advection_flag=advection_flag )
 
     ! 2D fields, don't need checkpointing
     call add_physics_field( microphysics_fields, depository, prognostic_fields,&

@@ -38,16 +38,15 @@ contains
   !>@param[in]     derived_fields Group of derived fields
   !>@param[in,out] microphysics_fields    Fields for mphys scheme
   !>@param[in]     cloud_fields           Fields for cloud scheme
-  !>@param[in]     turbulence_fields      Fields for turbulence scheme
+  !>@param[in]     aerosol_fields         Fields for the aerosol schemes
   !>@param[in,out] dmr_mphys      Mixing ratio increment due to microphysics
   !>@param[in,out] theta_inc      Potential temperature increment in wth space
   !>@param[in,out] dcfl           Increment to liquid cloud fraction
   !>@param[in,out] dcff           Increment to ice cloud fraction
   !>@param[in,out] dbcf           Increment to bulk cloud fraction
   subroutine casim_alg( mr_n, theta, dry_rho_in_w3, derived_fields,            &
-                        microphysics_fields, cloud_fields,                     &
-                        turbulence_fields, dmr_mphys, theta_inc, dcfl,         &
-                        dcff, dbcf )
+                        microphysics_fields, cloud_fields, aerosol_fields,     &
+                        dmr_mphys, theta_inc, dcfl, dcff, dbcf )
 
     use casim_kernel_mod, only: casim_kernel_type
     use mr_indices_mod,   only: imr_v, imr_cl, imr_r, imr_ci, imr_s, imr_g, nummr
@@ -63,7 +62,7 @@ contains
     type( field_collection_type ), intent(in)    :: derived_fields
     type( field_collection_type ), intent(in)    :: microphysics_fields
     type( field_collection_type ), intent(in)    :: cloud_fields
-    type( field_collection_type ), intent(in)    :: turbulence_fields
+    type( field_collection_type ), intent(in)    :: aerosol_fields
 
     type( field_type ), intent( inout ) :: dmr_mphys ( nummr )
     type( field_type ), intent( inout ) :: theta_inc
@@ -75,7 +74,6 @@ contains
     type( field_type ), pointer :: wetrho_in_w3        => null()
     type( field_type ), pointer :: rho_in_wth          => null()
 
-    type( field_type ), pointer :: cf_in               => null()
     type( field_type ), pointer :: cfl_in              => null()
     type( field_type ), pointer :: cff_in              => null()
 
@@ -89,7 +87,8 @@ contains
     type( field_type ), pointer :: ns_mphys            => null()
     type( field_type ), pointer :: ng_mphys            => null()
 
-    type( field_type ), pointer :: wvar   => null()
+    ! In cloud value passed to radiation
+    type( field_type ), pointer :: cloud_drop_no_conc  => null()
 
     type( field_type ), pointer :: height_w3 => null()
     type( field_type ), pointer :: height_wth => null()
@@ -102,7 +101,7 @@ contains
 
     integer(kind=i_def) :: mesh_id
 
-    if ( subroutine_timers ) call timer("mphys_alg")
+    if ( subroutine_timers ) call timer("casim_alg")
 
     call log_event( 'slow_physics: Running Microphysics', LOG_LEVEL_INFO )
 
@@ -134,7 +133,7 @@ contains
     call microphysics_fields%get_field('ns_mphys',ns_mphys)
     call microphysics_fields%get_field('ng_mphys',ng_mphys)
 
-    call turbulence_fields%get_field('wvar', wvar)
+    call aerosol_fields%get_field('cloud_drop_no_conc',cloud_drop_no_conc)
 
     height_w3 => get_height(W3, mesh_id)
     height_wth => get_height(Wtheta, mesh_id)
@@ -155,18 +154,18 @@ contains
                                      dmr_mphys(imr_ci), dmr_mphys(imr_r),      &
                                      dmr_mphys(imr_g), dmr_mphys(imr_s),       &
                                      ls_rain, ls_snow,                         &
-                                     theta_inc, dcfl, dcff,                    &
+                                     theta_inc, cloud_drop_no_conc,            &
                                      refl_tot, refl_1km ) )
 
     ! Save mv increment for stochastic physics
     call microphysics_fields%get_field('dmv_mphys', dmv_mphys)
     call invoke(setval_X(dmv_mphys, dmr_mphys(imr_v)))
 
-    if ( subroutine_timers ) call timer("mphys_alg")
+    if ( subroutine_timers ) call timer("casim_alg")
 
     ! Output microphysics diagnostics
     if (write_diag .and. use_xios_io) then
-      if ( subroutine_timers ) call timer("mphys_xios")
+      if ( subroutine_timers ) call timer("casim_xios")
       call ls_rain%write_field('microphysics__ls_rain')
       call ls_snow%write_field('microphysics__ls_snow')
 
@@ -180,7 +179,7 @@ contains
       call ns_mphys%write_field('casim__ns_mphys')
       call ng_mphys%write_field('casim__ng_mphys')
 
-      if ( subroutine_timers ) call timer("mphys_xios")
+      if ( subroutine_timers ) call timer("casim_xios")
     end if
 
   end subroutine casim_alg

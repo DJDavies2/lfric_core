@@ -165,9 +165,6 @@ module semi_implicit_timestep_alg_mod
   type( field_type ) :: visc_m ! Smagorinsky diffusion coefficient for momentum
   type( field_type ) :: visc_h ! Smagorinsky diffusion coefficient for scalars
 
-  type( field_type ) :: cfl_after_adv
-  type( field_type ), pointer :: cfl => null()
-
   public  :: semi_implicit_alg_init
   public  :: semi_implicit_alg_step
   public  :: semi_implicit_alg_final
@@ -520,12 +517,6 @@ contains
                       .true., dlayer_on )
       else
         if (use_moisture) call copy_bundle(mr_after_slow, mr, nummr)
-      end if
-
-      if (microphysics_casim) then
-        call cloud_fields%get_field('liquid_fraction', cfl)
-        call cfl%copy_field_properties( cfl_after_adv )
-        call invoke( setval_X(cfl_after_adv, cfl) )
       end if
 
       if (use_physics) then

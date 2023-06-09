@@ -8,19 +8,6 @@
 
 module um_sizes_init_mod
 
-  ! LFRic namelists which have bee read
-  use extrusion_config_mod,        only : number_of_layers
-  use cloud_config_mod,            only : cld_fsd_hill
-  use mixing_config_mod,           only : smagorinsky
-  use radiation_config_mod,        only : topography, topography_horizon
-  use casim_switches,              only : its, ite, jts, jte, kts, kte,        &
-                                          ils, ile, jls, jle, kls, kle,        &
-                                          irs, ire, jrs, jre, krs, kre
-  use cloud_inputs_mod,            only : i_cld_vn
-  use pc2_constants_mod,           only : i_cld_smith, i_cld_pc2,              &
-                                          i_cld_bimodal
-  use microphysics_config_mod,     only : microphysics_casim
-
   ! Other modules used
   use constants_mod,               only : i_um, r_um, rmdi, i_def, r_def
 
@@ -103,46 +90,6 @@ contains
     ! but may change if we ever do.
     call atm_fields_bounds_init( 0_i_um, 0_i_um, 0_i_um, &
                                  0_i_um, row_length, rows, rows)
-
-    if (microphysics_casim) then
-        !---------------------------------------------------------------------
-        ! Set up microphysics dimensions
-        !---------------------------------------------------------------------
-        ! Set up dimensions of the parent model, (the UM) based on tdims
-
-        its = rows
-        ite = rows
-        jts = row_length
-        jte = row_length
-        kts = 1_i_um
-        kte = number_of_layers
-
-        ! We do not want to do any microphysics in the lateral boundary
-        ! rim for a nested model...
-        ils = its
-        ile = ite
-        jls = jts
-        jle = jte
-        kls = kts
-        if ( i_cld_vn == i_cld_smith .or. i_cld_vn == i_cld_pc2                &
-                                     .or. i_cld_vn == i_cld_bimodal) then
-          kle = kte
-        else
-          kle = kte - 2
-        end if ! i_cld_vn
-
-        irs = its
-        ire = ite
-        jrs = jts
-        jre = jte
-        krs = kts
-        if ( i_cld_vn == i_cld_smith .or. i_cld_vn == i_cld_pc2                &
-                                     .or. i_cld_vn == i_cld_bimodal) then
-          kre = kte
-        else
-          kre = kte - 2
-        end if
-    end if
 
   end subroutine um_sizes_init
 

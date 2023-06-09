@@ -236,7 +236,7 @@ split_w=.true.,
 /
 &mixing
 leonard_term=.false.,
-method='blending'
+method='blend_1dbl_fa'
 mix_factor=0.2
 smagorinsky=.true.
 /

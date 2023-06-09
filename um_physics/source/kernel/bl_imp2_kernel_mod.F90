@@ -40,7 +40,7 @@ module bl_imp2_kernel_mod
   !>
   type, public, extends(kernel_type) :: bl_imp2_kernel_type
     private
-    type(arg_type) :: meta_args(53) = (/                                         &
+    type(arg_type) :: meta_args(54) = (/                                         &
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                &! outer
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                &! loop
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      WTHETA),                   &! wetrho_in_wth
@@ -58,6 +58,7 @@ module bl_imp2_kernel_mod
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, WTHETA),                   &! m_v
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, WTHETA),                   &! m_cl
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, WTHETA),                   &! m_ci
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      WTHETA),                   &! m_s
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, WTHETA),                   &! cf_area
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, WTHETA),                   &! cf_ice
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, WTHETA),                   &! cf_liq
@@ -126,6 +127,7 @@ contains
   !> @param[in,out] m_v                  Vapour mixing ration after advection
   !> @param[in,out] m_cl                 Cloud liq mixing ratio after advection
   !> @param[in,out] m_ci                 Cloud ice mixing ratio after advection
+  !> @param[in]     m_s                  Snow mixing ratio after advection
   !> @param[in,out] cf_area              Area cloud fraction
   !> @param[in,out] cf_ice               Ice cloud fraction
   !> @param[in,out] cf_liq               Liquid cloud fraction
@@ -207,6 +209,7 @@ contains
                           m_v,                                &
                           m_cl,                               &
                           m_ci,                               &
+                          m_s,                                &
                           cf_area,                            &
                           cf_ice,                             &
                           cf_liq,                             &
@@ -261,7 +264,7 @@ contains
     use gen_phys_inputs_mod, only: l_mr_physics
     use mphys_inputs_mod, only: l_mcr_qcf2, l_casim
     use nlsizes_namelist_mod, only: bl_levels
-    use pc2_constants_mod, only: i_cld_off, i_cld_smith, i_cld_pc2,            &
+    use pc2_constants_mod, only: i_cld_smith, i_cld_pc2,            &
          pc2init_logic_smooth, acf_off, i_cld_bimodal
     use planet_constants_mod, only: p_zero, kappa, planet_radius, g, cp, lcrcp
     use timestep_mod, only: timestep
@@ -319,7 +322,7 @@ contains
                                                          bq_bl, bt_bl,         &
                                                          dtrdz_tq_bl,          &
                                                          dsldzm,               &
-                                                         wvar,                 &
+                                                         wvar, m_s,            &
                                                          gradrinr,             &
                                                          tau_dec_bm,           &
                                                          tau_hom_bm,           &
@@ -664,8 +667,7 @@ contains
             p_theta_levels(i,1,k) = p_zero*(exner_in_wth(map_wth(1,i) + k))**(1.0_r_def/kappa)
             qcl_latest(i,1,k) = m_cl(map_wth(1,i) + k)
             qcf_latest(i,1,k) = m_ci(map_wth(1,i) + k)
-            ! Set qcf2_latest to zero for now, until needed by CASIM coupling.
-            qcf2_latest(i,1,k) = 0.0_r_um
+            qcf2_latest(i,1,k) = m_s(map_wth(1,i) + k)
           end do
           p_theta_levels(i,1,0) = p_zero*(exner_in_wth(map_wth(1,i) + 0))**(1.0_r_def/kappa)
         end do

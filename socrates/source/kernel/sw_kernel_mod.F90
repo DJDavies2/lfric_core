@@ -33,7 +33,7 @@ private
 ! Contains the metadata needed by the PSy layer.
 type, public, extends(kernel_type) :: sw_kernel_type
   private
-  type(arg_type) :: meta_args(59) = (/ &
+  type(arg_type) :: meta_args(60) = (/ &
     arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, Wtheta),                    & ! sw_heating_rate_rts
     arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! sw_down_surf_rts
     arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! sw_direct_surf_rts
@@ -57,6 +57,7 @@ type, public, extends(kernel_type) :: sw_kernel_type
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! mv
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! mcl
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! mci
+    arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! n_ice
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! conv_liquid_mmr
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! conv_frozen_mmr
     arg_type(GH_FIELD,  GH_REAL,    GH_READ,      Wtheta),                    & ! radiative_cloud_fraction
@@ -132,6 +133,7 @@ contains
 !> @param[in]     mv                        Water vapour field
 !> @param[in]     mcl                       Cloud liquid field
 !> @param[in]     mci                       Cloud ice field
+!> @param[in]     n_ice                     Ice number concentration
 !> @param[in]     conv_liquid_mmr           Convective liquid gridbox MMR
 !> @param[in]     conv_frozen_mmr           Convective frozen gridbox MMR
 !> @param[in]     radiative_cloud_fraction  Large scale cloud fraction
@@ -198,7 +200,7 @@ subroutine sw_code(nlayers, n_profile,                                         &
                    d_mass, layer_heat_capacity,                                &
                    cos_zenith_angle_rts, lit_fraction_rts,                     &
                    stellar_irradiance_rts, orographic_correction_rts,          &
-                   ozone, mv, mcl, mci,                                        &
+                   ozone, mv, mcl, mci, n_ice,                                 &
                    conv_liquid_mmr, conv_frozen_mmr,                           &
                    radiative_cloud_fraction, radiative_conv_fraction,          &
                    liquid_fraction, frozen_fraction,                           &
@@ -275,7 +277,7 @@ subroutine sw_code(nlayers, n_profile,                                         &
   real(r_def), dimension(undf_wth), intent(in) :: &
     rho_in_wth, pressure_in_wth, temperature_in_wth, &
     d_mass, layer_heat_capacity, ozone, mv, mcl, mci, &
-    conv_liquid_mmr, conv_frozen_mmr, &
+    n_ice, conv_liquid_mmr, conv_frozen_mmr, &
     radiative_cloud_fraction, radiative_conv_fraction, &
     liquid_fraction, frozen_fraction, &
     conv_liquid_fraction, conv_frozen_fraction, &
@@ -491,6 +493,8 @@ subroutine sw_code(nlayers, n_profile,                                         &
         ice_frac_1d            = frozen_fraction(wth_1:wth_last),            &
         liq_mmr_1d             = mcl(wth_1:wth_last),                        &
         ice_mmr_1d             = mci(wth_1:wth_last),                        &
+        ice_nc_1d              = n_ice(wth_1:wth_last),                      &
+        ice_conv_nc_1d         = n_ice(wth_1:wth_last),                      &
         liq_dim_constant       = constant_droplet_effective_radius,          &
         liq_nc_1d              = cloud_drop_no_conc(wth_1:wth_last),         &
         conv_frac_1d           = radiative_conv_fraction(wth_1:wth_last),    &

@@ -17,7 +17,8 @@ module bl_imp_alg_mod
                                            get_latitude
   use physical_op_constants_mod,     only: get_rdz_fd1, get_dtrdz_fd2, &
                                            get_rdz_w3
-  use mr_indices_mod,                only: nummr, imr_v, imr_cl, imr_ci, imr_r
+  use mr_indices_mod,                only: nummr, imr_v, imr_cl, imr_ci, imr_r,&
+                                           imr_s
   use timestepping_config_mod,       only: outer_iterations
   use um_sizes_init_mod,             only: um_sizes_init
 
@@ -533,7 +534,8 @@ contains
                                        exner_in_wth, theta_star, height_w3,    &
                                        height_wth, ntml, cumulus, dtheta_bl,   &
                                        diss_u, diss_v, dt_conv, mr(imr_v),     &
-                                       mr(imr_cl), mr(imr_ci), cf_area, cf_fro,&
+                                       mr(imr_cl), mr(imr_ci), mr(imr_s),      &
+                                       cf_area, cf_fro,                        &
                                        cf_liq, cf_bulk, rh_crit, dsldzm, wvar, &
                                        gradrinr, tau_dec_bm, tau_hom_bm,       &
                                        tau_mph_bm, rhokh, bq_bl, bt_bl, fqw,   &
