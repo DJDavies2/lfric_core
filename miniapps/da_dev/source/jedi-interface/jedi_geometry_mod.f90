@@ -19,6 +19,7 @@ module jedi_geometry_mod
                                             get_domain_top,            &
                                             get_cubesphere_resolution, &
                                             get_nlayers,               &
+                                            get_layer_ncells,          &
                                             get_lonlat,                &
                                             get_sigma_w3_levels,       &
                                             get_sigma_wtheta_levels,   &
@@ -84,7 +85,7 @@ subroutine initialise( self )
 
   ! Get grid size and layers
   self%n_layers = get_nlayers()
-  self%n_horizontal = get_cubesphere_resolution() ** 2 * 6
+  self%n_horizontal = get_layer_ncells()
 
   ! Create horizontal_map
   lonlat = get_lonlat()

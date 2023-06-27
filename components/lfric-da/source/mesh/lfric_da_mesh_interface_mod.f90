@@ -57,6 +57,20 @@ contains
 
   end function get_nlayers
 
+  !> @brief  Gets the number of cells in a horizontal layer of the mesh in the
+  !>         local partition, excluding ghost and halo cells.
+  !>
+  !> @return  The number of cells in a horizontal layer in the mesh.
+  function get_layer_ncells() result(horizontal)
+
+    implicit none
+
+    integer(i_def) :: horizontal
+
+    horizontal = mesh%get_last_edge_cell()
+
+  end function get_layer_ncells
+
   !> @brief  Determines whether the target mesh is a cubesphere.
   !> @details  Cubesphere meshes are spherical with six panels.
   !>

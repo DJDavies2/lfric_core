@@ -25,6 +25,7 @@ module lfric_da_mesh_interface_test
                                             get_domain_top,         &
                                             get_stretching_height,  &
                                             get_nlayers,            &
+                                            get_layer_ncells,       &
                                             get_sigma_w3_levels,    &
                                             get_sigma_wtheta_levels
   use log_mod,                        only: log_event, LOG_LEVEL_INFO
@@ -44,6 +45,7 @@ module lfric_da_mesh_interface_test
     procedure test_get_domain_top
     procedure test_get_stretching_height
     procedure test_get_nlayers
+    procedure test_get_layer_ncells
     procedure test_get_sigma_w3_levels
     procedure test_get_sigma_wtheta_levels
   end type lfric_da_mesh_interface_test_type
@@ -149,6 +151,22 @@ module lfric_da_mesh_interface_test
     @assertEqual(kgo, out)
 
   end subroutine test_get_nlayers
+
+  @Test
+  subroutine test_get_layer_ncells( this )
+
+    implicit none
+
+    class(lfric_da_mesh_interface_test_type), intent(inout) :: this
+    integer(i_def) :: out, kgo
+
+    out = get_layer_ncells()
+
+    kgo = 9_i_def
+
+    @assertEqual(kgo, out)
+
+  end subroutine test_get_layer_ncells
 
   @Test
   subroutine test_get_sigma_w3_levels( this )
