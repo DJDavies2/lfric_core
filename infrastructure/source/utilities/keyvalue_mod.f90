@@ -23,9 +23,10 @@ module keyvalue_mod
 
   use, intrinsic :: iso_fortran_env, only: int32, int64, real32, real64
 
-  use constants_mod, only: imdi, cmdi, str_longlong, str_def
-  use log_mod,       only: log_event, log_scratch_space, &
-                           LOG_LEVEL_INFO, LOG_LEVEL_ERROR
+  use constants_mod,        only: imdi, cmdi, str_longlong, str_def
+  use linked_list_data_mod, only: linked_list_data_type
+  use log_mod,              only: log_event, log_scratch_space, &
+                                  LOG_LEVEL_INFO, LOG_LEVEL_ERROR
 
   implicit none
 
@@ -42,7 +43,7 @@ module keyvalue_mod
   !=========================================
   ! Key-Value pair abstract type
   !=========================================
-  type, abstract :: keyvalue_type
+  type, abstract, extends(linked_list_data_type) :: keyvalue_type
 
     private
     character(:), allocatable :: key

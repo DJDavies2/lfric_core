@@ -1,0 +1,274 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2023 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!> @brief Unit-tests for namelist collection object (namelist_collection_type)
+!>
+module namelist_collection_mod_test
+
+  use, intrinsic :: iso_fortran_env, only: int32, int64, real32, real64
+
+  use constants_mod,           only: imdi, rmdi, cmdi, i_def, &
+                                     r_def, str_def, l_def
+  use namelist_mod,            only: namelist_type
+  use namelist_item_mod,       only: namelist_item_type
+  use namelist_collection_mod, only: namelist_collection_type
+
+  use pFUnit_mod
+
+  implicit none
+
+  private
+  public :: nml_collection_test_type, &
+            test_nml_queries,         &
+            test_nml_retrival
+
+  @testCase
+  type, extends( TestCase ) :: nml_collection_test_type
+
+    private
+    type( namelist_collection_type ) :: nml_bank
+
+  contains
+
+    procedure :: setUp
+    procedure :: tearDown
+    procedure :: test_nml_queries
+    procedure :: test_nml_retrival
+
+  end type nml_collection_test_type
+
+contains
+
+  !==============================================================
+  subroutine setUp(this)
+
+    implicit none
+
+    class(nml_collection_test_type), intent(inout) :: this
+
+    type(namelist_item_type), allocatable :: members(:)
+    type(namelist_type) :: test_nml
+
+    call this%nml_bank%initialise( name='uut', table_len=3 )
+
+    allocate( members(8) )
+
+    !====================================================
+    ! Create test namelist `jack_bean`
+    call members(1)%initialise( 'fee', 1_int32 )
+    call members(2)%initialise( 'fi',  8_int64 )
+    call members(3)%initialise( 'fo',  5.0_real32 )
+    call members(4)%initialise( 'fum', 3.0_real64 )
+    call members(5)%initialise( 'too', [3_int32, 1_int32] )
+    call members(6)%initialise( 'bin', [7.0_real64, 2.0_real64] )
+    call members(7)%initialise( 'tee', [.true., .false., .true.] )
+    call members(8)%initialise( 'pot', ['big','fat','tin'] )
+
+    call test_nml%initialise( 'jack_bean', members )
+    call this%nml_bank%add_namelist(test_nml)
+    call test_nml%clear()
+
+    !====================================================
+    ! Create test namelist multiple instance of
+    ! namelist defintion `dwarves`
+    deallocate(members)
+    allocate(members(1))
+    call members(1)%initialise( 'main_trait', 'sleeps a lot' )
+    call test_nml%initialise( 'dwarves', members, profile_name='sleepy' )
+    call this%nml_bank%add_namelist(test_nml)
+    call test_nml%clear()
+
+    deallocate(members)
+    allocate(members(1))
+    call members(1)%initialise( 'main_trait', 'shouts a lot' )
+    call test_nml%initialise( 'dwarves', members, profile_name='angry' )
+    call this%nml_bank%add_namelist(test_nml)
+    call test_nml%clear()
+
+    deallocate(members)
+    allocate(members(1))
+    call members(1)%initialise( 'main_trait', 'eats a lot' )
+    call test_nml%initialise( 'dwarves', members, profile_name='hungry' )
+    call this%nml_bank%add_namelist(test_nml)
+    call test_nml%clear()
+
+
+    !====================================================
+    ! Create test namelist multiple instance of
+    ! namelist defintion `heros`
+    deallocate(members)
+    allocate(members(1))
+    call members(1)%initialise( 'power', 'breathes air' )
+    call test_nml%initialise( 'heros', members, profile_name='human' )
+    call this%nml_bank%add_namelist(test_nml)
+    call test_nml%clear()
+
+    deallocate(members)
+    allocate(members(1))
+    call members(1)%initialise( 'power', 'it is a potato' )
+    call test_nml%initialise( 'heros', members, profile_name='potato' )
+    call this%nml_bank%add_namelist(test_nml)
+    call test_nml%clear()
+
+    deallocate(members)
+
+  end subroutine setUp
+
+
+  !==============================================================
+  subroutine tearDown(this)
+
+    implicit none
+
+    class(nml_collection_test_type), intent( inout ) :: this
+
+    call this%nml_bank%clear()
+
+  end subroutine tearDown
+
+
+  !==============================================================
+  @test
+  subroutine test_nml_queries(this)
+
+    implicit none
+
+    class(nml_collection_test_type), intent( inout ) :: this
+
+    character(str_def) :: test_collection_name
+    character(str_def), allocatable :: test_nml_names(:)
+    character(str_def), allocatable :: test_nml_profiles(:)
+
+    integer(i_def) :: test_nlists
+    integer(i_def) :: test_table_len
+
+    character(str_def), allocatable :: kgo_names(:)
+
+    test_collection_name = this%nml_bank%get_name()
+    @assertEqual( 'uut', trim(test_collection_name) )
+
+    test_nlists = this%nml_bank%get_n_namelists()
+    @assertEqual ( 6, test_nlists )
+
+    test_table_len = this%nml_bank%get_table_len()
+    @assertEqual ( 3, test_table_len )
+
+    test_nml_names = this%nml_bank%get_namelist_names()
+    allocate(kgo_names(3))
+    kgo_names(1) = 'jack_bean'
+    kgo_names(2) = 'dwarves'
+    kgo_names(3) = 'heros'
+    @assertTrue ( kgo_names == test_nml_names )
+    deallocate(kgo_names)
+
+    test_nml_names = this%nml_bank%get_namelist_names(show_full=.true.)
+    allocate(kgo_names(6))
+    kgo_names(1) = 'jack_bean'
+    kgo_names(2) = 'dwarves:sleepy'
+    kgo_names(3) = 'dwarves:angry'
+    kgo_names(4) = 'dwarves:hungry'
+    kgo_names(5) = 'heros:human'
+    kgo_names(6) = 'heros:potato'
+    @assertTrue ( kgo_names == test_nml_names )
+    deallocate(kgo_names)
+
+    test_nml_profiles = this%nml_bank%get_namelist_profiles()
+    allocate(kgo_names(5))
+    kgo_names(1) = 'dwarves:sleepy'
+    kgo_names(2) = 'dwarves:angry'
+    kgo_names(3) = 'dwarves:hungry'
+    kgo_names(4) = 'heros:human'
+    kgo_names(5) = 'heros:potato'
+    @assertTrue ( kgo_names == test_nml_profiles )
+    deallocate(kgo_names)
+
+    test_nml_profiles = this%nml_bank%get_namelist_profiles(name='heros')
+    allocate(kgo_names(2))
+    kgo_names(1) = 'human'
+    kgo_names(2) = 'potato'
+    @assertTrue ( kgo_names == test_nml_profiles )
+    deallocate(kgo_names)
+
+    test_nml_profiles = this%nml_bank%get_namelist_profiles(name='dwarves')
+    allocate(kgo_names(3))
+    kgo_names(1) = 'sleepy'
+    kgo_names(2) = 'angry'
+    kgo_names(3) = 'hungry'
+    @assertTrue ( kgo_names == test_nml_profiles )
+    deallocate(kgo_names)
+
+  end subroutine test_nml_queries
+
+
+  !==============================================================
+  @test
+  subroutine test_nml_retrival(this)
+
+    implicit none
+
+    class(nml_collection_test_type), intent(inout) :: this
+
+    type(namelist_type), pointer :: nml_obj => null()
+
+    character(str_def) :: test_str
+
+    integer(int32) :: test_int32
+    integer(int64) :: test_int64
+    real(real32)   :: test_real32
+    real(real64)   :: test_real64
+
+    integer(int32), allocatable :: test_int32arr(:)
+    real(real64),   allocatable :: test_real64arr(:)
+    logical,        allocatable :: test_logicarr(:)
+
+    character(str_def), allocatable :: test_stringarr(:)
+
+    character(str_def) :: kgo_strarr(3) = ['big','fat','tin']
+
+    nml_obj => this%nml_bank%get_namelist('jack_bean')
+    call nml_obj%get_value('fee', test_int32 )
+    call nml_obj%get_value('fi',  test_int64 )
+    call nml_obj%get_value('fo',  test_real32 )
+    call nml_obj%get_value('fum', test_real64 )
+    call nml_obj%get_value('too', test_int32arr )
+    call nml_obj%get_value('bin', test_real64arr )
+    call nml_obj%get_value('tee', test_logicarr )
+    call nml_obj%get_value('pot', test_stringarr )
+
+    @assertEqual( 1_int32, test_int32 )
+    @assertEqual( 8_int64, test_int64 )
+    @assertEqual( 5.0_real32, test_real32 )
+    @assertEqual( 3.0_real64, test_real64 )
+
+    @assertEqual( [3_int32, 1_int32], test_int32arr )
+    @assertEqual( [7.0_real64, 2.0_real64], test_real64arr )
+    @assertTrue ( [.true.,.false.,.true.] .eqv. test_logicarr )
+    @assertTrue ( kgo_strarr == test_stringarr )
+
+
+    nml_obj => this%nml_bank%get_namelist('dwarves', profile_name='sleepy')
+    call nml_obj%get_value('main_trait', test_str )
+    @assertEqual ( 'sleeps a lot', trim(test_str) )
+
+    nml_obj => this%nml_bank%get_namelist('dwarves', profile_name='angry')
+    call nml_obj%get_value('main_trait', test_str )
+    @assertEqual ( 'shouts a lot', trim(test_str) )
+
+    nml_obj => this%nml_bank%get_namelist('dwarves', profile_name='hungry')
+    call nml_obj%get_value('main_trait', test_str )
+    @assertEqual ( 'eats a lot', trim(test_str) )
+
+    nml_obj => this%nml_bank%get_namelist('heros', profile_name='human')
+    call nml_obj%get_value('power', test_str )
+    @assertEqual ( 'breathes air', trim(test_str) )
+
+    nml_obj => this%nml_bank%get_namelist('heros', profile_name='potato')
+    call nml_obj%get_value('power', test_str )
+    @assertEqual ( 'it is a potato', trim(test_str) )
+
+    return
+  end subroutine test_nml_retrival
+
+end module namelist_collection_mod_test

@@ -37,3 +37,5 @@ class namelist_mod::namelist_type {
 }
 
 linked_list_data_mod::linked_list_data_type <|-- namelist_mod::namelist_type
+namelist_mod::namelist_type o-> "*" namelist_item_mod::namelist_item_type
+namelist_item_mod::namelist_item_type o-> keyvalue_mod::keyvalue_type
