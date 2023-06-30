@@ -12,7 +12,7 @@
 !>          external fields inherit
 !
 module abstract_external_field_mod
-  use constants_mod,        only: i_def
+  use constants_mod,        only: i_def, i_native
   use field_mod,            only: field_type
   use linked_list_data_mod, only: linked_list_data_type
   implicit none
@@ -39,15 +39,19 @@ contains
 end type abstract_external_field_type
 
 abstract interface
-  subroutine copy_from_lfric_interface( self )
+  subroutine copy_from_lfric_interface( self, return_code )
     import abstract_external_field_type
+    import :: i_native
     implicit none
     class( abstract_external_field_type ), intent(inout) :: self
+    integer(i_native), intent(out), optional :: return_code
   end subroutine copy_from_lfric_interface
-  subroutine copy_to_lfric_interface( self )
+  subroutine copy_to_lfric_interface( self, return_code )
     import abstract_external_field_type
+    import :: i_native
     implicit none
     class( abstract_external_field_type ), intent(inout) :: self
+    integer(i_native), intent(out), optional :: return_code
   end subroutine copy_to_lfric_interface
 end interface
 

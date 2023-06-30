@@ -22,7 +22,7 @@ module atlas_field_interface_mod
   use abstract_external_field_mod,   only : abstract_external_field_type
   use field_mod,                     only : field_type, field_proxy_type
   use fs_continuity_mod,             only : W3, Wtheta, name_from_functionspace
-  use constants_mod,                 only : i_def, str_def, l_def
+  use constants_mod,                 only : i_def, str_def, l_def, i_native
 
   implicit none
 
@@ -239,11 +239,12 @@ subroutine field_initialiser( self, atlas_data_ptr, map_horizontal_ptr, &
 end subroutine field_initialiser
 
 !> Copy Atlas field from the LFRic field
-subroutine copy_from_lfric(self)
+subroutine copy_from_lfric(self, return_code)
 
   implicit none
 
   class( atlas_field_interface_type ), intent(inout) :: self
+  integer(i_native), intent(out), optional :: return_code
 
   type( field_type ), pointer :: lfric_field_ptr
   type( field_proxy_type )    :: field_proxy
@@ -276,11 +277,12 @@ subroutine copy_from_lfric(self)
 end subroutine copy_from_lfric
 
 !> Copy Atlas field to the LFRic field
-subroutine copy_to_lfric( self )
+subroutine copy_to_lfric( self, return_code )
 
   implicit none
 
   class( atlas_field_interface_type ), intent(inout) :: self
+  integer(i_native), intent(out), optional :: return_code
 
   type( field_type ), pointer :: lfric_field_ptr
   type( field_proxy_type )    :: field_proxy

@@ -19,9 +19,6 @@ module coupler_mod
                                             namsrcfld, namdstfld, oasis_in,    &
                                             prism_real
 #endif
-  use cpl_field_send_mod,             only: cpl_field_send, &
-                                            initialise_send_fields
-  use cpl_field_receive_mod,          only: cpl_field_receive
   use field_mod,                      only: field_type, field_proxy_type
   use field_parent_mod,               only: field_parent_type
   use pure_abstract_field_mod,        only: pure_abstract_field_type
@@ -34,7 +31,7 @@ module coupler_mod
   use field_collection_mod,           only: field_collection_type
   use sort_mod,                       only: bubble_sort
   use constants_mod,                  only: i_def, r_def, i_halo_index, l_def, &
-                                            imdi, rmdi
+                                            i_native, imdi, rmdi
   use timestepping_config_mod,        only: dt
   use log_mod,                        only: log_event,       &
                                             LOG_LEVEL_INFO,  &
@@ -49,6 +46,8 @@ module coupler_mod
   use coupler_diagnostics_mod,        only: cpl_diagnostics, cpl_reset_field, &
                                             initialise_extra_coupling_fields, &
                                             acc_step, ldump_prep
+  use coupler_external_field_mod,     only: coupler_external_field_type, &
+                                            initialise_send_fields
   use coupler_update_prognostics_mod, only: coupler_update_prognostics,       &
                                             initialise_snow_mass
   use process_o2a_algorithm_mod,      only: process_o2a_algorithm
@@ -156,14 +155,11 @@ module coupler_mod
    type( field_type ),         pointer          :: cfield        => null()
    !iterator
    type( field_collection_iterator_type)        :: iter
-   !fail flag to prevent model failure after single failure
-   logical(l_def)                               :: lfail
 
    ! Initilaise accumulation step counter
    acc_step = 0.0
    ldump_prep = .false.
 
-   lfail = .false.
    call iter%initialise(dcpl_rcv)
    do
      if (.not.iter%has_next())exit
@@ -181,13 +177,10 @@ module coupler_mod
          write(log_scratch_space, '(2A)') "Problem cpl_init_fields: field ", &
                                trim(cfield%get_name())//" is NOT field_type"
          call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-         lfail = .true.
        end select
    end do
 
    nullify(cfield_iter)
-
-   if(lfail) call log_event("Errors in cpl_init_fields", LOG_LEVEL_ERROR )
 
   end subroutine cpl_init_fields
 
@@ -667,14 +660,13 @@ module coupler_mod
     class( field_parent_type ), pointer          :: field   => null()
     !pointer to a field
     type( field_type ), pointer                  :: field_ptr   => null()
-    !failure flag
-    logical(l_def)                               :: lfail
     !iterator
     type( field_collection_iterator_type)        :: iter
     !pointer to sea ice fractions
     type( field_type ),         pointer          :: ice_frac_ptr   => null()
+    ! External field used for sending data to Oasis
+    type(coupler_external_field_type)            :: coupler_external_field
 
-    lfail = .false.
     ldump_prep = .false.
 
     ! increment accumulation step
@@ -689,22 +681,24 @@ module coupler_mod
         type is (field_type)
           field_ptr => field
           call cpl_diagnostics(field_ptr, depository, model_clock)
-          call cpl_field_send(field_ptr, model_clock, lfail, &
+          ! Create a coupling external field and call copy_from_lfric
+          ! to send the coupling field to Oasis
+          call coupler_external_field%initialise_cpl_external_field(field_ptr, &
                               nmax, icpl_size, slength, slocal_index)
+          call coupler_external_field%set_coupling_time(model_clock)
+          ! Call through to cpl_field_send in coupler_external_field_mod
+          call coupler_external_field%copy_from_lfric()
           call field_ptr%write_field(trim(field%get_name()))
         class default
           write(log_scratch_space, '(2A)' ) "PROBLEM cpl_snd: field ", &
                 trim(field%get_name())//" is NOT field_type"
           call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-          lfail = .true.
       end select
 
     end do
 
    ice_frac_ptr   => null()
    nullify(field)
-
-    if (lfail) call log_event("Errors in cpl_snd", LOG_LEVEL_ERROR )
 
   end subroutine cpl_snd
 
@@ -727,14 +721,11 @@ module coupler_mod
    class( field_parent_type ), pointer          :: field   => null()
    !pointer to a field
    type( field_type ), pointer                  :: field_ptr   => null()
-   !failure flag
-   logical(l_def)                               :: lfail
    !iterator
    type( field_collection_iterator_type)        :: iter
    !pointer to sea ice fractions
    type( field_type ),         pointer          :: ice_frac_ptr        => null()
 
-   lfail = .false.
    ldump_prep = .true.
    acc_step = acc_step + 1.0
 
@@ -753,7 +744,6 @@ module coupler_mod
           write(log_scratch_space, '(2A)' ) "PROBLEM cpl_fld_update: field ", &
                          trim(field%get_name())//" is NOT field_type"
           call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-          lfail = .true.
         end select
    end do
 
@@ -761,8 +751,6 @@ module coupler_mod
 
    ice_frac_ptr   => null()
    nullify(field)
-
-   if(lfail) call log_event("Errors in cpl_fld_update", LOG_LEVEL_ERROR )
 
   end subroutine cpl_fld_update
 
@@ -783,24 +771,16 @@ module coupler_mod
    class( field_parent_type ), pointer          :: field   => null()
    !pointer to a field
    type( field_type ), pointer                  :: field_ptr => null()
-   !failure flag
-   logical(l_def)                               :: lfail
-   !model time
-   integer(i_def)                               :: mtime
+   ! External field used for receiving data from Oasis
+   type(coupler_external_field_type)            :: coupler_external_field
    !iterator
    type( field_collection_iterator_type)        :: iter
-   !logical flag for processing data that has just been exchanged
-   ! (true once data has been sucessfully passed through the coupler)
-   logical(kind=l_def)                          :: l_process_data
+   !flag for processing data that has just been exchanged
+   ! (set to 1 once data has been successfully passed through the coupler)
+   integer(i_native)                            :: exchange_flag
 
    ! Set defaults
-   lfail = .false.
-   l_process_data = .false.
-
-   mtime                                                                    &
-     = int( model_clock%seconds_from_steps(model_clock%get_step())          &
-            - model_clock%seconds_from_steps(model_clock%get_first_step()), &
-            i_def)
+   exchange_flag = 0
 
    call iter%initialise(dcpl_rcv)
    do
@@ -809,26 +789,28 @@ module coupler_mod
       select type(field)
         type is (field_type)
           field_ptr => field
-          call cpl_field_receive(field_ptr, mtime, l_process_data, lfail, &
-                                 icpl_size, slength, slocal_index)
+          ! Create a coupling external field and call copy_to_lfric
+          ! to receive the coupling field from Oasis
+          call coupler_external_field%initialise_cpl_external_field(field_ptr, &
+                              nmax, icpl_size, slength, slocal_index)
+          call coupler_external_field%set_coupling_time(model_clock)
+          ! Call through to cpl_field_receive in coupler_external_field_mod
+          call coupler_external_field%copy_to_lfric(exchange_flag)
         class default
           write(log_scratch_space, '(2A)' ) "PROBLEM cpl_rcv: field ", &
                         trim(field%get_name())//" is NOT field_type"
              call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-          lfail = .true.
         end select
    end do
 
-   if(lfail) call log_event("Errors in cpl_rcv", LOG_LEVEL_ERROR )
-
-   if (l_process_data .and. l_esm_couple_test) then
+   if (exchange_flag == 1 .and. l_esm_couple_test) then
       write(log_scratch_space, '(2A)' ) "Skipping updating of prognostics ",&
                             "from coupler (due to l_esm_couple_test=.true.)"
       call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
-      l_process_data=.false.
+      exchange_flag = 0
    end if
 
-   if(l_process_data) then
+   if(exchange_flag == 1) then
 
       ! If exchange is successful then process the data that has
       ! come through the coupler
