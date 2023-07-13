@@ -113,8 +113,6 @@
       <field field_ref="microphysics__ls_snow_acc"/>
       <field field_ref="convection__conv_rain_acc"/>
       <field field_ref="convection__conv_snow_acc"/>
-      <field field_ref="stochastic__du_div_skeb"/>
-      <field field_ref="stochastic__dv_div_skeb"/>
     </field_group>
   </file>
 
