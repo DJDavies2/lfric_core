@@ -20,8 +20,7 @@ module create_lbcs_mod
   use mr_indices_mod,             only : nummr,                      &
                                          mr_names
   use linked_list_mod,            only : linked_list_type
-  use lfric_xios_time_axis_mod,   only : time_axis_type,        &
-                                         update_interface
+  use lfric_xios_time_axis_mod,   only : time_axis_type
   use init_time_axis_mod,         only : setup_field
   use initialization_config_mod,  only : lbc_option,             &
                                          lbc_option_analytic,    &
@@ -55,7 +54,6 @@ module create_lbcs_mod
     type(linked_list_type),      intent(out)   :: lbc_times_list
 
     logical(l_def)                             :: checkpoint_restart_flag
-    procedure(update_interface), pointer       :: tmp_update_ptr => null()
 
     type(time_axis_type), save                 :: lbc_time_axis
     logical(l_def),   parameter                :: cyclic=.false.

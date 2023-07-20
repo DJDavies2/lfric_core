@@ -76,6 +76,8 @@ module gungho_model_data_mod
   use process_inputs_alg_mod,             only : process_inputs_alg
   use update_tstar_alg_mod,               only : update_tstar_alg
   use variable_fields_mod,                only : init_variable_fields
+  use lfric_xios_time_axis_mod,           only : regridder
+  use intermesh_mappings_alg_mod,         only : map_scalar_field
 #endif
   use linked_list_mod,                    only : linked_list_type, &
                                                  linked_list_item_type
@@ -330,6 +332,12 @@ subroutine create_model_data( model_data,         &
     type( field_type ), pointer :: temp_correction_field => null()
     type( field_type ), pointer :: accumulated_fluxes    => null()
 
+#ifdef UM_PHYSICS
+    procedure(regridder), pointer :: regrid_operation => null()
+
+    regrid_operation => map_scalar_field
+#endif
+
     ! Initialise all the physics fields here. We'll then re initialise
     ! them below if need be
     if (use_physics) then
@@ -475,8 +483,9 @@ subroutine create_model_data( model_data,         &
           call update_tstar_alg(model_data%surface_fields, &
                                 model_data%fd_fields, put_field=.true. )
         case ( ancil_option_fixed, ancil_option_updating )
-          call init_variable_fields( model_data%ancil_times_list, &
-                                     model_clock, model_data%ancil_fields )
+          call init_variable_fields( model_data%ancil_times_list,          &
+                                     model_clock, model_data%ancil_fields, &
+                                     regrid_operation )
           if (.not. checkpoint_read) then
             ! These parts only need to happen on a new run
             call log_event( "Gungho: Reading ancillaries from file ", LOG_LEVEL_INFO )

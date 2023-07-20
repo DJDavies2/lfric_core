@@ -49,6 +49,8 @@ module gungho_driver_mod
                                   only : aerosol_mesh_name
 #ifdef UM_PHYSICS
   use variable_fields_mod,        only : update_variable_fields
+  use lfric_xios_time_axis_mod,   only : regridder
+  use intermesh_mappings_alg_mod, only : map_scalar_field
   use update_ancils_alg_mod,      only : update_ancils_alg
   use gas_calc_all_mod,           only : gas_calc_all
 #endif
@@ -150,7 +152,11 @@ contains
 
     type(mesh_type), pointer :: mesh      => null()
     type(mesh_type), pointer :: twod_mesh => null()
+#ifdef UM_PHYSICS
+    procedure(regridder), pointer :: regrid_operation => null()
 
+    regrid_operation => map_scalar_field
+#endif
     ! Get primary and 2D meshes
     mesh => mesh_collection%get_mesh(prime_mesh_name)
     twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
@@ -210,7 +216,8 @@ contains
     if ( ancil_option == ancil_option_updating ) then
       call update_variable_fields( modeldb%model_data%ancil_times_list, &
                                    modeldb%clock,                       &
-                                   modeldb%model_data%ancil_fields )
+                                   modeldb%model_data%ancil_fields,     &
+                                   regrid_operation )
       call update_ancils_alg( modeldb%model_data%ancil_times_list, &
                               modeldb%clock,                       &
                               modeldb%model_data%ancil_fields,     &

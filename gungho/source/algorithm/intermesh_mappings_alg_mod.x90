@@ -44,6 +44,7 @@ module intermesh_mappings_alg_mod
   private :: prolong_scalar_simple     ! Injection/recovery of W3/Wtheta field
   private :: prolong_scalar_reversible ! Reversible prolongation of non-conservative W3/Wtheta field
   public  :: map_scalar_intermesh      ! Public routine for non-conservative W3/Wtheta fields
+  public  :: map_scalar_field          ! Simple interface to map_scalar_intermesh
   private :: restrict_rho              ! Conservative restriction of W3 field
   private :: inject_rho                ! Conservative injection of W3 field
   private :: prolong_rho_reversible    ! Conservative and reversible prolong for W3 fields
@@ -194,25 +195,28 @@ contains
   !> @param[in]     source_field       Source field
   !> @param[in]     lowest_order_flag  Optional logical argument to force any
   !!                                   recovery to be lowest-order
-  !> @param[in]     ndata              Size of data if a multidata field
-  subroutine map_scalar_intermesh( target_field, source_field, lowest_order_flag, ndata )
+  subroutine map_scalar_intermesh( target_field, source_field, lowest_order_flag )
 
     implicit none
 
     type(field_type),              intent(in)    :: source_field
     type(field_type),              intent(inout) :: target_field
     logical(kind=l_def), optional, intent(in)    :: lowest_order_flag
-    integer(kind=i_def), optional, intent(in)    :: ndata
 
     type(mesh_type), pointer  :: source_mesh => null()
     type(mesh_type), pointer  :: target_mesh => null()
     integer(kind=i_def)       :: source_ncells
     integer(kind=i_def)       :: target_ncells
     integer(kind=i_def)       :: recovery_order_arg
+    integer(kind=i_def)       :: ndata
+    type(function_space_type), pointer :: fs_type => null()
 
     ! Get source and target mesh ids and meshes
     source_mesh => source_field%get_mesh()
     target_mesh => target_field%get_mesh()
+
+    fs_type => source_field%get_function_space()
+    ndata = fs_type%get_ndata()
 
     ! Figure out which of the meshes has fewer cells
     source_ncells = source_mesh%get_ncells()
@@ -222,13 +226,13 @@ contains
       call invoke( setval_X(target_field, source_field))
 
     else if ( source_ncells > target_ncells ) then
-      if (present(ndata) .and. ndata > 1) then
+      if (ndata > 1) then
         call log_event('Restriction not available for multidata field', LOG_LEVEL_ERROR)
       end if
       call restrict_scalar(target_field, source_field)
 
     else
-      if (present(ndata) .and. ndata > 1) then
+      if (ndata > 1) then
         call log_event('Prolongation not available for multidata field', LOG_LEVEL_ERROR)
       end if
       if ( present(lowest_order_flag) .and. lowest_order_flag ) then
@@ -248,9 +252,24 @@ contains
       end if
     end if
 
-    nullify(source_mesh, target_mesh)
+    nullify(source_mesh, target_mesh, fs_type)
 
   end subroutine map_scalar_intermesh
+
+  !> @brief Interface to map_scalar_intermesh where lowest_order_flag option is not required
+  !> @details Can be used to satisfy generic remapping requirements
+  !> @param[in,out] target_field       Target field
+  !> @param[in]     source_field       Source field
+  subroutine map_scalar_field( target_field, source_field )
+
+    implicit none
+
+    type(field_type),              intent(in)    :: source_field
+    type(field_type),              intent(inout) :: target_field
+
+    call map_scalar_intermesh( target_field, source_field )
+
+  end subroutine map_scalar_field
 
   !> @brief Conservative restriction of a W3 field (such as a density)
   !> @param[in,out] target_field  Target field, on a coarse mesh

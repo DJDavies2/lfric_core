@@ -9,10 +9,7 @@
 !>          time axis object can be linked to a field to provide information
 !>          of how the field should be updated with time.
 module lfric_xios_time_axis_mod
-#if defined(UM_PHYSICS)
-  use intermesh_mappings_alg_mod, &
-                            only: map_scalar_intermesh
-#endif
+
   use constants_mod,        only: i_def, i_native, str_def, str_long, &
                                   str_max_filename, r_def, l_def
   use field_mod,            only: field_type, field_proxy_type
@@ -109,22 +106,20 @@ module lfric_xios_time_axis_mod
 
   abstract interface
 
-  !> @brief Interface for updating the field data associated with the time axis.
-  !> @param[in]     field_name  Name of the field to be updated
-  !> @param[in,out] field_proxy Field proxy to be updated
-  !> @param[in]     times       The time data corresponding to the new field data
-  !>
-  subroutine update_interface(field_name, field_proxy, times, xios_id)
-    import i_def, field_proxy_type
-    character(len=*),        intent(in) :: field_name
-    type(field_proxy_type),  intent(inout) :: field_proxy
-    integer(i_def),          intent(in) :: times(:)
-    character(len=*),        intent(in) :: xios_id
-  end subroutine update_interface
+    !> @brief Interface for optionally regridding a field
+    !> @param[in,out]   target_field  Name of the field to be updated
+    !> @param[in]       source_field  Name of the original field
+    !>
+    subroutine regridder(target_field, source_field)
+      import :: field_type
+      implicit none
 
-end interface
+      type(field_type),              intent(inout) :: target_field
+      type(field_type),              intent(in)    :: source_field
+    end subroutine regridder
+  end interface
 
-public :: update_interface
+  public :: regridder
 
 contains
 
@@ -534,12 +529,14 @@ contains
 
   !> @brief Populates model fields using time axis data fields.
   !> @param[in] model_fields Field collection to populate from data fields
-  subroutine populate_model_fields(self, model_fields)
+  !> @param[in] regrid_proc  Optional procedure to regrid the field
+  subroutine populate_model_fields(self, model_fields, regrid_proc)
 
     implicit none
 
     class(time_axis_type),       intent(inout) :: self
     type(field_collection_type), intent(in)    :: model_fields
+    procedure(regridder), pointer, optional    :: regrid_proc
 
     class(field_parent_type),  pointer :: field_next => null()
     type(field_type),          pointer :: model_field => null()
@@ -606,11 +603,11 @@ contains
         ! If any spatial interpolated is needed then that is done here.
         ! Otherwise this algorithm does a copy of data from interpolating_field
         ! to model_field
-#if defined(UM_PHYSICS)
-        call map_scalar_intermesh(model_field, interpolating_field, ndata=ndata)
-#else
-        model_proxy%data(:) = interpolating_proxy%data(:)
-#endif
+        if ( present(regrid_proc) ) then
+          call regrid_proc(model_field, interpolating_field)
+        else
+          model_proxy%data(:) = interpolating_proxy%data(:)
+        end if
         ! Set halos dirty
         call model_proxy%set_dirty()
 

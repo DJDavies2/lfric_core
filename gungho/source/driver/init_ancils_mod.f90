@@ -27,7 +27,7 @@ module init_ancils_mod
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : W3, WTheta
   use pure_abstract_field_mod,        only : pure_abstract_field_type
-  use lfric_xios_time_axis_mod,       only : time_axis_type, update_interface
+  use lfric_xios_time_axis_mod,       only : time_axis_type
   use jules_control_init_mod,         only : n_land_tile
   use jules_surface_types_mod,        only : npft
   use dust_parameters_mod,            only : ndiv
@@ -79,9 +79,6 @@ contains
     type( mesh_type ), intent(in), pointer :: aerosol_twod_mesh
 
     type(linked_list_type), intent(out) :: ancil_times_list
-
-    ! Pointer to time-axis update procedure
-    procedure(update_interface), pointer :: tmp_update_ptr => null()
 
     ! Time axis objects for different ancil groups - must be saved to be
     ! available after function call

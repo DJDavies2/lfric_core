@@ -8,7 +8,7 @@ module variable_fields_mod
 
   use constants_mod,                 only : r_def, r_second, str_def
   use field_collection_mod,          only : field_collection_type
-  use lfric_xios_time_axis_mod,      only : time_axis_type
+  use lfric_xios_time_axis_mod,      only : time_axis_type, regridder
   use linked_list_mod,               only : linked_list_type, &
                                             linked_list_item_type
   use model_clock_mod,               only : model_clock_type
@@ -20,14 +20,19 @@ module variable_fields_mod
             update_variable_fields
 
 contains
-
-  subroutine init_variable_fields(time_axis_list, clock, fields)
+  !> @brief Initialise time-varying input fields
+  !> @param [in]     time_axis_list  A list of objects referencing time-varying input fields
+  !> @param [in]     clock  Model clock
+  !> @param [in,out] fields  The model fields
+  !> @param [in]     regrid_operation  Optional procedure for regridding input data
+  subroutine init_variable_fields(time_axis_list, clock, fields, regrid_operation)
 
     implicit none
 
     type(linked_list_type),      intent(in)    :: time_axis_list
     class(model_clock_type),     intent(in)    :: clock
     type(field_collection_type), intent(inout) :: fields
+    procedure(regridder), pointer, optional    :: regrid_operation
 
     ! Pointer to linked list - used for looping through the list
     type(linked_list_item_type), pointer :: loop => null()
@@ -52,7 +57,7 @@ contains
           call time_axis%update_fields()
           ! Only populate the fields on a new run
           if ( clock%is_initialisation() ) then
-            call time_axis%populate_model_fields(fields)
+            call time_axis%populate_model_fields(fields, regrid_operation)
           end if
 
       end select
@@ -66,13 +71,19 @@ contains
 
   end subroutine init_variable_fields
 
-  subroutine update_variable_fields(time_axis_list, clock, fields)
+  !> @brief Update time-varying input fields
+  !> @param [in]     time_axis_list  A list of objects referencing time-varying input fields
+  !> @param [in]     clock  Model clock
+  !> @param [in,out] fields  The model fields
+  !> @param [in]     regrid_operation  Optional procedure for regridding input data
+  subroutine update_variable_fields(time_axis_list, clock, fields, regrid_operation)
 
     implicit none
 
     type(linked_list_type),      intent(in)    :: time_axis_list
     class(model_clock_type),     intent(in)    :: clock
     type(field_collection_type), intent(inout) :: fields
+    procedure(regridder), pointer, optional    :: regrid_operation
 
     ! Pointer to linked list - used for looping through the list
     type(linked_list_item_type), pointer :: loop => null()
@@ -96,7 +107,7 @@ contains
 
           ! Populate the model fields from the time axis data
           if ( time_axis%populate_fields() ) then
-            call time_axis%populate_model_fields(fields)
+            call time_axis%populate_model_fields(fields, regrid_operation)
           end if
 
       end select

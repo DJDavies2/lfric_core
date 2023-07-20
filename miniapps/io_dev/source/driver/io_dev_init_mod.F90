@@ -24,7 +24,7 @@ module io_dev_init_mod
                                              LOG_LEVEL_ERROR
   use mesh_mod,                       only : mesh_type
   use pure_abstract_field_mod,        only : pure_abstract_field_type
-  use lfric_xios_time_axis_mod,       only : time_axis_type, update_interface
+  use lfric_xios_time_axis_mod,       only : time_axis_type
   ! Configuration
   use io_dev_config_mod,              only : field_kind,      &
                                              field_kind_real, &
