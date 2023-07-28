@@ -70,7 +70,7 @@ contains
                                                 spt_level_bottom, &
                                                 spt_level_top
 
-    use qsat_mod,                   only: qsat_wat
+    use qsat_mod,                   only: qsat_wat_mix
 
     implicit none
 
@@ -96,7 +96,7 @@ contains
     do k= spt_level_bottom, spt_level_top
 
       ! Call qsat from UM routine
-      call qsat_wat(qsat,  T_latest(map_wth(1) + k), pressure(map_wth(1) + k))
+      call qsat_wat_mix(qsat,  T_latest(map_wth(1) + k), pressure(map_wth(1) + k))
 
       ! ! Remove points where perturbed mv is above saturation
       if ( mv(map_wth(1) + k) + dmv(map_wth(1) + k) > qsat ) then

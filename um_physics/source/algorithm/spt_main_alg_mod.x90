@@ -369,7 +369,7 @@ module spt_main_alg_mod
 
     ! Apply tendencies to dX_spt, conver dt to theta
     if (.not. spt_mse_conservation) then
-      call invoke(inc_X_times_Y(dt_conv_cfl,exner_wth), &
+      call invoke(inc_X_divideby_Y(dt_conv_cfl,exner_wth), &
                   inc_X_plus_bY(dtheta_spt,spt_stddev_convection,dt_conv_cfl))
     end if
     call invoke(inc_X_plus_bY(dmv_spt,spt_stddev_convection,dmv_conv_cfl) )
@@ -412,7 +412,7 @@ module spt_main_alg_mod
   call theta_star%copy_field_properties(T_latest)
   call invoke(X_plus_Y(T_latest,theta_star,dtheta), &
               ! convert T_latest from pot. Temp to Temp
-              inc_X_divideby_Y(T_latest,exner_wth), &
+              inc_X_times_Y(T_latest,exner_wth), &
               spt_saturation_cap_kernel_type(dtheta_spt,dmv_spt, &
               T_latest,mv, pressure))
 
