@@ -16,6 +16,15 @@ module create_physics_prognostics_mod
   use field_parent_mod,               only : write_interface, read_interface,  &
                                              checkpoint_write_interface,       &
                                              checkpoint_read_interface
+  use field_spec_mod,                 only : main_coll_dict, &
+                                             adv_coll_dict, &
+                                             field_spec_type, &
+                                             processor_type, &
+                                             make_spec, &
+                                             if_adv => if_advected
+  use field_mapper_mod,               only : field_mapper_type
+  use field_maker_mod,                only : field_maker_type
+  use lfric_xios_diag_mod,            only : field_is_enabled
   use finite_element_config_mod,      only : element_order
   use function_space_collection_mod,  only : function_space_collection
   use field_collection_mod,           only : field_collection_type
@@ -81,100 +90,23 @@ module create_physics_prognostics_mod
   implicit none
 
   private
-  public :: create_physics_prognostics
+  public :: create_physics_prognostics, process_physics_prognostics
 
 contains
 
-  !>@brief Routine to initialise the field objects required by the physics
-  !> @param[in]    mesh      The current 3d mesh
-  !> @param[in]    twod_mesh The current 2d mesh
-  !> @param[in]    clock Model time.
-  !> @param[in,out] depository Main collection of all fields in memory
-  !> @param[in,out] prognostic_fields The prognostic variables in the model
-  !> @param[out]   adv_fields_all_outer Collection of fields that need to be advected every outer iteration
-  !> @param[out]   adv_fields_last_outer Collection of fields that need to be advected at final outer iteration
-  !> @param[out]   derived_fields Collection of FD fields derived from FE fields
-  !> @param[out]   radition_fields Collection of fields for radiation scheme
-  !> @param[out]   microphysics_fields Collection of fields for microphys scheme
-  !> @param[out]   electric_fields Collection of fields for electric scheme
-  !> @param[out]   orography_fields Collection of fields for orogr drag scheme
-  !> @param[out]   turbulence_fields Collection of fields for turbulence scheme
-  !> @param[out]   convection_fields Collection of fields for convection scheme
-  !> @param[out]   cloud_fields Collection of fields for cloud scheme
-  !> @param[out]   surface_fields Collection of fields for surface scheme
-  !> @param[out]   soil_fields Collection of fields for soil hydrology scheme
-  !> @param[out]   snow_fields Collection of fields for snow scheme
-  !> @param[out]   aerosol_fields Collection of fields for aerosol scheme
-  !> @param[out]   chemistry_fields Collection of fields for chemistry scheme
-  subroutine create_physics_prognostics( mesh,                  &
-                                         twod_mesh,             &
-                                         clock,                 &
-                                         depository,            &
-                                         prognostic_fields,     &
-                                         adv_fields_all_outer,  &
-                                         adv_fields_last_outer, &
-                                         derived_fields,        &
-                                         radiation_fields,      &
-                                         microphysics_fields,   &
-                                         electric_fields,       &
-                                         orography_fields,      &
-                                         turbulence_fields,     &
-                                         convection_fields,     &
-                                         cloud_fields,          &
-                                         surface_fields,        &
-                                         soil_fields,           &
-                                         snow_fields,           &
-                                         chemistry_fields,      &
-                                         aerosol_fields,        &
-                                         stph_fields )
-
+  !> @brief Iterate over active model fields and apply an arbitrary
+  !> processor to the field specifiers.
+  !> @details To be used by create_physics_prognostics to create fields and by
+  !> gungho_model_mod / initialise_infrastrucure to enable checkpoint fields.
+  !> These two operations have to be separate because they have to happen
+  !> at different times. The enabling of checkpoint fields has to happen
+  !> before the io context closes, and this is too early for field creation.
+  !> @param  process Processor to be applied to selected field specifiers
+  subroutine process_physics_prognostics(processor)
+    use field_spec_mod,            only : main => main_coll_dict, &
+                                          adv => adv_coll_dict
     implicit none
-
-    type( mesh_type ), intent(in), pointer :: mesh
-    type( mesh_type ), intent(in), pointer :: twod_mesh
-
-    class(clock_type), intent(in) :: clock
-
-    ! Collections of fields
-    type(field_collection_type), intent(inout) :: depository
-    type(field_collection_type), intent(inout) :: prognostic_fields
-    type(field_collection_type), intent(inout) :: adv_fields_all_outer
-    type(field_collection_type), intent(inout) :: adv_fields_last_outer
-    type(field_collection_type), intent(out) :: derived_fields
-    type(field_collection_type), intent(out) :: radiation_fields
-    type(field_collection_type), intent(out) :: microphysics_fields
-    type(field_collection_type), intent(out) :: electric_fields
-    type(field_collection_type), intent(out) :: orography_fields
-    type(field_collection_type), intent(out) :: turbulence_fields
-    type(field_collection_type), intent(out) :: convection_fields
-    type(field_collection_type), intent(out) :: cloud_fields
-    type(field_collection_type), intent(out) :: surface_fields
-    type(field_collection_type), intent(out) :: soil_fields
-    type(field_collection_type), intent(out) :: snow_fields
-    type(field_collection_type), intent(out) :: chemistry_fields
-    type(field_collection_type), intent(out) :: aerosol_fields
-    type(field_collection_type), intent(out) :: stph_fields
-
-    ! pointers to vector spaces
-#ifdef UM_PHYSICS
-    type(function_space_type), pointer :: vector_space => null()
-    type(function_space_type), pointer :: surft_space => null()
-    type(function_space_type), pointer :: pft_space => null()
-    type(function_space_type), pointer :: soil_space => null()
-    type(function_space_type), pointer :: sice_space => null()
-    type(function_space_type), pointer :: snow_space => null()
-    type(function_space_type), pointer :: h_ang_space => null()
-    type(function_space_type), pointer :: h_asp_space => null()
-#endif
-    type(function_space_type), pointer :: twod_space => null()
-    type(function_space_type), pointer :: wtheta_space => null()
-    type(function_space_type), pointer :: w3_space => null()
-    type(function_space_type), pointer :: w2_space => null()
-    type(function_space_type), pointer :: w2h_space => null()
-
-    type( field_type ), pointer :: theta => null()
-
-    integer(i_def) :: theta_space
+    class(processor_type) :: processor
 #ifdef UM_PHYSICS
     logical(l_def) :: checkpoint_flag, checkpoint_GC3, checkpoint_GC5
     logical(l_def) :: checkpoint_couple
@@ -182,71 +114,26 @@ contains
     logical(l_def) :: advection_flag_dust
 #endif
 
-    call log_event( 'Create physics prognostics', LOG_LEVEL_INFO )
+    class(clock_type), pointer :: clock
 
-    call prognostic_fields%get_field('theta', theta)
-    theta_space = theta%which_function_space()
-
-    if (theta_space /= Wtheta)then
-      call log_event( 'Physics: requires theta variable to be in Wtheta',      &
-                      LOG_LEVEL_ERROR )
-    end if
-
-    if (element_order > 0)then
-      call log_event( 'Physics: requires lowest order elements',               &
-                      LOG_LEVEL_ERROR )
-    end if
-
-    ! Create the vector spaces once here for re-use later
-    wtheta_space => function_space_collection%get_fs(mesh, 0, Wtheta)
-    w3_space => function_space_collection%get_fs(mesh, 0, W3)
-    w2_space => function_space_collection%get_fs(mesh, 0, W2)
-    w2h_space => function_space_collection%get_fs(mesh, 0, W2H)
-    twod_space  => function_space_collection%get_fs(twod_mesh, 0, W3)
-#ifdef UM_PHYSICS
-    surft_space => function_space_collection%get_fs(twod_mesh, 0, W3,          &
-         get_ndata_val('surface_tiles'))
-    pft_space   => function_space_collection%get_fs(twod_mesh, 0, W3,          &
-         get_ndata_val('plant_types'))
-    soil_space  => function_space_collection%get_fs(twod_mesh, 0, W3,          &
-         get_ndata_val('soil_levels'))
-    sice_space  => function_space_collection%get_fs(twod_mesh, 0, W3,          &
-         get_ndata_val('sea_ice_tiles'))
-    snow_space  => function_space_collection%get_fs(twod_mesh, 0, W3,          &
-         get_ndata_val('snow_layers_and_tiles'))
-#endif
+    clock => processor%get_clock()
 
     !========================================================================
     ! Fields derived from the FE dynamical fields for use in physics
     !========================================================================
-    call derived_fields%initialise(name='derived_fields', table_len=100)
 
     ! Wtheta fields
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'velocity_w2v',      wtheta_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'w_in_wth',      wtheta_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'rho_in_wth',     wtheta_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'wetrho_in_wth',  wtheta_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'exner_in_wth',   wtheta_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'exner_wth_n',   wtheta_space )
+    call processor%apply(make_spec('velocity_w2v', main%derived, Wtheta))
+    call processor%apply(make_spec('w_in_wth', main%derived, Wtheta))
+    call processor%apply(make_spec('rho_in_wth', main%derived, Wtheta))
+    call processor%apply(make_spec('wetrho_in_wth', main%derived, Wtheta))
+    call processor%apply(make_spec('exner_in_wth', main%derived, Wtheta))
+    call processor%apply(make_spec('exner_wth_n', main%derived, Wtheta))
 
     if ( boundary_layer == boundary_layer_um .or. &
          convection     == convection_um ) then
 
-      call add_physics_field( derived_fields, depository, prognostic_fields,     &
-        adv_fields_last_outer, &
-        'theta_star',     wtheta_space )
+      call processor%apply(make_spec('theta_star', main%derived, Wtheta))
 
     end if
 
@@ -254,86 +141,50 @@ contains
          convection     == convection_um     .or. &
          smagorinsky ) then
 
-      call add_physics_field( derived_fields, depository, prognostic_fields,     &
-        adv_fields_last_outer, &
-        'shear',          wtheta_space )
+      call processor%apply(make_spec('shear', main%derived, Wtheta))
 
     end if
 
     ! W3 fields
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'u_in_w3',      w3_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'v_in_w3',      w3_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'w_in_w3',      w3_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'theta_in_w3',   w3_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'wetrho_in_w3',  w3_space )
+    call processor%apply(make_spec('u_in_w3', main%derived, W3))
+    call processor%apply(make_spec('v_in_w3', main%derived, W3))
+    call processor%apply(make_spec('w_in_w3', main%derived, W3))
+    call processor%apply(make_spec('theta_in_w3', main%derived, W3))
+    call processor%apply(make_spec('wetrho_in_w3', main%derived, W3))
 
     if ( boundary_layer               == boundary_layer_um .or.                  &
          convection                   == convection_um     .or.                  &
          stochastic_physics_placement == stochastic_physics_placement_fast ) then
 
-      call add_physics_field( derived_fields, depository, prognostic_fields,     &
-        adv_fields_last_outer, &
-        'u_in_w3_star', w3_space )
-      call add_physics_field( derived_fields, depository, prognostic_fields,     &
-        adv_fields_last_outer, &
-        'v_in_w3_star', w3_space )
-      call add_physics_field( derived_fields, depository, prognostic_fields,     &
-        adv_fields_last_outer, &
-        'w_in_w3_star', w3_space )
+      call processor%apply(make_spec('u_in_w3_star', main%derived, W3))
+      call processor%apply(make_spec('v_in_w3_star', main%derived, W3))
+      call processor%apply(make_spec('w_in_w3_star', main%derived, W3))
 
     end if
 
     ! W2 fields
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'u_physics',      w2_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'u_physics_star', w2_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'u_star',         w2_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'wetrho_in_w2',   w2_space )
+    call processor%apply(make_spec('u_physics', main%derived, W2))
+    call processor%apply(make_spec('u_physics_star', main%derived, W2))
+    call processor%apply(make_spec('u_star', main%derived, W2))
+    call processor%apply(make_spec('wetrho_in_w2', main%derived, W2))
 
     ! W2H fields
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'u_in_w2h',      w2h_space )
-    call add_physics_field( derived_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'v_in_w2h',      w2h_space )
+    call processor%apply(make_spec('u_in_w2h', main%derived, W2H))
+    call processor%apply(make_spec('v_in_w2h', main%derived, W2H))
 
     ! 2D fields
     if ( encorr_usage /= encorr_usage_none ) then
-      call add_physics_field( derived_fields, depository,               &
-                              prognostic_fields, adv_fields_last_outer, &
-                              'temp_correction_field',                  &
-                              twod_space, twod = .true.,                &
-                              checkpoint_flag = .true. )
+      call processor%apply(make_spec('temp_correction_field', main%derived, W3,       &
+          twod=.true., ckp=.true.))
 
-      call add_physics_field( derived_fields, depository,               &
-                              prognostic_fields, adv_fields_last_outer, &
-                              'accumulated_fluxes',                     &
-                              twod_space, twod = .true. )
+      call processor%apply(make_spec('accumulated_fluxes', main%derived, W3,          &
+          twod=.true.))
     end if
 
 #ifdef UM_PHYSICS
     !========================================================================
     ! Fields owned by the radiation scheme
     !========================================================================
-    call radiation_fields%initialise(name='radiation_fields', table_len=100)
 
     ! 2D fields, might need checkpointing
     if (surface == surface_jules .and. albedo_obs) then
@@ -341,66 +192,41 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'albedo_obs_vis', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'albedo_obs_nir', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('albedo_obs_vis', main%radiation, W3, twod=.true., &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('albedo_obs_nir', main%radiation, W3, twod=.true., &
+        ckp=checkpoint_flag))
 
     ! 3D fields, need checkpointing
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'ozone', wtheta_space, checkpoint_flag=.true. )
+    call processor%apply(make_spec('ozone', main%radiation, Wtheta, ckp=.true.))
 
     ! 2D fields, don't need checkpointing
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_down_surf', twod_space, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_down_surf', twod_space, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_direct_surf', twod_space, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_down_blue_surf', twod_space, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_direct_blue_surf', twod_space, twod=.true. )
+    call processor%apply(make_spec('lw_down_surf', main%radiation, W3, twod=.true.))
+    call processor%apply(make_spec('sw_down_surf', main%radiation, W3, twod=.true.))
+    call processor%apply(make_spec('sw_direct_surf', main%radiation, W3,              &
+        twod=.true.))
+    call processor%apply(make_spec('sw_down_blue_surf', main%radiation, W3,           &
+        twod=.true.))
+    call processor%apply(make_spec('sw_direct_blue_surf', main%radiation, W3,         &
+        twod=.true.))
 
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'cos_zenith_angle',   twod_space, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lit_fraction',       twod_space, twod=.true. )
+    call processor%apply(make_spec('cos_zenith_angle', main%radiation, W3,            &
+        twod=.true.))
+    call processor%apply(make_spec('lit_fraction', main%radiation, W3, twod=.true.))
 
     ! 3D fields, don't need checkpointing
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_heating_rate', wtheta_space )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_heating_rate', wtheta_space )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'dtheta_rad', wtheta_space )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'dmv_pc2_rad', wtheta_space )
+    call processor%apply(make_spec('sw_heating_rate', main%radiation, Wtheta))
+    call processor%apply(make_spec('lw_heating_rate', main%radiation, Wtheta))
+    call processor%apply(make_spec('dtheta_rad', main%radiation, Wtheta))
+    call processor%apply(make_spec('dmv_pc2_rad', main%radiation, Wtheta))
 
     ! Fields on surface tiles, don't need checkpointing
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_up_tile', surft_space, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_tile', surft_space, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_blue_tile', surft_space, twod=.true. )
+    call processor%apply(make_spec('lw_up_tile', main%radiation, W3,                  &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('sw_up_tile', main%radiation, W3,                  &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('sw_up_blue_tile', main%radiation, W3,             &
+        mult='surface_tiles', twod=.true.))
 
     ! Fields that need checkpointing for the topographic correction scheme
     if (radiation == radiation_socrates .and. &
@@ -409,37 +235,31 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'slope_angle', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'slope_aspect', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'skyview', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('slope_angle', main%radiation, W3, twod=.true.,    &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('slope_aspect', main%radiation, W3, twod=.true.,   &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('skyview', main%radiation, W3, twod=.true.,        &
+        ckp=checkpoint_flag))
     if (radiation == radiation_socrates .and. &
         topography == topography_horizon) then
       checkpoint_flag = .true.
-      h_ang_space => function_space_collection%get_fs( &
-                       twod_mesh, 0, W3, n_horiz_layer*n_horiz_ang)
-      h_asp_space => function_space_collection%get_fs( &
-                       twod_mesh, 0, W3, n_horiz_ang)
+      ! h_ang_space => function_space_collection%get_fs( &
+                       ! twod_mesh, 0, W3, n_horiz_layer*n_horiz_ang)
+      ! h_asp_space => function_space_collection%get_fs( &
+                       ! twod_mesh, 0, W3, n_horiz_ang)
     else
       checkpoint_flag = .false.
-      h_ang_space => function_space_collection%get_fs(twod_mesh, 0, W3, 1)
-      h_asp_space => function_space_collection%get_fs(twod_mesh, 0, W3, 1)
+      ! h_ang_space => function_space_collection%get_fs(twod_mesh, 0, W3, 1)
+      ! h_asp_space => function_space_collection%get_fs(twod_mesh, 0, W3, 1)
     end if
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'horizon_angle', h_ang_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'horizon_aspect', h_asp_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('horizon_angle', main%radiation, W3,               &
+        mult='horiz_angle', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('horizon_aspect', main%radiation, W3,              &
+        mult='horiz_aspect', twod=.true., ckp=checkpoint_flag))
 
     ! Fields which need checkpointing for radiation timestepping
     !
-    !> @todo There is probably a better way of handling this test which doesn't
     !>       involving passing the clock down here.
     !>
     if (radiation == radiation_socrates) then
@@ -453,134 +273,93 @@ contains
     end if
 
     ! 2D fields
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_down_surf_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_down_surf_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_direct_surf_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_down_blue_surf_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_direct_blue_surf_rts', twod_space, checkpoint_flag=checkpoint_flag,  &
-      twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_up_surf_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_surf_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_up_toa_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_toa_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_direct_toa_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('lw_down_surf_rts', main%radiation, W3,            &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_down_surf_rts', main%radiation, W3,            &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_direct_surf_rts', main%radiation, W3,          &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_down_blue_surf_rts', main%radiation, W3,       &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_direct_blue_surf_rts', main%radiation, W3,     &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('lw_up_surf_rts', main%radiation, W3, twod=.true., &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_up_surf_rts', main%radiation, W3, twod=.true., &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('lw_up_toa_rts', main%radiation, W3, twod=.true.,  &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_up_toa_rts', main%radiation, W3, twod=.true.,  &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_direct_toa_rts', main%radiation, W3,           &
+        twod=.true., ckp=checkpoint_flag))
 
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'cos_zenith_angle_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lit_fraction_rts', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'stellar_irradiance_rts', twod_space, checkpoint_flag=checkpoint_flag,   &
-      twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sin_stellar_declination_rts', twod_space,                               &
-      checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'stellar_eqn_of_time_rts', twod_space, checkpoint_flag=checkpoint_flag,  &
-      twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, 'orographic_correction_rts', twod_space,          &
-      checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('cos_zenith_angle_rts', main%radiation, W3,        &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('lit_fraction_rts', main%radiation, W3,            &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('stellar_irradiance_rts', main%radiation, W3,      &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sin_stellar_declination_rts', main%radiation, W3, &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('stellar_eqn_of_time_rts', main%radiation, W3,     &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('orographic_correction_rts', main%radiation, W3,   &
+        twod=.true., ckp=checkpoint_flag))
 
     ! 3D fields
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_heating_rate_rts', wtheta_space, checkpoint_flag=checkpoint_flag )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_heating_rate_rts', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('sw_heating_rate_rts', main%radiation, Wtheta,     &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('lw_heating_rate_rts', main%radiation, Wtheta,     &
+        ckp=checkpoint_flag))
 
     ! Fields on surface tiles
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_up_tile_rts', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_tile_rts', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_blue_tile_rts', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('lw_up_tile_rts', main%radiation, W3,              &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_up_tile_rts', main%radiation, W3,              &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_up_blue_tile_rts', main%radiation, W3,         &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
 
 
     ! Fields which need checkpointing for radiation incremental timestepping
     checkpoint_flag = checkpoint_flag .and. l_inc_radstep
 
     ! 2D fields
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_down_surf_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_down_surf_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_direct_surf_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_down_blue_surf_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_direct_blue_surf_rtsi', twod_space, checkpoint_flag=checkpoint_flag,  &
-      twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_up_surf_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_surf_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_up_toa_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_toa_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_direct_toa_rtsi', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('lw_down_surf_rtsi', main%radiation, W3,           &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_down_surf_rtsi', main%radiation, W3,           &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_direct_surf_rtsi', main%radiation, W3,         &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_down_blue_surf_rtsi', main%radiation, W3,      &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_direct_blue_surf_rtsi', main%radiation, W3,    &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('lw_up_surf_rtsi', main%radiation, W3,             &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_up_surf_rtsi', main%radiation, W3,             &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('lw_up_toa_rtsi', main%radiation, W3, twod=.true., &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_up_toa_rtsi', main%radiation, W3, twod=.true., &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_direct_toa_rtsi', main%radiation, W3,          &
+        twod=.true., ckp=checkpoint_flag))
 
     ! 3D fields
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_heating_rate_rtsi', wtheta_space, checkpoint_flag=checkpoint_flag )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_heating_rate_rtsi', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('sw_heating_rate_rtsi', main%radiation, Wtheta,    &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('lw_heating_rate_rtsi', main%radiation, Wtheta,    &
+        ckp=checkpoint_flag))
 
     ! Fields on surface tiles
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'lw_up_tile_rtsi', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_tile_rtsi', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sw_up_blue_tile_rtsi', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('lw_up_tile_rtsi', main%radiation, W3,             &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_up_tile_rtsi', main%radiation, W3,             &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sw_up_blue_tile_rtsi', main%radiation, W3,        &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
 
     ! Fields which need checkpointing when superstepping radaer
     ! Checkpoint unless both the first timestep of this run and the
@@ -593,38 +372,30 @@ contains
       checkpoint_flag = .false.
     end if
 
-    vector_space=>function_space_collection%get_fs(mesh,0,Wtheta,              &
-         get_ndata_val('aero_modes') )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-         adv_fields_last_outer, 'aer_mix_ratio', vector_space,                 &
-         checkpoint_flag=checkpoint_flag )
-    vector_space=>function_space_collection%get_fs(mesh,0,Wtheta,              &
-         get_ndata_val('sw_bands_aero_modes') )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-         adv_fields_last_outer, 'aer_sw_absorption', vector_space,             &
-         checkpoint_flag=checkpoint_flag )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-         adv_fields_last_outer, 'aer_sw_scattering', vector_space,             &
-         checkpoint_flag=checkpoint_flag )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-         adv_fields_last_outer, 'aer_sw_asymmetry', vector_space,              &
-         checkpoint_flag=checkpoint_flag )
-    vector_space=>function_space_collection%get_fs(mesh,0,Wtheta,              &
-         get_ndata_val('lw_bands_aero_modes') )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-         adv_fields_last_outer, 'aer_lw_absorption', vector_space,             &
-         checkpoint_flag=checkpoint_flag )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-         adv_fields_last_outer, 'aer_lw_scattering', vector_space,             &
-         checkpoint_flag=checkpoint_flag )
-    call add_physics_field( radiation_fields, depository, prognostic_fields,   &
-         adv_fields_last_outer, 'aer_lw_asymmetry', vector_space,              &
-         checkpoint_flag=checkpoint_flag )
+    ! vector_space=>function_space_collection%get_fs(mesh,0,Wtheta,
+    !     get_ndata_val('aero_modes') )
+    call processor%apply(make_spec('aer_mix_ratio', main%radiation, Wtheta,           &
+        mult='aero_modes', ckp=checkpoint_flag))
+    ! vector_space=>function_space_collection%get_fs(mesh,0,Wtheta,
+    !     get_ndata_val('sw_bands_aero_modes') )
+    call processor%apply(make_spec('aer_sw_absorption', main%radiation, Wtheta,       &
+        mult='sw_bands_aero_modes', ckp=checkpoint_flag))
+    call processor%apply(make_spec('aer_sw_scattering', main%radiation, Wtheta,       &
+        mult='sw_bands_aero_modes', ckp=checkpoint_flag))
+    call processor%apply(make_spec('aer_sw_asymmetry', main%radiation, Wtheta,        &
+        mult='sw_bands_aero_modes', ckp=checkpoint_flag))
+    ! vector_space=>function_space_collection%get_fs(mesh,0,Wtheta,
+    !     get_ndata_val('lw_bands_aero_modes') )
+    call processor%apply(make_spec('aer_lw_absorption', main%radiation, Wtheta,       &
+        mult='lw_bands_aero_modes', ckp=checkpoint_flag))
+    call processor%apply(make_spec('aer_lw_scattering', main%radiation, Wtheta,       &
+        mult='lw_bands_aero_modes', ckp=checkpoint_flag))
+    call processor%apply(make_spec('aer_lw_asymmetry', main%radiation, Wtheta,        &
+        mult='lw_bands_aero_modes', ckp=checkpoint_flag))
 
     !========================================================================
     ! Fields owned by the microphysics scheme
     !========================================================================
-    call microphysics_fields%initialise(name='microphysics_fields', table_len=100)
 
     ! 3D fields, need checkpointing
 
@@ -632,83 +403,51 @@ contains
     checkpoint_flag = microphysics_casim
     advection_flag = microphysics_casim
 
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, 'nl_mphys', wtheta_space, &
-      checkpoint_flag=checkpoint_flag, &
-      advection_flag=(advection_flag .and. casim_iopt_act /= 0_i_def) )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, 'nr_mphys', wtheta_space, &
-      checkpoint_flag=checkpoint_flag, advection_flag=advection_flag )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, 'ni_mphys', wtheta_space, &
-      checkpoint_flag=checkpoint_flag, advection_flag=advection_flag )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, 'ns_mphys', wtheta_space, &
-      checkpoint_flag=checkpoint_flag, advection_flag=advection_flag )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, 'ng_mphys', wtheta_space, &
-      checkpoint_flag=checkpoint_flag, advection_flag=advection_flag )
+    call processor%apply(make_spec('nl_mphys', main%microphysics, Wtheta,             &
+        adv_coll=if_adv((advection_flag .and. casim_iopt_act /= 0_i_def), adv%last),  &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('nr_mphys', main%microphysics, Wtheta,             &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('ni_mphys', main%microphysics, Wtheta,             &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('ns_mphys', main%microphysics, Wtheta,             &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('ng_mphys', main%microphysics, Wtheta,             &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
 
     ! 2D fields, don't need checkpointing
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'ls_rain',  twod_space, twod=.true. )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'ls_snow',  twod_space, twod=.true. )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'lsca_2d',  twod_space, twod=.true. )
+    call processor%apply(make_spec('ls_rain', main%microphysics, W3, twod=.true.))
+    call processor%apply(make_spec('ls_snow', main%microphysics, W3, twod=.true.))
+    call processor%apply(make_spec('lsca_2d', main%microphysics, W3, twod=.true.))
 
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-                            adv_fields_last_outer, 'ls_graup',  twod_space,    &
-                            twod=.true. )
+    call processor%apply(make_spec('ls_graup', main%microphysics, W3, twod=.true.))
 
     ! 3D fields, don't need checkpointing
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'dtheta_mphys', wtheta_space )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'dmv_mphys', wtheta_space )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'ls_rain_3d', wtheta_space )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'ls_snow_3d', wtheta_space )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'autoconv', wtheta_space )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'accretion', wtheta_space )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'rim_cry', wtheta_space )
-    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
-      adv_fields_last_outer, &
-      'rim_agg', wtheta_space )
+    call processor%apply(make_spec('dtheta_mphys', main%microphysics, Wtheta))
+    call processor%apply(make_spec('dmv_mphys', main%microphysics, Wtheta))
+    call processor%apply(make_spec('ls_rain_3d', main%microphysics, Wtheta))
+    call processor%apply(make_spec('ls_snow_3d', main%microphysics, Wtheta))
+    call processor%apply(make_spec('autoconv', main%microphysics, Wtheta))
+    call processor%apply(make_spec('accretion', main%microphysics, Wtheta))
+    call processor%apply(make_spec('rim_cry', main%microphysics, Wtheta))
+    call processor%apply(make_spec('rim_agg', main%microphysics, Wtheta))
 
     !========================================================================
     ! Fields owned by the electric scheme
     !========================================================================
-    call electric_fields%initialise(name='electric_fields', table_len=100)
 
     if ( electric == electric_um ) then
 
       ! 2D lightning potential field. Assuming needs checkpointing for now.
       ! This field doesn't need to be advected.
-      call add_physics_field( electric_fields, depository, prognostic_fields, &
-         adv_fields_last_outer, 'flash_potential', twod_space,                &
-         checkpoint_flag=.true., twod=.true. )
+      call processor%apply(make_spec('flash_potential', main%electric, W3,            &
+          twod=.true., ckp=.true.))
 
     end if
 
     !========================================================================
     ! Fields owned by the orographic drag schemes
     !========================================================================
-    call orography_fields%initialise(name='orography_fields', table_len=100)
 
     ! 2D fields, might need checkpointing
     if (boundary_layer == boundary_layer_um .or. &
@@ -718,39 +457,30 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field( orography_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'sd_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( orography_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'grad_xx_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( orography_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'grad_xy_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( orography_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'grad_yy_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( orography_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'peak_to_trough_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( orography_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'silhouette_area_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('sd_orog', main%orography, W3, twod=.true.,        &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('grad_xx_orog', main%orography, W3, twod=.true.,   &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('grad_xy_orog', main%orography, W3, twod=.true.,   &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('grad_yy_orog', main%orography, W3, twod=.true.,   &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('peak_to_trough_orog', main%orography, W3,         &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('silhouette_area_orog', main%orography, W3,        &
+        twod=.true., ckp=checkpoint_flag))
 
     ! Mean X, Y Gradients for the orographic correction to radiation
     checkpoint_flag = .false.
-    call add_physics_field( orography_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'grad_x_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( orography_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'grad_y_orog', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('grad_x_orog', main%orography, W3, twod=.true.,    &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('grad_y_orog', main%orography, W3, twod=.true.,    &
+        ckp=checkpoint_flag))
 
 
     !========================================================================
     ! Fields owned by the turbulence scheme
     !========================================================================
-    call turbulence_fields%initialise(name='turbulence_fields', table_len=100)
 
     ! 2D fields, might need checkpointing
 
@@ -759,132 +489,77 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'zh',      twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'wvar',    wtheta_space, checkpoint_flag=turb_gen_mixph )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'gradrinr', wtheta_space )
+    call processor%apply(make_spec('zh', main%turbulence, W3, twod=.true.,            &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('wvar', main%turbulence, Wtheta,                   &
+        ckp=turb_gen_mixph))
+    call processor%apply(make_spec('gradrinr', main%turbulence, Wtheta))
 
     ! 2D fields, don't need checkpointing
-    call add_integer_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'ntml',    twod_space, twod=.true. )
-    call add_integer_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'cumulus', twod_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'z_lcl',  twod_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'inv_depth',  twod_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'qcl_at_inv_top',  twod_space, twod=.true. )
-    call add_integer_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'blend_height_tq',  twod_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'zh_nonloc',  twod_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'zhsc', twod_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'bl_weight_1dbl',  twod_space, twod=.true. )
-    call add_integer_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'level_ent', twod_space, twod=.true. )
-    call add_integer_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'level_ent_dsc', twod_space, twod=.true. )
+    call processor%apply(make_spec('ntml', main%turbulence, W3, twod=.true.,          &
+        is_int=.true.))
+    call processor%apply(make_spec('cumulus', main%turbulence, W3, twod=.true.,       &
+        is_int=.true.))
+    call processor%apply(make_spec('z_lcl', main%turbulence, W3, twod=.true.))
+    call processor%apply(make_spec('inv_depth', main%turbulence, W3, twod=.true.))
+    call processor%apply(make_spec('qcl_at_inv_top', main%turbulence, W3,             &
+        twod=.true.))
+    call processor%apply(make_spec('blend_height_tq', main%turbulence, W3,            &
+        twod=.true., is_int=.true.))
+    call processor%apply(make_spec('zh_nonloc', main%turbulence, W3, twod=.true.))
+    call processor%apply(make_spec('zhsc', main%turbulence, W3, twod=.true.))
+    call processor%apply(make_spec('bl_weight_1dbl', main%turbulence, W3,             &
+        twod=.true.))
+    call processor%apply(make_spec('level_ent', main%turbulence, W3, twod=.true.,     &
+        is_int=.true.))
+    call processor%apply(make_spec('level_ent_dsc', main%turbulence, W3, twod=.true., &
+        is_int=.true.))
 
     ! Space for the 7 BL types
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,         &
-         get_ndata_val('boundary_layer_types'))
-    call add_integer_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'bl_type_ind',  vector_space, twod=.true. )
+    ! vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,
+    !     get_ndata_val('boundary_layer_types'))
+    call processor%apply(make_spec('bl_type_ind', main%turbulence, W3,                &
+        mult='boundary_layer_types', twod=.true., is_int=.true.))
 
     ! 3D fields, don't need checkpointing
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'bq_bl', wtheta_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'bt_bl', wtheta_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'lmix_bl', wtheta_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dsldzm',  wtheta_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'tke_bl', wtheta_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dtrdz_tq_bl', wtheta_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dw_bl', wtheta_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'thetal_inc_leonard', wtheta_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'mt_inc_leonard', wtheta_space )
+    call processor%apply(make_spec('bq_bl', main%turbulence, Wtheta))
+    call processor%apply(make_spec('bt_bl', main%turbulence, Wtheta))
+    call processor%apply(make_spec('lmix_bl', main%turbulence, Wtheta))
+    call processor%apply(make_spec('dsldzm', main%turbulence, Wtheta))
+    call processor%apply(make_spec('tke_bl', main%turbulence, Wtheta))
+    call processor%apply(make_spec('dtrdz_tq_bl', main%turbulence, Wtheta))
+    call processor%apply(make_spec('dw_bl', main%turbulence, Wtheta))
+    call processor%apply(make_spec('thetal_inc_leonard', main%turbulence, Wtheta))
+    call processor%apply(make_spec('mt_inc_leonard', main%turbulence, Wtheta))
 
     ! 3D fields on W3 (rho) levels
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'moist_flux_bl',     w3_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'heat_flux_bl',     w3_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'rhokh_bl', w3_space )
+    call processor%apply(make_spec('moist_flux_bl', main%turbulence, W3))
+    call processor%apply(make_spec('heat_flux_bl', main%turbulence, W3))
+    call processor%apply(make_spec('rhokh_bl', main%turbulence, W3))
 
     ! W2 fields, don't need checkpointing
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'rhokm_w2', w2_space )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'tau_w2', w2_space )
+    call processor%apply(make_spec('rhokm_w2', main%turbulence, W2))
+    call processor%apply(make_spec('tau_w2', main%turbulence, W2))
 
     ! Fields on entrainment levels, don't need checkpointing
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,         &
-         get_ndata_val('entrainment_levels'))
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'ent_we_lim', vector_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'ent_t_frac', vector_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'ent_zrzi', vector_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'ent_we_lim_dsc', vector_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'ent_t_frac_dsc', vector_space, twod=.true. )
-    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'ent_zrzi_dsc', vector_space, twod=.true. )
+    ! vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,
+    !     get_ndata_val('entrainment_levels'))
+    call processor%apply(make_spec('ent_we_lim', main%turbulence, W3,                 &
+        mult='entrainment_levels', twod=.true.))
+    call processor%apply(make_spec('ent_t_frac', main%turbulence, W3,                 &
+        mult='entrainment_levels', twod=.true.))
+    call processor%apply(make_spec('ent_zrzi', main%turbulence, W3,                   &
+        mult='entrainment_levels', twod=.true.))
+    call processor%apply(make_spec('ent_we_lim_dsc', main%turbulence, W3,             &
+        mult='entrainment_levels', twod=.true.))
+    call processor%apply(make_spec('ent_t_frac_dsc', main%turbulence, W3,             &
+        mult='entrainment_levels', twod=.true.))
+    call processor%apply(make_spec('ent_zrzi_dsc', main%turbulence, W3,               &
+        mult='entrainment_levels', twod=.true.))
 
     !========================================================================
     ! Fields owned by the convection scheme
     !========================================================================
-    call convection_fields%initialise(name='convection_fields', table_len=100)
 
     ! 2D fields, might need checkpointing
     if (convection == convection_um) then
@@ -892,18 +567,12 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'conv_rain',  twod_space,                                                &
-      checkpoint_flag=(checkpoint_flag .and. add_cgw), twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'conv_snow',  twod_space,                                                &
-      checkpoint_flag=(checkpoint_flag .and. add_cgw), twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dd_mf_cb',  twod_space,                                                 &
-      checkpoint_flag=(checkpoint_flag .and. srf_ex_cnv_gust), twod=.true. )
+    call processor%apply(make_spec('conv_rain', main%convection, W3, twod=.true.,     &
+        ckp=(checkpoint_flag .and. add_cgw)))
+    call processor%apply(make_spec('conv_snow', main%convection, W3, twod=.true.,     &
+        ckp=(checkpoint_flag .and. add_cgw)))
+    call processor%apply(make_spec('dd_mf_cb', main%convection, W3, twod=.true.,      &
+        ckp=(checkpoint_flag .and. srf_ex_cnv_gust)))
 
     ! 3D fields, might need checkpointing
     if (convection == convection_um) then
@@ -918,112 +587,59 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field(convection_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'cca', wtheta_space, checkpoint_flag=checkpoint_flag)
-    call add_physics_field(convection_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'ccw', wtheta_space, checkpoint_flag=checkpoint_flag)
+    call processor%apply(make_spec('cca', main%convection, Wtheta,                    &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('ccw', main%convection, Wtheta,                    &
+        ckp=checkpoint_flag))
 
     ! 2D fields, don't need checkpointing
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'cca_2d',  twod_space, twod=.true. )
-    call add_integer_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'shallow_flag',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'uw0_flux',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'vw0_flux',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'lcl_height',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'parcel_top',  twod_space, twod=.true. )
-    call add_integer_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'level_parcel_top',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'wstar',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'thv_flux',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'parcel_buoyancy',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'qsat_at_lcl',  twod_space, twod=.true. )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'cape_diluted', twod_space, twod=.true. )
+    call processor%apply(make_spec('cca_2d', main%convection, W3, twod=.true.))
+    call processor%apply(make_spec('shallow_flag', main%convection, W3, twod=.true.,  &
+        is_int=.true.))
+    call processor%apply(make_spec('uw0_flux', main%convection, W3, twod=.true.))
+    call processor%apply(make_spec('vw0_flux', main%convection, W3, twod=.true.))
+    call processor%apply(make_spec('lcl_height', main%convection, W3, twod=.true.))
+    call processor%apply(make_spec('parcel_top', main%convection, W3, twod=.true.))
+    call processor%apply(make_spec('level_parcel_top', main%convection, W3,           &
+        twod=.true., is_int=.true.))
+    call processor%apply(make_spec('wstar', main%convection, W3, twod=.true.))
+    call processor%apply(make_spec('thv_flux', main%convection, W3, twod=.true.))
+    call processor%apply(make_spec('parcel_buoyancy', main%convection, W3,            &
+        twod=.true.))
+    call processor%apply(make_spec('qsat_at_lcl', main%convection, W3, twod=.true.))
+    call processor%apply(make_spec('cape_diluted', main%convection, W3,               &
+        twod=.true.))
 
     ! 3D fields, don't need checkpointing
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dt_conv', wtheta_space )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dmv_conv', wtheta_space )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dmcl_conv', wtheta_space )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dmci_conv', wtheta_space )
-    call add_physics_field(convection_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'dcfl_conv', wtheta_space )
-    call add_physics_field(convection_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'dcff_conv', wtheta_space )
-    call add_physics_field(convection_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'dbcf_conv', wtheta_space )
-    call add_physics_field(convection_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'massflux_up', wtheta_space )
-    call add_physics_field(convection_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'massflux_down', wtheta_space )
-    call add_physics_field( convection_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'conv_rain_3d', wtheta_space )
-    call add_physics_field( convection_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'conv_snow_3d', wtheta_space )
+    call processor%apply(make_spec('dt_conv', main%convection, Wtheta))
+    call processor%apply(make_spec('dmv_conv', main%convection, Wtheta))
+    call processor%apply(make_spec('dmcl_conv', main%convection, Wtheta))
+    call processor%apply(make_spec('dmci_conv', main%convection, Wtheta))
+    call processor%apply(make_spec('dcfl_conv', main%convection, Wtheta))
+    call processor%apply(make_spec('dcff_conv', main%convection, Wtheta))
+    call processor%apply(make_spec('dbcf_conv', main%convection, Wtheta))
+    call processor%apply(make_spec('massflux_up', main%convection, Wtheta))
+    call processor%apply(make_spec('massflux_down', main%convection, Wtheta))
+    call processor%apply(make_spec('conv_rain_3d', main%convection, Wtheta))
+    call processor%apply(make_spec('conv_snow_3d', main%convection, Wtheta))
 
     ! 3D fields on W3 (rho) levels
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'du_conv', w3_space )
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'dv_conv', w3_space )
+    call processor%apply(make_spec('du_conv', main%convection, W3))
+    call processor%apply(make_spec('dv_conv', main%convection, W3))
 
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_all_outer,  'conv_prog_dtheta', wtheta_space,                 &
-      checkpoint_flag=l_conv_prog_dtheta,                                      &
-      advection_flag=(l_conv_prog_dtheta .and. adv_conv_prog_dtheta))
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_all_outer,  'conv_prog_dmv', wtheta_space,                    &
-      checkpoint_flag=l_conv_prog_dq,                                          &
-      advection_flag=(l_conv_prog_dq .and. adv_conv_prog_dq))
+    call processor%apply(make_spec('conv_prog_dtheta', main%convection, Wtheta,       &
+        adv_coll=if_adv((l_conv_prog_dtheta .and. adv_conv_prog_dtheta), adv%all),    &
+        ckp=l_conv_prog_dtheta))
+    call processor%apply(make_spec('conv_prog_dmv', main%convection, Wtheta,          &
+        adv_coll=if_adv((l_conv_prog_dq .and. adv_conv_prog_dq), adv%all),            &
+        ckp=l_conv_prog_dq))
 
-    call add_physics_field( convection_fields, depository, prognostic_fields,  &
-      adv_fields_all_outer, 'conv_prog_precip', wtheta_space,                  &
-      checkpoint_flag=l_conv_prog_precip,                                      &
-      advection_flag=l_conv_prog_precip)
+    call processor%apply(make_spec('conv_prog_precip', main%convection, Wtheta,       &
+        adv_coll=if_adv(l_conv_prog_precip, adv%all), ckp=l_conv_prog_precip))
 
     !========================================================================
     ! Fields owned by the cloud scheme
     !========================================================================
-    call cloud_fields%initialise(name='cloud_fields', table_len=100)
 
     ! 3D fields, might need checkpointing
     if (cloud == cloud_um) then
@@ -1031,10 +647,8 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'area_fraction',   wtheta_space,                                  &
-      checkpoint_flag=(checkpoint_flag .and. radiation==radiation_socrates))
+    call processor%apply(make_spec('area_fraction', main%cloud, Wtheta,               &
+        ckp=(checkpoint_flag .and. radiation==radiation_socrates)))
 
     ! 3D fields, might need advecting
     if ( scheme == scheme_pc2 ) then
@@ -1042,54 +656,30 @@ contains
     else
       advection_flag=.false.
     endif
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_all_outer, &
-      'liquid_fraction', wtheta_space, checkpoint_flag=checkpoint_flag, &
-      advection_flag=advection_flag)
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_all_outer, &
-      'frozen_fraction', wtheta_space, checkpoint_flag=checkpoint_flag, &
-      advection_flag=advection_flag)
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_all_outer, &
-      'bulk_fraction',   wtheta_space, checkpoint_flag=checkpoint_flag, &
-      advection_flag=advection_flag)
+    call processor%apply(make_spec('liquid_fraction', main%cloud, Wtheta,             &
+        adv_coll=if_adv(advection_flag, adv%all), ckp=checkpoint_flag))
+    call processor%apply(make_spec('frozen_fraction', main%cloud, Wtheta,             &
+        adv_coll=if_adv(advection_flag, adv%all), ckp=checkpoint_flag))
+    call processor%apply(make_spec('bulk_fraction', main%cloud, Wtheta,               &
+        adv_coll=if_adv(advection_flag, adv%all), ckp=checkpoint_flag))
 
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'rh_crit',     wtheta_space )
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'departure_exner_wth', wtheta_space, advection_flag=advection_flag)
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-       adv_fields_last_outer, &
-      'sigma_mc',   wtheta_space )
+    call processor%apply(make_spec('rh_crit', main%cloud, Wtheta))
+    call processor%apply(make_spec('departure_exner_wth', main%cloud, Wtheta,         &
+        adv_coll=if_adv(advection_flag, adv%last)))
+    call processor%apply(make_spec('sigma_mc', main%cloud, Wtheta))
 
     ! Fields for bimodal cloud scheme
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'tau_dec_bm',  wtheta_space )
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'tau_hom_bm',  wtheta_space )
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'tau_mph_bm',  wtheta_space )
+    call processor%apply(make_spec('tau_dec_bm', main%cloud, Wtheta))
+    call processor%apply(make_spec('tau_hom_bm', main%cloud, Wtheta))
+    call processor%apply(make_spec('tau_mph_bm', main%cloud, Wtheta))
 
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'sskew_bm',     wtheta_space )
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'svar_bm',     wtheta_space )
-    call add_physics_field(cloud_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'svar_tb',     wtheta_space )
+    call processor%apply(make_spec('sskew_bm', main%cloud, Wtheta))
+    call processor%apply(make_spec('svar_bm', main%cloud, Wtheta))
+    call processor%apply(make_spec('svar_tb', main%cloud, Wtheta))
 
     !========================================================================
     ! Fields owned by the surface exchange scheme
     !========================================================================
-    call surface_fields%initialise(name='surface_fields', table_len=100)
 
     ! 2D fields, might need checkpointing
     if (surface == surface_jules) then
@@ -1105,210 +695,134 @@ contains
       checkpoint_couple = .false.
     end if
 
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'z0msea',  twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'surface_conductance', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'chloro_sea', twod_space,                                                &
-      checkpoint_flag=(checkpoint_flag .and. sea_alb_var_chl), twod=.true. )
+    call processor%apply(make_spec('z0msea', main%surface, W3, twod=.true.,           &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('surface_conductance', main%surface, W3,           &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('chloro_sea', main%surface, W3, twod=.true.,       &
+        ckp=(checkpoint_flag .and. sea_alb_var_chl)))
 
     ! Fields on surface tiles, might need checkpointing
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tile_fraction', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tile_temperature', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'screen_temperature', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'time_since_transition', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'canopy_water', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tile_lw_grey_albedo', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('tile_fraction', main%surface, W3,                 &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('tile_temperature', main%surface, W3,              &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('screen_temperature', main%surface, W3,            &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('time_since_transition', main%surface, W3,         &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('canopy_water', main%surface, W3,                  &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('tile_lw_grey_albedo', main%surface, W3,           &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
 
-    vector_space=>function_space_collection%get_fs(twod_mesh, 0, W3,           &
-         get_ndata_val('land_tile_rad_band'))
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'albedo_obs_scaling', vector_space,                                      &
-      checkpoint_flag=(checkpoint_flag .and. albedo_obs), twod=.true. )
+    ! vector_space=>function_space_collection%get_fs(twod_mesh, 0, W3,
+    !     get_ndata_val('land_tile_rad_band'))
+    call processor%apply(make_spec('albedo_obs_scaling', main%surface, W3,            &
+        mult='land_tile_rad_band', twod=.true.,                                       &
+        ckp=(checkpoint_flag .and. albedo_obs)))
 
     ! Fields on plant functional types, might need checkpointing
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'leaf_area_index', pft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'canopy_height', pft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('leaf_area_index', main%surface, W3,               &
+        mult='plant_types', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('canopy_height', main%surface, W3,                 &
+        mult='plant_types', twod=.true., ckp=checkpoint_flag))
 
 
     ! Sea-ice category fields, might need checkpointing
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'sea_ice_thickness', sice_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'sea_ice_temperature', sice_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'sea_ice_conductivity', sice_space, checkpoint_flag=.false., twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'melt_pond_fraction', sice_space, checkpoint_flag=.false., twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'melt_pond_depth', sice_space, checkpoint_flag=.false., twod=.true. )
+    call processor%apply(make_spec('sea_ice_thickness', main%surface, W3,             &
+        mult='sea_ice_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sea_ice_temperature', main%surface, W3,           &
+        mult='sea_ice_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('sea_ice_conductivity', main%surface, W3,          &
+        mult='sea_ice_tiles', twod=.true., ckp=.false.))
+    call processor%apply(make_spec('melt_pond_fraction', main%surface, W3,            &
+        mult='sea_ice_tiles', twod=.true., ckp=.false.))
+    call processor%apply(make_spec('melt_pond_depth', main%surface, W3,               &
+        mult='sea_ice_tiles', twod=.true., ckp=.false.))
 
     ! Sea surface velocity vector components provided via the coupler.
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'sea_u_current', twod_space, checkpoint_flag=.false., twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'sea_v_current', twod_space, checkpoint_flag=.false., twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'sea_current_w2', w2_space, checkpoint_flag=.false. )
+    call processor%apply(make_spec('sea_u_current', main%surface, W3, twod=.true.,    &
+        ckp=.false.))
+    call processor%apply(make_spec('sea_v_current', main%surface, W3, twod=.true.,    &
+        ckp=.false.))
+    call processor%apply(make_spec('sea_current_w2', main%surface, W2, ckp=.false.))
 
     ! Fields on surface tiles, don't need checkpointing
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tile_heat_flux', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'alpha1_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'ashtf_prime_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'dtstar_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'fraca_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'z0h_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'z0m_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'rhokh_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'chr1p5m_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'resfs_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'canhc_tile', surft_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'gc_tile', surft_space, twod=.true. )
+    call processor%apply(make_spec('tile_heat_flux', main%surface, W3,                &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('alpha1_tile', main%surface, W3,                   &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('ashtf_prime_tile', main%surface, W3,              &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('dtstar_tile', main%surface, W3,                   &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('fraca_tile', main%surface, W3,                    &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('z0h_tile', main%surface, W3,                      &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('z0m_tile', main%surface, W3,                      &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('rhokh_tile', main%surface, W3,                    &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('chr1p5m_tile', main%surface, W3,                  &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('resfs_tile', main%surface, W3,                    &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('canhc_tile', main%surface, W3,                    &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('gc_tile', main%surface, W3, mult='surface_tiles', &
+        twod=.true.))
 
    ! Fields on surface tiles used by coupler, need checkpointing in coupled models
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tile_moisture_flux', surft_space, checkpoint_flag=checkpoint_couple, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'snowice_melt', surft_space, checkpoint_flag=checkpoint_couple, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'surf_ht_flux', surft_space, checkpoint_flag=checkpoint_couple, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'snowice_sublimation', surft_space, checkpoint_flag=checkpoint_couple, twod=.true. )
+    call processor%apply(make_spec('tile_moisture_flux', main%surface, W3,            &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_couple))
+    call processor%apply(make_spec('snowice_melt', main%surface, W3,                  &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_couple))
+    call processor%apply(make_spec('surf_ht_flux', main%surface, W3,                  &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_couple))
+    call processor%apply(make_spec('snowice_sublimation', main%surface, W3,           &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_couple))
 
     ! 2D fields, don't need checkpointing
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'z0m_eff', twod_space, twod=.true. )
-    call add_physics_field(surface_fields, depository, prognostic_fields,      &
-      adv_fields_last_outer, &
-      'net_prim_prod', twod_space, twod=.true.)
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'taux_ssi', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tauy_ssi', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'z0m', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'ustar', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'wspd10m', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbwrr', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbhwr', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbhgt', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbdisp', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbztm', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbalbwl', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbalbrd', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbemisw', twod_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'urbemisr', twod_space, twod=.true. )
+    call processor%apply(make_spec('z0m_eff', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('net_prim_prod', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('taux_ssi', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('tauy_ssi', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('z0m', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('ustar', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('wspd10m', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbwrr', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbhwr', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbhgt', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbdisp', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbztm', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbalbwl', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbalbrd', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbemisw', main%surface, W3, twod=.true.))
+    call processor%apply(make_spec('urbemisr', main%surface, W3, twod=.true.))
 
     ! Space for variables required for regridding to cell faces
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W2,         &
-         get_ndata_val('surface_regrid_vars'))
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'surf_interp_w2',  vector_space, twod=.true. )
+    ! vector_space => function_space_collection%get_fs(twod_mesh, 0, W2,
+    !     get_ndata_val('surface_regrid_vars'))
+    call processor%apply(make_spec('surf_interp_w2', main%surface, W2,                &
+        mult='surface_regrid_vars', twod=.true.))
 
     ! 2D fields at W2 points
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W2)
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tau_land_w2',  vector_space, twod=.true. )
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tau_ssi_w2',  vector_space, twod=.true. )
+    ! vector_space => function_space_collection%get_fs(twod_mesh, 0,
+    !     W2)
+    call processor%apply(make_spec('tau_land_w2', main%surface, W2, twod=.true.))
+    call processor%apply(make_spec('tau_ssi_w2', main%surface, W2, twod=.true.))
 
     ! Field on soil levels and land tiles
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,         &
-         get_ndata_val('soil_levels_and_tiles'))
-    call add_physics_field( surface_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'tile_water_extract', vector_space, twod=.true. )
+    ! vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,
+    !     get_ndata_val('soil_levels_and_tiles'))
+    call processor%apply(make_spec('tile_water_extract', main%surface, W3,            &
+        mult='soil_levels_and_tiles', twod=.true.))
 
     !========================================================================
     ! Fields owned by the soil hydrology scheme
     !========================================================================
-    call soil_fields%initialise(name='soil_fields', table_len=100)
 
     ! 2D fields, might need checkpointing
     if (surface == surface_jules) then
@@ -1316,95 +830,65 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_albedo', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_roughness', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_thermal_cond', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'mean_topog_index', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'a_sat_frac', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'c_sat_frac', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'a_wet_frac', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'c_wet_frac', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'soil_sat_frac', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'water_table', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'wetness_under_soil', twod_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_moist_wilt', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_moist_crit', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_moist_sat', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_cond_sat', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_thermal_cap', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_suction_sat', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'clapp_horn_b', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'surface_runoff', twod_space, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'sub_surface_runoff', twod_space, twod=.true. )
+    call processor%apply(make_spec('soil_albedo', main%soil, W3, twod=.true.,         &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_roughness', main%soil, W3, twod=.true.,      &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_thermal_cond', main%soil, W3, twod=.true.,   &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('mean_topog_index', main%soil, W3, twod=.true.,    &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('a_sat_frac', main%soil, W3, twod=.true.,          &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('c_sat_frac', main%soil, W3, twod=.true.,          &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('a_wet_frac', main%soil, W3, twod=.true.,          &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('c_wet_frac', main%soil, W3, twod=.true.,          &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_sat_frac', main%soil, W3, twod=.true.,       &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('water_table', main%soil, W3, twod=.true.,         &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('wetness_under_soil', main%soil, W3, twod=.true.,  &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_moist_wilt', main%soil, W3, twod=.true.,     &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_moist_crit', main%soil, W3, twod=.true.,     &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_moist_sat', main%soil, W3, twod=.true.,      &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_cond_sat', main%soil, W3, twod=.true.,       &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_thermal_cap', main%soil, W3, twod=.true.,    &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_suction_sat', main%soil, W3, twod=.true.,    &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('clapp_horn_b', main%soil, W3, twod=.true.,        &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('surface_runoff', main%soil, W3, twod=.true.))
+    call processor%apply(make_spec('sub_surface_runoff', main%soil, W3,               &
+        twod=.true.))
 
 
     ! Fields on soil levels
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_temperature', soil_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_moisture', soil_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'unfrozen_soil_moisture', soil_space, checkpoint_flag=checkpoint_flag,  &
-      twod=.true. )
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'frozen_soil_moisture', soil_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('soil_temperature', main%soil, W3,                 &
+        mult='soil_levels', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_moisture', main%soil, W3,                    &
+        mult='soil_levels', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('unfrozen_soil_moisture', main%soil, W3,           &
+        mult='soil_levels', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('frozen_soil_moisture', main%soil, W3,             &
+        mult='soil_levels', twod=.true., ckp=checkpoint_flag))
 
     ! 2D fields, don't need checkpointing
-    call add_physics_field( soil_fields, depository, prognostic_fields,       &
-      adv_fields_last_outer, &
-      'soil_moist_avail', twod_space, twod=.true. )
-    call add_physics_field(soil_fields, depository, prognostic_fields,        &
-      adv_fields_last_outer, &
-      'thermal_cond_wet_soil', twod_space, twod=.true.)
+    call processor%apply(make_spec('soil_moist_avail', main%soil, W3, twod=.true.))
+    call processor%apply(make_spec('thermal_cond_wet_soil', main%soil, W3,            &
+        twod=.true.))
 
     !========================================================================
     ! Fields owned by the snow scheme
     !========================================================================
-    call snow_fields%initialise(name='snow_fields', table_len=100)
 
     ! Fields on surface tiles, might need checkpointing
     if (surface == surface_jules) then
@@ -1412,56 +896,42 @@ contains
     else
       checkpoint_flag = .false.
     end if
-    call add_physics_field( snow_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'tile_snow_mass', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( snow_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'tile_snow_rgrain', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_integer_field( snow_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'n_snow_layers', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field( snow_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'snow_depth', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
-    call add_physics_field(snow_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'snowpack_density', surft_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(snow_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'snow_under_canopy', surft_space, checkpoint_flag=checkpoint_flag, twod=.true.)
+    call processor%apply(make_spec('tile_snow_mass', main%snow, W3,                   &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('tile_snow_rgrain', main%snow, W3,                 &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('n_snow_layers', main%snow, W3,                    &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag, is_int=.true.))
+    call processor%apply(make_spec('snow_depth', main%snow, W3, mult='surface_tiles', &
+        twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('snowpack_density', main%snow, W3,                 &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('snow_under_canopy', main%snow, W3,                &
+        mult='surface_tiles', twod=.true., ckp=checkpoint_flag))
 
     ! Fields on snow layers
-    call add_physics_field(snow_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'snow_layer_thickness', snow_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(snow_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'snow_layer_ice_mass', snow_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(snow_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'snow_layer_liq_mass', snow_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(snow_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'snow_layer_temp', snow_space, checkpoint_flag=checkpoint_flag, twod=.true.)
-    call add_physics_field(snow_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'snow_layer_rgrain', snow_space, checkpoint_flag=checkpoint_flag, twod=.true.)
+    call processor%apply(make_spec('snow_layer_thickness', main%snow, W3,             &
+        mult='snow_layers_and_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('snow_layer_ice_mass', main%snow, W3,              &
+        mult='snow_layers_and_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('snow_layer_liq_mass', main%snow, W3,              &
+        mult='snow_layers_and_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('snow_layer_temp', main%snow, W3,                  &
+        mult='snow_layers_and_tiles', twod=.true., ckp=checkpoint_flag))
+    call processor%apply(make_spec('snow_layer_rgrain', main%snow, W3,                &
+        mult='snow_layers_and_tiles', twod=.true., ckp=checkpoint_flag))
 
     ! 2D fields
-    call add_physics_field( snow_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'snow_soot', twod_space, checkpoint_flag=checkpoint_flag, twod=.true. )
+    call processor%apply(make_spec('snow_soot', main%snow, W3, twod=.true.,           &
+        ckp=checkpoint_flag))
 
     ! Fields which don't need checkpointing
-    call add_physics_field( snow_fields, depository, prognostic_fields,  &
-      adv_fields_last_outer, &
-      'snow_unload_rate', pft_space, twod=.true. )
+    call processor%apply(make_spec('snow_unload_rate', main%snow, W3,                 &
+        mult='plant_types', twod=.true.))
 
     !========================================================================
     ! Fields owned by the chemistry scheme
     !========================================================================
-    call chemistry_fields%initialise(name='chemistry_fields', table_len=100)
 
     ! 3D fields, might need checkpointing and advecting
     if ( aerosol == aerosol_um .and. glomap_mode == glomap_mode_ukca ) then
@@ -1471,55 +941,36 @@ contains
       checkpoint_flag = .false.
       advection_flag = .false.
     end if
-    call add_physics_field( chemistry_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'h2o2', wtheta_space, checkpoint_flag=checkpoint_flag,                   &
-      advection_flag=advection_flag )
-    call add_physics_field( chemistry_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'dms', wtheta_space, checkpoint_flag=checkpoint_flag,                    &
-      advection_flag=advection_flag )
-    call add_physics_field( chemistry_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'so2', wtheta_space, checkpoint_flag=checkpoint_flag,                    &
-      advection_flag=advection_flag )
-    call add_physics_field( chemistry_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'h2so4', wtheta_space, checkpoint_flag=checkpoint_flag,                  &
-      advection_flag=advection_flag )
-    call add_physics_field( chemistry_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'dmso', wtheta_space, checkpoint_flag=checkpoint_flag,                   &
-      advection_flag=advection_flag )
-    call add_physics_field( chemistry_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'monoterpene', wtheta_space, checkpoint_flag=checkpoint_flag,            &
-      advection_flag=advection_flag )
-    call add_physics_field( chemistry_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'secondary_organic', wtheta_space, checkpoint_flag=checkpoint_flag,      &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('h2o2', main%chemistry, Wtheta,                    &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('dms', main%chemistry, Wtheta,                     &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('so2', main%chemistry, Wtheta,                     &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('h2so4', main%chemistry, Wtheta,                   &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('dmso', main%chemistry, Wtheta,                    &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('monoterpene', main%chemistry, Wtheta,             &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
+    call processor%apply(make_spec('secondary_organic', main%chemistry, Wtheta,       &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
 
     ! 3D fields, might need checkpointing
     ! Not advected in Offline Oxidants chemistry scheme
     if ( aerosol == aerosol_um .and.            &
          ( glomap_mode == glomap_mode_ukca .or. &
            glomap_mode == glomap_mode_dust_and_clim ) ) then
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'o3', wtheta_space, checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'no3', wtheta_space, checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'oh', wtheta_space, checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'ho2', wtheta_space, checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, &
-      'h2o2_limit', wtheta_space, checkpoint_flag=checkpoint_flag )
+      call processor%apply(make_spec('o3', main%chemistry, Wtheta,                    &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('no3', main%chemistry, Wtheta,                   &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('oh', main%chemistry, Wtheta,                    &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('ho2', main%chemistry, Wtheta,                   &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('h2o2_limit', main%chemistry, Wtheta,            &
+          ckp=checkpoint_flag))
 
       ! Chemistry Emissions - need to define as long as ukca alg routine is
       ! called, but checkpointed only if chemistry is active, never advected
@@ -1530,50 +981,37 @@ contains
         checkpoint_flag = .false.
       end if
 
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_c2h6', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_c3h8', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_c5h8', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_ch4', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_co', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_hcho', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_me2co', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_mecho', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_nh3', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_no', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_meoh', twod_space, twod=.true., checkpoint_flag=checkpoint_flag )
+      call processor%apply(make_spec('emiss_c2h6', main%chemistry, W3, twod=.true.,   &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_c3h8', main%chemistry, W3, twod=.true.,   &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_c5h8', main%chemistry, W3, twod=.true.,   &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_ch4', main%chemistry, W3, twod=.true.,    &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_co', main%chemistry, W3, twod=.true.,     &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_hcho', main%chemistry, W3, twod=.true.,   &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_me2co', main%chemistry, W3, twod=.true.,  &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_mecho', main%chemistry, W3, twod=.true.,  &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_nh3', main%chemistry, W3, twod=.true.,    &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_no', main%chemistry, W3, twod=.true.,     &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_meoh', main%chemistry, W3, twod=.true.,   &
+          ckp=checkpoint_flag))
       ! 3-D emissions
-      call add_physics_field( chemistry_fields, depository, prognostic_fields, &
-        adv_fields_last_outer,  &
-        'emiss_no_aircrft', wtheta_space, checkpoint_flag=checkpoint_flag )
+      call processor%apply(make_spec('emiss_no_aircrft', main%chemistry, Wtheta,      &
+          ckp=checkpoint_flag))
 
     endif  ! glomap = ukca
 
     !========================================================================
     ! Fields owned by the aerosol scheme
     !========================================================================
-    call aerosol_fields%initialise(name='aerosol_fields', table_len=100)
 
     ! 2D fields, might need checkpointing
     if ( aerosol == aerosol_um .and. glomap_mode == glomap_mode_ukca ) then
@@ -1588,85 +1026,50 @@ contains
     if ( aerosol == aerosol_um .and.            &
          ( glomap_mode == glomap_mode_ukca .or. &
            glomap_mode == glomap_mode_dust_and_clim ) ) then
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_bc_biofuel', twod_space, twod=.true.,                             &
-      checkpoint_flag=checkpoint_flag)
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_bc_fossil', twod_space, twod=.true.,                              &
-      checkpoint_flag=checkpoint_flag )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_dms_land', twod_space, twod=.true.,                               &
-      checkpoint_flag=checkpoint_flag )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'dms_conc_ocean', twod_space, twod=.true.,                               &
-      checkpoint_flag=checkpoint_flag )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_monoterp', twod_space, twod=.true.,                               &
-      checkpoint_flag=checkpoint_flag )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_om_biofuel', twod_space, twod=.true.,                             &
-      checkpoint_flag=checkpoint_flag )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_om_fossil', twod_space, twod=.true.,                              &
-      checkpoint_flag=checkpoint_flag )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_so2_low', twod_space, twod=.true.,                                &
-      checkpoint_flag=checkpoint_flag )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_so2_high', twod_space, twod=.true.,                               &
-      checkpoint_flag=checkpoint_GC3 )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_bc_biomass_high', twod_space, twod=.true.,                        &
-      checkpoint_flag=checkpoint_GC5 )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_bc_biomass_low', twod_space, twod=.true.,                         &
-      checkpoint_flag=checkpoint_GC5 )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_om_biomass_high', twod_space, twod=.true.,                        &
-      checkpoint_flag=checkpoint_GC5 )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_om_biomass_low', twod_space, twod=.true.,                         &
-      checkpoint_flag=checkpoint_GC5 )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'surf_wetness', twod_space, twod=.true.,                                 &
-      checkpoint_flag=checkpoint_flag )
+      call processor%apply(make_spec('emiss_bc_biofuel', main%aerosol, W3,            &
+          twod=.true., ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_bc_fossil', main%aerosol, W3,             &
+          twod=.true., ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_dms_land', main%aerosol, W3, twod=.true., &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('dms_conc_ocean', main%aerosol, W3, twod=.true., &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_monoterp', main%aerosol, W3, twod=.true., &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_om_biofuel', main%aerosol, W3,            &
+          twod=.true., ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_om_fossil', main%aerosol, W3,             &
+          twod=.true., ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_so2_low', main%aerosol, W3, twod=.true.,  &
+          ckp=checkpoint_flag))
+      call processor%apply(make_spec('emiss_so2_high', main%aerosol, W3, twod=.true., &
+          ckp=checkpoint_GC3))
+      call processor%apply(make_spec('emiss_bc_biomass_high', main%aerosol, W3,       &
+          twod=.true., ckp=checkpoint_GC5))
+      call processor%apply(make_spec('emiss_bc_biomass_low', main%aerosol, W3,        &
+          twod=.true., ckp=checkpoint_GC5))
+      call processor%apply(make_spec('emiss_om_biomass_high', main%aerosol, W3,       &
+          twod=.true., ckp=checkpoint_GC5))
+      call processor%apply(make_spec('emiss_om_biomass_low', main%aerosol, W3,        &
+          twod=.true., ckp=checkpoint_GC5))
+      call processor%apply(make_spec('surf_wetness', main%aerosol, W3, twod=.true.,   &
+          ckp=checkpoint_flag))
     end if
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'soil_clay', twod_space, twod=.true.,                                    &
-      checkpoint_flag=checkpoint_flag )
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'soil_sand', twod_space, twod=.true.,                                    &
-      checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('soil_clay', main%aerosol, W3, twod=.true.,        &
+        ckp=checkpoint_flag))
+    call processor%apply(make_spec('soil_sand', main%aerosol, W3, twod=.true.,        &
+        ckp=checkpoint_flag))
 
     if ( aerosol == aerosol_um .and.            &
          ( glomap_mode == glomap_mode_ukca .or. &
            glomap_mode == glomap_mode_dust_and_clim ) ) then
       ! 3D fields, might need checkpointing
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_bc_biomass', wtheta_space, checkpoint_flag=checkpoint_GC3 )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_om_biomass', wtheta_space, checkpoint_flag=checkpoint_GC3 )
-      call add_physics_field( aerosol_fields, depository, prognostic_fields,   &
-      adv_fields_last_outer, &
-      'emiss_so2_nat', wtheta_space, checkpoint_flag=checkpoint_flag )
+      call processor%apply(make_spec('emiss_bc_biomass', main%aerosol, Wtheta,        &
+          ckp=checkpoint_GC3))
+      call processor%apply(make_spec('emiss_om_biomass', main%aerosol, Wtheta,        &
+          ckp=checkpoint_GC3))
+      call processor%apply(make_spec('emiss_so2_nat', main%aerosol, Wtheta,           &
+          ckp=checkpoint_flag))
     end if
 
     ! 3D fields, might need checkpointing and/or advecting
@@ -1679,20 +1082,14 @@ contains
       advection_flag = .false.
     end if
     ! Nucleation soluble mode number mixing ratio
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'n_nuc_sol', wtheta_space, checkpoint_flag=checkpoint_flag,              &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('n_nuc_sol', main%aerosol, Wtheta,                 &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Nucleation soluble H2SO4 aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'nuc_sol_su', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('nuc_sol_su', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Nucleation soluble organic carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer, &
-      'nuc_sol_om', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('nuc_sol_om', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
 
     ! Set flag defaults
     checkpoint_flag     = .false.
@@ -1722,120 +1119,74 @@ contains
     end if
 
     ! Aitken soluble mode number mixing ratio
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'n_ait_sol', wtheta_space, checkpoint_flag=checkpoint_flag,              &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('n_ait_sol', main%aerosol, Wtheta,                 &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Aitken soluble H2SO4 aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'ait_sol_su', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('ait_sol_su', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Aitken soluble black carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'ait_sol_bc', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('ait_sol_bc', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Aitken soluble organic carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'ait_sol_om', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('ait_sol_om', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Accumulation soluble mode number mixing ratio
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'n_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag,              &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('n_acc_sol', main%aerosol, Wtheta,                 &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Accumulation soluble H2SO4 aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'acc_sol_su', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('acc_sol_su', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Accumulation soluble black carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'acc_sol_bc', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('acc_sol_bc', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Accumulation soluble organic carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'acc_sol_om', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('acc_sol_om', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Accumulation soluble sea salt aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'acc_sol_ss', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('acc_sol_ss', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Accumulation soluble dust aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'acc_sol_du', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('acc_sol_du', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Coarse soluble mode number mixing ratio
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'n_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag,              &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('n_cor_sol', main%aerosol, Wtheta,                 &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Coarse soluble H2SO4 aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'cor_sol_su', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('cor_sol_su', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Coarse soluble black carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'cor_sol_bc', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('cor_sol_bc', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Coarse soluble organic carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'cor_sol_om', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('cor_sol_om', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Coarse soluble sea salt aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'cor_sol_ss', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('cor_sol_ss', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Coarse soluble dust aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'cor_sol_du', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('cor_sol_du', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Aitken insoluble mode number mixing ratio
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'n_ait_ins', wtheta_space, checkpoint_flag=checkpoint_flag,              &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('n_ait_ins', main%aerosol, Wtheta,                 &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Aitken insoluble black carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'ait_ins_bc', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('ait_ins_bc', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Aitken insoluble organic carbon aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'ait_ins_om', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag )
+    call processor%apply(make_spec('ait_ins_om', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag, adv%last), ckp=checkpoint_flag))
     ! Accumulation insoluble mode number mixing ratio
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'n_acc_ins', wtheta_space, checkpoint_flag=checkpoint_flag,              &
-      advection_flag=advection_flag_dust )
+    call processor%apply(make_spec('n_acc_ins', main%aerosol, Wtheta,                 &
+        adv_coll=if_adv(advection_flag_dust, adv%last), ckp=checkpoint_flag))
     ! Accumulation insoluble dust aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'acc_ins_du', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag_dust )
+    call processor%apply(make_spec('acc_ins_du', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag_dust, adv%last), ckp=checkpoint_flag))
     ! Coarse insoluble mode number mixing ratio
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'n_cor_ins', wtheta_space, checkpoint_flag=checkpoint_flag,              &
-      advection_flag=advection_flag_dust )
+    call processor%apply(make_spec('n_cor_ins', main%aerosol, Wtheta,                 &
+        adv_coll=if_adv(advection_flag_dust, adv%last), ckp=checkpoint_flag))
     ! Coarse insoluble dust aerosol mmr
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'cor_ins_du', wtheta_space, checkpoint_flag=checkpoint_flag,             &
-      advection_flag=advection_flag_dust )
+    call processor%apply(make_spec('cor_ins_du', main%aerosol, Wtheta,                &
+        adv_coll=if_adv(advection_flag_dust, adv%last), ckp=checkpoint_flag))
 
     ! 3D fields, might need checkpointing
     if (aerosol == aerosol_um .and. glomap_mode == glomap_mode_ukca) then
@@ -1845,409 +1196,170 @@ contains
     end if
 
     ! Cloud droplet number concentration
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'cloud_drop_no_conc', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('cloud_drop_no_conc', main%aerosol, Wtheta,        &
+        ckp=checkpoint_flag))
     ! Dry diameter Aitken mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'drydp_ait_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('drydp_ait_sol', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Dry diameter Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'drydp_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('drydp_acc_sol', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Dry diameter Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'drydp_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('drydp_cor_sol', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Dry diameter Aitken mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'drydp_ait_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('drydp_ait_ins', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Dry diameter Accumulation mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'drydp_acc_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('drydp_acc_ins', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Dry diameter Coarse mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'drydp_cor_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('drydp_cor_ins', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Wet diameter Aitken mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'wetdp_ait_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('wetdp_ait_sol', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Wet diameter Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'wetdp_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('wetdp_acc_sol', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Wet diameter Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'wetdp_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('wetdp_cor_sol', main%aerosol, Wtheta,             &
+        ckp=checkpoint_flag))
     ! Particle density Aitken mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'rhopar_ait_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('rhopar_ait_sol', main%aerosol, Wtheta,            &
+        ckp=checkpoint_flag))
     ! Particle density Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'rhopar_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('rhopar_acc_sol', main%aerosol, Wtheta,            &
+        ckp=checkpoint_flag))
     ! Particle density Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'rhopar_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('rhopar_cor_sol', main%aerosol, Wtheta,            &
+        ckp=checkpoint_flag))
     ! Particle density Aitken mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'rhopar_ait_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('rhopar_ait_ins', main%aerosol, Wtheta,            &
+        ckp=checkpoint_flag))
     ! Particle density Accumulation mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'rhopar_acc_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('rhopar_acc_ins', main%aerosol, Wtheta,            &
+        ckp=checkpoint_flag))
     ! Particle density Coarse mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'rhopar_cor_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('rhopar_cor_ins', main%aerosol, Wtheta,            &
+        ckp=checkpoint_flag))
     ! Partial volume of water Aitken mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_wat_ait_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_wat_ait_sol', main%aerosol, Wtheta,          &
+        ckp=checkpoint_flag))
     ! Partial volume of water Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_wat_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_wat_acc_sol', main%aerosol, Wtheta,          &
+        ckp=checkpoint_flag))
     ! Partial volume of water Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_wat_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_wat_cor_sol', main%aerosol, Wtheta,          &
+        ckp=checkpoint_flag))
     ! Partial volume component Sulphate Aitken mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_su_ait_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_su_ait_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Black Carbon Aitken mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_bc_ait_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_bc_ait_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Organic Matter Aitken mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_om_ait_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_om_ait_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Sulphate Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_su_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_su_acc_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Black Carbon Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_bc_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_bc_acc_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Organic Matter Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_om_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_om_acc_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Sea Salt Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_ss_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_ss_acc_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Dust Accumulation mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_du_acc_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_du_acc_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Sulphate Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_su_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_su_cor_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Black Carbon Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_bc_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_bc_cor_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Organic Matter Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_om_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_om_cor_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Sea Salt Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_ss_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_ss_cor_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Dust Coarse mode (Soluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_du_cor_sol', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_du_cor_sol', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Black Carbon Aitken mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_bc_ait_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_bc_ait_ins', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Organic Matter Aitken mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_om_ait_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_om_ait_ins', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Dust Accumulation mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_du_acc_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_du_acc_ins', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
     ! Partial volume component Dust Coarse mode (Insoluble)
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'pvol_du_cor_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
+    call processor%apply(make_spec('pvol_du_cor_ins', main%aerosol, Wtheta,           &
+        ckp=checkpoint_flag))
 
     ! Fields on dust space, might need checkpointing
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,         &
-         get_ndata_val('dust_divisions'))
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'dust_mrel', vector_space, twod=.true. , checkpoint_flag=checkpoint_flag )
+    ! vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,
+    !     get_ndata_val('dust_divisions'))
+    call processor%apply(make_spec('dust_mrel', main%aerosol, W3,                     &
+        mult='dust_divisions', twod=.true., ckp=checkpoint_flag))
 
     ! Fields on dust space, don't need checkpointing
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'dust_flux', vector_space, twod=.true. )
+    call processor%apply(make_spec('dust_flux', main%aerosol, W3,                     &
+        mult='dust_divisions', twod=.true.))
 
     ! 3D fields, don't need checkpointing
     ! Sulphuric Acid aerosol MMR
-    call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
-      adv_fields_last_outer,                                                   &
-      'sulphuric', wtheta_space )
+    call processor%apply(make_spec('sulphuric', main%aerosol, Wtheta))
 
     !========================================================================
     ! Fields owned by the stochastic physics scheme
     !========================================================================
-    call stph_fields%initialise(name='stph_fields', table_len=100)
 
     ! 3D fields, don't need checkpointing
-    call add_physics_field( stph_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, 'dtheta_stph', wtheta_space,               &
-      checkpoint_flag=.false., advection_flag=.false.)
-    call add_physics_field( stph_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, 'dmv_stph', wtheta_space,                  &
-      checkpoint_flag=.false., advection_flag=.false.)
-    call add_physics_field( stph_fields, depository, prognostic_fields, &
-      adv_fields_last_outer, 'du_stph', w2_space,                       &
-      checkpoint_flag=.false., advection_flag=.false.)
+    call processor%apply(make_spec('dtheta_stph', main%stph, Wtheta, ckp=.false.))
+    call processor%apply(make_spec('dmv_stph', main%stph, Wtheta, ckp=.false.))
+    call processor%apply(make_spec('du_stph', main%stph, W2, ckp=.false.))
 
 #endif
 
 
+  end subroutine process_physics_prognostics
+
+
+
+  !>@brief Routine to initialise the field objects required by the physics
+  !> @param[in]    mesh                 The current 3d mesh
+  !> @param[in]    twod_mesh            The current 2d mesh
+  !> @param[in]    field_mapper         Provides access to the field collections
+  !> @param[in]    clock                Model clock
+  subroutine create_physics_prognostics( mesh,                  &
+                                         twod_mesh,             &
+                                         field_mapper,          &
+                                         clock )
+    implicit none
+
+    type( mesh_type ), intent(in), pointer         :: mesh
+    type( mesh_type ), intent(in), pointer         :: twod_mesh
+    type( field_mapper_type ), intent(in)          :: field_mapper
+    class( clock_type ), intent(in)                :: clock
+
+    type( field_maker_type ) :: creator
+
+    call log_event( 'Create physics prognostics', LOG_LEVEL_INFO )
+
+    call creator%init(mesh, twod_mesh, field_mapper, clock)
+
+    call field_mapper%sanity_check()
+
+    call process_physics_prognostics(creator)
+
   end subroutine create_physics_prognostics
-
-  !>@brief Add field to field collection and set its write,
-  !>       checkpoint-restart and advection behaviour
-  !> @param[in,out] field_collection  Field collection that 'name' will be added to
-  !> @param[in,out] depository        Collection of all fields
-  !> @param[in,out] prognostic_fields Collection of checkpointed fields
-  !> @param[in,out] advected_fields   Collection of fields to be advected
-  !> @param[in]     name              Name of field to be added to collection
-  !> @param[in]     vector_space      Function space of field to set behaviour for
-  !> @param[in]     checkpoint_flag   Optional flag to allow checkpoint-
-  !>                                   restart behaviour of field to be set
-  !> @param[in]     twod              Optional flag to determine if this is a
-  !>                                   2D field for diagnostic output
-  !> @param[in]     advection_flag    Optional flag whether this field is to be advected
-  subroutine add_physics_field(field_collection, &
-                               depository, prognostic_fields, advected_fields, &
-                               name, vector_space, &
-                               checkpoint_flag, twod, advection_flag)
-
-    use io_config_mod,           only : use_xios_io, &
-                                        write_diag, checkpoint_write, &
-                                        checkpoint_read
-    use lfric_xios_read_mod,     only : read_field_face, &
-                                        read_field_single_face
-    use lfric_xios_write_mod,    only : write_field_face, &
-                                        write_field_single_face
-    use io_mod,                  only : checkpoint_write_netcdf, &
-                                        checkpoint_read_netcdf
-
-    implicit none
-
-    character(*), intent(in)                       :: name
-    type(field_collection_type), intent(inout)     :: field_collection
-    type(field_collection_type), intent(inout)     :: depository
-    type(field_collection_type), intent(inout)     :: prognostic_fields
-    type(field_collection_type), intent(inout)     :: advected_fields
-    type(function_space_type), pointer, intent(in) :: vector_space
-    logical(l_def), optional, intent(in)           :: checkpoint_flag
-    logical(l_def), optional, intent(in)           :: twod
-    logical(l_def), optional, intent(in)           :: advection_flag
-    !Local variables
-    type(field_type)                               :: new_field
-    type(field_type), pointer                      :: field_ptr => null()
-    class(pure_abstract_field_type), pointer       :: tmp_ptr => null()
-    logical(l_def)                                 :: twod_field, checkpointed
-    logical(l_def)                                 :: advected
-
-    ! pointers for xios write interface
-    procedure(write_interface), pointer :: write_behaviour => null()
-    procedure(read_interface),  pointer :: read_behaviour => null()
-    procedure(checkpoint_write_interface), pointer :: checkpoint_write_behaviour => null()
-    procedure(checkpoint_read_interface), pointer  :: checkpoint_read_behaviour => null()
-
-    ! Create the new field
-    call new_field%initialise( vector_space, name=trim(name) )
-
-    ! Set advection flag
-    if (present(advection_flag)) then
-      advected = advection_flag
-    else
-      advected = .false.
-    end if
-
-    ! Set checkpoint flag
-    if (present(checkpoint_flag)) then
-      checkpointed = checkpoint_flag
-    else
-      checkpointed = .false.
-    end if
-
-    ! Set read and write behaviour
-    if (use_xios_io) then
-      if (present(twod)) then
-        twod_field = twod
-      else
-        twod_field = .false.
-      end if
-      if (twod_field) then
-        write_behaviour => write_field_single_face
-        read_behaviour  => read_field_single_face
-      else
-        write_behaviour => write_field_face
-        read_behaviour  => read_field_face
-      end if
-      if (write_diag .or. checkpoint_write) &
-        call new_field%set_write_behaviour(write_behaviour)
-      if (checkpoint_read .and. checkpointed) &
-        call new_field%set_read_behaviour(read_behaviour)
-    else
-      checkpoint_write_behaviour => checkpoint_write_netcdf
-      checkpoint_read_behaviour  => checkpoint_read_netcdf
-      call new_field%set_checkpoint_write_behaviour(checkpoint_write_behaviour)
-      call new_field%set_checkpoint_read_behaviour(checkpoint_read_behaviour)
-    endif
-
-    ! Add the field to the depository
-    call depository%add_field(new_field)
-    call depository%get_field(name, field_ptr)
-    tmp_ptr => field_ptr
-    ! Put a pointer to the field in the required collection
-    call field_collection%add_reference_to_field( tmp_ptr )
-    ! If checkpointing the field, put a pointer to it in the prognostics collection
-    if ( checkpointed ) then
-      call prognostic_fields%add_reference_to_field( tmp_ptr )
-    endif
-    ! If advecting the field, put a pointer to it in the advected collection
-    if ( advected ) then
-      call advected_fields%add_reference_to_field( tmp_ptr )
-    endif
-
-  end subroutine add_physics_field
-
-  !>@brief Add integer field to field collection and set its write,
-  !>       checkpoint-restart and advection behaviour
-  !> @param[in,out] field_collection  Field collection that 'name' will be added to
-  !> @param[in,out] depository        Collection of all fields
-  !> @param[in,out] prognostic_fields Collection of checkpointed fields
-  !> @param[in,out] advected_fields   Collection of fields to be advected
-  !> @param[in]     name              Name of field to be added to collection
-  !> @param[in]     vector_space      Function space of field to set behaviour for
-  !> @param[in]     checkpoint_flag   Optional flag to allow checkpoint-
-  !>                                   restart behaviour of field to be set
-  !> @param[in]     twod              Optional flag to determine if this is a
-  !>                                   2D field for diagnostic output
-  !> @param[in]     advection_flag    Optional flag whether this field is to be advected
-  subroutine add_integer_field(field_collection, &
-                               depository, prognostic_fields, advected_fields, &
-                               name, vector_space, &
-                               checkpoint_flag, twod, advection_flag)
-
-    use io_config_mod,           only : use_xios_io, &
-                                        write_diag, checkpoint_write, &
-                                        checkpoint_read
-    use lfric_xios_read_mod,     only : read_field_face, &
-                                        read_field_single_face
-    use lfric_xios_write_mod,    only : write_field_face, &
-                                        write_field_single_face
-    use io_mod,                  only : checkpoint_write_netcdf, &
-                                        checkpoint_read_netcdf
-
-    implicit none
-
-    character(*), intent(in)                       :: name
-    type(field_collection_type), intent(inout)     :: field_collection
-    type(field_collection_type), intent(inout)     :: depository
-    type(field_collection_type), intent(inout)     :: prognostic_fields
-    type(field_collection_type), intent(inout)     :: advected_fields
-    type(function_space_type), pointer, intent(in) :: vector_space
-    logical(l_def), optional, intent(in)           :: checkpoint_flag
-    logical(l_def), optional, intent(in)           :: twod
-    logical(l_def), optional, intent(in)           :: advection_flag
-    !Local variables
-    type(integer_field_type)                       :: new_field
-    type(integer_field_type), pointer              :: field_ptr => null()
-    class(pure_abstract_field_type), pointer       :: tmp_ptr => null()
-    logical(l_def)                                 :: twod_field, checkpointed
-    logical(l_def)                                 :: advected
-
-    ! pointers for xios write interface
-    procedure(write_interface), pointer :: write_behaviour => null()
-    procedure(read_interface),  pointer :: read_behaviour => null()
-    procedure(checkpoint_write_interface), pointer :: checkpoint_write_behaviour => null()
-    procedure(checkpoint_read_interface), pointer  :: checkpoint_read_behaviour => null()
-
-    ! Create the new field
-    call new_field%initialise( vector_space, name=trim(name) )
-
-    ! Set advection flag
-    if (present(advection_flag)) then
-      advected = advection_flag
-    else
-      advected = .false.
-    end if
-
-    ! Set checkpoint flag
-    if (present(checkpoint_flag)) then
-      checkpointed = checkpoint_flag
-    else
-      checkpointed = .false.
-    end if
-
-    ! Set read and write behaviour
-    if (use_xios_io) then
-      if (present(twod)) then
-        twod_field = twod
-      else
-        twod_field = .false.
-      end if
-      if (twod_field) then
-        write_behaviour => write_field_single_face
-        read_behaviour  => read_field_single_face
-      else
-        write_behaviour => write_field_face
-        read_behaviour  => read_field_face
-      end if
-      if (write_diag .or. checkpoint_write) &
-        call new_field%set_write_behaviour(write_behaviour)
-      if (checkpoint_read .and. checkpointed) &
-        call new_field%set_read_behaviour(read_behaviour)
-    else
-      checkpoint_write_behaviour => checkpoint_write_netcdf
-      checkpoint_read_behaviour  => checkpoint_read_netcdf
-      call new_field%set_checkpoint_write_behaviour(checkpoint_write_behaviour)
-      call new_field%set_checkpoint_read_behaviour(checkpoint_read_behaviour)
-    endif
-
-    ! Add the field to the depository
-    call depository%add_field(new_field)
-    call depository%get_field(name, field_ptr)
-    ! Put a pointer to the field in the required collection
-    tmp_ptr => field_ptr
-    call field_collection%add_reference_to_field( tmp_ptr )
-    ! If checkpointing the field, put a pointer to it in the prognostics collection
-    if ( checkpointed ) then
-      call prognostic_fields%add_reference_to_field( tmp_ptr )
-    endif
-    ! If advecting the field, put a pointer to it in the advected collection
-    if ( advected ) then
-      call advected_fields%add_reference_to_field( tmp_ptr )
-    endif
-
-  end subroutine add_integer_field
 
 end module create_physics_prognostics_mod

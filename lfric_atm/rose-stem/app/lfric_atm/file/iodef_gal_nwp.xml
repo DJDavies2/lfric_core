@@ -20,7 +20,7 @@
     <field_definition src="./field_def_initial_diags.xml"/>
 
     <!-- Include file definitions -->
-    <file_definition src="./file_def_check_restart_nwp.xml"/>
+    <file_definition src="./file_def_check_restart.xml"/>
     <file_definition src="./file_def_ancil_main.xml"/>
     <file_definition src="./file_def_ancil_gal.xml"/>
     <file_definition src="./file_def_ancil_hadisst.xml"/>

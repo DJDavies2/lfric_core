@@ -26,12 +26,41 @@ module create_lbcs_mod
                                          lbc_option_analytic,    &
                                          lbc_option_gungho_file, &
                                          lbc_option_um2lfric_file
+  use create_gungho_prognostics_mod, only: &
+                                         enable_checkpointing
 
   implicit none
 
-  public  :: create_lbc_fields
+  public  :: create_lbc_fields, enable_lbc_fields
 
   contains
+
+    !> @brief   Enable LBC fields subject to checkpointing
+   subroutine enable_lbc_fields()
+
+      implicit none
+
+      integer(i_def)                             :: imr
+
+      call log_event( 'Enable LBC fields', LOG_LEVEL_INFO )
+
+      if ( lbc_option  == lbc_option_analytic ) then
+
+         call enable_checkpointing("lbc_theta")
+         call enable_checkpointing("lbc_rho")
+         call enable_checkpointing("lbc_u")
+         call enable_checkpointing("lbc_rho")
+         call enable_checkpointing("lbc_exner")
+         call enable_checkpointing("boundary_u_diff")
+         call enable_checkpointing("boundary_u_driving")
+
+         do imr = 1, nummr
+            call enable_checkpointing( trim('lbc_' // adjustl(mr_names(imr))) )
+         enddo
+
+      end if
+
+   end subroutine enable_lbc_fields
 
   !> @brief   Create and add LBC fields.
   !> @details Create the lateral boundary condition field collection.

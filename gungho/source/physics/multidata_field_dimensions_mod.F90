@@ -45,6 +45,10 @@ contains
     use cosp_config_mod,         only: n_subcol_gen
     use cosp_mod,                only: n_cloudsat_levels, n_backscatter_bins,  &
                                        n_isccp_tau_bins, n_isccp_pressure_bins
+    use radiation_config_mod,    only:                                         &
+      topography, topography_horizon, n_horiz_layer, n_horiz_ang
+    use section_choice_config_mod, only:                                       &
+      radiation, radiation_socrates
 #endif
 
     use log_mod,                 only: log_event, LOG_LEVEL_ERROR,             &
@@ -100,6 +104,20 @@ contains
             dim = n_cloudsat_levels
       case ('csat_lvls_atb_bins')
             dim = n_cloudsat_levels*n_backscatter_bins
+      case ('horiz_angle')
+            if (radiation == radiation_socrates .and. &
+                  topography == topography_horizon) then
+                  dim = n_horiz_layer*n_horiz_ang
+            else
+                  dim = 1
+            end if
+      case ('horiz_aspect')
+            if (radiation == radiation_socrates .and. &
+                  topography == topography_horizon) then
+                  dim = n_horiz_ang
+            else
+                  dim = 1
+            end if
       case ('')
             dim = 1 ! ordinary (non-multidata) field
 #endif

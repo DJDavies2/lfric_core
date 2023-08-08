@@ -15,7 +15,7 @@ module lfric_xios_context_mod
   use field_mod,            only : field_type
   use file_mod,             only : file_type
   use event_mod,            only : event_action, event_actor_type
-  use io_context_mod,       only : io_context_type
+  use io_context_mod,       only : io_context_type, callback_clock_arg
   use lfric_xios_file_mod,  only : lfric_xios_file_type
   use log_mod,              only : log_event,       &
                                    log_level_error, &
@@ -72,11 +72,13 @@ contains
   !> @param [in]     panel_id          Panel ID field
   !> @param [in]     model_clock       The model clock.
   !> @param [in]     calendar          The model calendar.
+  !> @param [in]     before_close      Routine to be called before context closes
   !> @param [in]     alt_coords        Array of coordinate fields for alternative meshes
   !> @param [in]     alt_panel_ids     Panel ID fields for alternative meshes
   subroutine initialise( this, id, communicator,          &
                          chi, panel_id,                   &
                          model_clock, calendar,           &
+                         before_close,                    &
                          alt_coords, alt_panel_ids )
 
     implicit none
@@ -88,6 +90,8 @@ contains
     class(field_type),              intent(in)    :: panel_id
     type(model_clock_type),         intent(inout) :: model_clock
     class(calendar_type),           intent(in)    :: calendar
+    procedure(callback_clock_arg), pointer, &
+                                    intent(in)    :: before_close
     type(field_type),     optional, intent(in)    :: alt_coords(:,:)
     type(field_type),     optional, intent(in)    :: alt_panel_ids(:)
 
@@ -104,6 +108,8 @@ contains
     call init_xios_calendar(model_clock, calendar)
     call init_xios_dimensions(chi, panel_id, alt_coords, alt_panel_ids)
     if (this%filelist%get_length() > 0) call setup_xios_files(this%filelist)
+
+    if (associated(before_close)) call before_close(model_clock)
 
     ! Close the context definition - no more I/O operations can be defined
     ! after this point

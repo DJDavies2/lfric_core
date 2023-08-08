@@ -34,6 +34,7 @@ module create_gungho_prognostics_mod
   use lfric_xios_write_mod,           only : write_field_node, &
                                              write_field_face, &
                                              checkpoint_write_xios
+  use lfric_xios_diag_mod,            only : enable_field
   use io_mod,                         only : checkpoint_write_netcdf, &
                                              checkpoint_read_netcdf
   use io_config_mod,                  only : use_xios_io,     &
@@ -45,11 +46,50 @@ module create_gungho_prognostics_mod
   implicit none
 
   private
-  public :: create_gungho_prognostics
+  public :: create_gungho_prognostics, enable_gungho_prognostics, enable_checkpointing
 
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief Enable a single field for checkpointing
+  !> @param[in] field_name The name (unique identifier of the field)
+  subroutine enable_checkpointing(field_name)
+    implicit none
+    character(*), intent(in) :: field_name
+    if (use_xios_io) then
+      if (checkpoint_write) call enable_field('checkpoint_' // trim(field_name))
+      if (checkpoint_read) call enable_field('restart_' // trim(field_name))
+    end if
+  end subroutine enable_checkpointing
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief Enable active gungho fields subject to checkpointing
+  subroutine enable_gungho_prognostics()
+    implicit none
+
+    integer(i_def)                            :: imr
+
+    call log_event( 'GungHo: Enable prognostics...', LOG_LEVEL_INFO )
+
+    ! Enable prognostic fields
+    call enable_checkpointing("theta")
+    call enable_checkpointing("u")
+    call enable_checkpointing("rho")
+    call enable_checkpointing("exner")
+
+    ! The moisture mixing ratio fields (mr) are subject
+    ! to checkpointing - see create_gungho_prognostics below
+    do imr = 1,nummr
+      call enable_checkpointing(trim(mr_names(imr)))
+    end do
+
+    if (transport_ageofair) then
+      call enable_checkpointing("ageofair")
+    end if
+
+  end subroutine enable_gungho_prognostics
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !> @brief Create empty fields to be used as prognostics by the gungho model
   !> @param[in]    mesh       The current 3d mesh
   !> @param[inout] depository A collection of all fields that need to be

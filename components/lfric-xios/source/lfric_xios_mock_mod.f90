@@ -24,6 +24,7 @@ module lfric_xios_mock_mod
             xios_get_domain_attr, &
             xios_get_axis_attr,   &
             xios_get_field_attr,  &
+            xios_set_field_attr,  &
             xios_field_is_active, &
             xios_is_valid_file,                   &
             xios_is_defined_file_attr,            &
@@ -118,6 +119,17 @@ type(xios_mock_data_type), public :: mock_xios_data
     end if
 
   end subroutine xios_get_axis_attr
+
+  !> Accept values for field attributes based on the field ID
+  !> @param[in]    field_id   The ID of the field to be tested
+  !> @param[inout] enabled    The enabled flag of the test field
+  subroutine xios_set_field_attr(field_id, enabled)
+    implicit none
+    character(*), intent(in) :: field_id
+    logical(l_def), intent(in) :: enabled
+
+    ! intentionally left bLank
+  end subroutine xios_set_field_attr
 
   !> Sets hard coded values for field attributes based on the field ID
   !> @param[in]    field_id   The ID of the field to be tested

@@ -25,6 +25,7 @@ USE gungho_extrusion_mod,       ONLY: create_extrusion
 USE halo_comms_mod,             ONLY: initialise_halo_comms
 USE inventory_by_mesh_mod,      ONLY: inventory_by_mesh_type
 USE model_clock_mod,            ONLY: model_clock_type
+USE io_context_mod,             ONLY: callback_clock_arg
 USE lfric_xios_context_mod,     ONLY: lfric_xios_context_type, advance
 USE lfric_xios_driver_mod,      ONLY: lfric_xios_initialise, &
                                       lfric_xios_finalise
@@ -98,6 +99,7 @@ TYPE(field_type), POINTER :: chi(:) => null()
 TYPE(field_type), POINTER :: panel_id => null()
 TYPE(inventory_by_mesh_type), POINTER :: chi_inventory => null()
 TYPE(inventory_by_mesh_type), POINTER :: panel_id_inventory => null()
+PROCEDURE(callback_clock_arg), POINTER :: before_close => null()
 
 ! Set module variables
 program_name = program_name_arg
@@ -162,7 +164,7 @@ allocate( io_context )
 file_list => io_context%get_filelist()
 CALL init_lfricinp_files(file_list)
 CALL io_context%initialise( xios_ctx, comm, chi, panel_id, &
-                            model_clock, model_calendar )
+                            model_clock, model_calendar, before_close )
 call advance(io_context, model_clock)
 
 ! Initialise runtime constants

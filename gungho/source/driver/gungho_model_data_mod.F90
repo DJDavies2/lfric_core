@@ -54,6 +54,7 @@ module gungho_model_data_mod
   use create_lbcs_mod,                    only : create_lbc_fields
   use create_gungho_prognostics_mod,      only : create_gungho_prognostics
   use create_physics_prognostics_mod,     only : create_physics_prognostics
+  use field_mapper_mod,                   only : field_mapper_type
   use section_choice_config_mod,          only : cloud, cloud_none
   use map_fd_to_prognostics_alg_mod,      only : map_fd_to_prognostics
   use model_clock_mod,                    only : model_clock_type
@@ -203,13 +204,13 @@ contains
   !> @param[in]    twod_mesh The current 2d mesh
   !> @param[in]    aerosol_mesh      Aerosol 3d mesh
   !> @param[in]    aerosol_twod_mesh Aerosol 2d mesh
+  !> @param[in]    model_cock        The model clock
 subroutine create_model_data( model_data,         &
                               mesh,               &
                               twod_mesh,          &
                               aerosol_mesh,       &
                               aerosol_twod_mesh,  &
                               model_clock         )
-
 
     implicit none
 
@@ -218,7 +219,9 @@ subroutine create_model_data( model_data,         &
     type( mesh_type ),       intent(in), pointer :: twod_mesh
     type( mesh_type ),       intent(in), pointer :: aerosol_mesh
     type( mesh_type ),       intent(in), pointer :: aerosol_twod_mesh
-    class(model_clock_type), intent(in)          :: model_clock
+    type(model_clock_type),  intent(in)          :: model_clock
+
+    type( field_mapper_type ), target :: field_mapper
 
     !-------------------------------------------------------------------------
     ! Select how to initialize model prognostic fields
@@ -268,26 +271,25 @@ subroutine create_model_data( model_data,         &
 
     ! Create prognostics used by physics
     if (use_physics) then
-      call create_physics_prognostics( mesh, twod_mesh,                  &
-                                       model_clock,                      &
-                                       model_data%depository,            &
-                                       model_data%prognostic_fields,     &
-                                       model_data%adv_fields_all_outer,  &
-                                       model_data%adv_fields_last_outer, &
-                                       model_data%derived_fields,        &
-                                       model_data%radiation_fields,      &
-                                       model_data%microphysics_fields,   &
-                                       model_data%electric_fields,       &
-                                       model_data%orography_fields,      &
-                                       model_data%turbulence_fields,     &
-                                       model_data%convection_fields,     &
-                                       model_data%cloud_fields,          &
-                                       model_data%surface_fields,        &
-                                       model_data%soil_fields,           &
-                                       model_data%snow_fields,           &
-                                       model_data%chemistry_fields,      &
-                                       model_data%aerosol_fields,        &
-                                       model_data%stph_fields  )
+      call field_mapper%init( model_data%depository,            &
+                              model_data%prognostic_fields,     &
+                              model_data%adv_fields_all_outer,  &
+                              model_data%adv_fields_last_outer, &
+                              model_data%derived_fields,        &
+                              model_data%radiation_fields,      &
+                              model_data%microphysics_fields,   &
+                              model_data%electric_fields,       &
+                              model_data%orography_fields,      &
+                              model_data%turbulence_fields,     &
+                              model_data%convection_fields,     &
+                              model_data%cloud_fields,          &
+                              model_data%surface_fields,        &
+                              model_data%soil_fields,           &
+                              model_data%snow_fields,           &
+                              model_data%chemistry_fields,      &
+                              model_data%aerosol_fields,        &
+                              model_data%stph_fields )
+      call create_physics_prognostics( mesh, twod_mesh, field_mapper, model_clock )
 
 #ifdef UM_PHYSICS
       ! Create FD prognostic fields

@@ -17,6 +17,7 @@ module lfric_xios_diag_mod
                                         xios_is_valid_field,                  &
                                         xios_is_defined_field_attr,           &
                                         xios_get_field_attr,                  &
+                                        xios_set_field_attr,                  &
                                         xios_field_is_active,                 &
                                         xios_get_axis_attr,                   &
                                         lfric_xios_mock_pull_in
@@ -29,6 +30,7 @@ module lfric_xios_diag_mod
                                         xios_is_valid_field,                  &
                                         xios_is_defined_field_attr,           &
                                         xios_get_field_attr,                  &
+                                        xios_set_field_attr,                  &
                                         xios_field_is_active,                 &
                                         xios_get_axis_attr
 
@@ -51,6 +53,7 @@ module lfric_xios_diag_mod
     field_is_valid,                                                            &
     field_is_enabled,                                                          &
     field_is_active,                                                           &
+    enable_field,                                                              &
     get_field_order,                                                           &
     get_field_grid_ref,                                                        &
     get_field_domain_ref,                                                      &
@@ -178,6 +181,20 @@ contains
       active = xios_field_is_active(unique_id, at_current_timestep)
     end if
   end function field_is_active
+
+  !> @brief Set the enabled flag of an XIOS field to true
+  !> @param[in]              unique_id    XIOS id of the field
+  subroutine enable_field(unique_id)
+    implicit none
+    character(*), intent(in) :: unique_id
+    if (.not. xios_is_valid_field(unique_id)) then
+      write(log_scratch_space, '(A, A)')                                      &
+      'Invalid XIOS field:', unique_id
+      call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+    else
+      call xios_set_field_attr(unique_id, enabled=.true.)
+    end if
+  end subroutine enable_field
 
   !> @brief Return the interpolation order of a field.
   !> @param[in]    unique_id    XIOS id of the field

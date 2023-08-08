@@ -16,7 +16,7 @@ module driver_io_mod
   use driver_model_data_mod,   only: model_data_type
   use field_mod,               only: field_type
   use inventory_by_mesh_mod,   only: inventory_by_mesh_type
-  use io_context_mod,          only: io_context_type
+  use io_context_mod,          only: io_context_type, callback_clock_arg
   use io_config_mod,           only: use_xios_io, subroutine_timers
   use log_mod,                 only: log_event, log_level_error, &
                                      log_level_trace
@@ -61,13 +61,16 @@ contains
   !> @param[in] model_data          Optional Model data object
   !> @param[in] alt_mesh_names      Optional array of names for other meshes
   !!                                to initialise I/O for
+  !> @param[in] before_close        Optional routine to be called before
+  !!                                context closes
   subroutine init_io( id, communicator,      &
                       chi_inventory,         &
                       panel_id_inventory,    &
                       model_clock, calendar, &
                       populate_filelist,     &
                       model_data,            &
-                      alt_mesh_names         )
+                      alt_mesh_names,        &
+                      before_close           )
 
     implicit none
 
@@ -81,6 +84,7 @@ contains
                    pointer, optional, intent(in)    :: populate_filelist
     class(model_data_type), optional, intent(in)    :: model_data
     character(len=str_def), optional, intent(in)    :: alt_mesh_names(:)
+    procedure(callback_clock_arg), optional         :: before_close
 
     type(mesh_type),                  pointer       :: mesh => null()
     type(field_type),                 pointer       :: chi(:) => null()
@@ -90,6 +94,14 @@ contains
     type(field_type),                 allocatable   :: alt_coords(:,:)
     type(field_type),                 allocatable   :: alt_panel_ids(:)
     integer(kind=i_def)                             :: num_meshes, i, j
+
+    procedure(callback_clock_arg),    pointer       :: before_close_ptr
+
+    if (present(before_close)) then
+      before_close_ptr => before_close
+    else
+      before_close_ptr => null()
+    end if
 
     ! Get coordinate fields for prime mesh
     mesh => mesh_collection%get_mesh(prime_mesh_name)
@@ -118,6 +130,7 @@ contains
                             id, communicator,      &
                             chi, panel_id,         &
                             model_clock, calendar, &
+                            before_close_ptr,      &
                             populate_filelist,     &
                             model_data,            &
                             alt_coords,            &
@@ -132,6 +145,7 @@ contains
                             id, communicator,      &
                             chi, panel_id,         &
                             model_clock, calendar, &
+                            before_close_ptr,      &
                             populate_filelist,     &
                             model_data )
     end if
@@ -151,6 +165,7 @@ contains
   !!                              vertex
   !> @param[in] model_clock       The model clock
   !> @param[in] calendar          The model calendar
+  !> @param[in] before_close      Routine to be called before context closes
   !> @param[in] populate_filelist Optional procedure for creating a list of
   !!                              file descriptions used by the model I/O
   !> @param[in] model_data        Optional Model data object
@@ -161,6 +176,7 @@ contains
                               id, communicator,      &
                               chi, panel_id,         &
                               model_clock, calendar, &
+                              before_close,          &
                               populate_filelist,     &
                               model_data,            &
                               alt_coords,            &
@@ -175,6 +191,7 @@ contains
     class(field_type),                   intent(in)    :: panel_id
     type(model_clock_type),              intent(inout) :: model_clock
     class(calendar_type),                intent(in)    :: calendar
+    procedure(callback_clock_arg), pointer, intent(in) :: before_close
     procedure(filelist_populator), &
                       pointer, optional, intent(in)    :: populate_filelist
     class(model_data_type),    optional, intent(in)    :: model_data
@@ -206,6 +223,7 @@ contains
         call io_context%initialise( id, communicator,      &
                                     chi, panel_id,         &
                                     model_clock, calendar, &
+                                    before_close,          &
                                     alt_coords, alt_panel_ids )
       end select
 #else

@@ -8,6 +8,7 @@
 module io_context_mod
 
   use clock_mod,       only : clock_type
+  use model_clock_mod, only : model_clock_type
   use constants_mod,   only : i_native, r_second
   use event_mod,       only : event_actor_type
   use field_mod,       only : field_type
@@ -49,6 +50,18 @@ module io_context_mod
       class(io_context_type), intent(inout) :: this
     end subroutine set_current_if
   end interface
+
+  abstract interface
+    !> @brief Callback interface for bespoke IO configuration
+    !> @param[in] clock     Clock to be passed in at call site
+    subroutine callback_clock_arg(clock)
+      use clock_mod, only : clock_type
+      implicit none
+      class(clock_type), intent(in) :: clock
+    end subroutine callback_clock_arg
+  end interface
+
+  public :: callback_clock_arg
 
 contains
 

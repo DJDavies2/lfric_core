@@ -20,7 +20,7 @@
     <field_definition src="./field_def_lbc_diags.xml"/>
 
     <!-- Include file definitions -->
-    <file_definition src="./file_def_check_restart_nwp.xml"/>
+    <file_definition src="./file_def_check_restart.xml"/>
     <file_definition src="./file_def_lbcs.xml"/>
     <file_definition src="./file_def_diags_empty.xml"/>
     <file_definition src="./file_def_diags_ral.xml"/>

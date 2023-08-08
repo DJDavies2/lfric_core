@@ -168,10 +168,31 @@ module um_physics_init_mod
   integer(i_def), protected :: level2km
 
   private
-  public :: um_physics_init,                                                   &
+  public :: um_physics_init, um_physics_pre_io_init,                           &
             n_aer_mode, mode_dimen, sw_band_mode, lw_band_mode, level2km
 
 contains
+
+  !>@brief Initialise UM physics variables required before IO initialisation
+  subroutine um_physics_pre_io_init()
+
+    use cv_run_mod, only: l_conv_prog_precip, l_conv_prog_dtheta, l_conv_prog_dq
+
+    implicit none
+
+    if ( convection == convection_um ) then
+
+      if ( cv_scheme == cv_scheme_gregory_rowntree ) then
+
+        l_conv_prog_precip  = .true.
+        l_conv_prog_dtheta  = .true.
+        l_conv_prog_dq      = .true.
+
+      end if
+
+    end if
+
+  end subroutine um_physics_pre_io_init
 
   !>@brief Initialise UM physics variables which are either fixed in LFRic
   !>        or derived from LFRic inputs or JULES variables
@@ -237,7 +258,6 @@ contains
          cpress_term, pr_melt_frz_opt, llcs_opt_crit_condens,              &
          llcs_detrain_coef, l_prog_pert, md_pert_opt, l_jules_flux,        &
          l_reset_neg_delthvu,                                              &
-         l_conv_prog_precip, l_conv_prog_dtheta, l_conv_prog_dq,           &
          adv_conv_prog_dtheta, adv_conv_prog_dq,                           &
          tau_conv_prog_precip, tau_conv_prog_dtheta, tau_conv_prog_dq,     &
          prog_ent_grad, prog_ent_int, prog_ent_max, prog_ent_min
@@ -623,9 +643,6 @@ contains
         l_anvil             = .true.
         l_ccrad             = .true.
         l_cmt_heating       = .true.
-        l_conv_prog_precip  = .true.
-        l_conv_prog_dtheta  = .true.
-        l_conv_prog_dq      = .true.
         l_cv_conserve_check = .true.
         l_fcape             = .true.
         l_mom               = .true.

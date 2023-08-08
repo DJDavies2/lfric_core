@@ -29,6 +29,14 @@ module gungho_model_mod
   use field_mod,                  only : field_type
   use field_parent_mod,           only : write_interface
   use field_collection_mod,       only : field_collection_type
+  use field_spec_mod,             only : field_spec_type, processor_type
+  use create_gungho_prognostics_mod, &
+                                  only : enable_gungho_prognostics, &
+                                         enable_checkpointing
+  use boundaries_config_mod,      only : limited_area
+  use create_lbcs_mod,            only : enable_lbc_fields
+  use create_physics_prognostics_mod, &
+                                  only : process_physics_prognostics
   use multigrid_config_mod,       only : chain_mesh_tags
   use multires_coupling_config_mod, &
                                   only : multires_coupling_mesh_tags
@@ -63,6 +71,7 @@ module gungho_model_mod
                                          minmax_tseries_final
   use mesh_mod,                   only : mesh_type
   use mesh_collection_mod,        only : mesh_collection
+  use clock_mod,                  only : clock_type
   use model_clock_mod,            only : model_clock_type
   use moisture_conservation_alg_mod, &
                                   only : moisture_conservation_alg
@@ -100,7 +109,8 @@ module gungho_model_mod
   use um_clock_init_mod,           only : um_clock_init
   use um_control_init_mod,         only : um_control_init
   use um_sizes_init_mod,           only : um_sizes_init
-  use um_physics_init_mod,         only : um_physics_init
+  use um_physics_init_mod,         only : um_physics_init, &
+                                          um_physics_pre_io_init
   use um_radaer_lut_init_mod,      only : um_radaer_lut_init
   use um_ukca_init_mod,            only : um_ukca_init
 #endif
@@ -111,13 +121,70 @@ module gungho_model_mod
 
   logical(l_def) :: use_moisture
 
+  !> @brief Processor class for enabling checkpointing fields
+  type, extends(processor_type) :: enabler_type
+  contains
+    private
+    ! main interface
+    procedure, public :: init => enabler_init
+    procedure, public :: apply => enabler_apply
+
+    ! destructor - here to avoid gnu compiler bug
+    final :: enabler_dtor
+  end type enabler_type
+
   public initialise_infrastructure, &
          initialise_model,          &
          finalise_infrastructure,   &
          finalise_model
-
 contains
+  !> @brief  Initialise processor object for enabling checkpointing
+  !> @param[in]   self      Enabler object
+  !> @param[in]   spec      Model clock
+  subroutine enabler_init(self, clock)
+    implicit none
+    class(enabler_type),       intent(inout) :: self
+    class(clock_type), target, intent(in)    :: clock
 
+    call self%set_clock(clock)
+  end subroutine enabler_init
+
+  !> @brief     Enabler's apply method
+  !> @details   Enable a field given by field specifier for checkpointing.
+  !> @param[in]   self      Enabler object
+  !> @param[in]   spec      Field specifier
+  subroutine enabler_apply(self, spec)
+    implicit none
+    class(enabler_type),   intent(in) :: self
+    type(field_spec_type), intent(in) :: spec
+
+    if (spec%ckp) then
+      call enable_checkpointing(spec%name)
+    end if
+  end subroutine enabler_apply
+
+  !> @brief Destructor of enabler object
+  !> @param[inout] self  Enabler object
+  subroutine enabler_dtor(self)
+    type(enabler_type), intent(inout) :: self
+    ! empty
+  end subroutine enabler_dtor
+
+  !> @brief Enable active state fields for checkpointing
+  !> @param[in] clock        The clock providing access to time information
+  subroutine before_context_close(clock)
+    implicit none
+    class(clock_type), intent(in) :: clock
+
+    type(enabler_type) :: enabler
+
+    call enable_gungho_prognostics()
+    if (limited_area) call enable_lbc_fields()
+    if (use_physics) then
+      call enabler%init(clock)
+      call process_physics_prognostics(enabler)
+    end if
+  end subroutine before_context_close
 
   !> @brief Initialises the infrastructure and sets up constants used by the
   !>        model.
@@ -362,9 +429,18 @@ contains
     ! Initialise aspects of output
     !-------------------------------------------------------------------------
 
+    if ( use_physics ) then
+#ifdef UM_PHYSICS
+        ! Initialisation of UM physics configuration needed
+        ! when callback below executes.
+        call um_physics_pre_io_init()
+#endif
+    end if
+
     call log_event("Initialising I/O context", LOG_LEVEL_INFO)
 
     files_init_ptr => init_gungho_files
+
     if ( use_multires_coupling ) then
       ! Compose list of meshes for I/O
       ! This is list of namelist mesh names minus the prime mesh name
@@ -381,15 +457,16 @@ contains
                     chi_inventory, panel_id_inventory, &
                     model_clock, calendar,             &
                     populate_filelist=files_init_ptr,  &
-                    alt_mesh_names=extra_io_mesh_names )
+                    alt_mesh_names=extra_io_mesh_names,&
+                    before_close=before_context_close )
 
     else
       call init_io( io_context_name, mpi%get_comm(),   &
                     chi_inventory, panel_id_inventory, &
                     model_clock, calendar,             &
-                    populate_filelist=files_init_ptr )
+                    populate_filelist=files_init_ptr,  &
+                    before_close=before_context_close )
     end if
-
 
     ! Set up surface altitude field - this will be used to generate orography
     ! for models with global land mass included (i.e GAL)

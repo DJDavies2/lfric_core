@@ -18,7 +18,7 @@
     <field_definition src="./field_def_initial_diags.xml"/>
 
     <!-- Include file definitions -->
-    <file_definition src="./file_def_check_restart_all.xml"/>
+    <file_definition src="./file_def_check_restart.xml"/>
     <file_definition src="./file_def_diags_idealised.xml"/>
     <file_definition src="./file_def_diags_ave.xml"/>
 
