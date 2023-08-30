@@ -192,10 +192,10 @@
             ],
             'compiler' : {
                 'intel' : [
-                    'module load meto-environment/lfric/intel/17.0.0.098/4'
+                    'module load meto-environment/lfric/intel/17.0.0.098/5'
                 ],
                 'cray' : [
-                    'module load meto-environment/lfric/cray/8.7.0/4'
+                    'module load meto-environment/lfric/cray/8.7.0/5'
                 ]
             },
             'reveal' : ['module list 2>&1', 'export'],
@@ -252,10 +252,10 @@
             ],
             'compiler' : {
                 'intel' : [
-                    'module load meto-environment/lfric/intel/17.0.0.098/4'
+                    'module load meto-environment/lfric/intel/17.0.0.098/5'
                 ],
                 'cray' : [
-                    'module load meto-environment/lfric/cray/8.7.0/4'
+                    'module load meto-environment/lfric/cray/8.7.0/5'
                 ]
             },
             'reveal' : ['module list 2>&1', 'export'],
