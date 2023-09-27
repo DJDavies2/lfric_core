@@ -16,7 +16,6 @@ module limited_area_constants_mod
   ! Infrastructure
   use constants_mod,                     only: i_def, r_def, str_def, str_short
   use extrusion_mod,                     only: TWOD
-  use fem_constants_mod,                 only: get_rmultiplicity
   use field_mod,                         only: field_type
   use r_solver_field_mod,                only: r_solver_field_type
   use field_parent_mod,                  only: field_parent_type, write_interface
@@ -183,7 +182,6 @@ contains
     type(field_type), pointer :: w3_fine_mask => null()
     type(field_type), pointer :: w2_source_mask => null()
     type(field_type), pointer :: w2_fine_mask => null()
-    type(field_type), pointer :: rmultiplicity_w2 => null()
 
     integer(kind=i_def) :: i, num_meshes
     integer(kind=i_def) :: mesh_id_fine
@@ -340,8 +338,6 @@ contains
         mesh_fine => w3_fs%get_mesh()
         mesh_id_fine =  mesh_fine%get_id()
 
-        rmultiplicity_w2 => get_rmultiplicity(W2, mesh_id_fine)
-
         ! Set the input as the fine level mesh masks
         call mask_w3_inventory%get_field(mesh_fine, w3_source_mask)
         call mask_w3_inventory%get_field(mesh_fine, w3_fine_mask)
@@ -366,7 +362,7 @@ contains
                                                w3_fine_mask),               &
             setval_C( mask_w2, 0.0_r_def ),                                 &
             restrict_masked_w2_kernel_type(mask_w2, w2_source_mask,         &
-                                           rmultiplicity_w2,  w2_fine_mask) )
+                                           w2_fine_mask) )
 
         call mask_w3_r_solver_inventory%add_field(mask_w3_r_solver, w3_fs, mesh_coarse)
         call mask_w2_r_solver_inventory%add_field(mask_w2_r_solver, w2_fs, mesh_coarse)

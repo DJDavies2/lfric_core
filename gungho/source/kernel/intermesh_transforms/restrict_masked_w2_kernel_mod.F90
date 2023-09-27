@@ -23,7 +23,7 @@ use argument_mod,            only: arg_type,                  &
                                    GH_COARSE, GH_FINE,        &
                                    ANY_SPACE_2, CELL_COLUMN
 use constants_mod,           only: i_def, r_def
-use fs_continuity_mod,       only: W2
+use fs_continuity_mod,       only: W2, W2broken
 use kernel_mod,              only: kernel_type
 use reference_element_mod,   only: W, S, E, N, B
 
@@ -38,13 +38,13 @@ public :: restrict_masked_w2_kernel_code
 !> The type declaration for the kernel. Contains the metadata needed by the
 !> Psy layer.
 !>
-
+! @TODO: #4052. Function space metadata for the GH_WRITE field should be changed
+! back to W2 once LFRic picks up PSyclone PR 2253
 type, public, extends(kernel_type) :: restrict_masked_w2_kernel_type
   private
-  type(arg_type) :: meta_args(4) = (/                                       &
-    arg_type(GH_FIELD, GH_REAL, GH_WRITE, W2,          mesh_arg=GH_COARSE), & ! coarse field
+  type(arg_type) :: meta_args(3) = (/                                       &
+    arg_type(GH_FIELD, GH_REAL, GH_WRITE, W2broken,    mesh_arg=GH_COARSE), & ! coarse field
     arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_FINE  ), & ! fine field
-    arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_FINE  ), & ! rmultiplicity
     arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_FINE  )  & ! fine mesh
     /)
   integer :: operates_on = CELL_COLUMN
@@ -70,8 +70,6 @@ contains
   !!                                         for the fine grid
   !> @param[in,out] coarse_field             Coarse grid W2 field to compute
   !> @param[in]     fine_field               Fine grid  W2 field to restrict
-  !> @param[in]     rmultiplicity            A fine grid W2 field containing the
-  !!                                         reciprocal multiplicity of nodes
   !> @param[in]     mask_fine                W2 mask on the fine grid
   !> @param[in]     undf_coarse              Total num of DoFs on the coarse
   !!                                         grid for this mesh partition
@@ -88,7 +86,6 @@ contains
                                      ncell_fine,              &
                                      coarse_field,            &
                                      fine_field,              &
-                                     rmultiplicity,           &
                                      mask_fine,               &
                                      undf_coarse,             &
                                      map_coarse,              &
@@ -108,7 +105,6 @@ contains
     ! Fields
     real(kind=r_def), intent(inout) :: coarse_field(undf_coarse)
     real(kind=r_def), intent(in)    :: fine_field(undf_fine)
-    real(kind=r_def), intent(in)    :: rmultiplicity(undf_fine)
     real(kind=r_def), intent(in)    :: mask_fine(undf_fine)
 
     ! Maps
@@ -226,12 +222,11 @@ contains
 
         do y_idx = y_idx_start(df), y_idx_end(df)
           do x_idx = x_idx_start(df), x_idx_end(df)
-            new_coarse = new_coarse + ( rmultiplicity(map_fine(df,cell_map(x_idx,y_idx))+k) &
-                                        * mask_fine(map_fine(df,cell_map(x_idx,y_idx)))     &
-                                        * fine_field(map_fine(df,cell_map(x_idx,y_idx))+k) )
+            new_coarse = new_coarse + ( mask_fine(map_fine(df,cell_map(x_idx,y_idx)))  &
+                                    * fine_field(map_fine(df,cell_map(x_idx,y_idx))+k) )
           end do
         end do
-        coarse_field(map_coarse(df)+k) = coarse_field(map_coarse(df)+k) + new_coarse * scaling(df)
+        coarse_field(map_coarse(df)+k) = new_coarse * scaling(df)
       end do
     end do
 
@@ -249,7 +244,7 @@ contains
 
       do y_idx = y_idx_start(df), y_idx_end(df)
         do x_idx = x_idx_start(df), x_idx_end(df)
-          new_coarse = new_coarse + ( mask_fine(map_fine(df,cell_map(x_idx,y_idx)))    &
+          new_coarse = new_coarse + ( mask_fine(map_fine(df,cell_map(x_idx,y_idx)))  &
                                   * fine_field(map_fine(df,cell_map(x_idx,y_idx))+k) )
         end do
       end do
