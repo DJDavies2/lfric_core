@@ -4,6 +4,7 @@
 # The file LICENCE, distributed with this code, contains details of the terms
 # under which the code may be used.
 
+rm ${MESH_DIR}/*.stripped
 
 file_list=$(ls ${MESH_DIR}/summary_${MESH_FILE_PREFIX}*)
 
