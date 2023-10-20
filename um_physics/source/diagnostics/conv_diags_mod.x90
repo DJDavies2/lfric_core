@@ -19,43 +19,46 @@ module conv_diags_mod
   private
 
   ! Logical indicating whether diagnostics are requested
-  logical( l_def ) :: deep_in_col_flag,       &    ! 2-D
-                      shallow_in_col_flag,    &
-                      mid_in_col_flag,        &
-                      freeze_level_flag,      &
-                      deep_prec_flag,         &
-                      shallow_prec_flag,      &
-                      mid_prec_flag,          &
-                      deep_term_flag,         &
-                      cape_timescale_flag,    &
-                      lowest_cv_base_flag,    &
-                      lowest_cv_top_flag,     &
-                      cv_base_flag,           &
-                      cv_top_flag,            &
-                      pres_cv_base_flag,      &
-                      pres_cv_top_flag,       &
-                      deep_cfl_limited_flag,  &
-                      mid_cfl_limited_flag,   &
-                      entrain_up_flag,        &   ! 3-D
-                      entrain_down_flag,      &
-                      detrain_up_flag,        &
-                      detrain_down_flag,      &
-                      dd_dt_flag,             &
-                      dd_dq_flag,             &
-                      deep_dt_flag,           &
-                      deep_dq_flag,           &
-                      deep_massflux_flag,     &
-                      shallow_dt_flag,        &
-                      shallow_dq_flag,        &
-                      shallow_massflux_flag,  &
-                      mid_dt_flag,            &
-                      mid_dq_flag,            &
-                      mid_massflux_flag,      &
-                      deep_tops_flag,         &
-                      massflux_up_half_flag,  &
-                      massflux_up_cmpta_flag, &
-                      cca_unadjusted_flag,    &
-                      dth_conv_noshal_flag,   &
+  logical( l_def ) :: deep_in_col_flag,            & ! 2-D
+                      shallow_in_col_flag,         &
+                      mid_in_col_flag,             &
+                      freeze_level_flag,           &
+                      deep_prec_flag,              &
+                      shallow_prec_flag,           &
+                      mid_prec_flag,               &
+                      deep_term_flag,              &
+                      cape_timescale_flag,         &
+                      lowest_cv_base_flag,         &
+                      lowest_cv_top_flag,          &
+                      cv_base_flag,                &
+                      cv_top_flag,                 &
+                      pres_cv_base_flag,           &
+                      pres_cv_top_flag,            &
+                      pres_lowest_cv_base_flag,    &
+                      pres_lowest_cv_top_flag,     &
+                      lowest_cca_2d_flag,          &
+                      deep_cfl_limited_flag,       &
+                      mid_cfl_limited_flag,        &
+                      entrain_up_flag,             & ! 3-D
+                      entrain_down_flag,           &
+                      detrain_up_flag,             &
+                      detrain_down_flag,           &
+                      dd_dt_flag,                  &
+                      dd_dq_flag,                  &
+                      deep_dt_flag,                &
+                      deep_dq_flag,                &
+                      deep_massflux_flag,          &
+                      shallow_dt_flag,             &
+                      shallow_dq_flag,             &
+                      shallow_massflux_flag,       &
+                      mid_dt_flag,                 &
+                      mid_dq_flag,                 &
+                      mid_massflux_flag,           &
+                      deep_tops_flag,              &
+                      massflux_up_half_flag,       &
+                      massflux_up_cmpta_flag,      &
+                      cca_unadjusted_flag,         &
+                      dth_conv_noshal_flag,        &
                       dmv_conv_noshal_flag
 
   public :: initialise_diags_for_conv
@@ -64,46 +67,49 @@ module conv_diags_mod
 contains
 
   !> @brief Initialise fields for locally-computed diagnostics
-  subroutine initialise_diags_for_conv(theta_star,        &
-                                       rho,               &
-                                       zh,                &
-                                       deep_in_col,       &    ! 2-D
-                                       shallow_in_col,    &
-                                       mid_in_col,        &
-                                       freeze_level,      &
-                                       deep_prec,         &
-                                       shallow_prec,      &
-                                       mid_prec,          &
-                                       deep_term,         &
-                                       cape_timescale,    &
-                                       lowest_cv_base,    &
-                                       lowest_cv_top,     &
-                                       cv_base,           &
-                                       cv_top,            &
-                                       pres_cv_base,      &
-                                       pres_cv_top,       &
-                                       deep_cfl_limited,  &
-                                       mid_cfl_limited,   &
-                                       entrain_up,        &   ! 3-D
-                                       entrain_down,      &
-                                       detrain_up,        &
-                                       detrain_down,      &
-                                       dd_dt,             &
-                                       dd_dq,             &
-                                       deep_dt,           &
-                                       deep_dq,           &
-                                       deep_massflux,     &
-                                       shallow_dt,        &
-                                       shallow_dq,        &
-                                       shallow_massflux,  &
-                                       mid_dt,            &
-                                       mid_dq,            &
-                                       mid_massflux,      &
-                                       deep_tops,         &
-                                       massflux_up_half,  &
-                                       massflux_up_cmpta, &
-                                       cca_unadjusted,    &
-                                       dth_conv_noshal,   &
+  subroutine initialise_diags_for_conv(theta_star,             &
+                                       rho,                    &
+                                       zh,                     &
+                                       deep_in_col,            & ! 2-D
+                                       shallow_in_col,         &
+                                       mid_in_col,             &
+                                       freeze_level,           &
+                                       deep_prec,              &
+                                       shallow_prec,           &
+                                       mid_prec,               &
+                                       deep_term,              &
+                                       cape_timescale,         &
+                                       lowest_cv_base,         &
+                                       lowest_cv_top,          &
+                                       cv_base,                &
+                                       cv_top,                 &
+                                       pres_cv_base,           &
+                                       pres_cv_top,            &
+                                       pres_lowest_cv_base,    &
+                                       pres_lowest_cv_top,     &
+                                       lowest_cca_2d,          &
+                                       deep_cfl_limited,       &
+                                       mid_cfl_limited,        &
+                                       entrain_up,             & ! 3-D
+                                       entrain_down,           &
+                                       detrain_up,             &
+                                       detrain_down,           &
+                                       dd_dt,                  &
+                                       dd_dq,                  &
+                                       deep_dt,                &
+                                       deep_dq,                &
+                                       deep_massflux,          &
+                                       shallow_dt,             &
+                                       shallow_dq,             &
+                                       shallow_massflux,       &
+                                       mid_dt,                 &
+                                       mid_dq,                 &
+                                       mid_massflux,           &
+                                       deep_tops,              &
+                                       massflux_up_half,       &
+                                       massflux_up_cmpta,      &
+                                       cca_unadjusted,         &
+                                       dth_conv_noshal,        &
                                        dmv_conv_noshal)
 
     implicit none
@@ -112,44 +118,47 @@ contains
     type( field_type ), intent(in)    :: theta_star, rho, zh
 
     ! Diagnostic fields to initialise
-    type( field_type ), intent(inout) :: deep_in_col,     &    ! 2-D
-                                       shallow_in_col,    &
-                                       mid_in_col,        &
-                                       freeze_level,      &
-                                       deep_prec,         &
-                                       shallow_prec,      &
-                                       mid_prec,          &
-                                       deep_term,         &
-                                       cape_timescale,    &
-                                       lowest_cv_base,    &
-                                       lowest_cv_top,     &
-                                       cv_base,           &
-                                       cv_top,            &
-                                       pres_cv_base,      &
-                                       pres_cv_top,       &
-                                       deep_cfl_limited,  &
-                                       mid_cfl_limited,   &
-                                       entrain_up,        &   ! 3-D
-                                       entrain_down,      &
-                                       detrain_up,        &
-                                       detrain_down,      &
-                                       dd_dt,             &
-                                       dd_dq,             &
-                                       deep_dt,           &
-                                       deep_dq,           &
-                                       deep_massflux,     &
-                                       shallow_dt,        &
-                                       shallow_dq,        &
-                                       shallow_massflux,  &
-                                       mid_dt,            &
-                                       mid_dq,            &
-                                       mid_massflux,      &
-                                       deep_tops,         &
-                                       massflux_up_half,  &
-                                       massflux_up_cmpta, &
-                                       cca_unadjusted,    &
-                                       dth_conv_noshal,   &
-                                       dmv_conv_noshal
+    type( field_type ), intent(inout) :: deep_in_col,             & ! 2-D
+                                         shallow_in_col,          &
+                                         mid_in_col,              &
+                                         freeze_level,            &
+                                         deep_prec,               &
+                                         shallow_prec,            &
+                                         mid_prec,                &
+                                         deep_term,               &
+                                         cape_timescale,          &
+                                         lowest_cv_base,          &
+                                         lowest_cv_top,           &
+                                         cv_base,                 &
+                                         cv_top,                  &
+                                         pres_cv_base,            &
+                                         pres_cv_top,             &
+                                         pres_lowest_cv_base,     &
+                                         pres_lowest_cv_top,      &
+                                         lowest_cca_2d,           &
+                                         deep_cfl_limited,        &
+                                         mid_cfl_limited,         &
+                                         entrain_up,              & ! 3-D
+                                         entrain_down,            &
+                                         detrain_up,              &
+                                         detrain_down,            &
+                                         dd_dt,                   &
+                                         dd_dq,                   &
+                                         deep_dt,                 &
+                                         deep_dq,                 &
+                                         deep_massflux,           &
+                                         shallow_dt,              &
+                                         shallow_dq,              &
+                                         shallow_massflux,        &
+                                         mid_dt,                  &
+                                         mid_dq,                  &
+                                         mid_massflux,            &
+                                         deep_tops,               &
+                                         massflux_up_half,        &
+                                         massflux_up_cmpta,       &
+                                         cca_unadjusted,          &
+                                         dth_conv_noshal,         &
+                                         dmv_conv_noshal
 
     logical(l_def) :: ignore
 
@@ -201,6 +210,18 @@ contains
 
     pres_cv_top_flag = init_diag(pres_cv_top, 'convection__pres_cv_top')
     ! not zeroed because overwritten
+
+    pres_lowest_cv_base_flag = init_diag(pres_lowest_cv_base, &
+                                         'convection__pres_lowest_cv_base')
+    ! not zeroed because overwritten
+
+    pres_lowest_cv_top_flag = init_diag(pres_lowest_cv_top, &
+                                        'convection__pres_lowest_cv_top')
+    ! not zeroed because overwritten
+
+    lowest_cca_2d_flag = init_diag(lowest_cca_2d, &
+                                   'convection__lowest_cca_2d')
+    if (lowest_cca_2d_flag) call invoke( setval_c(lowest_cca_2d, 0.0_r_def) )
 
     deep_cfl_limited_flag = init_diag(deep_cfl_limited, 'convection__deep_cfl_limited')
     if (deep_cfl_limited_flag) call invoke( setval_c(deep_cfl_limited, 0.0_r_def) )
@@ -291,63 +312,66 @@ contains
   end subroutine initialise_diags_for_conv
 
   !> @brief Output diagnostics from conv_alg
-  subroutine output_diags_for_conv(    cca,               & ! prognostics
-                                       ccw,               &
-                                       dt_conv,           & ! increments
-                                       dmv_conv,          &
-                                       dmcl_conv,         &
-                                       dmci_conv,         &
-                                       du_conv,           &
-                                       dv_conv,           &
-                                       dbcf_conv,         &
-                                       dcfl_conv,         &
-                                       dcff_conv,         &
-                                       massflux_up,       & ! not local
-                                       massflux_down,     &
-                                       cape_diluted,      &
-                                       conv_rain,         &
-                                       conv_snow,         &
-                                       conv_rain_3d,      &
-                                       conv_snow_3d,      &
-                                       cca_2d,            &
-                                       deep_in_col,       &    ! 2-D
-                                       shallow_in_col,    &
-                                       mid_in_col,        &
-                                       freeze_level,      &
-                                       deep_prec,         &
-                                       shallow_prec,      &
-                                       mid_prec,          &
-                                       deep_term,         &
-                                       cape_timescale,    &
-                                       lowest_cv_base,    &
-                                       lowest_cv_top,     &
-                                       cv_base,           &
-                                       cv_top,            &
-                                       pres_cv_base,      &
-                                       pres_cv_top,       &
-                                       deep_cfl_limited,  &
-                                       mid_cfl_limited,   &
-                                       entrain_up,        &   ! 3-D
-                                       entrain_down,      &
-                                       detrain_up,        &
-                                       detrain_down,      &
-                                       dd_dt,             &
-                                       dd_dq,             &
-                                       deep_dt,           &
-                                       deep_dq,           &
-                                       deep_massflux,     &
-                                       shallow_dt,        &
-                                       shallow_dq,        &
-                                       shallow_massflux,  &
-                                       mid_dt,            &
-                                       mid_dq,            &
-                                       mid_massflux,      &
-                                       deep_tops,         &
-                                       massflux_up_half,  &
-                                       massflux_up_cmpta, &
-                                       cca_unadjusted,    &
-                                       dth_conv_noshal,   &
-                                       dmv_conv_noshal)
+  subroutine output_diags_for_conv( cca,                    & ! prognostics
+                                    ccw,                    &
+                                    dt_conv,                & ! increments
+                                    dmv_conv,               &
+                                    dmcl_conv,              &
+                                    dmci_conv,              &
+                                    du_conv,                &
+                                    dv_conv,                &
+                                    dbcf_conv,              &
+                                    dcfl_conv,              &
+                                    dcff_conv,              &
+                                    massflux_up,            & ! not local
+                                    massflux_down,          &
+                                    cape_diluted,           &
+                                    conv_rain,              &
+                                    conv_snow,              &
+                                    conv_rain_3d,           &
+                                    conv_snow_3d,           &
+                                    cca_2d,                 &
+                                    deep_in_col,            & ! 2-D
+                                    shallow_in_col,         &
+                                    mid_in_col,             &
+                                    freeze_level,           &
+                                    deep_prec,              &
+                                    shallow_prec,           &
+                                    mid_prec,               &
+                                    deep_term,              &
+                                    cape_timescale,         &
+                                    lowest_cv_base,         &
+                                    lowest_cv_top,          &
+                                    cv_base,                &
+                                    cv_top,                 &
+                                    pres_cv_base,           &
+                                    pres_cv_top,            &
+                                    pres_lowest_cv_base,    &
+                                    pres_lowest_cv_top,     &
+                                    lowest_cca_2d,          &
+                                    deep_cfl_limited,       &
+                                    mid_cfl_limited,        &
+                                    entrain_up,             & ! 3-D
+                                    entrain_down,           &
+                                    detrain_up,             &
+                                    detrain_down,           &
+                                    dd_dt,                  &
+                                    dd_dq,                  &
+                                    deep_dt,                &
+                                    deep_dq,                &
+                                    deep_massflux,          &
+                                    shallow_dt,             &
+                                    shallow_dq,             &
+                                    shallow_massflux,       &
+                                    mid_dt,                 &
+                                    mid_dq,                 &
+                                    mid_massflux,           &
+                                    deep_tops,              &
+                                    massflux_up_half,       &
+                                    massflux_up_cmpta,      &
+                                    cca_unadjusted,         &
+                                    dth_conv_noshal,        &
+                                    dmv_conv_noshal)
 
     implicit none
 
@@ -374,43 +398,46 @@ contains
                                        conv_snow_3d,  &
                                        cca_2d
     ! local diagnostic fields to output
-    type( field_type ), intent(in)  :: deep_in_col,       &    ! 2-D
-                                       shallow_in_col,    &
-                                       mid_in_col,        &
-                                       freeze_level,      &
-                                       deep_prec,         &
-                                       shallow_prec,      &
-                                       mid_prec,          &
-                                       deep_term,         &
-                                       cape_timescale,    &
-                                       lowest_cv_base,    &
-                                       lowest_cv_top,     &
-                                       cv_base,           &
-                                       cv_top,            &
-                                       pres_cv_base,      &
-                                       pres_cv_top,       &
-                                       deep_cfl_limited,  &
-                                       mid_cfl_limited,   &
-                                       entrain_up,        &   ! 3-D
-                                       entrain_down,      &
-                                       detrain_up,        &
-                                       detrain_down,      &
-                                       dd_dt,             &
-                                       dd_dq,             &
-                                       deep_dt,           &
-                                       deep_dq,           &
-                                       deep_massflux,     &
-                                       shallow_dt,        &
-                                       shallow_dq,        &
-                                       shallow_massflux,  &
-                                       mid_dt,            &
-                                       mid_dq,            &
-                                       mid_massflux,      &
-                                       deep_tops,         &
-                                       massflux_up_half,  &
-                                       massflux_up_cmpta, &
-                                       cca_unadjusted,    &
-                                       dth_conv_noshal,   &
+    type( field_type ), intent(in)  :: deep_in_col,            & ! 2-D
+                                       shallow_in_col,         &
+                                       mid_in_col,             &
+                                       freeze_level,           &
+                                       deep_prec,              &
+                                       shallow_prec,           &
+                                       mid_prec,               &
+                                       deep_term,              &
+                                       cape_timescale,         &
+                                       lowest_cv_base,         &
+                                       lowest_cv_top,          &
+                                       cv_base,                &
+                                       cv_top,                 &
+                                       pres_cv_base,           &
+                                       pres_cv_top,            &
+                                       pres_lowest_cv_base,    &
+                                       pres_lowest_cv_top,     &
+                                       lowest_cca_2d,          &
+                                       deep_cfl_limited,       &
+                                       mid_cfl_limited,        &
+                                       entrain_up,             & ! 3-D
+                                       entrain_down,           &
+                                       detrain_up,             &
+                                       detrain_down,           &
+                                       dd_dt,                  &
+                                       dd_dq,                  &
+                                       deep_dt,                &
+                                       deep_dq,                &
+                                       deep_massflux,          &
+                                       shallow_dt,             &
+                                       shallow_dq,             &
+                                       shallow_massflux,       &
+                                       mid_dt,                 &
+                                       mid_dq,                 &
+                                       mid_massflux,           &
+                                       deep_tops,              &
+                                       massflux_up_half,       &
+                                       massflux_up_cmpta,      &
+                                       cca_unadjusted,         &
+                                       dth_conv_noshal,        &
                                        dmv_conv_noshal
 
     if ( subroutine_timers ) call timer("conv_diags")
@@ -457,6 +484,9 @@ contains
     if (cv_top_flag) call cv_top%write_field()
     if (pres_cv_base_flag) call pres_cv_base%write_field()
     if (pres_cv_top_flag) call pres_cv_top%write_field()
+    if (pres_lowest_cv_base_flag) call pres_lowest_cv_base%write_field()
+    if (pres_lowest_cv_top_flag) call pres_lowest_cv_top%write_field()
+    if (lowest_cca_2d_flag) call lowest_cca_2d%write_field()
     if (deep_cfl_limited_flag) call deep_cfl_limited%write_field()
     if (mid_cfl_limited_flag) call mid_cfl_limited%write_field()
     ! 3D

@@ -84,6 +84,8 @@ contains
   !> @param[in] tile_fraction     Surface tile fractions
   !> @param[in] z0m_tile          tile roughness length for momentum
   !> @param[in] z0m               Cell roughness length
+  !> @param[in] canopy_height     Height of the plant canopy
+  !> @param[in] leaf_area_index   Leaf area index of vegetated tiles
   !> @param[in] gross_prim_prod   Gross Primary Productivity
   !> @param[in] net_prim_prod     Net Primary Productivity
   !> @param[in] gc_tile           Stomatal conductance on tiles (m s-1)
@@ -99,6 +101,7 @@ contains
                                      ent_we_lim_dsc, ent_t_frac_dsc,           &
                                      ent_zrzi_dsc, zht, z0h_eff, oblen,        &
                                      tile_fraction, z0m_tile, z0m,             &
+                                     canopy_height, leaf_area_index,           &
                                      gross_prim_prod, net_prim_prod, gc_tile,  &
                                      soil_respiration, ustar, z0m_eff,         &
                                      bl_weight_1dbl, dust_flux)
@@ -118,7 +121,7 @@ contains
     type( field_type ), intent(in)    :: tile_fraction, z0m_tile, z0m,         &
                                          gross_prim_prod, net_prim_prod,       &
                                          gc_tile, soil_respiration, ustar,     &
-                                         z0m_eff
+                                         z0m_eff, canopy_height, leaf_area_index
     type( field_type ),  intent(in)   :: dust_flux
 
 
@@ -150,6 +153,8 @@ contains
     call z0m_tile%write_field('surface__z0m_tile')
     call z0m%write_field('surface__z0m')
     call z0m_eff%write_field('surface__z0m_eff')
+    call canopy_height%write_field('surface__canopy_height')
+    call leaf_area_index%write_field('surface__leaf_area_index')
     call net_prim_prod%write_field('surface__net_prim_prod')
     call gc_tile%write_field('surface__gc_tile')
     call ustar%write_field('surface__ustar')

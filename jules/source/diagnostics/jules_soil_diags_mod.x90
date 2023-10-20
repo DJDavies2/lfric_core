@@ -67,11 +67,10 @@ contains
     grid_throughfall_flag = init_diag(grid_throughfall, 'surface__grid_throughfall')
 
     ! surface tiled fields
-    throughfall_flag = init_diag(throughfall, 'surface__throughfall')
-    if (throughfall_flag) then
-      ! Initialise field to that sea and sea-ice tiles have zero values
-      if (throughfall_flag) call invoke(setval_c(throughfall, 0.0_r_def))
-    end if
+    throughfall_flag = init_diag(throughfall, 'surface__throughfall', &
+                                 activate = grid_throughfall_flag)
+    ! Initialise field to that sea and sea-ice tiles have zero values
+    if (throughfall_flag) call invoke(setval_c(throughfall, 0.0_r_def))
 
     if ( subroutine_timers ) call timer("jules_soil_diags")
 

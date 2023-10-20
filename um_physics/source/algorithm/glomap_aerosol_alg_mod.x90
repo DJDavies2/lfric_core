@@ -18,6 +18,7 @@ module glomap_aerosol_alg_mod
   use timer_mod,                       only: timer
   use radiation_config_mod,            only: n_radstep
   use aerosol_config_mod,              only: n_radaer_step
+  use enforce_lower_bound_kernel_mod,  only: enforce_lower_bound_kernel_type
 
   implicit none
 
@@ -199,6 +200,12 @@ contains
     call aerosol_fields%get_field('pvol_du_acc_ins', pvol_du_acc_ins)
     call aerosol_fields%get_field('pvol_du_cor_ins', pvol_du_cor_ins)
     call aerosol_fields%get_field('cloud_drop_no_conc', cloud_drop_no_conc)
+
+    ! Remove any negative values in these fields
+    call invoke(enforce_lower_bound_kernel_type(acc_ins_du, 0.0_r_def), &
+                enforce_lower_bound_kernel_type(n_acc_ins,  0.0_r_def), &
+                enforce_lower_bound_kernel_type(cor_ins_du, 0.0_r_def), &
+                enforce_lower_bound_kernel_type(n_cor_ins,  0.0_r_def) )
 
     ! Logical to determine if the radiation scheme will be called on this
     ! timestep

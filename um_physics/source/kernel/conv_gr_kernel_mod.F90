@@ -32,7 +32,7 @@ module conv_gr_kernel_mod
   !>
   type, public, extends(kernel_type) :: conv_gr_kernel_type
     private
-    type(arg_type) :: meta_args(131) = (/                                         &
+    type(arg_type) :: meta_args(134) = (/                                         &
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                &! outer
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W3),                       &! rho_in_w3
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      WTHETA),                   &! rho_in_wth
@@ -141,6 +141,9 @@ module conv_gr_kernel_mod
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! cv_top
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! pres_cv_base
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! pres_cv_top
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! pres_lowest_cv_base
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! pres_lowest_cv_top
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! lowest_cca_2d
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1),&! deep_cfl_limited
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1),&! mid_cfl_limited
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, WTHETA),                   &! entrain_up
@@ -287,6 +290,9 @@ contains
   !> @param[in,out] cv_top               Level number for end of highest convection in column
   !> @param[in,out] pres_cv_base         Pressure at base of highest convection in column
   !> @param[in,out] pres_cv_top          Pressure at end of highest convection in column
+  !> @param[in,out] pres_lowest_cv_base  Pressure at base of lowest convection in column
+  !> @param[in,out] pres_lowest_cv_top   Pressure at end of lowest convection in column
+  !> @param[in,out] lowest_cca_2d        2D convective cloud amount of lowest convecting layer
   !> @param[in,out] deep_cfl_limited     Deep convection CFL limited
   !> @param[in,out] mid_cfl_limited      Mid convection CFL limited
   !> @param[in,out] entrain_up           Convective upwards entrainment
@@ -431,6 +437,9 @@ contains
                           cv_top,                            &
                           pres_cv_base,                      &
                           pres_cv_top,                       &
+                          pres_lowest_cv_base,               &
+                          pres_lowest_cv_top,                &
+                          lowest_cca_2d,                     &
                           deep_cfl_limited,                  &
                           mid_cfl_limited,                   &
                           entrain_up,                        &
@@ -636,22 +645,25 @@ contains
     real(kind=r_def), intent(in out), dimension(undf_wth) :: n_cor_ins
     real(kind=r_def), intent(in out), dimension(undf_wth) :: cor_ins_du
 
-    real(kind=r_def), pointer, intent(inout) :: deep_in_col(:),      &
-                                                shallow_in_col(:),   &
-                                                mid_in_col(:),       &
-                                                freeze_level(:),     &
-                                                deep_prec(:),        &
-                                                shallow_prec(:),     &
-                                                mid_prec(:),         &
-                                                deep_term(:),        &
-                                                cape_timescale(:),   &
-                                                lowest_cv_base(:),   &
-                                                lowest_cv_top(:),    &
-                                                cv_base(:),          &
-                                                cv_top(:),           &
-                                                pres_cv_base(:),     &
-                                                pres_cv_top(:),      &
-                                                deep_cfl_limited(:), &
+    real(kind=r_def), pointer, intent(inout) :: deep_in_col(:),            &
+                                                shallow_in_col(:),         &
+                                                mid_in_col(:),             &
+                                                freeze_level(:),           &
+                                                deep_prec(:),              &
+                                                shallow_prec(:),           &
+                                                mid_prec(:),               &
+                                                deep_term(:),              &
+                                                cape_timescale(:),         &
+                                                lowest_cv_base(:),         &
+                                                lowest_cv_top(:),          &
+                                                cv_base(:),                &
+                                                cv_top(:),                 &
+                                                pres_cv_base(:),           &
+                                                pres_cv_top(:),            &
+                                                pres_lowest_cv_base(:),    &
+                                                pres_lowest_cv_top(:),     &
+                                                lowest_cca_2d(:),          &
+                                                deep_cfl_limited(:),       &
                                                 mid_cfl_limited(:)
 
     real(kind=r_def), pointer, intent(inout) :: entrain_up(:),       &
@@ -1248,12 +1260,8 @@ contains
       cct(1,1) = max( cct(1,1),it_cct(1,1))
       ! min ccb across total number of calls to convection
       ! excluding ccb=0
-      if (.not. associated(cv_base, empty_real_data) ) then
-        if (cv_base(map_2d(1)) > 0 .AND. it_ccb(1,1) > 0) then
-          ccb(1,1) = min(ccb(1,1),it_ccb(1,1))
-        else
-          ccb(1,1) = max(ccb(1,1),it_ccb(1,1))
-        end if
+      if (ccb(1,1) > 0 .AND. it_ccb(1,1) > 0) then
+        ccb(1,1) = min(ccb(1,1),it_ccb(1,1))
       else
         ccb(1,1) = max(ccb(1,1),it_ccb(1,1))
       end if
@@ -1289,6 +1297,10 @@ contains
                               it_cape_diluted(1,1)*one_over_conv_calls
 
       if (outer == outer_iterations) then
+        if (.not. associated(lowest_cca_2d, empty_real_data) ) then
+          lowest_cca_2d(map_2d(1)) = lowest_cca_2d(map_2d(1)) +               &
+                                     it_lcca(1,1)*one_over_conv_calls
+        end if
         if (.not. associated(deep_in_col, empty_real_data) ) then
           deep_in_col(map_2d(1)) = deep_in_col(map_2d(1)) +                   &
                                    it_ind_deep(1,1)*one_over_conv_calls
@@ -1656,6 +1668,22 @@ contains
           pres_cv_base(map_2d(1)) = p_rho_levels(1,1,ccb(1,1))
         else
           pres_cv_base(map_2d(1))= 0.0_r_def
+        end if
+      end if
+
+      ! pressure at lowest cv top/base
+      if (.not. associated(pres_lowest_cv_top, empty_real_data) ) then
+        if (lctop(1,1) > 0) then
+          pres_lowest_cv_top(map_2d(1)) = p_rho_levels(1,1,lctop(1,1))
+        else
+          pres_lowest_cv_top(map_2d(1)) = 0.0_r_def
+        end if
+      end if
+      if (.not. associated(pres_lowest_cv_base, empty_real_data) ) then
+        if (lcbase(1,1) > 0) then
+          pres_lowest_cv_base(map_2d(1)) = p_rho_levels(1,1,lcbase(1,1))
+        else
+          pres_lowest_cv_base(map_2d(1))= 0.0_r_def
         end if
       end if
 

@@ -612,6 +612,7 @@ contains
                                    ent_we_lim_dsc, ent_t_frac_dsc,           &
                                    ent_zrzi_dsc, zht, z0h_eff, oblen,        &
                                    tile_fraction, z0m_tile, z0m,             &
+                                   canopy_height, leaf_area_index,           &
                                    gross_prim_prod, net_prim_prod, gc_tile,  &
                                    soil_respiration, ustar, z0m_eff,         &
                                    bl_weight_1dbl, dust_flux)
