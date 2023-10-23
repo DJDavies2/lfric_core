@@ -15,13 +15,16 @@
 !>          initialiser call and the forecasts are handled by the model
 !>          objects.
 !>
+
+! Note: This program file represents generic OOPS code and so it should not be
+!       edited. If you need to make changes at the program level then please
+!       contact darth@metofice.gov.uk for advice.
 program jedi_tlm_forecast_tl
 
   use constants_mod,           only : PRECISION_REAL, i_def
   use log_mod,                 only : log_event, log_scratch_space, &
                                       LOG_LEVEL_ALWAYS
   use field_collection_mod,    only : field_collection_type
-  use namelist_collection_mod, only : namelist_collection_type
 
   ! Data types and methods to get/store configurations
   use jedi_state_config_mod,        only : jedi_state_config_type
@@ -64,7 +67,6 @@ program jedi_tlm_forecast_tl
   integer( kind=i_def )                  :: model_communicator
   character(*),                parameter :: program_name = "jedi_tlm_forecast_tl"
   type( field_collection_type ), pointer :: depository => null()
-  type( namelist_collection_type ), save :: configuration
 
   call log_event( 'Running ' // program_name // ' ...', LOG_LEVEL_ALWAYS )
   write(log_scratch_space,'(A)')                        &
@@ -82,10 +84,7 @@ program jedi_tlm_forecast_tl
   ! Ensemble applications would split the communicator here
 
   ! Initialize LFRic infrastructure
-  call configuration%initialise( program_name, table_len=10 )
-  call jedi_run%initialise_infrastructure( filename,           &
-                                           model_communicator, &
-                                           configuration )
+  call jedi_run%initialise_infrastructure( filename, model_communicator )
 
   ! Config for the jedi emulator objects
   ! State config

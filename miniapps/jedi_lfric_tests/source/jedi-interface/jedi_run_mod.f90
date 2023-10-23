@@ -10,7 +10,8 @@
 !
 module jedi_run_mod
 
-  use constants_mod, only : i_def, str_def
+  use constants_mod,           only : i_def, str_def
+  use namelist_collection_mod, only : namelist_collection_type
 
   implicit none
 
@@ -18,7 +19,8 @@ module jedi_run_mod
 
 type, public :: jedi_run_type
   private
-  character(str_def) :: jedi_run_name
+  character(str_def)             :: jedi_run_name
+  type(namelist_collection_type) :: configuration
 
 contains
 
@@ -72,10 +74,7 @@ end subroutine initialise
 !> @param [in]    filename           A character that contains the
 !>                                   location of the namelist file.
 !> @param [in]    model_communicator The communicator used by the model.
-!> @param [inout] configuration      Namelist collection object storing the
-!>                                   namelists read in from <filename>.
-subroutine initialise_infrastructure( self, filename, model_communicator, &
-                                      configuration )
+subroutine initialise_infrastructure( self, filename, model_communicator )
 
   use mpi_mod,                       only: global_mpi
   use jedi_lfric_comm_mod,           only: init_internal_comm
@@ -90,7 +89,8 @@ subroutine initialise_infrastructure( self, filename, model_communicator, &
   class( jedi_run_type ),         intent(inout) :: self
   character(len=*),               intent(in)    :: filename
   integer(i_def),                 intent(in)    :: model_communicator
-  type(namelist_collection_type), intent(inout) :: configuration
+
+  call self%configuration%initialise( self%jedi_run_name, table_len=10 )
 
   ! Initialise the model communicator to setup global_mpi
   call init_internal_comm( model_communicator )
@@ -98,7 +98,7 @@ subroutine initialise_infrastructure( self, filename, model_communicator, &
   ! The global_mpi is initialized in the previous step via init_internal_comm
   ! That is required for the following
   call init_config( filename, jedi_lfric_tests_required_namelists, &
-                    configuration )
+                    self%configuration )
   call init_collections()
   call initialise_toy_model( self%jedi_run_name, global_mpi )
 
