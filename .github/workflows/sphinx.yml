@@ -34,12 +34,12 @@ jobs:
     - id: permissions
       run: |
         chmod -c -R +rX "documentation/build/html/"
-    - id: archive
-      run: |
-        tar --directory documentation/build/html -cvf "${{ runner.temp }}/artifact.tar" .
+#    - id: archive
+#      run: |
+#        tar --directory documentation/build/html -cvf "${{ runner.temp }}/artifact.tar" .
     - id: deployment
       uses: actions/upload-pages-artifact@v2
       with:
         name: github-pages
-        path: ${{ runner.temp }}/artifact.tar
+        path: documentation/build/html
         retention-days: 1
