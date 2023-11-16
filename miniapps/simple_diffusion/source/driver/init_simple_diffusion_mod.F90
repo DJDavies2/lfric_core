@@ -25,7 +25,7 @@ module init_simple_diffusion_mod
   use mesh_mod,                           only : mesh_type
   use io_config_mod,                      only : write_diag, &
                                                  use_xios_io
-  use lfric_xios_write_mod,               only : write_field_face
+  use lfric_xios_write_mod,               only : write_field_generic
   use simple_diffusion_constants_mod,     only : create_simple_diffusion_constants
 
   implicit none
@@ -61,7 +61,7 @@ module init_simple_diffusion_mod
 
     ! Set up field with an IO behaviour (XIOS only at present)
     if (write_diag .and. use_xios_io) then
-       tmp_ptr => write_field_face
+       tmp_ptr => write_field_generic
        call diffusion_field%set_write_behaviour(tmp_ptr)
     end if
 

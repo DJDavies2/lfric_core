@@ -52,8 +52,7 @@ module init_time_axis_mod
     use io_config_mod,        only : use_xios_io,             &
                                      write_diag
     use lfric_xios_read_mod,  only : checkpoint_read_xios
-    use lfric_xios_write_mod, only : write_field_node, &
-                                     write_field_face, &
+    use lfric_xios_write_mod, only : write_field_generic, &
                                      checkpoint_write_xios
     use io_mod,               only : checkpoint_write_netcdf, &
                                      checkpoint_read_netcdf
@@ -127,20 +126,15 @@ module init_time_axis_mod
     ! Set diagnostic write behaviour.
     if ( use_xios_io .and. write_diag ) then
 
+      write_diag_behaviour => write_field_generic
       if ( present(imr) ) then
 
-        write_diag_behaviour => write_field_face
         call mr(imr)%set_write_behaviour( write_diag_behaviour )
 
       else
 
-        if ( new_field%which_function_space() == W0 ) then
-          write_diag_behaviour => write_field_node
-        else
-          write_diag_behaviour => write_field_face
-        endif
-
         call new_field%set_write_behaviour( write_diag_behaviour )
+
       endif
 
     endif

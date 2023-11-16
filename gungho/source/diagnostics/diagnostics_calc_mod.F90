@@ -23,8 +23,7 @@ module diagnostics_calc_mod
   use project_output_mod,            only: project_output
   use io_mod,                        only: ts_fname, &
                                            nodal_write_field
-  use lfric_xios_write_mod,          only: write_field_face, &
-                                           write_field_edge
+  use lfric_xios_write_mod,          only: write_field_generic
   use diagnostics_io_mod,            only: write_scalar_diagnostic,     &
                                            write_vector_diagnostic
   use initialise_diagnostics_mod,    only: diagnostic_to_be_sampled
@@ -86,7 +85,7 @@ subroutine write_divergence_diagnostic(u_field, clock, mesh)
 
     if (use_xios_io) then
       !If using XIOS, we need to set a field I/O method appropriately
-      tmp_write_ptr => write_field_face
+      tmp_write_ptr => write_field_generic
       call div_field%set_write_behaviour(tmp_write_ptr)
     end if
 

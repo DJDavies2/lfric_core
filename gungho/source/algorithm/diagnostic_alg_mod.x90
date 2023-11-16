@@ -415,7 +415,7 @@ contains
                                               vorticity_in_w1
     use function_space_collection_mod,  only: function_space_collection
     use field_parent_mod,               only: write_interface
-    use lfric_xios_write_mod,           only: write_field_face
+    use lfric_xios_write_mod,           only: write_field_generic
     implicit none
 
     type(field_type), intent(out) :: vorticity
@@ -435,7 +435,7 @@ contains
     call compute_vorticity_alg(vorticity, u, .false.)
 
     if ( use_xios_io ) then
-      tmp_write_ptr => write_field_face
+      tmp_write_ptr => write_field_generic
       ! Vector fields that are projected to scalar components
       call vorticity%set_write_behaviour(tmp_write_ptr)
       nullify( tmp_write_ptr )
@@ -458,7 +458,7 @@ contains
     use finite_element_config_mod,      only: element_order
     use function_space_collection_mod,  only: function_space_collection
     use field_parent_mod,               only: write_interface
-    use lfric_xios_write_mod,           only: write_field_face
+    use lfric_xios_write_mod,           only: write_field_generic
     implicit none
 
     type(field_type), intent(out) :: potential_vorticity
@@ -476,7 +476,7 @@ contains
     call compute_pv_alg(potential_vorticity, u, theta, rho)
 
     if ( use_xios_io ) then
-      tmp_write_ptr => write_field_face
+      tmp_write_ptr => write_field_generic
       ! Vector fields that are projected to scalar components
       call potential_vorticity%set_write_behaviour(tmp_write_ptr)
       nullify( tmp_write_ptr )
@@ -748,7 +748,7 @@ contains
 
     use calc_wbig_kernel_mod,             only: calc_wbig_kernel_type
     use io_config_mod,                    only: write_diag, use_xios_io
-    use lfric_xios_write_mod,             only: write_field_single_face
+    use lfric_xios_write_mod,             only: write_field_generic
     use field_parent_mod,                 only: write_interface
 
     implicit none

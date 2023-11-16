@@ -25,8 +25,7 @@ module diagnostics_io_mod
   use project_output_mod,            only: project_output
   use io_mod,                        only: ts_fname, &
                                            nodal_write_field
-  use lfric_xios_write_mod,          only: write_field_face, &
-                                           write_field_edge
+  use lfric_xios_write_mod,          only: write_field_generic
   use mesh_mod,                      only: mesh_type
   use model_clock_mod,               only: model_clock_type
   use field_mod,                     only: field_type
@@ -132,7 +131,7 @@ subroutine write_scalar_diagnostic( field_name, field, &
                                       mesh, .false. )
 
     ! Set a field I/O method appropriately
-    tmp_write_ptr => write_field_face
+    tmp_write_ptr => write_field_generic
     call output_field(1)%set_write_behaviour(tmp_write_ptr)
 
     ! Call write on the output field
@@ -267,7 +266,7 @@ subroutine write_vector_diagnostic( field_name, field, &
       call project_output( field, projected_field, output_dim, W3 , mesh )
 
       ! Set up correct I/O handler for Xi projected to W3
-      tmp_write_ptr => write_field_face
+      tmp_write_ptr => write_field_generic
 
       do i =1,output_dim
 
@@ -303,9 +302,9 @@ subroutine write_vector_diagnostic( field_name, field, &
                            field, mesh )
 
       ! Set up I/O handler as these are derived fields
-      tmp_write_ptr => write_field_face
+      tmp_write_ptr => write_field_generic
       call u3_wind%set_write_behaviour(tmp_write_ptr)
-      tmp_write_ptr => write_field_edge
+      tmp_write_ptr => write_field_generic
       call u1_wind%set_write_behaviour(tmp_write_ptr)
       call u2_wind%set_write_behaviour(tmp_write_ptr)
 
@@ -338,9 +337,9 @@ subroutine write_vector_diagnostic( field_name, field, &
         ! Convert u to w2h (h_wind) and wtheta (v_wind)
         call extract_w2h_diagnostic_alg( h_wind, v_wind, field )
 
-        tmp_write_ptr => write_field_face
+        tmp_write_ptr => write_field_generic
         call v_wind%set_write_behaviour(tmp_write_ptr)
-        tmp_write_ptr => write_field_edge
+        tmp_write_ptr => write_field_generic
         call h_wind%set_write_behaviour(tmp_write_ptr)
         if (clock%is_initialisation()) then
           call h_wind%write_field( "init_h_"//trim(field_name) )

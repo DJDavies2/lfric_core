@@ -36,15 +36,9 @@ module io_dev_init_mod
                                              time_variation,                    &
                                              time_variation_ancil
   ! I/O methods
-  use lfric_xios_read_mod,            only : read_field_node,                 &
-                                             read_field_edge,                 &
-                                             read_field_face,                 &
-                                             read_field_single_face,          &
+  use lfric_xios_read_mod,            only : read_field_generic,                 &
                                              read_state
-  use lfric_xios_write_mod,           only : write_field_node,                &
-                                             write_field_edge,                &
-                                             write_field_face,                &
-                                             write_field_single_face
+  use lfric_xios_write_mod,           only : write_field_generic
 
   implicit none
 
@@ -310,24 +304,8 @@ module io_dev_init_mod
     call new_field%initialise( vector_space, name=field_name )
 
     ! Set up I/O methods
-    if ( fs_id == W0 ) then
-      tmp_read_ptr  => read_field_node
-      tmp_write_ptr => write_field_node
-
-    else if ( fs_id == W2H ) then
-      tmp_read_ptr  => read_field_edge
-      tmp_write_ptr => write_field_edge
-
-    else if ( fs_id == W3 .and. twod_flag ) then
-      tmp_read_ptr  => read_field_single_face
-      tmp_write_ptr => write_field_single_face
-
-    else
-      tmp_read_ptr  => read_field_face
-      tmp_write_ptr => write_field_face
-
-    end if
-
+    tmp_read_ptr  => read_field_generic
+    tmp_write_ptr => write_field_generic
     call new_field%set_write_behaviour( tmp_write_ptr )
     call new_field%set_read_behaviour( tmp_read_ptr )
 
@@ -418,24 +396,8 @@ module io_dev_init_mod
     call new_field%initialise( vector_space, name=field_name )
 
     ! Set up I/O methods
-    if ( fs_id == W0 ) then
-      tmp_read_ptr  => read_field_node
-      tmp_write_ptr => write_field_node
-
-    else if ( fs_id == W2H ) then
-      tmp_read_ptr  => read_field_edge
-      tmp_write_ptr => write_field_edge
-
-    else if ( fs_id == W3 .and. twod_flag ) then
-      tmp_read_ptr  => read_field_single_face
-      tmp_write_ptr => write_field_single_face
-
-    else
-      tmp_read_ptr  => read_field_face
-      tmp_write_ptr => write_field_face
-
-    end if
-
+    tmp_read_ptr  => read_field_generic
+    tmp_write_ptr => write_field_generic
     call new_field%set_write_behaviour( tmp_write_ptr )
     call new_field%set_read_behaviour( tmp_read_ptr )
 

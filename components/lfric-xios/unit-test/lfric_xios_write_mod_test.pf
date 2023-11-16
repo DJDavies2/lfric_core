@@ -119,10 +119,7 @@ contains
   @Test
   subroutine test_lfric_xios_write( this )
 
-    use lfric_xios_write_mod,     only: write_field_node,         &
-                                        write_field_edge,         &
-                                        write_field_face,         &
-                                        write_field_single_face,  &
+    use lfric_xios_write_mod,     only: write_field_generic,         &
                                         write_state
 
     implicit none
@@ -165,7 +162,7 @@ contains
     call W0_field%initialise( this%w0_fs )
     test_proxy = W0_field%get_proxy()
     test_proxy%data = W0_data
-    call write_field_node("W0_field", test_proxy)
+    call write_field_generic("W0_field", test_proxy)
 
     allocate(W0_result(size(W0_data)))
     call get_latest_data(W0_result)
@@ -178,7 +175,7 @@ contains
     call W2H_field%initialise( this%w2h_fs )
     test_proxy = W2H_field%get_proxy()
     test_proxy%data = W2H_data
-    call write_field_edge("W2H_field", test_proxy)
+    call write_field_generic("W2H_field", test_proxy)
 
     allocate(W2H_result(size(W2H_data)))
     call get_latest_data(W2H_result)
@@ -191,7 +188,7 @@ contains
     call WTheta_field%initialise( this%wth_fs )
     test_proxy = WTheta_field%get_proxy()
     test_proxy%data = WTheta_data
-    call write_field_face("WTheta_field", test_proxy)
+    call write_field_generic("WTheta_field", test_proxy)
 
     allocate(WTheta_result(size(WTheta_data)))
     call get_latest_data(WTheta_result)
@@ -200,7 +197,7 @@ contains
     call W3_field%initialise( this%w3_fs )
     test_proxy = W3_field%get_proxy()
     test_proxy%data = W3_data
-    call write_field_face("W3_field", test_proxy)
+    call write_field_generic("W3_field", test_proxy)
 
     allocate(W3_result(size(W3_data)))
     call get_latest_data(W3_result)

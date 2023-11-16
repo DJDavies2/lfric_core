@@ -25,7 +25,7 @@ module physical_op_constants_mod
   use io_config_mod,                      only: subroutine_timers
   use log_mod,                            only: log_event, LOG_LEVEL_INFO, &
                                                 LOG_LEVEL_ERROR
-  use lfric_xios_write_mod,               only: write_field_face
+  use lfric_xios_write_mod,               only: write_field_generic
   use mesh_mod,                           only: mesh_type
   use mesh_collection_mod,                only: mesh_collection
   use model_clock_mod,                    only: model_clock_type
@@ -347,7 +347,7 @@ contains
           call dtrdz_wth_inventory%add_field(dtrdz_wth, wtheta_k0_fs, mesh)
           call rdz_fd1_inventory%add_field(rdz_fd1, w1_k0_fs, mesh)
           call rdz_w3_inventory%add_field(rdz_w3, w3_k0_fs, mesh)
-          write_behaviour => write_field_face
+          write_behaviour => write_field_generic
           call rdz_w3%set_write_behaviour(write_behaviour)
           call dz_at_wtheta_inventory%add_field(dz_at_wtheta, wtheta_k0_fs, mesh)
           call delta_at_wtheta_inventory%add_field(delta_at_wtheta, wtheta_k0_fs, mesh)

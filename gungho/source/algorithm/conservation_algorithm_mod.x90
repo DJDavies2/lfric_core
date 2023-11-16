@@ -25,7 +25,7 @@ module conservation_algorithm_mod
   use log_mod,                         only: log_event,         &
                                              log_scratch_space, &
                                              LOG_LEVEL_INFO
-  use lfric_xios_write_mod,            only: write_field_face
+  use lfric_xios_write_mod,            only: write_field_generic
   use mesh_mod,                        only: mesh_type
   use quadrature_xyoz_mod,             only: quadrature_xyoz_type
   use quadrature_rule_gaussian_mod,    only: quadrature_rule_gaussian_type
@@ -102,7 +102,7 @@ contains
     panel_id     => get_panel_id(mesh%get_id())
 
     ! Set write behaviour of fields to output
-    write_behaviour => write_field_face
+    write_behaviour => write_field_generic
 
     ! Initialise Mass, Energy and Axial Angular Momentum fields
     call kinetic_uv%initialise( vector_space = w3_fs )

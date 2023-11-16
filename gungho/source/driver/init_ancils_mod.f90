@@ -18,10 +18,8 @@ module init_ancils_mod
                                              write_interface
   use io_config_mod,                  only : use_xios_io, checkpoint_read
   use linked_list_mod,                only : linked_list_type
-  use lfric_xios_read_mod,            only : read_field_face, &
-                                             read_field_single_face
-  use lfric_xios_write_mod,           only : write_field_face, &
-                                             write_field_single_face
+  use lfric_xios_read_mod,            only : read_field_generic
+  use lfric_xios_write_mod,           only : write_field_generic
   use field_collection_mod,           only : field_collection_type
   use function_space_mod,             only : function_space_type
   use function_space_collection_mod,  only : function_space_collection
@@ -849,15 +847,14 @@ contains
       write(log_scratch_space,'(3A,I6)') &
            "Creating new field for ", trim(name)
       call log_event(log_scratch_space,LOG_LEVEL_INFO)
+      tmp_write_ptr => write_field_generic
       if (twod_field) then
         vec_space => function_space_collection%get_fs( twod_mesh, fs_order, &
                                                        W3, ndat )
-        tmp_write_ptr => write_field_single_face
       else
         vec_space => function_space_collection%get_fs( mesh, fs_order, &
                                                        WTheta, ndat )
-        tmp_write_ptr => write_field_face
-       end if
+      end if
       call new_field%initialise( vec_space, name=trim(name))
       call new_field%set_write_behaviour(tmp_write_ptr)
       ! Add the new field to the field depository
@@ -903,11 +900,7 @@ contains
 
     if (.not. present(time_axis)) then
       !Set up field read behaviour for 2D and 3D fields
-      if (twod_field) then
-        tmp_read_ptr => read_field_single_face
-      else
-        tmp_read_ptr => read_field_face
-      end if
+      tmp_read_ptr => read_field_generic
       ! Set field read behaviour for target field
       call fld_ptr%set_read_behaviour(tmp_read_ptr)
     end if

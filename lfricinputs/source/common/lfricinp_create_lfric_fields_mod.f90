@@ -14,10 +14,8 @@ USE field_mod,                     ONLY : field_type
 USE field_parent_mod,              ONLY :  read_interface, write_interface,    &
                                           field_parent_proxy_type
 USE lfric_xios_time_axis_mod,      ONLY : time_axis_type
-USE lfric_xios_read_mod,           ONLY : read_field_single_face,              &
-                                          read_field_face, read_field_edge
-USE lfric_xios_write_mod,          ONLY : write_field_single_face,             &
-                                          write_field_face, write_field_edge
+USE lfric_xios_read_mod,           ONLY : read_field_generic
+USE lfric_xios_write_mod,          ONLY : write_field_generic
 USE finite_element_config_mod,     ONLY : element_order
 USE function_space_mod,            ONLY : function_space_type
 USE function_space_collection_mod, ONLY : function_space_collection
@@ -101,6 +99,9 @@ DO i=1, SIZE(stash_list)
   ! without the do loop over stash list
   IF ( .NOT. field_collection%field_exists(field_name) ) THEN
 
+    tmp_read_ptr => read_field_generic
+    tmp_write_ptr => write_field_generic
+
     SELECT CASE (lfric_field_kind)
 
       CASE(w2h_field) ! Stashcodes that would map to W2h, i.e. winds
@@ -108,24 +109,18 @@ DO i=1, SIZE(stash_list)
         fs_id = W2H
         ndata_64 = 1_int64
         ndata_first = .FALSE.
-        tmp_read_ptr => read_field_edge
-        tmp_write_ptr => write_field_edge
 
       CASE(w3_field) ! Stashcodes that map to W3/rho
         type_mesh => mesh
         fs_id = W3
         ndata_64 = 1_int64
         ndata_first = .FALSE.
-        tmp_read_ptr => read_field_face
-        tmp_write_ptr => write_field_face
 
       CASE(wtheta_field) ! Stashcodes that maps to Wtheta
         type_mesh => mesh
         fs_id = Wtheta
         ndata_64 = 1_int64
         ndata_first = .FALSE.
-        tmp_read_ptr => read_field_face
-        tmp_write_ptr => write_field_face
 
       CASE(w3_field_2d) ! Stash that needs 2D mesh
         type_mesh => twod_mesh
@@ -138,16 +133,12 @@ DO i=1, SIZE(stash_list)
           ndata_64 = lfricinp_get_num_pseudo_levels(um_grid, stashcode)
         END IF
         ndata_first = .FALSE.
-        tmp_write_ptr => write_field_single_face
-        tmp_read_ptr => read_field_single_face
 
       CASE(w3_soil_field) ! Soil fields
         type_mesh => twod_mesh
         fs_id = W3
         ndata_64 = lfricinp_get_num_levels(um_file, stashcode)
         ndata_first = .TRUE.
-        tmp_write_ptr => write_field_single_face
-        tmp_read_ptr => read_field_single_face
 
       CASE DEFAULT
         WRITE(log_scratch_space, '(A,I0,A)')                                   &

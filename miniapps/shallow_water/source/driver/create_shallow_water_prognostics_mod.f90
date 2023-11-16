@@ -27,7 +27,7 @@ module create_shallow_water_prognostics_mod
                                                 checkpoint_write, &
                                                 checkpoint_read
   use pure_abstract_field_mod,            only: pure_abstract_field_type
-  use lfric_xios_write_mod,               only: write_field_face, &
+  use lfric_xios_write_mod,               only: write_field_generic, &
                                                 checkpoint_write_xios
   use lfric_xios_read_mod,                only: checkpoint_read_xios
   use io_mod,                             only: checkpoint_read_netcdf, &
@@ -103,7 +103,7 @@ module create_shallow_water_prognostics_mod
     ! Set I/O behaviours for diagnostic output
     if (write_diag .and. use_xios_io) then
        ! Fields that are output on the XIOS face domain
-       tmp_write_ptr => write_field_face
+       tmp_write_ptr => write_field_generic
        call wind%set_write_behaviour(tmp_write_ptr)
        call geopot%set_write_behaviour(tmp_write_ptr)
        call buoyancy%set_write_behaviour(tmp_write_ptr)

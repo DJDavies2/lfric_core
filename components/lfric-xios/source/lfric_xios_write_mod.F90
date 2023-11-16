@@ -49,10 +49,6 @@ module lfric_xios_write_mod
   private
   public :: checkpoint_write_xios,    &
             write_field_generic,      &
-            write_field_node,         &
-            write_field_single_face,  &
-            write_field_face,         &
-            write_field_edge,         &
             write_state,              &
             write_checkpoint
 
@@ -144,71 +140,6 @@ subroutine checkpoint_write_xios(xios_field_name, file_name, field_proxy)
   call xios_send_field("checkpoint_"//trim(xios_field_name), reshape (send_field, (/1, undf/)))
 
 end subroutine checkpoint_write_xios
-
-!>  @brief  Output W0 field data to the node UGRID via XIOS
-!>
-!>  @param[in]     xios_field_name  XIOS identifier for the field
-!>  @param[inout]  field_proxy      A field proxy to be written
-!>
-subroutine write_field_node(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*), optional,     intent(in) :: xios_field_name
-  class(field_parent_proxy_type), intent(in) :: field_proxy
-
-  call write_field_generic(xios_field_name, field_proxy)
-
-end subroutine write_field_node
-
-!>  @brief  Write W2H field data to the half-level edge UGRID via XIOS
-!>
-!>  @param[in]     xios_field_name  XIOS identifier for the field
-!>  @param[inout]  field_proxy      A field proxy to be written
-!>
-subroutine write_field_edge(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*), optional,     intent(in) :: xios_field_name
-  class(field_parent_proxy_type), intent(in) :: field_proxy
-
-  call write_field_generic(xios_field_name, field_proxy)
-
-end subroutine write_field_edge
-
-!>  @brief  Write single-level W3 field data to the face UGRID domain via XIOS
-!>
-!>  @param[in]     xios_field_name  XIOS identifier for the field
-!>  @param[inout]  field_proxy      A field proxy to be written
-!>
-subroutine write_field_single_face(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*), optional,     intent(in) :: xios_field_name
-  class(field_parent_proxy_type), intent(in) :: field_proxy
-
-  call write_field_generic(xios_field_name, field_proxy)
-
-end subroutine write_field_single_face
-
-!>  @brief  Write W3/WTheta field data to the full/half-level face UGRIDs via
-!>          XIOS
-!>
-!>  @param[in]     xios_field_name  XIOS identifier for the field
-!>  @param[inout]  field_proxy      A field proxy to be written
-!>
-subroutine write_field_face(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*), optional,     intent(in) :: xios_field_name
-  class(field_parent_proxy_type), intent(in) :: field_proxy
-
-  call write_field_generic(xios_field_name, field_proxy)
-
-end subroutine write_field_face
 
 !>  @brief    Write a collection of fields
 !>  @details  Iterate over a field collection and write each field if it is

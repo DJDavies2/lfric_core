@@ -31,8 +31,7 @@ module create_gungho_prognostics_mod
   use moist_dyn_mod,                  only : num_moist_factors
   use pure_abstract_field_mod,        only : pure_abstract_field_type
   use lfric_xios_read_mod,            only : checkpoint_read_xios
-  use lfric_xios_write_mod,           only : write_field_node, &
-                                             write_field_face, &
+  use lfric_xios_write_mod,           only : write_field_generic, &
                                              checkpoint_write_xios
   use lfric_xios_diag_mod,            only : enable_field
   use io_mod,                         only : checkpoint_write_netcdf, &
@@ -193,7 +192,7 @@ contains
 
        ! Face domain
 
-       tmp_write_ptr => write_field_face
+       tmp_write_ptr => write_field_generic
 
        ! Vector fields that are projected to scalar components
        call u%set_write_behaviour(tmp_write_ptr)
@@ -201,24 +200,7 @@ contains
        ! Scalar fields
        call rho%set_write_behaviour(tmp_write_ptr)
        call exner%set_write_behaviour(tmp_write_ptr)
-
-       ! Theta is a special case as it can be on face (if function space is WTheta)
-       ! or node (if function space is W0)
-       if (theta%which_function_space() == Wtheta) then
-
-         call theta%set_write_behaviour(tmp_write_ptr)
-
-       else
-
-        tmp_write_ptr => write_field_node
-
-        call theta%set_write_behaviour(tmp_write_ptr)
-
-       end if
-
-       ! Moisture uses the same type of field write as Theta
-
-       call theta%get_write_behaviour(tmp_write_ptr)
+       call theta%set_write_behaviour(tmp_write_ptr)
 
        do imr = 1,nummr
          call mr(imr)%set_write_behaviour(tmp_write_ptr)

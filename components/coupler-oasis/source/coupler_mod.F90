@@ -903,10 +903,8 @@ module coupler_mod
    use io_config_mod,           only : use_xios_io, &
                                        write_diag, checkpoint_write, &
                                        checkpoint_read
-   use lfric_xios_read_mod,     only : read_field_face, &
-                                       read_field_single_face
-   use lfric_xios_write_mod,    only : write_field_face, &
-                                       write_field_single_face
+   use lfric_xios_read_mod,     only : read_field_generic
+   use lfric_xios_write_mod,    only : write_field_generic
    use io_mod,                  only : checkpoint_write_netcdf, &
                                        checkpoint_read_netcdf
 
@@ -925,8 +923,6 @@ module coupler_mod
    !pointer to a field
    type(field_type), pointer                      :: field_ptr => null()
    class(pure_abstract_field_type), pointer       :: tmp_ptr => null()
-   !flag for single level field
-   logical(l_def)                                 :: twod_field
    !flag for field checkpoint
    logical(l_def)                                 :: checkpointed
 
@@ -949,18 +945,8 @@ module coupler_mod
 
    ! Set read and write behaviour
    if (use_xios_io) then
-     if (present(twod)) then
-       twod_field = twod
-     else
-       twod_field = .false.
-     end if
-     if (twod_field) then
-       write_behaviour => write_field_single_face
-       read_behaviour  => read_field_single_face
-     else
-       write_behaviour => write_field_face
-       read_behaviour  => read_field_face
-     end if
+     write_behaviour => write_field_generic
+     read_behaviour  => read_field_generic
      if (write_diag .or. checkpoint_write) &
        call new_field%set_write_behaviour(write_behaviour)
      if (checkpoint_read .and. checkpointed) &

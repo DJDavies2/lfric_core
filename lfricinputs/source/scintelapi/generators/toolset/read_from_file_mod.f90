@@ -20,7 +20,7 @@ SUBROUTINE read_from_file(dep_graph)
 !
 
 USE gen_io_check_mod,       ONLY: gen_io_check
-use lfric_xios_read_mod,    ONLY: read_field_face, read_field_single_face
+use lfric_xios_read_mod,    ONLY: read_field_generic
 USE field_mod,              ONLY: field_proxy_type
 USE field_parent_mod,       ONLY: read_interface
 USE log_mod,                ONLY: log_event, log_scratch_space, LOG_LEVEL_ERROR
@@ -39,12 +39,6 @@ CLASS(dependency_graph), INTENT(IN OUT) :: dep_graph
 !
 ! IO procedure pointers
 PROCEDURE(read_interface), POINTER :: tmp_read_ptr
-!
-! Number of layers in field
-INTEGER :: no_layers
-!
-! Field proxies to use
-TYPE(field_proxy_type) :: field_proxy
 !
 ! Parameter list
 CHARACTER(LEN=genpar_len) :: parlist
@@ -78,17 +72,7 @@ IF (ioerr /= 0 ) THEN
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END IF
 
-! Set read pointer based on whether field is 2D or 3D
-field_proxy = dep_graph % output_field(1) % field_ptr % get_proxy()
-no_layers = field_proxy % vspace % get_nlayers()
-
-IF (no_layers == 1) THEN   ! For a 2D field ...
-  tmp_read_ptr => read_field_single_face
-
-ELSE                       ! For a 3D field ...
-  tmp_read_ptr => read_field_face
-
-END IF
+tmp_read_ptr => read_field_generic
 
 ! Read field from file
 CALL dep_graph % output_field(1) % field_ptr %                                 &

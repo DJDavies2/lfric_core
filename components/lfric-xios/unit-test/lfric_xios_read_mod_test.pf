@@ -117,10 +117,7 @@ contains
   subroutine test_lfric_xios_read( this )
 
     use lfric_xios_read_mod,      only: checkpoint_read_xios,    &
-                                        read_field_node,         &
-                                        read_field_edge,         &
-                                        read_field_face,         &
-                                        read_field_single_face,  &
+                                        read_field_generic,      &
                                         read_state,              &
                                         read_field_time_var
 
@@ -162,7 +159,7 @@ contains
 
     call W0_field%initialise( this%w0_fs )
     test_proxy = W0_field%get_proxy()
-    call read_field_node("W0_field", test_proxy)
+    call read_field_generic("W0_field", test_proxy)
 
     @assertEqual( W0_data, test_proxy%data )
 
@@ -172,7 +169,7 @@ contains
 
     call W2H_field%initialise( this%w2h_fs )
     test_proxy = W2H_field%get_proxy()
-    call read_field_edge("W2H_field", test_proxy)
+    call read_field_generic("W2H_field", test_proxy)
 
     @assertEqual( W2H_data, test_proxy%data )
 
@@ -182,13 +179,13 @@ contains
 
     call WTheta_field%initialise( this%wth_fs )
     test_proxy = WTheta_field%get_proxy()
-    call read_field_face("WTheta_field", test_proxy)
+    call read_field_generic("WTheta_field", test_proxy)
 
     @assertEqual( WTheta_data, test_proxy%data )
 
     call W3_field%initialise( this%w3_fs )
     test_proxy = W3_field%get_proxy()
-    call read_field_face("W3_field", test_proxy)
+    call read_field_generic("W3_field", test_proxy)
 
     @assertEqual( W3_data, test_proxy%data )
 

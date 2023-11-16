@@ -23,10 +23,8 @@ module jedi_lfric_utils_mod
                                              LOG_LEVEL_TRACE, &
                                              log_scratch_space
   use mesh_mod,                       only : mesh_type
-  use lfric_xios_read_mod,            only : read_field_face, &
-                                             read_field_single_face
-  use lfric_xios_write_mod,           only : write_field_face, &
-                                             write_field_single_face
+  use lfric_xios_read_mod,            only : read_field_generic
+  use lfric_xios_write_mod,           only : write_field_generic
   use field_collection_mod,           only : field_collection_type
   use constants_mod,                  only : i_def
 
@@ -93,13 +91,8 @@ module jedi_lfric_utils_mod
       name = field_name )
 
     if (fs_enumerator == W3 .or. fs_enumerator == Wtheta) then
-      if (mesh%get_nlayers()==1) then
-        tmp_read_ptr => read_field_single_face
-        tmp_write_ptr => write_field_single_face
-      else
-        tmp_read_ptr => read_field_face
-        tmp_write_ptr => write_field_face
-      endif
+      tmp_read_ptr => read_field_generic
+      tmp_write_ptr => write_field_generic
     else
       write(log_scratch_space, '(3A)') "The ", &
         trim(name_from_functionspace(fs_enumerator)) , &

@@ -193,7 +193,7 @@ SUBROUTINE dump_write(global_field_index)
 ! write_name parameter set, to the target dump.
 !
 
-USE lfric_xios_write_mod, ONLY: write_field_face, write_field_single_face
+USE lfric_xios_write_mod, ONLY: write_field_generic
 USE field_parent_mod,     ONLY: write_interface
 USE field_mod,            ONLY: field_proxy_type
 
@@ -215,12 +215,10 @@ INTEGER :: no_layers
 TYPE(field_proxy_type) :: field_proxy
 !
 ! IO procedure pointers
-PROCEDURE(write_interface), POINTER :: tmp_write_ptr_2d => NULL(),             &
-                                       tmp_write_ptr_3d => NULL()
+PROCEDURE(write_interface), POINTER :: tmp_write_ptr
 
 ! Define IO procedure pointers for 2D and 3D fields
-tmp_write_ptr_2d => write_field_single_face
-tmp_write_ptr_3d => write_field_face
+tmp_write_ptr => write_field_generic
 
 ! Report which field is about to be written to dump
 WRITE(log_scratch_space,'(A)')                                                 &
@@ -232,23 +230,15 @@ CALL log_event(log_scratch_space, LOG_LEVEL_INFO)
 field_proxy = field_list(global_field_index) % get_proxy()
 no_layers = field_proxy % vspace % get_nlayers()
 
-! Set field write behaviour based on if field is 2D or 3D
-IF (no_layers == 1) THEN ! This is a 2D field
-
-  CALL field_list(global_field_index) % set_write_behaviour(tmp_write_ptr_2d)
-
-ELSE                     ! This is a 3D field
-
-  CALL field_list(global_field_index) % set_write_behaviour(tmp_write_ptr_3d)
-
-END IF
+! Set field write behaviour
+CALL field_list(global_field_index) % set_write_behaviour(tmp_write_ptr)
 
 ! Write the field to dump
 CALL field_list(global_field_index) %                                          &
            write_field('write_' // TRIM(field_io_name_list(global_field_index)))
 
 ! Nullify IO procedure pointers
-NULLIFY(tmp_write_ptr_2d, tmp_write_ptr_3d)
+NULLIFY(tmp_write_ptr)
 
 END SUBROUTINE dump_write
 

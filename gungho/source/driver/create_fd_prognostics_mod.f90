@@ -13,10 +13,8 @@ module create_fd_prognostics_mod
   use field_mod,                      only : field_type
   use field_parent_mod,               only : read_interface, &
                                              write_interface
-  use lfric_xios_read_mod,            only : read_field_face, &
-                                             read_field_edge
-  use lfric_xios_write_mod,           only : write_field_face, &
-                                             write_field_edge
+  use lfric_xios_read_mod,            only : read_field_generic
+  use lfric_xios_write_mod,           only : write_field_generic
   use finite_element_config_mod,      only : element_order
   use function_space_collection_mod,  only : function_space_collection
   use field_collection_mod,           only : field_collection_type
@@ -86,10 +84,10 @@ contains
     ! Create the field collection
     call fd_field_collection%initialise(name="fd_prognostics", table_len=100)
 
+    tmp_read_ptr => read_field_generic
+    tmp_write_ptr => write_field_generic
     if ( read_w2h_wind )then
        ! In this case we read in directly onto the W2H dofs
-       tmp_read_ptr => read_field_edge
-       tmp_write_ptr => write_field_edge
        call h_wind_in_w2h%initialise( vector_space = &
          function_space_collection%get_fs(mesh, element_order, W2H), &
          name='h_wind')
@@ -99,13 +97,11 @@ contains
 
     else
 
-      ! Setup I/O behaviour handler. In the case of FD prognostic fields these
-      ! are currently read from a UM2LFRic dump
-      tmp_read_ptr => read_field_face
-      tmp_write_ptr => write_field_face
-
       ! Create the fields, set the I/O behaviour and add to
       ! the field collection
+      ! In the case of FD prognostic fields these
+      ! are currently read from a UM2LFRic dump
+
       !========================================================================
       ! W3 fields - rho levels
       !========================================================================
@@ -129,9 +125,6 @@ contains
       call fd_field_collection%add_field(ns_wind_in_w3)
 
     end if
-
-    tmp_read_ptr => read_field_face
-    tmp_write_ptr => write_field_face
 
     call dry_rho_in_w3%initialise( vector_space = &
          function_space_collection%get_fs(mesh, element_order, W3), &

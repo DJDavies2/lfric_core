@@ -29,6 +29,7 @@ module gungho_diagnostics_driver_mod
   use field_collection_mod,      only : field_collection_type
   use field_mod,                 only : field_type
   use field_parent_mod,          only : field_parent_type, write_interface
+  use lfric_xios_write_mod,      only : write_field_generic
   use formulation_config_mod,    only : use_physics,             &
                                         moisture_formulation,    &
                                         moisture_formulation_dry
@@ -38,8 +39,6 @@ module gungho_diagnostics_driver_mod
   use initialization_config_mod, only : ls_option,          &
                                         ls_option_analytic, &
                                         ls_option_file
-  use lfric_xios_write_mod,      only : write_field_edge, &
-                                        write_field_single_face
   use mesh_mod,                  only : mesh_type
   use moist_dyn_mod,             only : num_moist_factors
   use mr_indices_mod,            only : nummr, mr_names
@@ -173,7 +172,7 @@ contains
     if ( use_physics .and. use_xios_io .and. modeldb%clock%is_initialisation() &
          .and. diagnostic_to_be_sampled("init_area_at_msl") ) then
       dA => get_da_msl_proj(twod_mesh%get_id())
-      tmp_write_ptr => write_field_single_face
+      tmp_write_ptr => write_field_generic
       call dA%set_write_behaviour(tmp_write_ptr)
       call dA%write_field("init_area_at_msl")
     endif
@@ -184,7 +183,7 @@ contains
       call derived_fields%get_field('u_in_w2h', u_in_w2h)
       call derived_fields%get_field('v_in_w2h', v_in_w2h)
       call derived_fields%get_field('w_in_wth', w_in_wth)
-      tmp_write_ptr => write_field_edge
+      tmp_write_ptr => write_field_generic
       call u_in_w2h%set_write_behaviour(tmp_write_ptr)
       call v_in_w2h%set_write_behaviour(tmp_write_ptr)
       if (modeldb%clock%is_initialisation()) then

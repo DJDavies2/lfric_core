@@ -55,10 +55,6 @@ module lfric_xios_read_mod
   private
   public :: checkpoint_read_xios,    &
             read_field_generic,      &
-            read_field_node,         &
-            read_field_edge,         &
-            read_field_face,         &
-            read_field_single_face,  &
             read_state,              &
             read_checkpoint,         &
             read_field_time_var
@@ -165,70 +161,6 @@ subroutine read_field_generic(xios_field_name, field_proxy)
   deallocate(xios_data)
 
 end subroutine read_field_generic
-
-!>  @brief  Read node UGRID data on to a W0 field via XIOS
-!>
-!>  @param[in]     xios_field_name  XIOS identifier for the field
-!>  @param[inout]  field_proxy      A field proxy to read data into
-!>
-subroutine read_field_node(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*),               intent(in)    :: xios_field_name
-  class(field_parent_proxy_type), intent(inout) :: field_proxy
-
-  call read_field_generic(xios_field_name, field_proxy)
-
-end subroutine read_field_node
-
-!>  @brief  Read half-level edge UGRID data on to a W2H field via XIOS
-!>
-!>  @param[in]     xios_field_name  XIOS identifier for the field
-!>  @param[inout]  field_proxy      A field proxy to read data into
-!>
-subroutine read_field_edge(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*),               intent(in)    :: xios_field_name
-  class(field_parent_proxy_type), intent(inout) :: field_proxy
-
-  call read_field_generic(xios_field_name, field_proxy)
-
-end subroutine read_field_edge
-
-!>  @brief  Read full/half-level face UGRID data on to a W3/WTheta field via XIOS
-!>
-!>  @param[in]  xios_field_name  XIOS identifier for the field
-!>  @param[in]  field_proxy      A field proxy to read data into
-!>
-subroutine read_field_face(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*),               intent(in)    :: xios_field_name
-  class(field_parent_proxy_type), intent(inout) :: field_proxy
-
-  call read_field_generic(xios_field_name, field_proxy)
-
-end subroutine read_field_face
-
-!>  @brief  Read face domain UGRID data on to a single-level W3 field via XIOS
-!>
-!>  @param[in]  xios_field_name  XIOS identifier for the field
-!>  @param[in]  field_proxy      A field proxy to read data into
-!>
-subroutine read_field_single_face(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*),               intent(in)    :: xios_field_name
-  class(field_parent_proxy_type), intent(inout) :: field_proxy
-
-  call read_field_generic(xios_field_name, field_proxy)
-
-end subroutine read_field_single_face
 
 !>  @brief  Read a time-varying field, with given time dimension, in UGRID format using XIOS
 !>

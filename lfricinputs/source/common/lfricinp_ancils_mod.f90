@@ -13,10 +13,8 @@ USE field_collection_mod,           ONLY: field_collection_type
 USE field_mod,                      ONLY : field_type
 USE field_parent_mod,               ONLY : read_interface, &
                                            write_interface
-use lfric_xios_read_mod,            ONLY : read_field_face, &
-                                           read_field_single_face
-use lfric_xios_write_mod,           ONLY : write_field_face, &
-                                           write_field_single_face
+use lfric_xios_read_mod,            ONLY : read_field_generic
+use lfric_xios_write_mod,           ONLY : write_field_generic
 USE field_collection_mod,           ONLY : field_collection_type
 USE mesh_mod,                       ONLY : mesh_type
 USE function_space_mod,             ONLY : function_space_type
@@ -118,13 +116,8 @@ CALL ancil_fields%add_field(new_field)
 call ancil_fields%get_field(name, tgt_ptr)
 
 ! Set up field read behaviour for 2D and 3D fields
-IF (PRESENT(twod)) THEN
-  tmp_read_ptr => read_field_single_face
-  tmp_write_ptr => write_field_single_face
-ELSE
-  tmp_read_ptr => read_field_face
-  tmp_write_ptr => write_field_face
-END IF
+tmp_read_ptr => read_field_generic
+tmp_write_ptr => write_field_generic
 
 ! Set field read behaviour for target field
 CALL tgt_ptr%set_read_behaviour(tmp_read_ptr)
