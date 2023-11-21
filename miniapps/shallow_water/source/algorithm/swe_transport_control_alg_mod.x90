@@ -9,7 +9,7 @@
 module swe_transport_control_alg_mod
 
   use combine_w2_field_kernel_mod,       only: combine_w2_field_kernel_type
-  use constants_mod,                     only: i_def, r_def, l_def
+  use constants_mod,                     only: i_def, r_def, l_def, r_tran
   use derived_config_mod,                only: bundle_size
   use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
   use field_mod,                         only: field_type
@@ -253,11 +253,11 @@ contains
     ! Initialise geopotential variables
     call geopot_np1%initialise(vector_space = geopot%get_function_space())
 
+    cast_dt = real( model_clock%get_seconds_per_step(), r_def )
+
     ! ------------------------------------------------------------------------ !
     ! Transport of prognostic variables
     ! ------------------------------------------------------------------------ !
-
-    cast_dt = real( model_clock%get_seconds_per_step(), r_def )
 
     ! ------------------------------------------------------------------------ !
     ! Transport geopotential

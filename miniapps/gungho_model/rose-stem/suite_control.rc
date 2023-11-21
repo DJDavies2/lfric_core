@@ -191,7 +191,7 @@
     'run_application("gungho_model", "dcmip200",
                      resolutions=[("C24_MG",600.0)],
                      env={"crun":1, "nrun":864,
-                          "directives":{"default":{"mpi_parts":6, "use_xios":"False", "threads":3, "wallclock":"00:10:00"} } },
+                          "directives":{"default":{"mpi_parts":6, "use_xios":"False", "threads":3, "wallclock":"00:15:00"} } },
                      plotstr="slices_orography.py ' + appDiagStemName + ' $NODAL_DATA_DIR u T000864 0 0 0 $PLOT_DIR 2-0-0")',
     'run_application("gungho_model", "bryan_fritsch-dry",
                      resolutions=[("BiP200x4-100x100",2.0)],

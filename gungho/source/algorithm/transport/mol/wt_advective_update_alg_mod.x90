@@ -433,7 +433,6 @@ contains
   !> @param[in]     transport_metadata  Contains transport configuration options
   subroutine hori_wt_update_alg(u_grad_f, wind, field, transport_metadata)
 
-    use remap_on_extended_mesh_alg_mod, only: remap_on_extended_mesh_alg
     implicit none
 
     type(r_tran_field_type),         intent(in)    :: wind
@@ -455,6 +454,10 @@ contains
 
     type(r_tran_field_type), target  :: remap_field
     type(r_tran_field_type), pointer :: field_ptr => null()
+    type(transport_runtime_type), pointer :: transport_runtime => null()
+
+    logical(kind=l_def) :: monotone
+
     if ( subroutine_timers ) call timer('Wt horizontal recon')
 
     mesh => wind%get_mesh()
@@ -471,11 +474,16 @@ contains
     multidata_fs => &
       function_space_collection%get_fs( mesh, element_order, Wtheta, 4, ndata_first=.false. )
     call h_reconstruction%initialise( multidata_fs )
-    if ( extended_mesh .and.                                                        &
-         (transport_metadata%get_horizontal_monotone() == horizontal_monotone_koren &
-          .or. oned_reconstruction) ) then
-      call remap_on_extended_mesh_alg(remap_field, field)
+    monotone = (transport_metadata%get_horizontal_monotone() == horizontal_monotone_koren)
+    if ( extended_mesh .and. (monotone .or. oned_reconstruction) ) then
+      transport_runtime => get_transport_runtime(mesh)
+      call transport_runtime%remap_on_extended_mesh(                   &
+                           remap_field, field,                         &
+                           monotone,                                   &
+                           transport_metadata%get_enforce_min_value(), &
+                           transport_metadata%get_min_value())
       field_ptr => remap_field
+      nullify(transport_runtime)
     else
       field_ptr => field
     end if

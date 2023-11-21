@@ -22,7 +22,8 @@ module horizontal_sl_advective_alg_mod
   use timer_mod,                        only: timer
 
   ! Transport runtime and metadata
-  use transport_enumerated_types_mod,   only: splitting_strang_hvh
+  use transport_enumerated_types_mod,   only: splitting_strang_hvh, &
+                                              horizontal_monotone_none
   use transport_metadata_mod,           only: transport_metadata_type
   use transport_runtime_alg_mod,        only: transport_runtime_type
   use transport_runtime_collection_mod, only: get_transport_runtime
@@ -31,7 +32,6 @@ module horizontal_sl_advective_alg_mod
   use end_of_transport_step_alg_mod,    only: end_of_advective_step_alg
   use horizontal_cubic_sl_kernel_mod,   only: horizontal_cubic_sl_kernel_type
   use horizontal_linear_sl_kernel_mod,  only: horizontal_linear_sl_kernel_type
-  use remap_on_extended_mesh_alg_mod,   only: remap_on_extended_mesh_alg
 
   ! Configs
   use transport_config_mod,             only: extended_mesh
@@ -107,6 +107,7 @@ module horizontal_sl_advective_alg_mod
     type(integer_field_type),     pointer :: cosmic_istart_y => null()
     type(integer_field_type),     pointer :: cosmic_iend_y   => null()
     integer(kind=i_def) :: hori_monotone
+    logical(kind=l_def) :: monotone_remap
 
     if ( subroutine_timers ) call timer('horizontal_sl_advective_alg')
 
@@ -162,7 +163,11 @@ module horizontal_sl_advective_alg_mod
 
     ! If needed remap the field on an extended cubed sphere
     if ( extended_mesh ) then
-      call remap_on_extended_mesh_alg(remap_field, field_n)
+      monotone_remap = ( hori_monotone /= horizontal_monotone_none )
+      call transport_runtime%remap_on_extended_mesh(                  &
+                          remap_field, field_n, monotone_remap,       &
+                          transport_metadata%get_enforce_min_value(), &
+                          transport_metadata%get_min_value() )
       field_ptr => remap_field
     else
       field_ptr => field_n
@@ -194,9 +199,15 @@ module horizontal_sl_advective_alg_mod
 
     ! If needed remap the field on an extended cubed sphere
     if ( extended_mesh ) then
-      call remap_on_extended_mesh_alg(remap_field_x, field_x)
+      call transport_runtime%remap_on_extended_mesh(                  &
+                          remap_field_x, field_x, monotone_remap,     &
+                          transport_metadata%get_enforce_min_value(), &
+                          transport_metadata%get_min_value() )
       field_x_ptr => remap_field_x
-      call remap_on_extended_mesh_alg(remap_field_y, field_y)
+      call transport_runtime%remap_on_extended_mesh(                  &
+                          remap_field_y, field_y, monotone_remap,     &
+                          transport_metadata%get_enforce_min_value(), &
+                          transport_metadata%get_min_value() )
       field_y_ptr => remap_field_y
     else
       field_x_ptr => field_x

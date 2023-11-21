@@ -297,6 +297,8 @@ contains
                                   cheap_update )
     end if
 
+    cast_dt = real(model_clock%get_seconds_per_step(), r_def)
+
     ! Initialise
     call clone_bundle(advected_fields, fields_np1, bundle_size)
     call set_bundle_scalar(0.0_r_def, fields_np1, bundle_size)
@@ -305,7 +307,6 @@ contains
     do_moisture_diagnostics = write_conservation_diag .and. &
                               outer == outer_iterations
 
-    cast_dt = real(model_clock%get_seconds_per_step(), r_def)
 
     ! ------------------------------------------------------------------------ !
     ! Transport of prognostic variables

@@ -25,13 +25,11 @@ module ffsl_hori_alg_mod
                                               equation_form_conservative, &
                                               equation_form_consistent,   &
                                               direction_h,                &
-                                              splitting_strang_hvh
+                                              splitting_strang_hvh,       &
+                                              horizontal_monotone_none
   use transport_metadata_mod,           only: transport_metadata_type
   use transport_runtime_alg_mod,        only: transport_runtime_type
   use transport_runtime_collection_mod, only: get_transport_runtime
-
-  ! Algorithms
-  use remap_on_extended_mesh_alg_mod,   only: remap_on_extended_mesh_alg
 
   ! Kernels
   use break_flux_kernel_mod,            only: break_flux_kernel_type
@@ -237,6 +235,7 @@ contains
     ! Transport options
     integer(kind=i_def) :: monotone
     logical(kind=l_def) :: strang
+    logical(kind=l_def) :: monotone_remap
 
     ! Constants
     integer(kind=i_def) :: mesh_id
@@ -298,7 +297,11 @@ contains
     ! remap the field on an extended cubed sphere, if required -----------------
     ! If needed remap the field on an extended cubed sphere
     if ( extended_mesh ) then
-      call remap_on_extended_mesh_alg(remap_field, field_n)
+      monotone_remap = ( monotone /= horizontal_monotone_none )
+      call transport_runtime%remap_on_extended_mesh(                  &
+                          remap_field, field_n, monotone_remap,       &
+                          transport_metadata%get_enforce_min_value(), &
+                          transport_metadata%get_min_value())
       field_ptr => remap_field
     else
       field_ptr => field_n
@@ -424,6 +427,7 @@ contains
     ! Transport options
     integer(kind=i_def) :: monotone
     logical(kind=l_def) :: strang
+    logical(kind=l_def) :: monotone_remap
 
     ! Constants
     integer(kind=i_def) :: mesh_id
@@ -482,8 +486,15 @@ contains
     ! remap the field on an extended cubed sphere, if required -----------------
     ! If needed remap the field on an extended cubed sphere
     if ( extended_mesh ) then
-      call remap_on_extended_mesh_alg(remap_field_x, field_x)
-      call remap_on_extended_mesh_alg(remap_field_y, field_y)
+      monotone_remap = ( monotone /= horizontal_monotone_none )
+      call transport_runtime%remap_on_extended_mesh(                  &
+                          remap_field_x, field_x, monotone_remap,     &
+                          transport_metadata%get_enforce_min_value(), &
+                          transport_metadata%get_min_value())
+      call transport_runtime%remap_on_extended_mesh(                  &
+                          remap_field_y, field_y, monotone_remap,     &
+                          transport_metadata%get_enforce_min_value(), &
+                          transport_metadata%get_min_value())
       field_x_ptr => remap_field_x
       field_y_ptr => remap_field_y
     else

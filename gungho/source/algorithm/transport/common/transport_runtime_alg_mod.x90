@@ -52,6 +52,9 @@ module transport_runtime_alg_mod
 
   use psykal_lite_mod,                only: invoke_copy_to_rtran, &
                                             invoke_rtran_field_min_max
+  use remap_on_extended_mesh_alg_mod, only: initialise_remap_on_extended_mesh, &
+                                            remap_field_on_extended_mesh,      &
+                                            linear_remap
 
   implicit none
 
@@ -113,6 +116,10 @@ module transport_runtime_alg_mod
     real(kind=r_tran),    allocatable, dimension(:)  :: total_cfl_max
     class(model_clock_type), pointer                 :: model_clock
 
+    type(r_tran_field_type)  :: remap_weights
+    type(integer_field_type) :: remap_indices
+    logical(kind=l_def)      :: computed_remapping
+
     contains
 
     procedure, private :: idx_from_mesh_id
@@ -158,6 +165,7 @@ module transport_runtime_alg_mod
     procedure, public  :: get_tracer_step_ctr
     procedure, public  :: inc_tracer_step_ctr
     procedure, public  :: reset_tracer_step_ctr
+    procedure, public  :: remap_on_extended_mesh
     procedure, public  :: initialise => transport_runtime_initialiser
     final              :: destroy_transport_runtime
 
@@ -271,6 +279,9 @@ contains
     write(log_scratch_space, '(A,I4)') 'Setting up transport_runtime on mesh: ', &
                                        primal_wind_n_rdef%get_mesh_id()
     call log_event(log_scratch_space, LOG_LEVEL_INFO)
+
+    ! Proxy for the first time the object is initialised
+    if ( .not. allocated(self%mesh_ids) ) self%computed_remapping = .false.
 
     ! Transfer r_def input to r_tran fields
     call primal_wind_n%initialise(vector_space = primal_wind_n_rdef%get_function_space() )
@@ -2024,5 +2035,51 @@ contains
     end select
 
   end function direction_w2_fs
+
+  subroutine remap_on_extended_mesh(self, remap_field, field, &
+                                    monotone, enforce_minvalue, minvalue)
+
+    implicit none
+    class(transport_runtime_type), target, intent(inout) :: self
+
+    type(r_tran_field_type), intent(inout) :: remap_field
+    type(r_tran_field_type), intent(in)    :: field
+
+    logical(kind=l_def),           intent(in) :: monotone
+    logical(kind=l_def),           intent(in) :: enforce_minvalue
+    real(kind=r_tran),             intent(in) :: minvalue
+
+    integer(kind=i_def) :: nremap
+
+    type(mesh_type),           pointer :: mesh => null(), &
+                                          twod_mesh => null()
+    type(function_space_type), pointer :: w3_fs => null()
+
+    if ( .not. self%computed_remapping ) then
+      ! Compute remapping weights for this mesh
+      if ( linear_remap ) then
+        nremap = 2
+      else
+        nremap = 4
+      end if
+      mesh => field%get_mesh()
+      twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
+      w3_fs => function_space_collection%get_fs(twod_mesh, 0, W3, nremap)
+      call self%remap_weights%initialise( w3_fs )
+      call self%remap_indices%initialise( w3_fs )
+      call initialise_remap_on_extended_mesh(self%remap_weights, self%remap_indices)
+      self%computed_remapping = .true.
+    end if
+
+    call remap_field_on_extended_mesh(remap_field, field, &
+                                      self%remap_weights, &
+                                      self%remap_indices, &
+                                      monotone,           &
+                                      enforce_minvalue,   &
+                                      minvalue )
+    nullify( mesh, twod_mesh, w3_fs )
+
+  end subroutine remap_on_extended_mesh
+
 
 end module transport_runtime_alg_mod
