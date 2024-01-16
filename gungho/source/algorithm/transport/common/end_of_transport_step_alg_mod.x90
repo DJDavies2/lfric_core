@@ -90,7 +90,7 @@ contains
     ! Internal variables
     real(kind=r_tran) :: min_value
 
-    if ( subroutine_timers ) call timer('end_of_transport')
+    if ( subroutine_timers ) call timer('transport.end_of_transport')
 
     ! Enforce a min value if required
     if ( transport_metadata%get_enforce_min_value() ) then
@@ -112,7 +112,7 @@ contains
                                          depth=transport_boundary_depth)
     end if
 
-    if ( subroutine_timers ) call timer('end_of_transport')
+    if ( subroutine_timers ) call timer('transport.end_of_transport')
 
   end subroutine end_of_advective_step_alg
 
@@ -167,7 +167,7 @@ contains
     real(kind=r_tran)                     :: field_min, field_max
     integer(kind=i_def)                   :: direction
 
-    if ( subroutine_timers ) call timer('end_of_transport')
+    if ( subroutine_timers ) call timer('transport.end_of_transport')
 
     ! Extract transport runtime
     mesh => field_np1%get_mesh()
@@ -206,6 +206,8 @@ contains
 
       if (enforce_min_value .and. min_val_method == min_val_method_iterative) then
 
+        if ( subroutine_timers ) call timer('transport.iterative_min_val')
+
         min_value = transport_metadata%get_min_value()
         acceptable_min = real(min_val_abs_tol, r_tran)
         adv_dt = 1.0_r_tran  ! dt hidden inside of flux already
@@ -233,6 +235,8 @@ contains
             call log_event(log_scratch_space, LOG_LEVEL_INFO)
           end if
         end do
+
+        if ( subroutine_timers ) call timer('transport.iterative_min_val')
 
       else
         ! Compute updated field using flux for whole transport step
@@ -303,6 +307,8 @@ contains
 
       else
         ! field_np1 is advective so need to compute the conservative update
+        if ( subroutine_timers ) call timer('transport.end_cons_update')
+
         div => get_directional_im3_div_r_tran(mesh_id, direction)
         conservative_field_n => transport_runtime%get_rho_d(mesh_id, step)
         call conservative_field_np1%initialise(field_in%get_function_space())
@@ -317,6 +323,9 @@ contains
         end if
 
         call transport_runtime%set_rho_d(conservative_field_np1, step + 1)
+
+        if ( subroutine_timers ) call timer('transport.end_cons_update')
+
       end if
 
       ! Store the dry flux
@@ -329,7 +338,7 @@ contains
     nullify(mesh, div, div_r_def, transport_runtime, field_start, &
             conservative_field_n)
 
-    if ( subroutine_timers ) call timer('end_of_transport')
+    if ( subroutine_timers ) call timer('transport.end_of_transport')
 
   end subroutine end_of_conservative_step_alg
 
@@ -404,7 +413,7 @@ contains
     real(kind=r_tran)                     :: acceptable_min
     real(kind=r_tran)                     :: field_min, field_max
 
-    if ( subroutine_timers ) call timer('end_of_transport')
+    if ( subroutine_timers ) call timer('transport.end_of_transport')
 
     ! Extract transport runtime
     prime_extrusion_mesh => field_np1%get_mesh()
@@ -427,6 +436,8 @@ contains
         (flux_function_space == W2 .or. flux_function_space == W2H) .and.      &
         (trim(transport_metadata%get_name()) == 'potential_temperature' .or.   &
          trim(transport_metadata%get_name()) == 'theta')) then
+
+      if ( subroutine_timers ) call timer('transport.theta_dispersion')
 
       shifted_mesh => mesh_collection%get_mesh(prime_extrusion_mesh, SHIFTED)
       sh_w3_fs => function_space_collection%get_fs(shifted_mesh, 0, W3)
@@ -460,6 +471,8 @@ contains
                                                      dry_flux,                 &
                                                      theta_factor_w2_shifted), &
                    inc_X_plus_Y(flux, flux_correction) )
+
+      if ( subroutine_timers ) call timer('transport.theta_dispersion')
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -526,6 +539,8 @@ contains
       call build_up_flux(sum_flux, flux, transport_runtime)
 
       if (enforce_min_value .and. min_val_method == min_val_method_iterative) then
+        if ( subroutine_timers ) call timer('transport.iterative_min_val')
+
         min_value = transport_metadata%get_min_value()
         adv_dt = 1.0_r_tran  ! dt hidden inside of flux already
         acceptable_min = real(min_val_abs_tol, r_tran)
@@ -553,6 +568,8 @@ contains
             call log_event(log_scratch_space, LOG_LEVEL_INFO)
           end if
         end do
+
+        if ( subroutine_timers ) call timer('transport.iterative_min_val')
 
       else
         ! Compute updated field using flux for whole transport step
@@ -621,7 +638,7 @@ contains
     nullify(prime_extrusion_mesh, shifted_mesh, mr_start, transport_runtime,  &
             rho_d_start, rho_d_np1, w3_fs, w2_fs, sh_w3_fs, sh_w2_fs, div, div_r_def)
 
-    if ( subroutine_timers ) call timer('end_of_transport')
+    if ( subroutine_timers ) call timer('transport.end_of_transport')
 
   end subroutine end_of_consistent_step_alg
 
@@ -654,6 +671,8 @@ contains
     type(r_tran_field_type)            :: combined_flux
     logical(kind=l_def)                :: is_flux_3d
     logical(kind=l_def)                :: is_flux_split
+
+    if ( subroutine_timers ) call timer('transport.build_up_flux')
 
     ! Don't know which function space the fluxes are in -- add up each
     mesh => sum_flux%get_mesh()
@@ -708,6 +727,8 @@ contains
     end if
 
     nullify(mesh, w2_fs, w2h_fs, w2v_fs, old_flux)
+
+    if ( subroutine_timers ) call timer('transport.build_up_flux')
 
   end subroutine build_up_flux
 

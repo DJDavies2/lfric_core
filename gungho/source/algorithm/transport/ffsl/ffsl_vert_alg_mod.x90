@@ -125,7 +125,7 @@ contains
     logical(kind=l_def) :: to_compute_field_np1
 
     ! Subroutine name for timer
-    character(*), parameter :: routine_name = 'ffsl_vert_transport_alg'
+    character(*), parameter :: routine_name = 'transport.ffsl_vertical'
 
     type(r_tran_field_type) :: conservative_field_n
     type(r_tran_field_type) :: conservative_field_np1

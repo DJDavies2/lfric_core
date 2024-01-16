@@ -92,7 +92,7 @@ contains
     integer(kind=i_def)  :: monotone, monotone_order
     logical(l_def)       :: enforce_min_value
 
-    if ( subroutine_timers ) call timer( 'vertical_sl_conservative_alg' )
+    if ( subroutine_timers ) call timer( 'transport.slice_vertical' )
 
     if ( slice_order /= slice_order_linear  .and. &
          slice_order /= slice_order_cubic   .and. &
@@ -184,7 +184,7 @@ contains
     nullify( mm_w3, mm_w3_inv, dep_pts_z_get, mesh, transport_runtime, w2v_fs, &
              interp_coef, interp_index, linear_coef )
 
-    if ( subroutine_timers ) call timer( 'vertical_sl_conservative_alg' )
+    if ( subroutine_timers ) call timer( 'transport.slice_vertical' )
 
   end subroutine vertical_sl_conservative_alg
 

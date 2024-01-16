@@ -65,7 +65,7 @@ contains
     real(r_tran)   :: dt_substep
     logical(l_def) :: final_rk_stage
 
-    if ( subroutine_timers ) call timer('mol_advective_alg')
+    if ( subroutine_timers ) call timer('transport.mol_advective')
 
     ! get the stuff needed by the advection algorithm
     mesh_id = field%get_mesh_id()
@@ -155,7 +155,7 @@ contains
     if ( allocated( rk_field ) ) deallocate( rk_field )
     if ( allocated( rk_weights ) ) deallocate( rk_weights )
 
-    if ( subroutine_timers ) call timer('mol_advective_alg')
+    if ( subroutine_timers ) call timer('transport.mol_advective')
 
   end subroutine mol_advective_alg
 

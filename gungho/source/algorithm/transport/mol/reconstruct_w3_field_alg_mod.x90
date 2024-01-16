@@ -527,7 +527,7 @@ contains
 
     logical(kind=l_def) :: monotone
 
-    if ( subroutine_timers ) call timer('W3 horizontal recon')
+    if ( subroutine_timers ) call timer('transport.w3_hori_recon')
 
     mesh => field_new%get_mesh()
     mesh_id = mesh%get_id()
@@ -583,7 +583,7 @@ contains
 
     nullify(mesh, flux_stencil_extent, flux_2d_stencil_size, ndata_h, flux_coeffs)
 
-    if ( subroutine_timers ) call timer('W3 horizontal recon')
+    if ( subroutine_timers ) call timer('transport.w3_hori_recon')
 
   end subroutine hori_w3_reconstruct_alg
 
@@ -612,7 +612,7 @@ contains
     logical(kind=l_def)              :: reversible
     integer(kind=i_def)              :: monotonicity
 
-    if ( subroutine_timers ) call timer('W3 vertical recon')
+    if ( subroutine_timers ) call timer('transport.w3_vert_recon')
 
     reversible = ( transport_metadata%get_reversible() .and. final_rk_stage )
     logspace = transport_metadata%get_log_space()
@@ -657,7 +657,7 @@ contains
     end if
 
     nullify(mesh, ndata_v, vert_flux_coeffs)
-    if ( subroutine_timers ) call timer('W3 vertical recon')
+    if ( subroutine_timers ) call timer('transport.w3_vert_recon')
 
   end subroutine vert_w3_reconstruct_alg
 

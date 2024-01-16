@@ -85,7 +85,7 @@ module mol_conservative_alg_mod
     logical(l_def)                :: do_flux
     logical(l_def)                :: do_advective
 
-    if ( subroutine_timers ) call timer('mol_conservative_alg')
+    if ( subroutine_timers ) call timer('transport.mol_conservative')
 
     ! ------------------------------------------------------------------------ !
     ! Extract transport metadata and initialise temporary fields
@@ -257,7 +257,7 @@ module mol_conservative_alg_mod
 
     nullify( div, advecting_wind, mesh, transport_runtime )
 
-    if ( subroutine_timers ) call timer('mol_conservative_alg')
+    if ( subroutine_timers ) call timer('transport.mol_conservative')
 
   end subroutine mol_conservative_alg
 

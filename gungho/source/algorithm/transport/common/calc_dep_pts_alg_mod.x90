@@ -112,7 +112,7 @@ contains
     type(mesh_type), pointer ::  mesh => null()
     real( kind=r_tran ) :: max_hori_dep, min_hori_dep
 
-    if ( subroutine_timers ) call timer( 'calc_hori_dep_pts' )
+    if ( subroutine_timers ) call timer( 'transport.hori_dep_pts' )
 
     ! Get function space, mesh, and Det(J) at W3
     w2_fs  => wind_n%get_function_space()
@@ -183,7 +183,7 @@ contains
 
     nullify( w2_fs, w2h_fs, mesh, detj_at_w3 )
 
-    if ( subroutine_timers ) call timer( 'calc_hori_dep_pts' )
+    if ( subroutine_timers ) call timer( 'transport.hori_dep_pts' )
 
   end subroutine calc_hori_dep_pts
 
@@ -228,7 +228,7 @@ contains
     type( function_space_type ), pointer :: w2v_fs => null()
     type( mesh_type ), pointer ::  mesh => null()
 
-    if ( subroutine_timers ) call timer( 'calc_vert_dep_pts' )
+    if ( subroutine_timers ) call timer( 'transport.vert_dep_pts' )
 
     ! Get function spaces
     w2v_fs => dep_pts_z%get_function_space()
@@ -279,7 +279,7 @@ contains
 
     nullify( w2v_fs, mesh, detj_at_w3, height_w2_rdef )
 
-    if ( subroutine_timers ) call timer( 'calc_vert_dep_pts' )
+    if ( subroutine_timers ) call timer( 'transport.vert_dep_pts' )
 
   end subroutine calc_vert_dep_pts
 

@@ -60,7 +60,7 @@ contains
 
     integer(kind=i_def) :: ndata
 
-    if ( subroutine_timers ) call timer('initialise_extended_mesh_remapping')
+    if ( subroutine_timers ) call timer('transport.init_extended_mesh')
 
     call log_event('Settting up remapping weights', &
                    LOG_LEVEL_INFO)
@@ -86,7 +86,7 @@ contains
 
     nullify( chi, chi_ext, panel_id, twod_mesh, mesh, fs )
 
-    if ( subroutine_timers ) call timer('initialise_extended_mesh_remapping')
+    if ( subroutine_timers ) call timer('transport.init_extended_mesh')
 
   end subroutine initialise_remap_on_extended_mesh
 
@@ -120,7 +120,7 @@ contains
     integer(kind=i_def) :: ndata
 
 
-    if ( subroutine_timers ) call timer('remap_on_extended_mesh')
+    if ( subroutine_timers ) call timer('transport.remap_extended_mesh')
 
     fs => remap_weights%get_function_space()
     ndata = fs%get_ndata()
@@ -142,7 +142,7 @@ contains
                                            minvalue )
     nullify(mesh, fs, panel_id)
 
-    if ( subroutine_timers ) call timer('remap_on_extended_mesh')
+    if ( subroutine_timers ) call timer('transport.remap_extended_mesh')
 
   end subroutine remap_field_on_extended_mesh
 

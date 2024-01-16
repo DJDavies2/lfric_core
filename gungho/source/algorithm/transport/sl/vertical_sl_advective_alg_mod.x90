@@ -70,7 +70,7 @@ contains
     type(integer_field_type), pointer :: interp_index => null()
     type(r_tran_field_type),  pointer :: linear_coef  => null()
 
-    if ( subroutine_timers ) call timer( 'vertical_sl_advective_alg' )
+    if ( subroutine_timers ) call timer( 'transport.sl_vertical' )
 
     if ( vertical_sl_order /= vertical_sl_order_cubic           .and. &
          vertical_sl_order /= vertical_sl_order_cubic_hermite   .and. &
@@ -137,7 +137,7 @@ contains
     nullify( mesh, transport_runtime, &
              interp_coef, interp_index, linear_coef )
 
-    if ( subroutine_timers ) call timer( 'vertical_sl_advective_alg' )
+    if ( subroutine_timers ) call timer( 'transport.sl_vertical' )
 
   end subroutine vertical_sl_advective_alg
 

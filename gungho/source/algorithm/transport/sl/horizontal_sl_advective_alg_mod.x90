@@ -109,7 +109,7 @@ module horizontal_sl_advective_alg_mod
     integer(kind=i_def) :: hori_monotone
     logical(kind=l_def) :: monotone_remap
 
-    if ( subroutine_timers ) call timer('horizontal_sl_advective_alg')
+    if ( subroutine_timers ) call timer('transport.sl_horizontal')
 
     ! Get mesh ID
     mesh_id = field_n%get_mesh_id()
@@ -237,7 +237,7 @@ module horizontal_sl_advective_alg_mod
     ! End of step: if necessary enforce min val and overwrite in blending zone
     call end_of_advective_step_alg(field_np1, field_n, transport_metadata)
 
-    if ( subroutine_timers ) call timer('horizontal_sl_advective_alg')
+    if ( subroutine_timers ) call timer('transport.sl_horizontal')
 
     nullify( mesh, transport_runtime, dep_pts_x_get, dep_pts_y_get, field_ptr, &
              cosmic_istart_x, cosmic_iend_x, cosmic_istart_y, cosmic_iend_y,   &

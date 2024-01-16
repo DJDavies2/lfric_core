@@ -101,7 +101,7 @@ module mol_consistent_alg_mod
     type(r_tran_field_type)                   :: dummy
 
     ! ------------------------------------------------------------------------ !
-    if ( subroutine_timers ) call timer('mol_consistent_alg')
+    if ( subroutine_timers ) call timer('transport.mol_consistent')
     ! ------------------------------------------------------------------------ !
     ! Get all the stuff needed by the transport algorithm
     ! ------------------------------------------------------------------------ !
@@ -302,7 +302,7 @@ module mol_consistent_alg_mod
              dry_flux, prime_advecting_wind,          &
              prime_extrusion_mesh, shifted_mesh )
 
-    if ( subroutine_timers ) call timer('mol_consistent_alg')
+    if ( subroutine_timers ) call timer('transport.mol_consistent')
 
   end subroutine mol_consistent_alg
 

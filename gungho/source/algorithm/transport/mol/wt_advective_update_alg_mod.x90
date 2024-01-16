@@ -458,7 +458,7 @@ contains
 
     logical(kind=l_def) :: monotone
 
-    if ( subroutine_timers ) call timer('Wt horizontal recon')
+    if ( subroutine_timers ) call timer('transport.wt_hori_recon')
 
     mesh => wind%get_mesh()
     mesh_id = mesh%get_id()
@@ -533,7 +533,7 @@ contains
              adv_stencil_extent,          &
              adv_2d_stencil_size, mesh )
 
-    if ( subroutine_timers ) call timer('Wt horizontal recon')
+    if ( subroutine_timers ) call timer('transport.wt_hori_recon')
 
   end subroutine hori_wt_update_alg
 
@@ -566,7 +566,7 @@ contains
     logical(kind=l_def)              :: reversible
     integer(kind=i_def)              :: monotonicity
 
-    if ( subroutine_timers ) call timer('Wt vertical recon')
+    if ( subroutine_timers ) call timer('transport.wt_vert_recon')
 
     reversible = ( transport_metadata%get_reversible() .and. final_rk_stage )
     logspace = transport_metadata%get_log_space()
@@ -607,7 +607,7 @@ contains
 
     nullify( vert_adv_coeffs, ndata_v )
 
-    if ( subroutine_timers ) call timer('Wt vertical recon')
+    if ( subroutine_timers ) call timer('transport.wt_vert_recon')
 
   end subroutine vert_wt_update_alg
 

@@ -60,7 +60,7 @@ contains
     ! Internal variables
     integer(kind=i_def)                :: imr
 
-    if ( subroutine_timers ) call timer('moist mixing ratio transport')
+    if ( subroutine_timers ) call timer('transport.moisture')
 
 
     do imr = 1, nummr_to_transport
@@ -118,7 +118,7 @@ contains
       call invoke( setval_X(mr_out_rdef(imr), mr_in_rdef(imr)) )
     end do
 
-    if ( subroutine_timers ) call timer('moist mixing ratio transport')
+    if ( subroutine_timers ) call timer('transport.moisture')
 
   end subroutine moist_mr_transport_alg
 

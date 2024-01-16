@@ -77,7 +77,7 @@ contains
     ! The saved version of field after slow physics
     type(field_type), pointer :: single_field_in => null()
 
-    if ( subroutine_timers ) call timer('tracer collection transport')
+    if ( subroutine_timers ) call timer('transport.tracer_collection')
 
       if ( fields_in%get_length() > 0 ) then
 
@@ -137,7 +137,7 @@ contains
         end do ! if ( .not. iterator%has_next() ) exit
       end if ! fields_in%get_length() > 0
 
-    if ( subroutine_timers ) call timer('tracer collection transport')
+    if ( subroutine_timers ) call timer('transport.tracer_collection')
 
   end subroutine tracer_collection_transport_alg
 
@@ -183,7 +183,7 @@ contains
     type(function_space_type), pointer :: coarse_fs => null()
     type(field_type)                   :: coarse_field_in, coarse_field_out
 
-    if ( subroutine_timers ) call timer('tracer collection transport')
+    if ( subroutine_timers ) call timer('transport.tracer_collection')
 
 
     if ( fields_in%get_length() > 0 ) then
@@ -245,7 +245,7 @@ contains
 
     end if
 
-    if ( subroutine_timers ) call timer('tracer collection transport')
+    if ( subroutine_timers ) call timer('transport.tracer_collection')
 
   end subroutine coarse_collection_transport_alg
 
