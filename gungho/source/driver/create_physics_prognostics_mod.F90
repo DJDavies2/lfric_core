@@ -245,14 +245,8 @@ contains
     if (radiation == radiation_socrates .and.                                   &
         topography == topography_horizon) then
       checkpoint_flag = .true.
-      ! h_ang_space => function_space_collection%get_fs(                        &
-                       ! twod_mesh, 0, W3, n_horiz_layer*n_horiz_ang)
-      ! h_asp_space => function_space_collection%get_fs(                        &
-                       ! twod_mesh, 0, W3, n_horiz_ang)
     else
       checkpoint_flag = .false.
-      ! h_ang_space => function_space_collection%get_fs(twod_mesh, 0, W3, 1)
-      ! h_asp_space => function_space_collection%get_fs(twod_mesh, 0, W3, 1)
     end if
     call processor%apply(make_spec('horizon_angle', main%radiation,             &
           ckp=checkpoint_flag))

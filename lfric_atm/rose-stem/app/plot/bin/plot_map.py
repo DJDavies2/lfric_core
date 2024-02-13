@@ -86,7 +86,7 @@ lw_up_toa_rts = ['lw_up_toa_rts', 100, 400]
 lw_up_clear_toa_rts = ['lw_up_clear_toa_rts', 100, 400]
 lw_down_clear_surf_rts = ['lw_down_clear_surf_rts', 100, 600]
 lw_up_clear_surf_rts = ['lw_up_clear_surf_rts', 100, 600]
-orographic_correction_rts = ['orographic_correction_rts', 0, 4]
+orographic_correction_rts = ['orographic_correction_rts', 0, 2]
 slope_angle = ['slope_angle', 0, 0.1]
 slope_aspect = ['slope_aspect', 0, 6.3]
 skyview = ['skyview', 0.999, 1.001]
@@ -194,7 +194,6 @@ if __name__ == "__main__":
         do_plot(datapath, sw_heating_rate, plotpath)
     if horizon_plots:
         do_plot(datapath, skyview, plotpath)
-        do_plot(datapath, lw_net_skyview_incr, plotpath)
         do_plot(datapath, horizon_angle, plotpath, plotlevel=2)
         do_plot(datapath, horizon_aspect, plotpath, plotlevel=2)
     if cosp_plots:
@@ -240,6 +239,7 @@ if __name__ == "__main__":
         do_plot(datapath, sw_direct_orog_incr_rts, plotpath)
     if ral_plots:
         do_plot(datapath, ls_prec,      plotpath)
+        do_plot(datapath, lw_net_skyview_incr, plotpath)
     else:
         do_plot(datapath, total_prec,   plotpath)
     if encorr_plots:
