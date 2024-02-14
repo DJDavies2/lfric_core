@@ -46,7 +46,7 @@ INTEGER(KIND=int64), PARAMETER :: calendar_gregorian = 1, calendar_360 = 2,    &
                                   calendar_365 = 3
 
 ! Array of shumlib field objects that will be returned from UM file
-TYPE(shum_field_type), ALLOCATABLE  :: um_input_fields(:)
+INTEGER(KIND=int64), ALLOCATABLE  :: um_input_field_indices(:)
 
 INTEGER(KIND=int64) :: stashcode, calendar_type
 
@@ -74,24 +74,24 @@ DO i_field = 1, SIZE(stash_list)
 
   stashcode = stash_list(i_field)
 
-  CALL shumlib("um2lfric::find_fields_in_file",                                &
-                um_file%find_fields_in_file(um_input_fields,                   &
+  CALL shumlib("um2lfric::find_field_indices_in_file",                         &
+                um_file%find_field_indices_in_file(um_input_field_indices,     &
                 stashcode = stashcode, lbproc = 0_int64),                      &
                 ignore_warning = true_cbool, errorstatus = errorstatus)
 
   ! If stashcode is not present in dump, move onto next one
   IF (errorstatus /= 0 ) THEN
-    IF (ALLOCATED(um_input_fields)) DEALLOCATE(um_input_fields)
+    IF (ALLOCATED(um_input_field_indices)) DEALLOCATE(um_input_field_indices)
     CYCLE
   END IF
 
-  DO level = 1, SIZE(um_input_fields)
+  DO level = 1, SIZE(um_input_field_indices)
 
     ! Get forecast and validity time for this specific field
     CALL shumlib("um2lfric::get_real_fctime",                                  &
-                  um_input_fields(level) % get_real_fctime(fctime))
+                  um_file%fields(um_input_field_indices(level)) % get_real_fctime(fctime))
     CALL shumlib("um2lfric::get_timestring",                                   &
-                  um_input_fields(level) % get_timestring(timestring))
+                  um_file%fields(um_input_field_indices(level)) % get_timestring(timestring))
 
     ! Check if forecast time is already in current stored list of forecast
     ! times. If not insert new forecast time into array, preserving ordering.
@@ -129,7 +129,7 @@ DO i_field = 1, SIZE(stash_list)
 
   END DO
 
-  IF (ALLOCATED(um_input_fields)) DEALLOCATE(um_input_fields)
+  IF (ALLOCATED(um_input_field_indices)) DEALLOCATE(um_input_field_indices)
 
 END DO
 
