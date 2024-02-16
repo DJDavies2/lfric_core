@@ -22,7 +22,7 @@ program gungho_model
   use driver_config_mod,      only: init_config, final_config
   use driver_counter_mod,     only: init_counters, final_counters
   use driver_log_mod,         only: init_logger, final_logger
-  use driver_time_mod,        only: init_time, get_calendar
+  use driver_time_mod,        only: init_time, final_time
   use driver_timer_mod,       only: init_timers, final_timers
   use gungho_mod,             only: gungho_required_namelists
   use gungho_driver_mod,      only: initialise, step, finalise
@@ -62,13 +62,13 @@ program gungho_model
   call init_logger( modeldb%mpi%get_comm(), application_name )
   call init_timers( application_name )
   call init_collections()
-  call init_time( modeldb%clock )
+  call init_time( modeldb%clock, modeldb%calendar )
   call init_counters( application_name )
   deallocate( filename )
 
   write( log_scratch_space, '("Initialise ", A, " ...")' ) application_name
   call log_event( log_scratch_space, log_level_trace )
-  call initialise( application_name, modeldb, get_calendar() )
+  call initialise( application_name, modeldb, modeldb%calendar )
 
   if (l_esm_couple) then
     write(log_scratch_space,'("Configuration is coupled to ocean")')
@@ -87,6 +87,7 @@ program gungho_model
   call finalise( application_name, modeldb )
 
   call final_counters( application_name )
+  call final_time( modeldb%clock, modeldb%calendar )
   call final_collections()
   call final_timers( application_name )
   call final_logger( application_name )

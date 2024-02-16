@@ -8,13 +8,14 @@
 !> run_transport() and finalise_transport().
 program transport
 
+  use calendar_mod,            only: calendar_type
   use cli_mod,                 only: get_initial_filename
   use constants_mod,           only: i_def, r_def
   use driver_collections_mod,  only: init_collections, final_collections
   use driver_comm_mod,         only: init_comm, final_comm
   use driver_config_mod,       only: init_config, final_config
   use driver_log_mod,          only: init_logger, final_logger
-  use driver_time_mod,         only: init_time, get_calendar
+  use driver_time_mod,         only: init_time, final_time
   use driver_timer_mod,        only: init_timers, final_timers
   use log_mod,                 only: log_event,       &
                                      log_level_trace, &
@@ -34,6 +35,7 @@ program transport
   character(:), allocatable :: filename
 
   type(model_clock_type), allocatable  :: model_clock
+  class(calendar_type),   allocatable  :: model_calendar
   type(namelist_collection_type), save :: configuration
 
   call configuration%initialise( program_name, table_len=10 )
@@ -52,12 +54,12 @@ program transport
   call init_logger( global_mpi%get_comm(), program_name )
   call init_timers( program_name )
   call init_collections()
-  call init_time( model_clock )
+  call init_time( model_clock, model_calendar )
   deallocate( filename )
 
   call log_event( 'Initialising ' // program_name // ' ...', log_level_trace )
   call initialise_transport( configuration, global_mpi, model_clock, &
-                             program_name, get_calendar() )
+                             program_name, model_calendar )
 
   call log_event( 'Running ' // program_name // ' ...', log_level_trace )
   do while (model_clock%tick())
@@ -67,6 +69,7 @@ program transport
   call log_event( 'Finalising ' // program_name // ' ...', log_level_trace )
   call finalise_transport( program_name )
 
+  call final_time( model_clock, model_calendar )
   call final_collections()
   call final_timers( program_name )
   call final_logger( program_name )

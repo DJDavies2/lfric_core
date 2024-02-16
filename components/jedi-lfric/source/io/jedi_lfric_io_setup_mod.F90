@@ -9,7 +9,6 @@ module jedi_lfric_io_setup_mod
 
   use calendar_mod,              only: calendar_type
   use constants_mod,             only: i_def
-  use driver_time_mod,           only: get_calendar
   use driver_fem_mod,            only: init_fem, final_fem
   use empty_io_context_mod,      only: empty_io_context_type
   use field_mod,                 only: field_type
@@ -46,7 +45,8 @@ contains
   !> @param [in]    mesh_name    The name of the mesh
   !> @param [inout] xios_context The LFRic context object
   !> @param [inout] model_clock  The model clock
-  subroutine initialise_io( context_name, mpi, file_meta, mesh_name, xios_context, model_clock )
+  !> @param [in]    calendar     The model calendar
+  subroutine initialise_io( context_name, mpi, file_meta, mesh_name, xios_context, model_clock, calendar )
 
     implicit none
 
@@ -56,6 +56,7 @@ contains
     character(len=*),                       intent(in) :: mesh_name
     class(io_context_type), allocatable, intent(inout) :: xios_context
     type(model_clock_type),              intent(inout) :: model_clock
+    class(calendar_type),                   intent(in) :: calendar
 
     ! Local
     type(inventory_by_mesh_type) :: chi_inventory
@@ -74,7 +75,7 @@ contains
 
     ! Initialise I/O context and setup file to use
     call init_io( context_name, mpi%get_comm(), file_meta, xios_context, chi, panel_id, &
-                  model_clock, get_calendar() )
+                  model_clock, calendar )
 
     ! Do initial step
     if ( model_clock%is_initialisation() ) then

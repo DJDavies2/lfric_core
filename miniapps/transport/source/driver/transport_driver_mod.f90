@@ -19,7 +19,6 @@ module transport_driver_mod
   use driver_fem_mod,                   only: init_fem
   use driver_io_mod,                    only: init_io, final_io
   use driver_mesh_mod,                  only: init_mesh
-  use driver_time_mod,                  only: init_time, get_calendar
   use derived_config_mod,               only: set_derived_config
   use diagnostics_io_mod,               only: write_scalar_diagnostic, &
                                               write_vector_diagnostic
@@ -407,7 +406,7 @@ contains
                     chi_inventory,      &
                     panel_id_inventory, &
                     model_clock,        &
-                    get_calendar(),     &
+                    calendar,           &
                     alt_mesh_names=extra_io_mesh_names )
     else
       call init_io( xios_ctx,           &
@@ -415,7 +414,7 @@ contains
                     chi_inventory,      &
                     panel_id_inventory, &
                     model_clock,        &
-                    get_calendar() )
+                    calendar )
     end if
 
     ! Output initial conditions

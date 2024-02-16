@@ -17,6 +17,7 @@ module jedi_increment_mod
   use, intrinsic :: iso_fortran_env, only : real64
   use atlas_field_emulator_mod,      only : atlas_field_emulator_type
   use atlas_field_interface_mod,     only : atlas_field_interface_type
+  use calendar_mod,                  only : calendar_type
   use jedi_lfric_datetime_mod,       only : jedi_datetime_type
   use jedi_lfric_duration_mod,       only : jedi_duration_type
   use jedi_geometry_mod,             only : jedi_geometry_type
@@ -307,9 +308,11 @@ subroutine create_model_data( self )
 
   class( jedi_increment_type ),       intent(inout) :: self
 
+  class( calendar_type ), allocatable    :: calendar
+
   ! Create model data and then link to the Atlas fields
   call create_fake_tlm_model_data( self%geometry%get_mesh(), self%model_data )
-  call init_time( self%model_clock )
+  call init_time( self%model_clock, calendar )
   call self%setup_interface_to_model_data()
 
 end subroutine create_model_data

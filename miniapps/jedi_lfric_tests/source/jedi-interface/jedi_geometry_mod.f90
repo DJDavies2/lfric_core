@@ -13,6 +13,7 @@ module jedi_geometry_mod
 
   use, intrinsic :: iso_fortran_env, only : real64
 
+  use calendar_mod,                  only : calendar_type
   use constants_mod,                 only : i_def, str_def, l_def
   use driver_time_mod,               only : init_time
   use extrusion_mod,                 only : extrusion_type, TWOD
@@ -278,15 +279,17 @@ subroutine setup_io(self, config)
 
   class( jedi_geometry_type ), intent(inout)    :: self
   type( jedi_geometry_config_type ), intent(in) :: config
+  class( calendar_type ), allocatable    :: calendar
 
-  call init_time( self%xios_clock )
+  call init_time( self%xios_clock, calendar )
 
   call initialise_io( config%context_name,   &
                       self%get_mpi_comm(),   &
                       config%file_meta_data, &
                       self%get_mesh_name(),  &
                       self%xios_context,     &
-                      self%xios_clock )
+                      self%xios_clock,       &
+                      calendar )
 
   ! Tick out of initialisation state
   if ( .not. self%xios_clock%tick() ) then

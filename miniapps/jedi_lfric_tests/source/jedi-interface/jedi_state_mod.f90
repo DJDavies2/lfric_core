@@ -17,6 +17,7 @@ module jedi_state_mod
   use, intrinsic :: iso_fortran_env, only : real64
   use atlas_field_emulator_mod,      only : atlas_field_emulator_type
   use atlas_field_interface_mod,     only : atlas_field_interface_type
+  use calendar_mod,                  only : calendar_type
   use jedi_lfric_datetime_mod,       only : jedi_datetime_type
   use jedi_lfric_duration_mod,       only : jedi_duration_type
   use jedi_geometry_mod,             only : jedi_geometry_type
@@ -178,6 +179,7 @@ subroutine state_initialiser( self, geometry, config )
   type( jedi_state_config_type ),  intent(inout) :: config
 
   ! Local
+  class( calendar_type ), allocatable    :: calendar
   integer(i_def) :: n_horizontal
   integer(i_def) :: n_levels
   integer(i_def) :: n_layers
@@ -230,7 +232,7 @@ subroutine state_initialiser( self, geometry, config )
 
   ! If running the model, create model data and link to fields .
   if ( .not. config%use_pseudo_model ) then
-    call init_time( self%model_clock )
+    call init_time( self%model_clock, calendar )
     call self%create_model_data()
   end if
 

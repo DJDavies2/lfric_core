@@ -12,6 +12,7 @@
 !!
 module driver_modeldb_mod
 
+  use calendar_mod,             only: calendar_type
   use driver_model_data_mod,    only: model_data_type
   use key_value_collection_mod, only: key_value_collection_type
   use model_clock_mod,          only: model_clock_type
@@ -40,6 +41,7 @@ module driver_modeldb_mod
 
     !> Tracks time in the model
     type(model_clock_type), public, allocatable :: clock
+    class(calendar_type),   public, allocatable :: calendar
 
     !> MPI object that contains all the functionality to perform MPI tasks
     !> on the MPI communicator for this model instance.

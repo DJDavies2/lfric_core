@@ -22,7 +22,7 @@ program jedi_lfric_tests
   use driver_config_mod,      only: init_config, final_config
   use driver_log_mod,         only: init_logger, final_logger
   use gungho_modeldb_mod,     only: modeldb_type
-  use driver_time_mod,        only: init_time, get_calendar
+  use driver_time_mod,        only: init_time, final_time
   use constants_mod,          only: i_def
   use log_mod,                only: log_event, log_level_trace
   use mpi_mod,                only: global_mpi
@@ -55,8 +55,8 @@ program jedi_lfric_tests
   call modeldb%model_data%diagnostic_fields%initialise(name="diagnostics", table_len=100)
 
   call log_event( 'Initialising ' // program_name // ' ...', log_level_trace )
-  call init_time( modeldb%clock )
-  call initialise( modeldb, get_calendar() )
+  call init_time( modeldb%clock, modeldb%calendar )
+  call initialise( modeldb, modeldb%calendar )
 
   call log_event( 'Running ' // program_name // ' ...', log_level_trace )
   do while ( modeldb%clock%tick() )
@@ -66,6 +66,7 @@ program jedi_lfric_tests
   call log_event( 'Finalising ' // program_name // ' ...', log_level_trace )
   call finalise( program_name, modeldb )
 
+  call final_time( modeldb%clock, modeldb%calendar )
   call final_collections()
   call final_logger( program_name )
   call final_config()

@@ -11,12 +11,13 @@
 
 program gravity_wave
 
+  use calendar_mod,            only: calendar_type
   use cli_mod,                 only: get_initial_filename
   use driver_collections_mod,  only: init_collections, final_collections
   use driver_comm_mod,         only: init_comm, final_comm
   use driver_config_mod,       only: init_config, final_config
   use driver_log_mod,          only: init_logger, final_logger
-  use driver_time_mod,         only: init_time, get_calendar
+  use driver_time_mod,         only: init_time, final_time
   use driver_timer_mod,        only: init_timers, final_timers
   use gravity_wave_mod,        only: gravity_wave_required_namelists
   use gravity_wave_driver_mod, only: initialise, step, finalise
@@ -33,6 +34,7 @@ program gravity_wave
   character(:), allocatable :: filename
 
   type(model_clock_type), allocatable  :: model_clock
+  class(calendar_type),   allocatable  :: model_calendar
   type(namelist_collection_type), save :: configuration
 
   call configuration%initialise( program_name, table_len=10 )
@@ -44,11 +46,11 @@ program gravity_wave
   call init_logger( global_mpi%get_comm(), program_name )
   call init_collections()
   call init_timers( program_name )
-  call init_time( model_clock )
+  call init_time( model_clock, model_calendar )
   deallocate( filename )
 
   call log_event( 'Initialising '//program_name//' ...', log_level_trace )
-  call initialise( configuration, global_mpi, model_clock, get_calendar() )
+  call initialise( configuration, global_mpi, model_clock, model_calendar )
 
   write(log_scratch_space,'("Running ",A, " ...")') program_name
   call log_event( log_scratch_space, log_level_trace )
@@ -59,6 +61,7 @@ program gravity_wave
   call log_event( 'Finalising '//program_name//' ...', log_level_trace )
   call finalise( model_clock, program_name )
 
+  call final_time( model_clock, model_calendar )
   call final_timers( program_name )
   call final_collections()
   call final_logger( program_name )

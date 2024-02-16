@@ -19,7 +19,7 @@ program linear_model
   use driver_comm_mod,        only : init_comm, final_comm
   use driver_config_mod,      only : init_config, final_config
   use driver_log_mod,         only : init_logger, final_logger
-  use driver_time_mod,        only : init_time, get_calendar
+  use driver_time_mod,        only : init_time, final_time
   use gungho_mod,             only : gungho_required_namelists
   use gungho_modeldb_mod,     only : modeldb_type
   use linear_driver_mod,      only : initialise, step, finalise
@@ -53,10 +53,10 @@ program linear_model
                     modeldb%configuration )
   call init_logger( modeldb%mpi%get_comm(), application_name )
   call init_collections()
-  call init_time( modeldb%clock )
+  call init_time( modeldb%clock, modeldb%calendar )
   deallocate( filename )
 
-  call initialise( modeldb, get_calendar() )
+  call initialise( modeldb, modeldb%calendar )
 
   write( log_scratch_space,'("Running ", A, " ...")' ) application_name
   call log_event( log_scratch_space, log_level_trace )
@@ -67,6 +67,7 @@ program linear_model
   call log_event( 'Finalising '//application_name//' ...', log_level_trace )
   call finalise( application_name, modeldb )
 
+  call final_time( modeldb%clock, modeldb%calendar )
   call final_collections()
   call final_logger( application_name )
   call final_config()

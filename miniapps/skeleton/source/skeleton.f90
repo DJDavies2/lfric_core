@@ -19,7 +19,7 @@ program skeleton
   use driver_config_mod,       only: init_config, final_config
   use driver_log_mod,          only: init_logger, final_logger
   use driver_modeldb_mod,      only: modeldb_type
-  use driver_time_mod,         only: init_time, get_calendar
+  use driver_time_mod,         only: init_time, final_time
   use log_mod,                 only: log_event,       &
                                      log_level_trace, &
                                      log_scratch_space
@@ -51,14 +51,14 @@ program skeleton
                     modeldb%configuration )
   call init_logger( modeldb%mpi%get_comm(), program_name )
   call init_collections()
-  call init_time( modeldb%clock )
+  call init_time( modeldb%clock, modeldb%calendar )
   deallocate( filename )
 
   ! Create the depository field collection and place it in modeldb
   call modeldb%fields%add_empty_field_collection("depository")
 
   call log_event( 'Initialising ' // program_name // ' ...', log_level_trace )
-  call initialise( program_name, modeldb, get_calendar() )
+  call initialise( program_name, modeldb, modeldb%calendar )
 
   do while (modeldb%clock%tick())
     call step( program_name, modeldb )
@@ -67,6 +67,7 @@ program skeleton
   call log_event( 'Finalising ' // program_name // ' ...', log_level_trace )
   call finalise( program_name, modeldb )
 
+  call final_time( modeldb%clock, modeldb%calendar )
   call final_collections()
   call final_logger( program_name )
   call final_config()

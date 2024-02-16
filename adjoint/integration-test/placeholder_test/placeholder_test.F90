@@ -12,7 +12,7 @@ program placeholder_test
   use configuration_mod,      only: read_configuration, final_configuration
   use constants_mod,          only: r_def
   use driver_collections_mod, only: init_collections, final_collections
-  use driver_time_mod,        only: init_time, get_calendar
+  use driver_time_mod,        only: init_time, final_time
   use gungho_modeldb_mod,     only: modeldb_type
   use halo_comms_mod,         only: initialise_halo_comms, &
                                     finalise_halo_comms
@@ -69,13 +69,14 @@ program placeholder_test
   deallocate( filename )
 
   call init_collections()
-  call init_time( modeldb%clock )
+  call init_time( modeldb%clock, modeldb%calendar )
 
   ! Some science is called, resulting in the following result
   res = 0.0_r_def
   write( log_scratch_space, '("Result = ", F5.2)' ) res
   call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
+  call final_time( modeldb%clock, modeldb%calendar )
   call final_collections()
   call final_configuration()
   call finalise_halo_comms()

@@ -21,7 +21,7 @@ program lfric_coupled
   use driver_comm_mod,        only : init_comm, final_comm
   use driver_config_mod,      only : init_config, final_config
   use driver_log_mod,         only : init_logger, final_logger
-  use driver_time_mod,        only : init_time, get_calendar
+  use driver_time_mod,        only : init_time, final_time
   use gungho_mod,             only : gungho_required_namelists
   use gungho_driver_mod,      only : initialise, step, finalise
   use gungho_modeldb_mod,     only : modeldb_type
@@ -46,7 +46,7 @@ program lfric_coupled
                     modeldb%configuration )
   call init_logger( modeldb%mpi%get_comm(), application_name )
   call init_collections()
-  call init_time( modeldb%clock )
+  call init_time( modeldb%clock, modeldb%calendar )
   deallocate(filename)
 
   call modeldb%values%initialise( 'values', 5 )
@@ -56,12 +56,13 @@ program lfric_coupled
   call modeldb%model_data%prognostic_fields%initialise(name="prognostics", table_len=100)
   call modeldb%model_data%diagnostic_fields%initialise(name="diagnostics", table_len=100)
 
-  call initialise( application_name, modeldb, get_calendar() )
+  call initialise( application_name, modeldb, modeldb%calendar )
   do while (modeldb%clock%tick())
     call step( modeldb )
   end do
   call finalise( application_name, modeldb )
 
+  call final_time( modeldb%clock, modeldb%calendar )
   call final_collections()
   call final_logger( application_name )
   call final_config()

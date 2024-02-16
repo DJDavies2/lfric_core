@@ -21,7 +21,7 @@ program shallow_water
   use driver_counter_mod,        only: init_counters, final_counters
   use driver_log_mod,            only: init_logger, final_logger
   use driver_modeldb_mod,        only: modeldb_type
-  use driver_time_mod,           only: init_time, get_calendar
+  use driver_time_mod,           only: init_time, final_time
   use driver_timer_mod,          only: init_timers, final_timers
   use log_mod,                   only: log_event,       &
                                        log_level_trace, &
@@ -58,11 +58,11 @@ program shallow_water
   call init_timers( program_name )
   call init_counters( program_name )
   call init_collections()
-  call init_time( modeldb%clock )
+  call init_time( modeldb%clock, modeldb%calendar )
   deallocate( filename )
 
   call log_event( 'Initialising Infrastructure ...', log_level_trace )
-  call initialise( modeldb, program_name, get_calendar() )
+  call initialise( modeldb, program_name, modeldb%calendar )
   write(log_scratch_space,'("Running ", A, "...")') program_name
   call log_event( log_scratch_space, log_level_trace )
   do while (modeldb%clock%tick())
@@ -72,6 +72,7 @@ program shallow_water
   call log_event( 'Finalising ' // program_name // ' ...', log_level_trace )
   call finalise( modeldb, program_name )
 
+  call final_time( modeldb%clock, modeldb%calendar )
   call final_collections()
   call final_counters( program_name )
   call final_timers( program_name )

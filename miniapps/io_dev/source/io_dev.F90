@@ -17,7 +17,7 @@ program io_dev
   use driver_comm_mod,        only: init_comm, final_comm
   use driver_config_mod,      only: init_config, final_config
   use driver_log_mod,         only: init_logger, final_logger
-  use driver_time_mod,        only: init_time, get_calendar
+  use driver_time_mod,        only: init_time, final_time
   use driver_timer_mod,       only: init_timers, final_timers
   use io_dev_mod,             only: io_dev_required_namelists
   use io_dev_driver_mod,      only: initialise, step, finalise
@@ -57,12 +57,12 @@ program io_dev
   call init_logger( global_mpi%get_comm(), program_name )
   call init_timers( program_name )
   call init_collections()
-  call init_time( modeldb%clock )
+  call init_time( modeldb%clock, modeldb%calendar )
   deallocate( filename )
 
   call log_event( 'Initialising '//program_name//' ...', log_level_trace )
   call initialise( modeldb, &
-                   program_name, get_calendar() )
+                   program_name, modeldb%calendar )
 
   write(log_scratch_space,'("Running ", A, " ...")') program_name
   call log_event( log_scratch_space, log_level_trace )
@@ -73,6 +73,7 @@ program io_dev
   call log_event( 'Finalising '//program_name//' ...', log_level_trace )
   call finalise( modeldb )
 
+  call final_time( modeldb%clock, modeldb%calendar )
   call final_collections()
   call final_timers( program_name )
   call final_logger( program_name )

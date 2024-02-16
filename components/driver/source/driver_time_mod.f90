@@ -9,7 +9,6 @@
 module driver_time_mod
 
   use calendar_mod,            only: calendar_type
-  use clock_mod,               only: clock_type
   use constants_mod,           only: i_def
   use log_mod,                 only: log_event, log_level_error
   use model_clock_mod,         only: model_clock_type
@@ -21,21 +20,20 @@ module driver_time_mod
   implicit none
 
   private
-  public :: init_time, get_calendar
-
-  ! Model calendar
-  class(calendar_type), allocatable, target :: calendar
+  public :: init_time, final_time
 
 contains
 
   !> Initialise model clock and calendar from configuration
   !>
-  !> @param[out] clock  The model clock
-  subroutine init_time(clock)
+  !> @param[out] clock    The model clock
+  !> @param[out] calendar The model calendar
+  subroutine init_time(clock, calendar)
 
     implicit none
 
-    type(model_clock_type), allocatable, intent(out) :: clock
+    type(model_clock_type),   allocatable, intent(out) :: clock
+    class(calendar_type),     allocatable, intent(out) :: calendar
 
     integer(i_def) :: rc
 
@@ -59,15 +57,20 @@ contains
 
   end subroutine init_time
 
-  !> @brief  Returns the model calendar.
-  function get_calendar() result(calendar_ptr)
+  !> Finalise model clock and calendar
+  !>
+  !> @param[out] clock    The model clock
+  !> @param[out] calendar The model calendar
+  subroutine final_time(clock, calendar)
 
     implicit none
 
-    class(calendar_type), pointer :: calendar_ptr
+    type(model_clock_type),   allocatable, intent(inout) :: clock
+    class(calendar_type),     allocatable, intent(inout) :: calendar
 
-    calendar_ptr => calendar
+     if (allocated(clock))    deallocate(clock)
+     if (allocated(calendar)) deallocate(calendar)
 
-  end function get_calendar
+  end subroutine final_time
 
 end module driver_time_mod
