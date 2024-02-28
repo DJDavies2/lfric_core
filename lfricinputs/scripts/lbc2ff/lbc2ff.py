@@ -5,13 +5,15 @@
 # For further details please refer to the file LICENCE.txt
 # which you should have received as part of this distribution.
 # *****************************COPYRIGHT*******************************
-"""
+'''
 Converts an LBC file into standard fieldsfile.
 
 Takes a single positional argument - input filename. Script will output a
 fieldsfile in the working directory with the same name as the input file with
 '.ff' appended.
-"""
+
+'''
+# pylint: disable=import-error
 import argparse
 import mule
 from mule.lbc import LBCToMaskedArrayOperator
@@ -19,18 +21,31 @@ from lbc_stash_map import LBC_STASH_MAP
 
 
 def main():
-    parser = argparse.ArgumentParser(usage='Convert an LBC file into a fieldsfile')
+    '''
+    This function parses an LBC file from a path specified on the command line
+    and creates a FieldsFile from the parsed LBC by calling the
+    `create_ff_from_lbc` function.
+    The LBC fields are then each transposed from a 1-dimensional LBC array into
+    a 3-dimensional arrray of levels, rows, and columns and the array is
+    sliced to remove the halo regions. The FieldsFile created in this function
+    then has each transposed and trimmed field appended to it and is finally
+    written to an outfile of the same name as the LBC but with the `.ff`
+    extension appended.
+
+    '''
+    parser = argparse.ArgumentParser(usage=str('Convert an LBC file into a' +
+                                     ' fieldsfile'))
     parser.add_argument("input_filename", help=argparse.SUPPRESS)
     args = parser.parse_args()
     input_filename = args.input_filename
 
     # Open file
     lbc = mule.lbc.LBCFile.from_file(input_filename)
-    ff = create_ff_from_lbc(lbc)
+    fldfle = create_ff_from_lbc(lbc)
 
     # Use the mule provided LBC operator. This converts the 1d LBC array
     # (which contains all levels) into a standard 3d array of levels, rows
-    # and columns
+    # and columns.
     lbc_to_masked = LBCToMaskedArrayOperator()
     for field in lbc.fields:
         field = lbc_to_masked(field)
@@ -48,39 +63,80 @@ def main():
             # where to get data from. Slice the array to remove halo regions
             # as not needed in LFRic LBC file
             array_provider = mule.ArrayDataProvider(
-                single_level.filled(mule._REAL_MDI)[halo_ns:nrows + halo_ns,
-                halo_ew:ncols + halo_ew])
+                single_level.filled(mule._REAL_MDI)[
+                    halo_ns:nrows + halo_ns,
+                    halo_ew:ncols + halo_ew])
             field_2d.set_data_provider(array_provider)
             # Update the stash code to the standard prognostic version
             field_2d.lbuser4 = LBC_STASH_MAP[field_2d.lbuser4]
             # Update level number
             field_2d.lblev = level_num
             # Update lbhem variable to be what is expected by fieldsfile
-            field_2d.lbhem = ff.fixed_length_header.horiz_grid_type % 100
-            ff.fields.append(field_2d)
-            # import pdb;pdb.set_trace()
+            field_2d.lbhem = fldfle.fixed_length_header.horiz_grid_type % 100
+            fldfle.fields.append(field_2d)
     # Set dataset version
-    ff.fixed_length_header.data_set_format_version = 20
+    fldfle.fixed_length_header.data_set_format_version = 20
     # Update dataset type to be fieldsfile
-    ff.fixed_length_header.dataset_type = 3
-    ff.to_file(input_filename + ".ff")
+    fldfle.fixed_length_header.dataset_type = 3
+    fldfle.to_file(input_filename + ".ff")
 
 
 def create_ff_from_lbc(lbc):
+    '''
+    This function takes in a pre-parsed LBC file that contains all the
+    information required to describe a Unified Model (UM) mesh. The LBC object
+    has its data accessed and copied into a FieldsFile which is initialised
+    within the scope of this function.
+
+    param lbc: A pre-parsed LBC file.
+    type lbc: :py:class:`mule.lbc.LBCFile`
+
+    return fldfle: A FieldsFile containing identical information to the input
+               LBC file.
+    rtype fldfle: :py:class:`mule.FieldsFile`
+
+    '''
+    # Assign Classes to variables so they do not need line breaks (pycodestyle)
+    FF_LDC = mule.ff.FF_LevelDependentConstants     # Level
+    FF_RDC = mule.ff.FF_RowDependentConstants       # Row
+    FF_CDC = mule.ff.FF_ColumnDependentConstants    # Column
+
     # Create new file to copy into
-    ff = mule.FieldsFile()
-    # Copy across all headers
-    ff.fixed_length_header = mule.FixedLengthHeader(
+    fldfle = mule.FieldsFile()
+
+    # Copy across all standard headers found in an LBC
+    fldfle.fixed_length_header = mule.FixedLengthHeader(
         lbc.fixed_length_header.raw[1:])
-    ff.integer_constants = mule.ff.FF_IntegerConstants(
+    fldfle.integer_constants = mule.ff.FF_IntegerConstants(
         lbc.integer_constants.raw[1:])
-    ff.real_constants = mule.ff.FF_RealConstants(
+    fldfle.real_constants = mule.ff.FF_RealConstants(
         lbc.real_constants.raw[1:])
-    ff.level_dependent_constants = mule.ff.FF_LevelDependentConstants.empty(
+    fldfle.level_dependent_constants = FF_LDC.empty(
         lbc.level_dependent_constants.raw.shape[0])
-    ff.level_dependent_constants.raw[:, 1:5] = (
+    fldfle.level_dependent_constants.raw[:, 1:5] = (
         lbc.level_dependent_constants.raw[:, 1:])
-    return ff
+
+    # For variable resolution files both row_dependent_constants (phi_p and
+    # phi_v), and column_dependent_constants (lamba_u and lambda_p) will be
+    # present and must be copied across.
+
+    # Check Row Dependent constants
+    if lbc.row_dependent_constants is not None:
+        fldfle.row_dependent_constants = FF_RDC.empty(
+            lbc.row_dependent_constants.raw.shape[0]
+            )
+        fldfle.row_dependent_constants = FF_RDC(
+            lbc.row_dependent_constants.raw[:, 1:3]
+            )
+    # Check Column Dependent Constants
+    if lbc.column_dependent_constants is not None:
+        fldfle.column_dependent_constants = FF_CDC.empty(
+            lbc.column_dependent_constants.raw.shape[0]
+            )
+        fldfle.column_dependent_constants = FF_CDC(
+            lbc.column_dependent_constants.raw[:, 1:3]
+            )
+    return fldfle
 
 
 if __name__ == "__main__":

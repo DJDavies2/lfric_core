@@ -16,6 +16,9 @@
                                "target_grid_type"   : "global",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/aquaplanet_llama.n48",
                                "lfric_mesh"         : {"file":"$CANNED_MESH_DIR/mesh_"~C_NUM~".nc", "name":"dynamics"},
+                               "weight_gen_option"  : "dump-file",
+                               "var_res_src"        : "",
+                               "namelist_src"       : "um_grid.nml",
                              },
 
 
@@ -30,6 +33,9 @@
                                "target_grid_type"   : "global",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/basic_gal_n96l70.astart",
                                "lfric_mesh"         : {"file":"$CANNED_MESH_DIR/mesh_"~C_NUM~".nc", "name":"dynamics"},
+                               "weight_gen_option"  : "dump-file",
+                               "var_res_src"        : "",
+                               "namelist_src"       : "um_grid.nml",
                              },
 
 
@@ -44,6 +50,9 @@
                                "target_grid_type"   : "global",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/proto_gal.71L",
                                "lfric_mesh"         : {"file":"$CANNED_MESH_DIR/mesh_"~C_NUM~".nc", "name":"dynamics"},
+                               "weight_gen_option"  : "dump-file",
+                               "var_res_src"        : "",
+                               "namelist_src"       : "um_grid.nml",
                              },
 
 "protogal_chem_N96L70_"~C_NUM~"L70" : {
@@ -57,6 +66,9 @@
                                "target_grid_type"   : "global",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/ga7_chem_N48eL70.astart",
                                "lfric_mesh"         : {"file":"$CANNED_MESH_DIR/mesh_"~C_NUM~".nc", "name":"dynamics"},
+                               "weight_gen_option"  : "dump-file",
+                               "var_res_src"        : "",
+                               "namelist_src"       : "um_grid.nml",
                              },
 }) %}
 {% endfor %}
@@ -74,6 +86,9 @@
                                "target_grid_type"   : "regional",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/RA2M_astart",
                                "lfric_mesh"         : {"file":"$CANNED_MESH_DIR/aquaplanet_lam.nc", "name":"dynamics"},
+                               "weight_gen_option"  : "dump-file",
+                               "var_res_src"        : "",
+                               "namelist_src"       : "um_grid.nml",
                              },
 
 "aquaplanet_lbc"           : {
@@ -87,6 +102,9 @@
                                "target_grid_type"   : "regional",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/aquaplanet.lbc.ff",
                                "lfric_mesh"         : {"file":"$CANNED_MESH_DIR/aquaplanet_lam.nc", "name":"dynamics"},
+                               "weight_gen_option"  : "dump-file",
+                               "var_res_src"        : "",
+                               "namelist_src"       : "um_grid.nml",
                              },
 
 
@@ -101,7 +119,26 @@
                                "target_grid_type"   : "regional",
                                "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/flk_T+000_new",
                                "lfric_mesh"         : {"file":"$CANNED_MESH_DIR/falklands.nc", "name":"gungho"},
+                               "weight_gen_option"  : "dump-file",
+                               "var_res_src"        : "",
+                               "namelist_src"       : "um_grid.nml",
                              },
 
+
+"var_seuk_lam"            : {
+                               "app"                : "um2lfric",
+                               "opt_config"         : "var_seuk_lam",
+                               "source_grid_res"    : "",
+                               "source_grid_levs"   : "70",
+                               "source_grid_type"   : "regional",
+                               "target_grid_res"    : "",
+                               "target_grid_levs"   : "70",
+                               "target_grid_type"   : "regional",
+                               "source_dump"        : "$UMDIR/standard_jobs/lfricinputs/inputs/var_seuk/RA2M_astart",
+                               "lfric_mesh"         : {"file":"$CANNED_MESH_DIR/var_seuk/seuk_var_mesh.nc", "name":"dynamics"},
+                               "weight_gen_option"  : "var-dump-file",
+                               "var_res_src"        : "$CANNED_MESH_DIR/var_seuk/variable.accessa_grid",
+                               "namelist_src"       : "$CANNED_MESH_DIR/var_seuk/grid.nl",
+                              },
 
 }) %}

@@ -2,6 +2,9 @@
 
 {%- do SUITE_GROUPS.update({
 
+"um2lfric-xc40-safe-var_seuk_lam"         : ["um2lfric-xc40_ifort_icc_safe-var_seuk_lam",
+	 	                                     "um2lfric-xc40_crayftn_craycc_safe-var_seuk_lam",],
+
 "um2lfric-spice-safe-aquaplanet_lam"      : ["um2lfric-spice_gfortran_gcc_safe-aquaplanet_lam",
                                              "um2lfric-spice_ifort_gcc_safe-aquaplanet_lam",],
 "um2lfric-spice-rigorous-aquaplanet_lam"  : ["um2lfric-spice_gfortran_gcc_rigorous-aquaplanet_lam",
@@ -278,7 +281,7 @@
                                              "scintelapi-xc40-rigorous-science"],
 "scintelapi-xc40"                         : ["scintelapi-xc40-safe",
                                              "scintelapi-xc40-rigorous",],
- 
+
 "scintelapi-basic"                        : ["scintelapi-spice-basic",
                                              "scintelapi-xc40-basic",],
 "scintelapi-science"                      : ["scintelapi-spice-science",

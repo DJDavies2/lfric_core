@@ -4,14 +4,14 @@
 # For further details please refer to the file LICENCE
 # which you should have received as part of this distribution.
 # *****************************COPYRIGHT*******************************
-"""Run ESMF regrid program to generate weights"""
+'''Run ESMF regrid program to generate weights'''
 import subprocess
 import sys
 import os
 
 
 class INTER:
-    """Class to hold ESMF regrid options"""
+    '''Class to hold ESMF regrid options'''
     def __init__(self):
         self.method = None
         self.pole = None
@@ -27,7 +27,7 @@ class INTER:
         self.um_grid_path = None
 
     def set_regrid_info(self):
-        """Set information from environment variables"""
+        '''Set information from environment variables'''
         self.method = os.environ.get('INT_METHOD')
         self.pole = os.environ.get('INT_POLE')
         self.unmapped = os.environ.get('INT_UNMAPPED')
@@ -40,9 +40,9 @@ class INTER:
         self.um_grid_path = os.environ.get('GRID_PATH_UM')
         self.lfric_grid_type = os.environ.get('GRID_TYPE_LFRIC')
         self.lfric_grid_path = os.environ.get('GRID_PATH_LFRIC')
-        
+
     def set_arguments_um2lfric(self):
-        """Set ESMF regrid command line options"""
+        '''Set ESMF regrid command line options'''
         options = ' -s ' + self.um_grid_path
         options = options + ' -d ' + self.lfric_grid_path
         options = options + ' --dst_loc center'
@@ -66,7 +66,7 @@ class INTER:
         return options
 
     def set_arguments_lfric2um(self):
-        """Set ESMF regrid command line options"""
+        '''Set ESMF regrid command line options'''
         options = ' -s ' + self.lfric_grid_path
         options = options + ' --src_loc center'
         options = options + ' -d ' + self.um_grid_path
@@ -89,7 +89,7 @@ class INTER:
         return options
 
     def print_info(self):
-        """Print options to the output"""
+        '''Print options to the output'''
         print('INTERPOLATION Options:')
         print('method: ', self.method)
         print('pole: ', self.pole)
@@ -103,8 +103,9 @@ class INTER:
         print('LFRic grid type: ', self.lfric_grid_type)
         print('Interpolation direction: ', self.interpolation_direction)
 
+
 def run_exe(arg, outfile, style):
-    """Run ESMF regrid"""
+    '''Run ESMF regrid'''
     model = ' ESMF_RegridWeightGen ' + arg + ' -w ' + outfile
     nproc = os.environ.get('MPIRUN_N_JOBS')
     cmd = 'mpirun -n ' + nproc + model

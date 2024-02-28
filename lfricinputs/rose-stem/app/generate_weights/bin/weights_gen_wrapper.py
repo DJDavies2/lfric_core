@@ -4,14 +4,23 @@
 # For further details please refer to the file LICENCE
 # which you should have received as part of this distribution.
 # *****************************COPYRIGHT*******************************
-"""
-Wrapper script for a set of commands/script used to create weights files
-"""
+'''
+Wrapper script for a set of commands/script used to create weights files.
+
+'''
+
 import subprocess
 import os
 
 
 def run_command(command):
+    '''
+    Takes in a list of commands and, if n commands > 1, pipes the commands
+    to the CLI and executes.
+
+    param list command: A list of commands (incl files) to execute.
+
+    '''
     cmd = subprocess.Popen(command, stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE)
     stdout, stderr = cmd.communicate()
@@ -25,6 +34,22 @@ def run_command(command):
 
 
 def weight_gen(um_ptype, int_method):
+    '''
+    This function sets environment variables from passed arguments as well
+    as setting the output filename dependent on the interpolation method
+    (int_method).
+
+    After setting env vars and outfile name, weight_gen utilises the
+    run_command function declared in this module to create a um_grid object,
+    generate weights for this object, and relocate the output to the outfile
+    name.
+
+    param str um_ptype: The grid type that dictates the coordinate shift
+                        performed in 'create_um_grid.py'.
+    param str int_method: The interpolation method that will dictate the
+                          output filename and some weight generation settings.
+
+    '''
     os.environ["GRID"] = um_ptype
     os.environ["INT_METHOD"] = int_method
     os.environ["GRID_PATH_UM"] = "UM_grid_" + um_ptype + ".nc"
@@ -42,16 +67,21 @@ def weight_gen(um_ptype, int_method):
 
 
 if __name__ == "__main__":
+
     option = os.environ.get('UM_GRID_INPUT')
-    os.environ["NLIST_FILE"] = "um_grid.nml"
+
+    # Conditionals to check if namelist file needs to be generated and
+    # calls appropriate script with environment variables set as
+    # arguments.
+    # Fixed resolution: generates namelist from 'NLIST_FILE'
     if option == 'dump-file':
         argument = os.environ.get('DUMPPATH')
         run_command(["create_um_grid_nml.py", "-d", argument])
     elif option == 'specified-resolution':
         argument = os.environ.get('RESOLUTION')
         run_command(["create_um_grid_nml.py", "-r", argument])
-    else:
-        raise Exception('UM grid generation input option invalid')
+
+    # Loop over grid types and generate weights for each
     for um_ptype in ["P", "U", "V"]:
         for int_method in ["bilinear", "neareststod"]:
             weight_gen(um_ptype, int_method)

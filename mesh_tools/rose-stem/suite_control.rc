@@ -41,6 +41,7 @@
                       'nzlam4',
                       'polar',
                       'lam',
+                      'var_seuk',
                       'planar_stretch_centres',
                       'planar_stretch_nodes',
                       'planar_stretch_points'] %}
