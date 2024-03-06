@@ -10,7 +10,7 @@ module space_from_metadata_mod
   use log_mod,                         only:                                  &
     log_event,                                                                &
     log_scratch_space,                                                        &
-    log_level_debug,                                                          &
+    log_level_trace,                                                          &
     log_level_error
   use constants_mod,                   only: i_def, l_def, str_def
   use mesh_mod,                        only: mesh_type
@@ -301,7 +301,7 @@ contains
        // '", fs: ", A, ", flavour: ", A, ", ndata: ", I5)')                  &
       trim(xios_id), trim(status), trim(this_mesh%get_mesh_name()), order,    &
       trim(name_from_functionspace(fsenum)), trim(flavour), ndata
-    call log_event(log_scratch_space, log_level_debug)
+    call log_event(log_scratch_space, log_level_trace)
 #endif
     ! paranoia
     nullify(this_mesh)

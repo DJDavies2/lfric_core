@@ -55,7 +55,7 @@ module gungho_model_mod
                                          log_scratch_space,  &
                                          LOG_LEVEL_INFO,     &
                                          LOG_LEVEL_ERROR,    &
-                                         LOG_LEVEL_DEBUG,    &
+                                         LOG_LEVEL_TRACE,    &
                                          LOG_LEVEL_ALWAYS
   use minmax_tseries_mod,         only : minmax_tseries,      &
                                          minmax_tseries_init, &
@@ -969,10 +969,10 @@ contains
       call prognostic_fields%get_field('exner', exner)
 
       ! Log fields
-      call rho%log_field(   LOG_LEVEL_DEBUG, 'rho' )
-      call theta%log_field( LOG_LEVEL_DEBUG, 'theta' )
-      call exner%log_field( LOG_LEVEL_DEBUG, 'exner' )
-      call u%log_field(     LOG_LEVEL_DEBUG, 'u' )
+      call rho%log_field(   LOG_LEVEL_TRACE, 'rho' )
+      call theta%log_field( LOG_LEVEL_TRACE, 'theta' )
+      call exner%log_field( LOG_LEVEL_TRACE, 'exner' )
+      call u%log_field(     LOG_LEVEL_TRACE, 'u' )
 
       ! Write checksums to file
       if (use_moisture) then
