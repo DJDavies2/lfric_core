@@ -9,7 +9,9 @@ module assign_field_random_range_alg_mod
   use assign_field_random_kernel_mod,      only: assign_field_random_kernel_type
   use constants_mod,                       only: r_def
   use field_mod,                           only: field_type
-  use log_mod,                             only: LOG_LEVEL_INFO
+  use log_mod,                             only: log_event,         &
+                                                 log_scratch_space, &
+                                                 LOG_LEVEL_ERROR
 
   implicit none
 
@@ -33,7 +35,9 @@ contains
     real(kind=r_def) :: diff
 
     if(range_max <= range_min) then
-      return
+      write(log_scratch_space, *) "Input range_min = ", range_min, &
+                                  "greater than or equal to range_max = ", range_max
+      call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     end if
 
     call field%copy_field_properties(shift)

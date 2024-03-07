@@ -28,6 +28,7 @@ OPERATE_ON ?= lfric_atm                  \
               mesh_tools                 \
               linear                     \
               adjoint                    \
+              miniapps/adjoint_test      \
               miniapps/gungho_model      \
               miniapps/linear_model      \
               miniapps/skeleton          \

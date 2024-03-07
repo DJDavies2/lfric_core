@@ -29,6 +29,7 @@ GROUP_NAME=developer
 
 PROJECT_NAMES=( lfric_atm \
                 lfric_coupled \
+                adjoint_test \
                 gungho_model \
                 linear_model \
                 skeleton \

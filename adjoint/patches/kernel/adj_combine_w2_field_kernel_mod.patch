@@ -1,0 +1,20 @@
+@@ -4,8 +4,8 @@
+   use fs_continuity_mod, only : w2, w2h, w2v
+   use kernel_mod, only : kernel_type
+   implicit none
+-  interface combine_w2_field_code
+-  module procedure combine_w2_field_code_r_single, combine_w2_field_code_r_double
++  interface adj_combine_w2_field_code
++  module procedure adj_combine_w2_field_code_r_single, adj_combine_w2_field_code_r_double
+ end interface
+   type, public, extends(kernel_type) :: adj_combine_w2_field_kernel_type
+   type(ARG_TYPE) :: META_ARGS(3) = (/ &
+@@ -17,7 +17,7 @@
+ 
+   private
+ 
+-  public :: combine_w2_field_code
++  public :: adj_combine_w2_field_code
+ 
+   contains
+   subroutine adj_combine_w2_field_code_r_double(nlayers, uvw, uv, w, ndf_w2, undf_w2, map_w2, ndf_w2h, undf_w2h, map_w2h, ndf_w2v, &

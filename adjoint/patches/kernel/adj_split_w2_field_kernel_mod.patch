@@ -1,0 +1,20 @@
+@@ -4,8 +4,8 @@
+   use fs_continuity_mod, only : w2, w2h, w2v
+   use kernel_mod, only : kernel_type
+   implicit none
+-  interface split_w2_field_code
+-  module procedure split_w2_field_code_r_single, split_w2_field_code_r_double
++  interface adj_split_w2_field_code
++  module procedure adj_split_w2_field_code_r_single, adj_split_w2_field_code_r_double
+ end interface
+   type, public, extends(kernel_type) :: adj_split_w2_field_kernel_type
+   type(ARG_TYPE) :: META_ARGS(3) = (/ &
+@@ -17,7 +17,7 @@
+ 
+   private
+ 
+-  public :: split_w2_field_code
++  public :: adj_split_w2_field_code
+ 
+   contains
+   subroutine adj_split_w2_field_code_r_double(nlayers, uv, w, uvw, ndf_w2h, undf_w2h, map_w2h, ndf_w2v, undf_w2v, map_w2v, ndf_w2, &
