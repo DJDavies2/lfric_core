@@ -165,7 +165,7 @@ contains
     use jules_science_fixes_mod, only: l_dtcanfix, l_fix_alb_ice_thick,     &
          l_fix_albsnow_ts, ctile_orog_fix, l_fix_wind_snow,                 &
          l_accurate_rho, l_fix_osa_chloro, l_fix_ustar_dust,                &
-         correct_sea_only, l_fix_lake_ice_temperatures
+         correct_sea_only, l_fix_lake_ice_temperatures, l_fix_neg_snow
     use jules_sea_seaice_mod, only: nice, nice_use, iseasurfalg, emis_sea,  &
          seasalinityfactor, ip_ss_surf_div, z0sice,                   &
          z0h_z0m_sice, emis_sice, l_ctile, l_tstar_sice_new,                &
@@ -547,6 +547,7 @@ contains
     l_fix_ustar_dust    = .true.
     l_fix_wind_snow     = .true.
     l_fix_lake_ice_temperatures = .true.
+    l_fix_neg_snow     = .true.
 
     ! The following routine initialises 3D arrays which are used direct
     ! from modules throughout the JULES code base.

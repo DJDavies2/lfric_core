@@ -783,7 +783,9 @@ contains
         mult='surface_tiles', twod=.true.))
     call processor%apply(make_spec('dtstar_tile', main%surface, W3,             &
         mult='surface_tiles', twod=.true.))
-    call processor%apply(make_spec('fraca_tile', main%surface, W3,              &
+    call processor%apply(make_spec('fracaero_t_tile', main%surface, W3,               &
+        mult='surface_tiles', twod=.true.))
+    call processor%apply(make_spec('fracaero_s_tile', main%surface, W3,               &
         mult='surface_tiles', twod=.true.))
     call processor%apply(make_spec('z0h_tile', main%surface, W3,                &
         mult='surface_tiles', twod=.true.))

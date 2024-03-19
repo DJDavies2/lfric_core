@@ -294,7 +294,8 @@ contains
 &cos_zenith_angle, skyview, &
 sw_up_tile, tile_lw_grey_albedo, &
 sw_down_surf, lw_down_surf, sw_down_blue_surf, sw_direct_blue_surf, dd_mf_cb, ozone, cf_bulk, cf_liquid, rhokm_bl, &
-&surf_interp, rhokh_bl, moist_flux_bl, heat_flux_bl, gradrinr, alpha1_tile, ashtf_prime_tile, dtstar_tile, fraca_tile, z0h_tile, &
+&surf_interp, rhokh_bl, moist_flux_bl, heat_flux_bl, gradrinr, &
+&alpha1_tile, ashtf_prime_tile, dtstar_tile, fracaero_t_tile, fracaero_s_tile, z0h_tile, &
 &z0m_tile, rhokh_tile, chr1p5m_tile, resfs_tile, gc_tile, canhc_tile, tile_water_extract, blend_height_tq, z0m_eff, ustar, &
 &soil_moist_avail, snow_unload_rate, albedo_obs_scaling, soil_clay, soil_sand, dust_mrel, dust_flux, day_of_year, &
  urbwrr, urbhwr, urbhgt, urbztm, urbdisp, urbemisw, urbemisr, &
@@ -314,7 +315,8 @@ sea_ice_pensolar, sea_ice_pensolar_frac_direct, sea_ice_pensolar_frac_diffuse, t
 &unfrozen_soil_moisture, frozen_soil_moisture, tile_heat_flux, tile_moisture_flux, net_prim_prod, cos_zenith_angle, &
 skyview, sw_up_tile, tile_lw_grey_albedo,&
 &sw_down_surf, lw_down_surf, sw_down_blue_surf, sw_direct_blue_surf, dd_mf_cb, ozone, cf_bulk, cf_liquid, rhokm_bl, surf_interp, rhokh_bl, &
-&moist_flux_bl, heat_flux_bl, gradrinr, alpha1_tile, ashtf_prime_tile, dtstar_tile, fraca_tile, z0h_tile, z0m_tile, rhokh_tile, &
+&moist_flux_bl, heat_flux_bl, gradrinr, &
+&alpha1_tile, ashtf_prime_tile, dtstar_tile, fracaero_t_tile, fracaero_s_tile, z0h_tile, z0m_tile, rhokh_tile, &
 &chr1p5m_tile, resfs_tile, gc_tile, canhc_tile, tile_water_extract, z0m_eff, ustar, soil_moist_avail, snow_unload_rate, &
 &albedo_obs_scaling, soil_clay, soil_sand, dust_mrel, dust_flux, &
 urbwrr, urbhwr, urbhgt, urbztm, urbdisp, urbemisw, urbemisr, &
@@ -338,7 +340,8 @@ sea_ice_pensolar_proxy, sea_ice_pensolar_frac_direct_proxy, sea_ice_pensolar_fra
 sw_up_tile_proxy, tile_lw_grey_albedo_proxy, &
 sw_down_surf_proxy, lw_down_surf_proxy, sw_down_blue_surf_proxy, sw_direct_blue_surf_proxy, dd_mf_cb_proxy, &
 &ozone_proxy, cf_bulk_proxy, cf_liquid_proxy, rhokm_bl_proxy, surf_interp_proxy, rhokh_bl_proxy, moist_flux_bl_proxy, &
-&heat_flux_bl_proxy, gradrinr_proxy, alpha1_tile_proxy, ashtf_prime_tile_proxy, dtstar_tile_proxy, fraca_tile_proxy, &
+&heat_flux_bl_proxy, gradrinr_proxy, alpha1_tile_proxy, ashtf_prime_tile_proxy, dtstar_tile_proxy, &
+&fracaero_t_tile_proxy, fracaero_s_tile_proxy, &
 &z0h_tile_proxy, z0m_tile_proxy, rhokh_tile_proxy, chr1p5m_tile_proxy, resfs_tile_proxy, gc_tile_proxy, canhc_tile_proxy, &
 &tile_water_extract_proxy, z0m_eff_proxy, ustar_proxy, soil_moist_avail_proxy, snow_unload_rate_proxy, albedo_obs_scaling_proxy, &
 &soil_clay_proxy, soil_sand_proxy, dust_mrel_proxy, dust_flux_proxy, &
@@ -446,7 +449,8 @@ rhostar_proxy, recip_l_mo_sea_proxy, h_blend_orog_proxy, &
       alpha1_tile_proxy = alpha1_tile%get_proxy()
       ashtf_prime_tile_proxy = ashtf_prime_tile%get_proxy()
       dtstar_tile_proxy = dtstar_tile%get_proxy()
-      fraca_tile_proxy = fraca_tile%get_proxy()
+      fracaero_t_tile_proxy = fracaero_t_tile%get_proxy()
+      fracaero_s_tile_proxy = fracaero_s_tile%get_proxy()
       z0h_tile_proxy = z0h_tile%get_proxy()
       z0m_tile_proxy = z0m_tile%get_proxy()
       rhokh_tile_proxy = rhokh_tile%get_proxy()
@@ -622,7 +626,8 @@ sea_ice_pensolar_frac_diffuse_proxy%data, &
 sw_up_tile_proxy%data, tile_lw_grey_albedo_proxy%data, sw_down_surf_proxy%data, lw_down_surf_proxy%data, &
 &sw_down_blue_surf_proxy%data, sw_direct_blue_surf_proxy%data, dd_mf_cb_proxy%data, ozone_proxy%data, cf_bulk_proxy%data, cf_liquid_proxy%data, &
 &rhokm_bl_proxy%data, surf_interp_proxy%data, rhokh_bl_proxy%data, moist_flux_bl_proxy%data, heat_flux_bl_proxy%data, &
-&gradrinr_proxy%data, alpha1_tile_proxy%data, ashtf_prime_tile_proxy%data, dtstar_tile_proxy%data, fraca_tile_proxy%data, &
+&gradrinr_proxy%data, alpha1_tile_proxy%data, ashtf_prime_tile_proxy%data, dtstar_tile_proxy%data, &
+&fracaero_t_tile_proxy%data, fracaero_s_tile_proxy%data, &
 &z0h_tile_proxy%data, z0m_tile_proxy%data, rhokh_tile_proxy%data, chr1p5m_tile_proxy%data, resfs_tile_proxy%data, &
 &gc_tile_proxy%data, canhc_tile_proxy%data, tile_water_extract_proxy%data, blend_height_tq_proxy%data, z0m_eff_proxy%data, &
 &ustar_proxy%data, soil_moist_avail_proxy%data, snow_unload_rate_proxy%data, albedo_obs_scaling_proxy%data, soil_clay_proxy%data, &
@@ -662,7 +667,8 @@ z0h_eff_proxy%data, ocn_cpl_point_proxy%data, ndf_wtheta, &
       CALL alpha1_tile_proxy%set_dirty()
       CALL ashtf_prime_tile_proxy%set_dirty()
       CALL dtstar_tile_proxy%set_dirty()
-      CALL fraca_tile_proxy%set_dirty()
+      CALL fracaero_t_tile_proxy%set_dirty()
+      CALL fracaero_s_tile_proxy%set_dirty()
       CALL z0h_tile_proxy%set_dirty()
       CALL z0m_tile_proxy%set_dirty()
       CALL rhokh_tile_proxy%set_dirty()

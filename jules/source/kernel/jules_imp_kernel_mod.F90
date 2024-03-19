@@ -40,7 +40,7 @@ module jules_imp_kernel_mod
   !>
   type, public, extends(kernel_type) :: jules_imp_kernel_type
     private
-    type(arg_type) :: meta_args(75) = (/                                         &
+    type(arg_type) :: meta_args(76) = (/                                         &
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                &! outer
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                &! loop
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W3),                       &! wetrho_in_w3
@@ -84,7 +84,8 @@ module jules_imp_kernel_mod
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! alpha1_tile
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! ashtf_prime_tile
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! dtstar_tile
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! fraca_tile
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! fracaero_t_tile
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! fracaero_s_tile
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! z0h_tile
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! z0m_tile
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2),&! rhokh_tile
@@ -175,7 +176,8 @@ contains
   !> @param[in]     alpha1_tile          dqsat/dT in surface layer on tiles
   !> @param[in]     ashtf_prime_tile     Heat flux coefficient on tiles
   !> @param[in]     dtstar_tile          Change in surface temperature on tiles
-  !> @param[in]     fraca_tile           Fraction of moisture flux with only aerodynamic resistance
+  !> @param[in]     fracaero_t_tile      Fraction of moisture flux with only aerodynamic resistance
+  !> @param[in]     fracaero_s_tile      Fraction of moisture flux with only aerodynamic resistance
   !> @param[in]     z0h_tile             Heat roughness length on tiles
   !> @param[in]     z0m_tile             Momentum roughness length on tiles
   !> @param[in]     rhokh_tile           Surface heat diffusivity on tiles
@@ -270,7 +272,8 @@ contains
                             alpha1_tile,                        &
                             ashtf_prime_tile,                   &
                             dtstar_tile,                        &
-                            fraca_tile,                         &
+                            fracaero_t_tile,                    &
+                            fracaero_s_tile,                    &
                             z0h_tile,                           &
                             z0m_tile,                           &
                             rhokh_tile,                         &
@@ -482,7 +485,8 @@ contains
     real(kind=r_def), dimension(undf_tile), intent(in)  :: alpha1_tile,      &
                                                            ashtf_prime_tile, &
                                                            dtstar_tile,      &
-                                                           fraca_tile,       &
+                                                           fracaero_t_tile,  &
+                                                           fracaero_s_tile,  &
                                                            z0h_tile,         &
                                                            z0m_tile,         &
                                                            rhokh_tile,       &
@@ -538,7 +542,8 @@ contains
 
     ! fields on land points and surface tiles
     real(r_um), dimension(:,:), allocatable :: dtstar_surft,              &
-         alpha1, ashtf_prime_surft, chr1p5m, fraca, resfs, rhokh_surft,   &
+         alpha1, ashtf_prime_surft, chr1p5m,                              &
+         fracaero_t, fracaero_s, resfs, rhokh_surft,                      &
          resft, flake, canhc_surft, tscrndcl_surft, epot_surft
 
     ! field on surface tiles and soil levels
@@ -657,7 +662,8 @@ contains
     allocate(alpha1(land_field,ntiles))
     allocate(ashtf_prime_surft(land_field,ntiles))
     allocate(dtstar_surft(land_field,ntiles))
-    allocate(fraca(land_field,ntiles))
+    allocate(fracaero_t(land_field,ntiles))
+    allocate(fracaero_s(land_field,ntiles))
     allocate(rhokh_surft(land_field,ntiles))
     allocate(chr1p5m(land_field,ntiles))
     allocate(resfs(land_field,ntiles))
@@ -943,7 +949,8 @@ contains
           alpha1(l, n) = alpha1_tile(map_tile(1,ainfo%land_index(l))+n-1)
           ashtf_prime_surft(l, n) = ashtf_prime_tile(map_tile(1,ainfo%land_index(l))+n-1)
           dtstar_surft(l, n) = dtstar_tile(map_tile(1,ainfo%land_index(l))+n-1)
-          fraca(l, n) = fraca_tile(map_tile(1,ainfo%land_index(l))+n-1)
+          fracaero_t(l, n) = fracaero_t_tile(map_tile(1,ainfo%land_index(l))+n-1)
+          fracaero_s(l, n) = fracaero_s_tile(map_tile(1,ainfo%land_index(l))+n-1)
           fluxes%z0h_surft(l, n) = z0h_tile(map_tile(1,ainfo%land_index(l))+n-1)
           fluxes%z0m_surft(l, n) = z0m_tile(map_tile(1,ainfo%land_index(l))+n-1)
           rhokh_surft(l, n) = rhokh_tile(map_tile(1,ainfo%land_index(l))+n-1)
@@ -955,7 +962,7 @@ contains
                real(tile_lw_grey_albedo(map_tile(1,ainfo%land_index(l))+n-1), r_um)
         end do
         ! recalculate the total resistance factor
-        resft(l,:) = fraca(l,:) + (1.0 - fraca(l,:)) * resfs(l,:)
+        resft(l,:) = fracaero_t(l,:) + (1.0 - fracaero_t(l,:)) * resfs(l,:)
         resft(l,lake) = 1.0
         ! recalculate the total lake fraction
         flake(l,:) = 0.0
@@ -1093,8 +1100,9 @@ contains
          !Misc INTENT(IN) Many of these come out of explicit and into here.
          !Things with _u/v get interpolated in UM
          rhokm_u, rhokm_v, gamma1, gamma2, alpha1, alpha1_sea, alpha1_sice,  &
-         ashtf_prime, ashtf_prime_sea, ashtf_prime_surft, du_1, dv_1, fraca, &
-         resfs, resft, rhokh, rhokh_surft, rhokh_sice, rhokh_sea, z0hssi,    &
+         ashtf_prime, ashtf_prime_sea, ashtf_prime_surft, du_1, dv_1,        &
+         fracaero_t, fracaero_s, resfs, resft,                               &
+         rhokh, rhokh_surft, rhokh_sice, rhokh_sea, z0hssi,                  &
          z0mssi, chr1p5m, chr1p5m_sice, canhc_surft, flake, ainfo%frac_surft,&
          wt_ext_surft, cdr10m_u, cdr10m_v, r_gamma,                          &
          !INOUT diagnostics
@@ -1497,7 +1505,8 @@ contains
     deallocate(alpha1)
     deallocate(ashtf_prime_surft)
     deallocate(dtstar_surft)
-    deallocate(fraca)
+    deallocate(fracaero_t)
+    deallocate(fracaero_s)
     deallocate(rhokh_surft)
     deallocate(chr1p5m)
     deallocate(resfs)

@@ -47,7 +47,7 @@ module jules_exp_kernel_mod
   !>
   type, public, extends(kernel_type) :: jules_exp_kernel_type
     private
-    type(arg_type) :: meta_args(107) = (/                                      &
+    type(arg_type) :: meta_args(108) = (/                                      &
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      WTHETA),                   &! theta_in_wth
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      WTHETA),                   &! exner_in_wth
          arg_type(GH_FIELD, GH_REAL,  GH_READ,      W3, STENCIL(REGION)),      &! u_in_w3
@@ -120,7 +120,8 @@ module jules_exp_kernel_mod
          arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! alpha1_tile
          arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! ashtf_prime_tile
          arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! dtstar_tile
-         arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! fraca_tile
+         arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! fracaero_t_tile
+         arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! fracaero_s_tile
          arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! z0h_tile
          arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! z0m_tile
          arg_type(GH_FIELD, GH_REAL,  GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! rhokh_tile
@@ -241,7 +242,8 @@ contains
   !> @param[in,out] alpha1_tile            dqsat/dT in surface layer on tiles
   !> @param[in,out] ashtf_prime_tile       Heat flux coefficient on tiles
   !> @param[in,out] dtstar_tile            Change in surface temperature on tiles
-  !> @param[in,out] fraca_tile             Fraction of moisture flux with only aerodynamic resistance
+  !> @param[in,out] fracaero_t_tile        Total fraction of moisture flux with only aerodynamic resistance
+  !> @param[in,out] fracaero_s_tile        Fraction of moisture flux with only aerodynamic resistance from frozen surface
   !> @param[in,out] z0h_tile               Heat roughness length on tiles
   !> @param[in,out] z0m_tile               Momentum roughness length on tiles
   !> @param[in,out] rhokh_tile             Surface heat diffusivity on tiles
@@ -391,7 +393,8 @@ contains
                            alpha1_tile,                           &
                            ashtf_prime_tile,                      &
                            dtstar_tile,                           &
-                           fraca_tile,                            &
+                           fracaero_t_tile,                       &
+                           fracaero_s_tile,                       &
                            z0h_tile,                              &
                            z0m_tile,                              &
                            rhokh_tile,                            &
@@ -675,7 +678,8 @@ contains
     real(kind=r_def), dimension(undf_tile), intent(inout):: alpha1_tile,      &
                                                             ashtf_prime_tile, &
                                                             dtstar_tile,      &
-                                                            fraca_tile,       &
+                                                            fracaero_t_tile,  &
+                                                            fracaero_s_tile,  &
                                                             z0h_tile,         &
                                                             z0m_tile,         &
                                                             rhokh_tile,       &
@@ -742,7 +746,8 @@ contains
     ! fields on land points and tiles
     real(r_um), dimension(:,:), allocatable ::                               &
          dtstar_surft, alpha1, ashtf_prime_surft, chr1p5m, resfs,            &
-         rhokh_surft, canhc_surft, fraca, epot_surft, flake, resft
+         rhokh_surft, canhc_surft, fracaero_t, fracaero_s,                   &
+         epot_surft, flake, resft
 
     ! field on surface tiles and soil levels
     real(r_um), dimension(:,:,:), allocatable :: wt_ext_surft
@@ -905,9 +910,11 @@ contains
     pdims_s%i_end=seg_len_halo
 
     ! Initialise those fields whose contents will not be fully set
-    allocate(fraca(land_field,ntiles))
+    allocate(fracaero_t(land_field,ntiles))
+    allocate(fracaero_s(land_field,ntiles))
     allocate(epot_surft(land_field,ntiles))
-    fraca            = 0.0_r_um
+    fracaero_t       = 0.0_r_um
+    fracaero_s       = 0.0_r_um
     epot_surft       = 0.0_r_um
 
     call jules_vars_alloc(land_field,ntype,n_land_tile,rad_nband,nsoilt,       &
@@ -1396,7 +1403,8 @@ contains
       cdr10m, alpha1, alpha1_sea, alpha1_sice, ashtf_prime, ashtf_prime_sea,   &
       ashtf_prime_surft, epot_surft,                                           &
       !rhokh needed in BL
-      fraca, resfs, resft, rhokh, rhokh_surft, rhokh_sice, rhokh_sea,          &
+      fracaero_t, fracaero_s, resfs, resft,                                    &
+      rhokh, rhokh_surft, rhokh_sice, rhokh_sea,                               &
       dtstar_surft, dtstar_sea, dtstar_sice, z0hssi, z0mssi, chr1p5m,          &
       chr1p5m_sice, canhc_surft, wt_ext_surft, flake,                          &
       !Out of explicit and into extra only INTENT(OUT)
@@ -1674,7 +1682,8 @@ contains
         alpha1_tile(map_tile(1,ainfo%land_index(l))+n-1) = alpha1(l,n)
         ashtf_prime_tile(map_tile(1,ainfo%land_index(l))+n-1) = ashtf_prime_surft(l,n)
         dtstar_tile(map_tile(1,ainfo%land_index(l))+n-1) = dtstar_surft(l,n)
-        fraca_tile(map_tile(1,ainfo%land_index(l))+n-1) = fraca(l,n)
+        fracaero_t_tile(map_tile(1,ainfo%land_index(l))+n-1) = fracaero_t(l,n)
+        fracaero_s_tile(map_tile(1,ainfo%land_index(l))+n-1) = fracaero_s(l,n)
         z0h_tile(map_tile(1,ainfo%land_index(l))+n-1) = fluxes%z0h_surft(l,n)
         z0m_tile(map_tile(1,ainfo%land_index(l))+n-1) = fluxes%z0m_surft(l,n)
         rhokh_tile(map_tile(1,ainfo%land_index(l))+n-1) = rhokh_surft(l,n)
@@ -1816,7 +1825,8 @@ contains
     pdims_s%i_end=seg_len
 
     deallocate(resp_s_tot_soilt)
-    deallocate(fraca)
+    deallocate(fracaero_t)
+    deallocate(fracaero_s)
     deallocate(epot_surft)
     deallocate(hcons_soilt)
     deallocate(emis_soil)

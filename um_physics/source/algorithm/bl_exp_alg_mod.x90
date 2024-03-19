@@ -200,7 +200,8 @@ contains
     type( field_type ), pointer :: alpha1_tile         => null()
     type( field_type ), pointer :: ashtf_prime_tile    => null()
     type( field_type ), pointer :: dtstar_tile         => null()
-    type( field_type ), pointer :: fraca_tile          => null()
+    type( field_type ), pointer :: fracaero_t_tile     => null()
+    type( field_type ), pointer :: fracaero_s_tile     => null()
     type( field_type ), pointer :: z0h_tile            => null()
     type( field_type ), pointer :: z0m_tile            => null()
     type( field_type ), pointer :: rhokh_tile          => null()
@@ -394,7 +395,8 @@ contains
     call surface_fields%get_field('alpha1_tile', alpha1_tile)
     call surface_fields%get_field('ashtf_prime_tile', ashtf_prime_tile)
     call surface_fields%get_field('dtstar_tile', dtstar_tile)
-    call surface_fields%get_field('fraca_tile', fraca_tile)
+    call surface_fields%get_field('fracaero_t_tile', fracaero_t_tile)
+    call surface_fields%get_field('fracaero_s_tile', fracaero_s_tile)
     call surface_fields%get_field('z0h_tile', z0h_tile)
     call surface_fields%get_field('z0m_tile', z0m_tile)
     call surface_fields%get_field('rhokh_tile', rhokh_tile)
@@ -543,7 +545,8 @@ contains
                                cf_liquid, rhokm_bl, surf_interp, rhokh_bl,     &
                                moist_flux_bl, heat_flux_bl, gradrinr,          &
                                alpha1_tile, ashtf_prime_tile, dtstar_tile,     &
-                               fraca_tile, z0h_tile, z0m_tile, rhokh_tile,     &
+                               fracaero_t_tile, fracaero_s_tile,               &
+                               z0h_tile, z0m_tile, rhokh_tile,                 &
                                chr1p5m_tile, resfs_tile, gc_tile, canhc_tile,  &
                                tile_water_extract, blend_height_tq, z0m_eff,   &
                                ustar, soil_moist_avail, snow_unload_rate,      &
