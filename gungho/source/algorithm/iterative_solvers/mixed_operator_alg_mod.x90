@@ -50,13 +50,16 @@ module mixed_operator_alg_mod
                                          LOG_LEVEL_INFO,             &
                                          log_scratch_space
   use mesh_mod,                          only: mesh_type
+  use integer_field_mod,                 only: integer_field_type
   use combine_w2_field_kernel_mod,       only: combine_w2_field_kernel_type
   use split_w2_field_kernel_mod,         only: split_w2_field_kernel_type
   use mixed_solver_config_mod,           only: split_w, &
                                                eliminate_variables, &
                                                eliminate_variables_analytic, &
                                                eliminate_variables_discrete
-  use formulation_config_mod,    only: p2theta_vert
+  use formulation_config_mod,            only: p2theta_vert
+  use geometric_constants_mod,           only: get_face_selector_ew, &
+                                               get_face_selector_ns
 
   implicit none
 
@@ -125,37 +128,40 @@ contains
     class(abstract_vector_type), intent(in)    :: x
     class(abstract_vector_type), intent(inout) :: y
 
-    type(r_solver_operator_type), pointer :: mm_vel => null(), &
-                                             p2theta => null(), &
-                                             div_star => null(), &
-                                             ptheta2 => null(), &
-                                             m3_exner_star => null(), &
-                                             p3theta => null()
-    type(r_solver_field_type), pointer    :: mt_lumped_inv => null(), &
-                                             m2_diag => null()
+    type(r_solver_operator_type), pointer :: mm_vel
+    type(r_solver_operator_type), pointer :: p2theta
+    type(r_solver_operator_type), pointer :: div_star
+    type(r_solver_operator_type), pointer :: ptheta2
+    type(r_solver_operator_type), pointer :: m3_exner_star
+    type(r_solver_operator_type), pointer :: p3theta
+    type(r_solver_field_type),    pointer :: mt_lumped_inv
+    type(r_solver_field_type),    pointer :: m2_diag
     type(r_solver_field_type)             :: x_uvw, y_uvw
-    type(function_space_type), pointer    :: u_fs => null(), &
-                                             t_fs => null()
+    type(function_space_type),    pointer :: u_fs
+    type(function_space_type),    pointer :: t_fs
     integer(i_def)                        :: p
-    type(r_solver_field_type), pointer    :: w2_mask     => null(), &
-                                             w3_mask     => null()
+    type(r_solver_field_type),    pointer :: w2_mask
+    type(r_solver_field_type),    pointer :: w3_mask
     type(r_solver_field_type)             :: x_t
-    real(kind=r_solver), parameter        :: minus_one = -1.0_r_solver
+    real(kind=r_solver),        parameter :: minus_one = -1.0_r_solver
     type(r_solver_field_type)             :: q22u
-    type(r_solver_operator_type), pointer :: q22_op => null(), &
-                                             q32_op => null()
-    type(r_solver_field_type), pointer    :: xvec_uv => null(), &
-                                             xvec_p => null(),  &
-                                             xvec_w => null()
-    type(r_solver_field_type), pointer    :: yvec_uv => null(), &
-                                             yvec_p => null(),  &
-                                             yvec_w => null()
+    type(r_solver_operator_type), pointer :: q22_op
+    type(r_solver_operator_type), pointer :: q32_op
+    type(r_solver_field_type),    pointer :: xvec_uv
+    type(r_solver_field_type),    pointer :: xvec_p
+    type(r_solver_field_type),    pointer :: xvec_w
+    type(r_solver_field_type),    pointer :: yvec_uv
+    type(r_solver_field_type),    pointer :: yvec_p
+    type(r_solver_field_type),    pointer :: yvec_w
 
-    type(mesh_type), pointer :: mesh => null()
+    type(mesh_type), pointer :: mesh
 
     logical(kind=l_def) :: optimised_operator
 
     type(r_solver_field_type) :: w2h_mask, w2v_mask
+
+    type(integer_field_type), pointer :: face_selector_ew
+    type(integer_field_type), pointer :: face_selector_ns
 
     if ( subroutine_timers ) call timer('mixed_operator')
 
@@ -173,6 +179,11 @@ contains
     if ( limited_area ) then
       w2_mask => get_mask_r_solver(W2, mesh%get_id())
       w3_mask => get_mask_r_solver(W3, mesh%get_id())
+    end if
+
+    if ( split_w ) then
+      face_selector_ew => get_face_selector_ew(mesh%get_id())
+      face_selector_ns => get_face_selector_ns(mesh%get_id())
     end if
 
 
@@ -221,7 +232,9 @@ contains
            call y_uvw%initialise( vector_space = u_fs )
 
            if ( split_w ) then
-             call invoke( combine_w2_field_kernel_type( x_uvw, xvec_uv, xvec_w ) )
+             call invoke( combine_w2_field_kernel_type( x_uvw, xvec_uv, xvec_w, &
+                                                        face_selector_ew,       &
+                                                        face_selector_ns ) )
            else
              call invoke( setval_X( x_uvw, xvec_uv ) )
            end if
@@ -299,7 +312,9 @@ contains
              call w2v_mask%initialise( yvec_w%get_function_space() )
              call invoke(                                      &
                         split_w2_field_kernel_type( w2h_mask,  &
-                                         w2v_mask, w2_mask ),  &
+                                         w2v_mask, w2_mask,    &
+                                         face_selector_ew,     &
+                                         face_selector_ns ),   &
                         inc_X_times_Y( yvec_uv, w2h_mask ),    &
                         inc_X_times_Y( yvec_w,  w2v_mask ),    &
                         inc_X_times_Y( yvec_p,  w3_mask )      &
@@ -310,21 +325,17 @@ contains
                         inc_X_times_Y( yvec_p, w3_mask )  &
                         )
            end if
-           nullify( w2_mask, w3_mask )
          end if
+
          if ( .not. optimised_operator ) then
            if ( split_w )then
-             call invoke( split_w2_field_kernel_type( yvec_uv, yvec_w, y_uvw ) )
+             call invoke( split_w2_field_kernel_type( yvec_uv, yvec_w, y_uvw,  &
+                                                      face_selector_ew,        &
+                                                      face_selector_ns ) )
            else
              call invoke( setval_X( yvec_uv, y_uvw ) )
            end if
         end if
-
-         nullify( mm_vel, p2theta,                            &
-                  div_star, ptheta2, m3_exner_star, p3theta,  &
-                  mt_lumped_inv, m2_diag, u_fs, t_fs, q22_op, &
-                  q32_op, xvec_uv, xvec_p, xvec_w, yvec_uv,   &
-                  yvec_p, yvec_w )
 
        class default
           write(log_scratch_space, '(A)') &
@@ -336,8 +347,6 @@ contains
              "mixed_operator_alg_mod: incorrect vector_type argument x"
        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
     end select
-
-    nullify(mesh)
 
     if ( subroutine_timers ) call timer('mixed_operator')
 

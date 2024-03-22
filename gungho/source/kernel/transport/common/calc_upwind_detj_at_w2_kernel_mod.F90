@@ -16,7 +16,7 @@ module calc_upwind_detj_at_w2_kernel_mod
                                     GH_REAL, GH_WRITE,   &
                                     GH_READ, CELL_COLUMN
 
-  use constants_mod,         only : r_tran, i_def
+  use constants_mod,         only : r_tran, r_def, i_def
   use fs_continuity_mod,     only : W2
   use kernel_mod,            only : kernel_type
   use reference_element_mod, only : T
@@ -80,8 +80,8 @@ subroutine calc_upwind_detj_at_w2_code( nlayers,       &
   integer(kind=i_def),                    intent(in)    :: ndf_w2
   integer(kind=i_def),                    intent(in)    :: undf_w2
   real(kind=r_tran), dimension(undf_w2),  intent(inout) :: detj_w2
-  real(kind=r_tran), dimension(undf_w2),  intent(in)    :: detj_w2_above
-  real(kind=r_tran), dimension(undf_w2),  intent(in)    :: detj_w2_below
+  real(kind=r_def),  dimension(undf_w2),  intent(in)    :: detj_w2_above
+  real(kind=r_def),  dimension(undf_w2),  intent(in)    :: detj_w2_below
   real(kind=r_tran), dimension(undf_w2),  intent(in)    :: wind
   integer(kind=i_def), dimension(ndf_w2), intent(in)    :: map_w2
 
@@ -100,9 +100,9 @@ subroutine calc_upwind_detj_at_w2_code( nlayers,       &
 
     detj_w2(map_w2(df)+k) =                                                      &
             0.5_r_tran*(1.0_r_tran - sign( 1.0_r_tran, wind(map_w2(df)+k) ) )*   &
-            detj_w2_above(map_w2(df)+k)                                          &
+            real(detj_w2_above(map_w2(df)+k), r_tran)                            &
             + 0.5_r_tran*(1.0_r_tran + sign( 1.0_r_tran, wind(map_w2(df)+k) ) )* &
-            detj_w2_below(map_w2(df)+k)
+            real(detj_w2_below(map_w2(df)+k), r_tran)
 
   end do
 

@@ -31,7 +31,6 @@ contains
     integer(kind=i_def), parameter :: nlayers = 1
     integer(kind=i_def), parameter :: ndf_wf = 1
     integer(kind=i_def), parameter :: ndf_w2 = 4
-    integer(kind=i_def), parameter :: ndf_wp = 1
     integer(kind=i_def), parameter :: stencil_size = 9
     integer(kind=i_def), parameter :: stencil_size_x = stencil_size
     integer(kind=i_def), parameter :: stencil_size_y = stencil_size
@@ -39,11 +38,9 @@ contains
     integer(kind=i_def), parameter :: undf_w2  = ndf_w2*nlayers
     integer(kind=i_def), parameter :: undf_wf  = ndf_wf*nlayers
     integer(kind=i_def), parameter :: undf_wfs = ndf_wf*nlayers*stencil_size
-    integer(kind=i_def), parameter :: undf_wp  = ndf_wp
 
     integer(kind=i_def), dimension(ndf_wf) :: map_wf
     integer(kind=i_def), dimension(ndf_w2) :: map_w2
-    integer(kind=i_def), dimension(ndf_wp) :: map_wp
     integer(kind=i_def), dimension(ndf_wf,stencil_size_x) :: stencil_map_x
     integer(kind=i_def), dimension(ndf_wf,stencil_size_y) :: stencil_map_y
 
@@ -51,12 +48,7 @@ contains
     real(kind=r_tran),   dimension(undf_wf)  :: increment_y
     real(kind=r_tran),   dimension(undf_wfs) :: field_x
     real(kind=r_tran),   dimension(undf_wfs) :: field_y
-    real(kind=r_tran),   dimension(undf_w2)  :: dep_pts_x
-    real(kind=r_tran),   dimension(undf_w2)  :: dep_pts_y
-    integer(kind=i_def), dimension(undf_wp)  :: ix_start
-    integer(kind=i_def), dimension(undf_wp)  :: ix_end
-    integer(kind=i_def), dimension(undf_wp)  :: iy_start
-    integer(kind=i_def), dimension(undf_wp)  :: iy_end
+    real(kind=r_tran),   dimension(undf_w2)  :: dep_pts
 
     real(kind=r_tran)   :: dt
     integer(kind=i_def) :: monotone
@@ -73,7 +65,6 @@ contains
     stencil_map_y(1,:) = (/ 1, 2, 3, 4, 5, 6, 7, 8, 9 /)
     map_w2(:) = (/ 1, 2, 3, 4 /)
     map_wf(1) = 1
-    map_wp(1) = 1
 
     ! Set no monotonicity
     monotone = horizontal_monotone_none
@@ -91,13 +82,8 @@ contains
     increment_y = 0.0_r_tran
 
     ! Test with fractional departure distance on one panel
-    dep_pts_x(:) = 0.5_r_tran
-    dep_pts_y(:) = -0.5_r_tran
+    dep_pts(:) = 0.5_r_tran
     dt = 1.0_r_tran
-    ix_start = -1_i_def
-    ix_end = -2_i_def
-    iy_start = -1_i_def
-    iy_end = -2_i_def
 
     call horizontal_cubic_sl_code( nlayers,        &
                                    increment_x,    &
@@ -108,21 +94,13 @@ contains
                                    field_y,        &
                                    stencil_size_y, &
                                    stencil_map_y,  &
-                                   ix_start,       &
-                                   ix_end,         &
-                                   iy_start,       &
-                                   iy_end,         &
-                                   dep_pts_x,      &
-                                   dep_pts_y,      &
+                                   dep_pts,        &
                                    monotone,       &
                                    extent_size,    &
                                    dt,             &
                                    ndf_wf,         &
                                    undf_wfs,       &
                                    map_wf,         &
-                                   ndf_wp,         &
-                                   undf_wp,        &
-                                   map_wp,         &
                                    ndf_w2,         &
                                    undf_w2,        &
                                    map_w2 )

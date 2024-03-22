@@ -37,11 +37,14 @@ contains
     integer(kind=i_def) :: ndf_f           ! number of dofs per fine cell
     integer(kind=i_def) :: ndf_c           ! number of dofs per coarse cell
     integer(kind=i_def) :: undf_f, undf_c  ! unique number of dofs over whole field
+    integer(kind=i_def) :: undf_w3_2d
 
     ! Integer Arrays
     integer(kind=i_def), allocatable, dimension(:,:) :: cell_map
     integer(kind=i_def), allocatable, dimension(:,:) :: map_f ! Cell and dof indexed
     integer(kind=i_def), allocatable, dimension(:)   :: map_c ! only dof indexed
+    integer(kind=i_def), allocatable, dimension(:)   :: map_w3_2d
+    integer(kind=i_def), allocatable, dimension(:)   :: face_selector
 
     ! Real Arrays
     real(kind=r_def), allocatable, dimension(:) :: coarse_field, fine_field
@@ -58,6 +61,7 @@ contains
     ndf_c = 6
     undf_c = 16
     undf_f = 75
+    undf_w3_2d = 1
 
     allocate( cell_map(ncell_f_per_c_x, ncell_f_per_c_y) )
     allocate( map_f(ndf_f, ncell_f) )
@@ -65,6 +69,8 @@ contains
     allocate( coarse_field(undf_c) )
     allocate( fine_field(undf_f) )
     allocate( answer(undf_c) )
+    allocate( face_selector(undf_w3_2d) )
+    allocate( map_w3_2d(1) )
 
     ! set simple values for cell map
     do lp_y = 1, ncell_f_per_c_y
@@ -84,6 +90,10 @@ contains
 
     ! DoF map for single coarse cell
     map_c = (/ 1, 4, 7, 10, 13, 14 /)
+    map_w3_2d = (/ 1 /)
+
+    ! Do computation on all faces
+    face_selector = 2
 
     answer(:) = 0.0_r_def
     coarse_field(:) = 0.0_r_def
@@ -162,11 +172,15 @@ contains
                            ncell_f,         &
                            coarse_field,    &
                            fine_field,      &
+                           face_selector,   &
+                           face_selector,   &
                            undf_c,          &
                            map_c,           &
                            ndf_f,           &
                            undf_f,          &
-                           map_f            )
+                           map_f,           &
+                           undf_w3_2d,      &
+                           map_w3_2d )
 
     ! Check answer for all DoFs
     do df = 1, undf_c
@@ -178,7 +192,9 @@ contains
                 map_c,         &
                 answer,        &
                 coarse_field,  &
-                fine_field     )
+                fine_field,    &
+                map_w3_2d,     &
+                face_selector  )
 
   end subroutine test_all
 

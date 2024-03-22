@@ -37,9 +37,7 @@ module check_configuration_mod
                                   enforce_min_value,               &
                                   horizontal_monotone,             &
                                   vertical_monotone,               &
-                                  consistent_ffsl_splitting,       &
-                                  min_val_method,                  &
-                                  min_val_method_low_order_correction
+                                  consistent_ffsl_splitting
   use transport_enumerated_types_mod,                              &
                             only: scheme_mol_3d,                   &
                                   scheme_ffsl_3d,                  &
@@ -83,6 +81,7 @@ module check_configuration_mod
   public :: check_any_consistent_swift
   public :: check_any_consistent_cosmic
   public :: check_any_shifted
+  public :: check_wind_shifted
   public :: check_any_eqn_consistent
   public :: check_any_wt_eqn_conservative
   public :: check_moisture_advective
@@ -445,16 +444,6 @@ contains
           write( log_scratch_space, '(A)') trim(field_names(i)) //  &
             'variable is set to use consistent transport, but this is ' // &
             'not yet implemented with 3D FFSL.'
-          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
-        end if
-
-        if ( consistent_ffsl_splitting(i) /= consistent_ffsl_splitting_swift   &
-              .and. equation_form(i) == equation_form_consistent               &
-              .and. enforce_min_value(i)                                       &
-              .and. min_val_method == min_val_method_low_order_correction ) then
-          write( log_scratch_space, '(A)') trim(field_names(i)) // ' variable ' // &
-            'is set to use COSMIC splitting and low-order flux correction to ' // &
-            'obtain positivity. This is not a valid combination of options.'
           call log_event(log_scratch_space, LOG_LEVEL_ERROR)
         end if
 
@@ -917,14 +906,18 @@ contains
       select case (scheme(i))
         ! It could be either 3D FFSL or split scheme using FFSL
         case (scheme_ffsl_3d)
-          any_shifted = .true.
-          return
+          if (equation_form(i) == equation_form_advective) then
+            any_shifted = .true.
+            return
+          end if
 
         case (scheme_split)
           if ( vertical_method(i) == split_method_ffsl &
                 .or. horizontal_method(i) == split_method_ffsl ) then
-            any_shifted = .true.
-            return
+            if (equation_form(i) == equation_form_advective) then
+              any_shifted = .true.
+              return
+            end if
           end if
 
       end select
@@ -934,6 +927,41 @@ contains
         moisture_formulation /= moisture_formulation_dry) any_shifted = .true.
 
   end function check_any_shifted
+
+  !> @brief   Determine whether the wind is needed on the shifted mesh
+  !> @details Loops through the transport schemes specified for different
+  !>          variables and determines whether the transporting wind is needed
+  !!          on the shifted mesh
+  !> @return  wind_shifted
+  function check_wind_shifted() result(wind_shifted)
+
+    implicit none
+
+    logical(kind=l_def)      :: wind_shifted
+    integer(kind=i_def)      :: i
+
+    wind_shifted = .false.
+
+    ! Need to compute a transporting wind on the shifted mesh if:
+    ! (a) there is a conservative variable that isn't the "dry_field"
+    ! (b) an advected Wtheta variable uses FFSL
+    do i = 1, profile_size
+      ! Check for a variable using conservative/consistent equation
+      ! (but don't include "dry_field" which will never use shifted grid)
+      if ( equation_form(i) == equation_form_conservative &
+            .and. field_names(i) /= dry_field_name ) then
+        wind_shifted = .true.
+        return
+      else if ( equation_form(i) == equation_form_advective           &
+                .and. (vertical_method(i) == split_method_ffsl .or.   &
+                       horizontal_method(i) == split_method_ffsl .or. &
+                       scheme(i) == scheme_ffsl_3d) ) then
+        wind_shifted = .true.
+        return
+      end if
+    end do
+
+  end function check_wind_shifted
 
   !> @brief   Determine whether any of the transport equations are consistent
   !> @details Loops through the transport equations specified for different

@@ -76,6 +76,7 @@ contains
     real(r_def), allocatable :: height_w3(:)
     real(r_def), allocatable :: height_wt(:)
     real(r_def), allocatable :: height_wt_sh(:)
+    integer(i_def), allocatable :: face_selector(:)
 
     integer(i_def) :: cell, k
     real(r_def) :: dz
@@ -83,13 +84,13 @@ contains
     ! Sizes
     integer(i_def) :: nlayers, nlayers_sh, ncells
     integer(i_def) :: ndf_w2_sh, ndf_wt_sh
-    integer(i_def) :: ndf_w2, ndf_wt, ndf_w3
+    integer(i_def) :: ndf_w2, ndf_wt, ndf_w3, ndf_w3_2d
     integer(i_def) :: undf_w2_sh, undf_wt_sh
-    integer(i_def) :: undf_w2, undf_wt, undf_w3
+    integer(i_def) :: undf_w2, undf_wt, undf_w3, undf_w3_2d
 
     ! Dofmaps
     integer(i_def), allocatable :: map_w2(:,:), map_w2_sh(:,:)
-    integer(i_def), allocatable :: map_w3(:,:)
+    integer(i_def), allocatable :: map_w3(:,:), map_w3_2d(:,:)
     integer(i_def), allocatable :: map_wt(:,:), map_wt_sh(:,:)
 
     ! just consider a single column of three layers
@@ -105,6 +106,8 @@ contains
     undf_wt = 4
     ndf_wt_sh = 1
     undf_wt_sh = 5
+    ndf_w3_2d = 1
+    undf_w3_2d = 1
     ncells = 1
     cell = 1
 
@@ -122,6 +125,8 @@ contains
     allocate( map_w3(1, ncells) )
     allocate( map_wt(2, ncells) )
     allocate( map_wt_sh(2, ncells) )
+    allocate( map_w3_2d(1, ncells) )
+    allocate( face_selector(undf_w3_2d) )
 
     ! Only one cell so all maps are to first cell
     map_w2_sh(:,:) = reshape( [1_i_def, 5_i_def, 9_i_def, &
@@ -131,12 +136,16 @@ contains
                                10_i_def, 13_i_def, 14_i_def], [6,1])
     map_w3(:,:)    = 1_i_def
     map_wt(:,:)    = reshape( [1_i_def, 2_i_def], [2,1])
+    map_w3_2d(:,:) = 1_i_def
 
     ! Set up the height fields for the meshes
     ! Let's consider a quadratic extrusion
     height_w3    = (/ 0.5_r_def, 2.5_r_def, 6.5_r_def /)
     height_wt    = (/ 0.0_r_def, 1.0_r_def, 4.0_r_def, 9.0_r_def /)
     height_wt_sh = (/ 0.0_r_def, 0.5_r_def, 2.5_r_def, 6.5_r_def, 9.0_r_def /)
+
+    ! Do all faces
+    face_selector = 2
 
     ! Set up the areas on each of the meshes
     ! First in W2 on the original mesh
@@ -195,17 +204,22 @@ contains
       height_wt_sh(map_wt_sh(2, cell)+nlayers_sh-1) * dx * dy
 
     ! Perform kernel
-    call sample_w2_to_sh_w2_code( nlayers_sh,   &
-                                  u_sh_field,   &
-                                  u_field,      &
-                                  area_w2_sh,   &
-                                  area_w2,      &
-                                  ndf_w2_sh,    &
-                                  undf_w2_sh,   &
-                                  map_w2_sh,    &
-                                  ndf_w2,       &
-                                  undf_w2,      &
-                                  map_w2        &
+    call sample_w2_to_sh_w2_code( nlayers_sh,    &
+                                  u_sh_field,    &
+                                  u_field,       &
+                                  area_w2_sh,    &
+                                  area_w2,       &
+                                  face_selector, &
+                                  face_selector, &
+                                  ndf_w2_sh,     &
+                                  undf_w2_sh,    &
+                                  map_w2_sh,     &
+                                  ndf_w2,        &
+                                  undf_w2,       &
+                                  map_w2,        &
+                                  ndf_w3_2d,     &
+                                  undf_w3_2d,    &
+                                  map_w3_2d      &
                                 )
 
     @assertEqual(answer(:), u_sh_field(:), tol)
@@ -218,11 +232,13 @@ contains
     deallocate( height_w3 )
     deallocate( height_wt )
     deallocate( height_wt_sh )
+    deallocate( face_selector )
     deallocate( map_w2_sh )
     deallocate( map_w2 )
     deallocate( map_w3 )
     deallocate( map_wt )
     deallocate( map_wt_sh )
+    deallocate( map_w3_2d )
 
   end subroutine test_all
 

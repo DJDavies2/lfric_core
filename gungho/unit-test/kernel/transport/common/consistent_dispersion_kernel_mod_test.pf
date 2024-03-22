@@ -79,18 +79,23 @@ contains
     integer(i_def), parameter :: ndf_w2_prime = 6
     integer(i_def), parameter :: ndf_w2_shifted = 6
     integer(i_def), parameter :: nfaces_h  = 4
+    integer(i_def), parameter :: ndf_w3_2d = 1
+    integer(i_def), parameter :: undf_w3_2d = 1
     integer(i_def), parameter :: undf_w2_prime = nfaces_h*nlayers_prime + nlayers_prime + 1
     integer(i_def), parameter :: undf_w2_shifted = nfaces_h*nlayers_shifted + nlayers_shifted + 1
 
     ! Maps
     integer(i_def), dimension(ndf_w2_prime)   :: map_w2_prime
     integer(i_def), dimension(ndf_w2_shifted) :: map_w2_shifted
+    integer(i_def), dimension(ndf_w3_2d)      :: map_w3_2d
 
     ! Fields
     real(r_tran), dimension(undf_w2_shifted) :: flux_X_correction
     real(r_tran), dimension(undf_w2_shifted) :: theta_factor
     real(r_tran), dimension(undf_w2_prime)   :: dry_flux_prime
     real(r_tran), dimension(undf_w2_shifted) :: flux_answer
+    integer(i_def), dimension(undf_w3_2d)    :: face_selector_ew
+    integer(i_def), dimension(undf_w3_2d)    :: face_selector_ns
 
     integer(i_def) :: j, k
 
@@ -108,12 +113,16 @@ contains
     map_w2_shifted(ndf_w2_shifted) = map_w2_shifted(nfaces_h+1) + 1
     map_w2_prime(nfaces_h+1) = 1 + nfaces_h*nlayers_prime
     map_w2_prime(ndf_w2_prime) = map_w2_prime(nfaces_h+1) + 1
+    map_w3_2d = (/ 1 /)
 
     ! ------------------------------------------------------------------------ !
     ! Set up initial fields
     ! ------------------------------------------------------------------------ !
 
     theta_factor(:) = 0.25_r_tran*deltaz*dtheta_dz
+
+    face_selector_ew(:) = 2
+    face_selector_ns(:) = 2
 
     ! Linear increase in horizontal fluxes with z
     do k = 0, nlayers_prime - 1
@@ -138,12 +147,17 @@ contains
                                      flux_X_correction,       &
                                      dry_flux_prime,          &
                                      theta_factor,            &
+                                     face_selector_ew,        &
+                                     face_selector_ns,        &
                                      ndf_w2_shifted,          &
                                      undf_w2_shifted,         &
                                      map_w2_shifted,          &
                                      ndf_w2_prime,            &
                                      undf_w2_prime,           &
-                                     map_w2_prime )
+                                     map_w2_prime,            &
+                                     ndf_w3_2d,               &
+                                     undf_w3_2d,              &
+                                     map_w3_2d )
 
     @assertEqual(flux_answer, flux_X_correction, tol)
 

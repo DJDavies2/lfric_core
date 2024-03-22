@@ -10,9 +10,12 @@ module linear_data_algorithm_mod
   use field_array_mod,                only: field_array_type
   use field_bundle_builtins_mod,      only: set_bundle_scalar
   use field_mod,                      only: field_type
+  use integer_field_mod,              only: integer_field_type
   use field_collection_mod,           only: field_collection_type
-  use geometric_constants_mod,        only: get_coordinates, &
-                                            get_panel_id
+  use geometric_constants_mod,        only: get_coordinates,      &
+                                            get_panel_id,         &
+                                            get_face_selector_ew, &
+                                            get_face_selector_ns
   use gungho_modeldb_mod,             only: modeldb_type
   use linked_list_mod,                only: linked_list_type
   use lfric_xios_read_mod,            only: read_state
@@ -185,6 +188,9 @@ module linear_data_algorithm_mod
     type(field_type), pointer                    :: h_wind => null()
     type(field_type), pointer                    :: v_wind => null()
 
+    type(integer_field_type), pointer :: face_selector_ew => null()
+    type(integer_field_type), pointer :: face_selector_ns => null()
+
     write(log_scratch_space,'(A)') "Combining winds "
     call log_event(log_scratch_space, LOG_LEVEL_INFO)
 
@@ -192,9 +198,13 @@ module linear_data_algorithm_mod
     call fields%get_field("ls_v_u", v_wind)
     call fields%get_field("ls_u", wind)
 
-    call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind) )
+    face_selector_ew => get_face_selector_ew(wind%get_mesh_id())
+    face_selector_ns => get_face_selector_ns(wind%get_mesh_id())
 
-    nullify( h_wind, v_wind, wind )
+    call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind,            &
+                                              face_selector_ew, face_selector_ns) )
+
+    nullify( h_wind, v_wind, wind, face_selector_ew, face_selector_ns )
 
   end subroutine combine_ls_winds
 

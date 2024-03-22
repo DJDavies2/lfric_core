@@ -30,20 +30,9 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use base_mesh_config_mod,      only : geometry_planar, &
-                                          topology_fully_periodic
-    use feign_config_mod,          only : feign_base_mesh_config
-
     implicit none
 
     class(apply_w3_to_sh_w3_test_type), intent(inout) :: this
-
-    call feign_base_mesh_config( file_prefix='foo',                &
-                                 prime_mesh_name='unit_test',      &
-                                 geometry=geometry_planar,         &
-                                 prepartitioned=.false.,           &
-                                 topology=topology_fully_periodic, &
-                                 fplane=.false., f_lat_deg=0.0_r_def )
 
   end subroutine setUp
 

@@ -18,8 +18,7 @@ module vertical_cubic_sl_kernel_mod
                                     GH_READWRITE, GH_READ,     &
                                     CELL_COLUMN, GH_LOGICAL,   &
                                     ANY_DISCONTINUOUS_SPACE_1, &
-                                    ANY_DISCONTINUOUS_SPACE_2, &
-                                    ANY_DISCONTINUOUS_SPACE_3
+                                    ANY_DISCONTINUOUS_SPACE_2
   use constants_mod,         only : r_tran, i_def, l_def, EPS_R_TRAN
   use kernel_mod,            only : kernel_type
   use transport_enumerated_types_mod, only : vertical_monotone_none,           &
@@ -40,11 +39,18 @@ module vertical_cubic_sl_kernel_mod
   !>                                      by the PSy layer.
   type, public, extends(kernel_type) :: vertical_cubic_sl_kernel_type
     private
-    type(arg_type) :: meta_args(7) = (/                                            &
+    type(arg_type) :: meta_args(14) = (/                                            &
          arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! field
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! cubic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! cubic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! cubic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! cubic_coef
          arg_type(GH_FIELD,  GH_INTEGER, GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! cubic_indices
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_3), & ! linear_coef
+         arg_type(GH_FIELD,  GH_INTEGER, GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! cubic_indices
+         arg_type(GH_FIELD,  GH_INTEGER, GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! cubic_indices
+         arg_type(GH_FIELD,  GH_INTEGER, GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! cubic_indices
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! linear_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! linear_coef
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                 & ! monotone scheme
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ),                                 & ! monotone order
          arg_type(GH_SCALAR, GH_LOGICAL, GH_READ)                                  & ! log_space
@@ -66,9 +72,9 @@ module vertical_cubic_sl_kernel_mod
   !!          departure point using 1d-Cubic-Lagrange interpolation.
   !> @param[in]     nlayers       The number of layers
   !> @param[in,out] field         The field at time level n interpolated to the departure point
-  !> @param[in]     cubic_coef    The cubic interpolation coefficients
-  !> @param[in]     cubic_indices The cubic interpolation indices
-  !> @param[in]     linear_coef   The linear interpolation coefficients (used for monotonicity)
+  !> @param[in]     cubic_coef    The cubic interpolation coefficients (1-4)
+  !> @param[in]     cubic_indices The cubic interpolation indices (1-4)
+  !> @param[in]     linear_coef   The linear interpolation coefficients (1-2, used for monotonicity)
   !> @param[in]     vertical_monotone
   !!                              The monotone scheme
   !> @param[in]     vertical_monotone_order
@@ -82,30 +88,30 @@ module vertical_cubic_sl_kernel_mod
   !> @param[in]     map_wf        The dofmap for the cell at the base of the column
   !!                              for the field (i.e. w3/wtheta) space
   !> @param[in]     ndf_wc        The number of degrees of freedom per cell
-  !!                              for the cubic coefficients space
+  !!                              for the coefficients space
   !> @param[in]     undf_wc       The number of unique degrees of freedom
-  !!                              for the cubic coefficients space
+  !!                              for the coefficients space
   !> @param[in]     map_wc        The dofmap for the cell at the base of the column
-  !!                              for the cubic coefficients space
-  !> @param[in]     ndf_wl        The number of degrees of freedom per cell
-  !!                              for the linear coefficients space
-  !> @param[in]     undf_wl       The number of unique degrees of freedom
-  !!                              for the linear coefficients space
-  !> @param[in]     map_wl        The dofmap for the cell at the base of the column
-  !!                              for the linear coefficients space
+  !!                              for the coefficients space
   !-------------------------------------------------------------------------------
 
   subroutine vertical_cubic_sl_code( nlayers,                 &
                                      field,                   &
-                                     cubic_coef,              &
-                                     cubic_indices,           &
-                                     linear_coef,             &
+                                     cubic_coef_1,            &
+                                     cubic_coef_2,            &
+                                     cubic_coef_3,            &
+                                     cubic_coef_4,            &
+                                     cubic_indices_1,         &
+                                     cubic_indices_2,         &
+                                     cubic_indices_3,         &
+                                     cubic_indices_4,         &
+                                     linear_coef_1,           &
+                                     linear_coef_2,           &
                                      vertical_monotone,       &
                                      vertical_monotone_order, &
                                      log_space,               &
                                      ndf_wf, undf_wf, map_wf, &
-                                     ndf_wc, undf_wc, map_wc, &
-                                     ndf_wl, undf_wl, map_wl )
+                                     ndf_wc, undf_wc, map_wc )
 
     implicit none
 
@@ -115,15 +121,19 @@ module vertical_cubic_sl_kernel_mod
     integer(kind=i_def),                     intent(in)    :: undf_wf
     integer(kind=i_def),                     intent(in)    :: ndf_wc
     integer(kind=i_def),                     intent(in)    :: undf_wc
-    integer(kind=i_def),                     intent(in)    :: ndf_wl
-    integer(kind=i_def),                     intent(in)    :: undf_wl
     integer(kind=i_def), dimension(ndf_wf),  intent(in)    :: map_wf
     integer(kind=i_def), dimension(ndf_wc),  intent(in)    :: map_wc
-    integer(kind=i_def), dimension(ndf_wl),  intent(in)    :: map_wl
     real(kind=r_tran),   dimension(undf_wf), intent(inout) :: field
-    real(kind=r_tran),   dimension(undf_wc), intent(in)    :: cubic_coef
-    integer(kind=i_def), dimension(undf_wc), intent(in)    :: cubic_indices
-    real(kind=r_tran),   dimension(undf_wl), intent(in)    :: linear_coef
+    real(kind=r_tran),   dimension(undf_wc), intent(in)    :: cubic_coef_1
+    real(kind=r_tran),   dimension(undf_wc), intent(in)    :: cubic_coef_2
+    real(kind=r_tran),   dimension(undf_wc), intent(in)    :: cubic_coef_3
+    real(kind=r_tran),   dimension(undf_wc), intent(in)    :: cubic_coef_4
+    integer(kind=i_def), dimension(undf_wc), intent(in)    :: cubic_indices_1
+    integer(kind=i_def), dimension(undf_wc), intent(in)    :: cubic_indices_2
+    integer(kind=i_def), dimension(undf_wc), intent(in)    :: cubic_indices_3
+    integer(kind=i_def), dimension(undf_wc), intent(in)    :: cubic_indices_4
+    real(kind=r_tran),   dimension(undf_wc), intent(in)    :: linear_coef_1
+    real(kind=r_tran),   dimension(undf_wc), intent(in)    :: linear_coef_2
     integer(kind=i_def), intent(in)  :: vertical_monotone,  &
                                         vertical_monotone_order
     logical(kind=l_def), intent(in)  :: log_space
@@ -147,16 +157,16 @@ module vertical_cubic_sl_kernel_mod
     ! so the indices are: map_md(1) + index*nz + k
     do k = 0, nl
       f0(k+1) = field(map_wf(1)+k)
-      cc(1,k+1) = cubic_coef(map_wc(1)+k)
-      cc(2,k+1) = cubic_coef(map_wc(1)+nz+k)
-      cc(3,k+1) = cubic_coef(map_wc(1)+2*nz+k)
-      cc(4,k+1) = cubic_coef(map_wc(1)+3*nz+k)
-      sc(1,k+1) = cubic_indices(map_wc(1)+k)
-      sc(2,k+1) = cubic_indices(map_wc(1)+nz+k)
-      sc(3,k+1) = cubic_indices(map_wc(1)+2*nz+k)
-      sc(4,k+1) = cubic_indices(map_wc(1)+3*nz+k)
-      cl(1,k+1) = linear_coef(map_wl(1)+k)
-      cl(2,k+1) = linear_coef(map_wl(1)+nz+k)
+      cc(1,k+1) = cubic_coef_1(map_wc(1)+k)
+      cc(2,k+1) = cubic_coef_2(map_wc(1)+k)
+      cc(3,k+1) = cubic_coef_3(map_wc(1)+k)
+      cc(4,k+1) = cubic_coef_4(map_wc(1)+k)
+      sc(1,k+1) = cubic_indices_1(map_wc(1)+k)
+      sc(2,k+1) = cubic_indices_2(map_wc(1)+k)
+      sc(3,k+1) = cubic_indices_3(map_wc(1)+k)
+      sc(4,k+1) = cubic_indices_4(map_wc(1)+k)
+      cl(1,k+1) = linear_coef_1(map_wc(1)+k)
+      cl(2,k+1) = linear_coef_2(map_wc(1)+k)
     end do
 
     ! Apply log to f0 if required

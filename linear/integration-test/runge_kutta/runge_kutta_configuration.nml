@@ -6,12 +6,12 @@ prime_mesh_name='C6',
 topology='fully_periodic',
 /
 &departure_points
-departure_grid='uniform',
 horizontal_limit='none',
-method='euler',
+horizontal_method='euler',
 n_dep_pt_iterations=1,
 vertical_limit='exponential',
 vertical_method='trapezoidal',
+vertical_sorting=.false.
 /
 &boundaries
 limited_area=.false.,
@@ -253,6 +253,7 @@ theta_dispersion_correction=.false.
 theta_variable='dry'
 use_density_predictor=.false.,
 vertical_sl_order='cubic',
+extended_mesh=.false.
 /
 &validity_test
 number_gamma_values=2,

@@ -15,8 +15,7 @@ module compute_vertical_cubic_coef_kernel_mod
                                     GH_FIELD, GH_WRITE, GH_SCALAR, &
                                     GH_REAL, GH_READ, GH_LOGICAL,  &
                                     GH_INTEGER, CELL_COLUMN,       &
-                                    ANY_DISCONTINUOUS_SPACE_1,     &
-                                    ANY_DISCONTINUOUS_SPACE_2
+                                    ANY_DISCONTINUOUS_SPACE_1
   use fs_continuity_mod,     only : W2v, Wtheta
   use constants_mod,         only : r_tran, i_def, l_def, EPS_R_TRAN
   use kernel_mod,            only : kernel_type
@@ -34,12 +33,19 @@ module compute_vertical_cubic_coef_kernel_mod
   !>                                      by the PSy layer.
   type, public, extends(kernel_type) :: compute_vertical_cubic_coef_kernel_type
     private
-    type(arg_type) :: meta_args(6) = (/                                        &
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2v),                       & ! dep_pts_z
+    type(arg_type) :: meta_args(13) = (/                                       &
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2v),                       & ! dep_dist_z
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,  Wtheta),                    & ! theta_height
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cubic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cubic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cubic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cubic_coef
          arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cubic_indices
-         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_2), & ! linear_coef
+         arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cubic_indices
+         arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cubic_indices
+         arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! cubic_indices
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! linear_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! linear_coef
          arg_type(GH_SCALAR, GH_LOGICAL, GH_READ)                              & ! hermite
          /)
     integer :: operates_on = CELL_COLUMN
@@ -59,11 +65,11 @@ module compute_vertical_cubic_coef_kernel_mod
   !!          only w (i.e., vertical motion only), then interpolate theta at the
   !!          departure point using 1d-Cubic-Lagrange interpolation.
   !> @param[in]     nlayers       The number of layers
-  !> @param[in]     dep_pts_z     The vertical departure distance used for SL advection
+  !> @param[in]     dep_dist_z    The vertical departure distance used for SL advection
   !> @param[in]     theta_height  The height of theta-points
-  !> @param[inout]  cubic_coef    The cubic interpolation coefficients
-  !> @param[inout]  cubic_indices The cubic interpolation indices
-  !> @param[inout]  linear_coef   The linear interpolation coefficients (used for monotonicity)
+  !> @param[inout]  cubic_coef    The cubic interpolation coefficients (1-4)
+  !> @param[inout]  cubic_indices The cubic interpolation indices (1-4)
+  !> @param[inout]  linear_coef   The linear interpolation coefficients (1-2, used for monotonicity)
   !> @param[in]     hermite       Flag to compute cubic-Hermite interpolation coefficients
   !> @param[in]     ndf_w2v       The number of degrees of freedom per cell
   !!                              on W2v space
@@ -78,28 +84,24 @@ module compute_vertical_cubic_coef_kernel_mod
   !> @param[in]     map_wt        The dofmap for the cell at the base of the column
   !!                              on Wtheta space
   !> @param[in]     ndf_wc        The number of degrees of freedom per cell
-  !!                              for the cubic coefficients space
+  !!                              for the coefficients space
   !> @param[in]     undf_wc       The number of unique degrees of freedom
-  !!                              for the cubic coefficients space
+  !!                              for the coefficients space
   !> @param[in]     map_wc        The dofmap for the cell at the base of the column
-  !!                              for the cubic coefficients space
-  !> @param[in]     ndf_wl        The number of degrees of freedom per cell
-  !!                              for the linear coefficients space
-  !> @param[in]     undf_wl       The number of unique degrees of freedom
-  !!                              for the linear coefficients space
-  !> @param[in]     map_wl        The dofmap for the cell at the base of the column
-  !!                              for the linear coefficients space
+  !!                              for the coefficients space
   !-------------------------------------------------------------------------------
 
-  subroutine compute_vertical_cubic_coef_code( nlayers,                                &
-                                               dep_pts_z,                              &
-                                               theta_height,                           &
-                                               cubic_coef, cubic_indices, linear_coef, &
-                                               hermite,                                &
-                                               ndf_w2v, undf_w2v, map_w2v,             &
-                                               ndf_wt, undf_wt, map_wt,                &
-                                               ndf_wc, undf_wc, map_wc,                &
-                                               ndf_wl, undf_wl, map_wl )
+  subroutine compute_vertical_cubic_coef_code( nlayers,                          &
+                                               dep_dist_z, theta_height,         &
+                                               cubic_coef_1, cubic_coef_2,       &
+                                               cubic_coef_3, cubic_coef_4,       &
+                                               cubic_indices_1, cubic_indices_2, &
+                                               cubic_indices_3, cubic_indices_4, &
+                                               linear_coef_1, linear_coef_2,     &
+                                               hermite,                          &
+                                               ndf_w2v, undf_w2v, map_w2v,       &
+                                               ndf_wt, undf_wt, map_wt,          &
+                                               ndf_wc, undf_wc, map_wc )
 
     implicit none
 
@@ -114,15 +116,19 @@ module compute_vertical_cubic_coef_kernel_mod
     integer(kind=i_def),                      intent(in) :: ndf_wc
     integer(kind=i_def),                      intent(in) :: undf_wc
     integer(kind=i_def), dimension(ndf_wc),   intent(in) :: map_wc
-    integer(kind=i_def),                      intent(in) :: ndf_wl
-    integer(kind=i_def),                      intent(in) :: undf_wl
-    integer(kind=i_def), dimension(ndf_wl),   intent(in) :: map_wl
-    real(kind=r_tran),   dimension(undf_w2v), intent(in) :: dep_pts_z
+    real(kind=r_tran),   dimension(undf_w2v), intent(in) :: dep_dist_z
     real(kind=r_tran),   dimension(undf_wt),  intent(in) :: theta_height
     logical(kind=l_def),                      intent(in) :: hermite
-    real(kind=r_tran),   dimension(undf_wc),  intent(inout) :: cubic_coef
-    integer(kind=i_def), dimension(undf_wc),  intent(inout) :: cubic_indices
-    real(kind=r_tran),   dimension(undf_wl),  intent(inout) :: linear_coef
+    real(kind=r_tran),   dimension(undf_wc),  intent(inout) :: cubic_coef_1
+    real(kind=r_tran),   dimension(undf_wc),  intent(inout) :: cubic_coef_2
+    real(kind=r_tran),   dimension(undf_wc),  intent(inout) :: cubic_coef_3
+    real(kind=r_tran),   dimension(undf_wc),  intent(inout) :: cubic_coef_4
+    integer(kind=i_def), dimension(undf_wc),  intent(inout) :: cubic_indices_1
+    integer(kind=i_def), dimension(undf_wc),  intent(inout) :: cubic_indices_2
+    integer(kind=i_def), dimension(undf_wc),  intent(inout) :: cubic_indices_3
+    integer(kind=i_def), dimension(undf_wc),  intent(inout) :: cubic_indices_4
+    real(kind=r_tran),   dimension(undf_wc),  intent(inout) :: linear_coef_1
+    real(kind=r_tran),   dimension(undf_wc),  intent(inout) :: linear_coef_2
 
     ! Local arrays and indices
     real(kind=r_tran),   dimension(nlayers)     :: zm, zmd
@@ -145,7 +151,7 @@ module compute_vertical_cubic_coef_kernel_mod
     ! Map departure points into 1d-array dist
     ! Map theta-height to 1d-zl (zl is cell-edges in the vertical)
     do k = 0, nlayers
-      dist(k+1) = dep_pts_z(map_w2v(1)+k)
+      dist(k+1) = dep_dist_z(map_w2v(1)+k)
       zl(k+1)   = theta_height(map_wt(1)+k)
     end do
 
@@ -202,19 +208,18 @@ module compute_vertical_cubic_coef_kernel_mod
       end if
     end if
 
-    ! Coeffs are on a layer-first W3/Wtheta multidata field
-    ! so the indices are: map_md(1) + index*nlp + k
+    ! Coeffs are W3/Wtheta fields
     do k = 0, nl
-      cubic_coef(map_wc(1)+k)       = cc(1,k+1)
-      cubic_coef(map_wc(1)+nlp+k)   = cc(2,k+1)
-      cubic_coef(map_wc(1)+2*nlp+k) = cc(3,k+1)
-      cubic_coef(map_wc(1)+3*nlp+k) = cc(4,k+1)
-      cubic_indices(map_wc(1)+k)       = sc(1,k+1)
-      cubic_indices(map_wc(1)+nlp+k)   = sc(2,k+1)
-      cubic_indices(map_wc(1)+2*nlp+k) = sc(3,k+1)
-      cubic_indices(map_wc(1)+3*nlp+k) = sc(4,k+1)
-      linear_coef(map_wl(1)+k)     = cl(1,k+1)
-      linear_coef(map_wl(1)+nlp+k) = cl(2,k+1)
+      cubic_coef_1(map_wc(1)+k)    = cc(1,k+1)
+      cubic_coef_2(map_wc(1)+k)    = cc(2,k+1)
+      cubic_coef_3(map_wc(1)+k)    = cc(3,k+1)
+      cubic_coef_4(map_wc(1)+k)    = cc(4,k+1)
+      cubic_indices_1(map_wc(1)+k) = sc(1,k+1)
+      cubic_indices_2(map_wc(1)+k) = sc(2,k+1)
+      cubic_indices_3(map_wc(1)+k) = sc(3,k+1)
+      cubic_indices_4(map_wc(1)+k) = sc(4,k+1)
+      linear_coef_1(map_wc(1)+k)   = cl(1,k+1)
+      linear_coef_2(map_wc(1)+k)   = cl(2,k+1)
     end do
 
   end subroutine compute_vertical_cubic_coef_code

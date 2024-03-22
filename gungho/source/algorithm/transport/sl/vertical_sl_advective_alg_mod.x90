@@ -66,9 +66,20 @@ contains
     logical(kind=l_def) :: log_space
 
     ! Interpolation coefficients
-    type(r_tran_field_type),  pointer :: interp_coef  => null()
-    type(integer_field_type), pointer :: interp_index => null()
-    type(r_tran_field_type),  pointer :: linear_coef  => null()
+    type(r_tran_field_type),  pointer :: interp_coef_1  => null()
+    type(r_tran_field_type),  pointer :: interp_coef_2  => null()
+    type(r_tran_field_type),  pointer :: interp_coef_3  => null()
+    type(r_tran_field_type),  pointer :: interp_coef_4  => null()
+    type(r_tran_field_type),  pointer :: interp_coef_5  => null()
+    type(r_tran_field_type),  pointer :: interp_coef_6  => null()
+    type(integer_field_type), pointer :: interp_index_1 => null()
+    type(integer_field_type), pointer :: interp_index_2 => null()
+    type(integer_field_type), pointer :: interp_index_3 => null()
+    type(integer_field_type), pointer :: interp_index_4 => null()
+    type(integer_field_type), pointer :: interp_index_5 => null()
+    type(integer_field_type), pointer :: interp_index_6 => null()
+    type(r_tran_field_type),  pointer :: linear_coef_1  => null()
+    type(r_tran_field_type),  pointer :: linear_coef_2  => null()
 
     if ( subroutine_timers ) call timer( 'transport.sl_vertical' )
 
@@ -107,25 +118,54 @@ contains
     call invoke( setval_X( field_np1, field_n ) )
 
     ! Get the SL interpolation coefficients and indices
-    linear_coef  => transport_runtime%get_vert_sl_coef(field_n, 0)
-    interp_coef  => transport_runtime%get_vert_sl_coef(field_n, sl_order)
-    interp_index => transport_runtime%get_vert_sl_index(field_n, sl_order)
+    linear_coef_1  => transport_runtime%get_vert_sl_coef(field_n, 0, 1)
+    linear_coef_2  => transport_runtime%get_vert_sl_coef(field_n, 0, 2)
+    interp_coef_1  => transport_runtime%get_vert_sl_coef(field_n, sl_order, 1)
+    interp_coef_2  => transport_runtime%get_vert_sl_coef(field_n, sl_order, 2)
+    interp_coef_3  => transport_runtime%get_vert_sl_coef(field_n, sl_order, 3)
+    interp_coef_4  => transport_runtime%get_vert_sl_coef(field_n, sl_order, 4)
+    interp_index_1 => transport_runtime%get_vert_sl_index(field_n, sl_order, 1)
+    interp_index_2 => transport_runtime%get_vert_sl_index(field_n, sl_order, 2)
+    interp_index_3 => transport_runtime%get_vert_sl_index(field_n, sl_order, 3)
+    interp_index_4 => transport_runtime%get_vert_sl_index(field_n, sl_order, 4)
 
     if (sl_order == vertical_sl_order_quintic) then
-      ! Quintic semi-Lagrangian transport
+      ! Quintic semi-Lagrangian transport requires extra interpolation values
+      interp_coef_5  => transport_runtime%get_vert_sl_coef(field_n, sl_order, 5)
+      interp_coef_6  => transport_runtime%get_vert_sl_coef(field_n, sl_order, 6)
+      interp_index_5 => transport_runtime%get_vert_sl_index(field_n, sl_order, 5)
+      interp_index_6 => transport_runtime%get_vert_sl_index(field_n, sl_order, 6)
       call invoke( vertical_quintic_sl_kernel_type( field_np1,      &
-                                                    interp_coef,    &
-                                                    interp_index,   &
-                                                    linear_coef,    &
+                                                    interp_coef_1,  &
+                                                    interp_coef_2,  &
+                                                    interp_coef_3,  &
+                                                    interp_coef_4,  &
+                                                    interp_coef_5,  &
+                                                    interp_coef_6,  &
+                                                    interp_index_1, &
+                                                    interp_index_2, &
+                                                    interp_index_3, &
+                                                    interp_index_4, &
+                                                    interp_index_5, &
+                                                    interp_index_6, &
+                                                    linear_coef_1,  &
+                                                    linear_coef_2,  &
                                                     monotone,       &
                                                     monotone_order, &
                                                     log_space ) )
     else
       ! Cubic (Lagrange or Hermite) semi-Lagrangian transport
       call invoke( vertical_cubic_sl_kernel_type( field_np1,      &
-                                                  interp_coef,    &
-                                                  interp_index,   &
-                                                  linear_coef,    &
+                                                  interp_coef_1,  &
+                                                  interp_coef_2,  &
+                                                  interp_coef_3,  &
+                                                  interp_coef_4,  &
+                                                  interp_index_1, &
+                                                  interp_index_2, &
+                                                  interp_index_3, &
+                                                  interp_index_4, &
+                                                  linear_coef_1,  &
+                                                  linear_coef_2,  &
                                                   monotone,       &
                                                   monotone_order, &
                                                   log_space ) )
@@ -134,8 +174,11 @@ contains
     ! End of step: if necessary enforce min val and overwrite in blending zone
     call end_of_advective_step_alg(field_np1, field_n, transport_metadata)
 
-    nullify( mesh, transport_runtime, &
-             interp_coef, interp_index, linear_coef )
+    nullify( mesh, transport_runtime, linear_coef_1, linear_coef_2, &
+             interp_coef_1, interp_coef_2, interp_coef_3,           &
+             interp_coef_4, interp_coef_5, interp_coef_6,           &
+             interp_index_1, interp_index_2, interp_index_3,        &
+             interp_index_4, interp_index_5, interp_index_6 )
 
     if ( subroutine_timers ) call timer( 'transport.sl_vertical' )
 

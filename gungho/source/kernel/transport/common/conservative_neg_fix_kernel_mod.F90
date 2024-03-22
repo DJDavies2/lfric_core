@@ -13,7 +13,7 @@ module conservative_neg_fix_kernel_mod
 use argument_mod,            only : arg_type, GH_FIELD, GH_READ,     &
                                     CELL_COLUMN, GH_REAL, GH_READWRITE
 use fs_continuity_mod,       only : W3
-use constants_mod,           only : r_tran, r_def, i_def, EPS_R_TRAN
+use constants_mod,           only : r_tran, i_def, EPS_R_TRAN
 use kernel_mod,              only : kernel_type
 
 implicit none
@@ -58,7 +58,7 @@ subroutine conservative_neg_fix_code(nlayers,                 &
   integer(kind=i_def), intent(in)    :: undf_w3, ndf_w3
   integer(kind=i_def), intent(in)    :: map_w3(ndf_w3)
   real(kind=r_tran),   intent(inout) :: field(undf_w3)
-  real(kind=r_def),    intent(in)    :: mm_w3_diag(undf_w3)
+  real(kind=r_tran),   intent(in)    :: mm_w3_diag(undf_w3)
 
   ! Internal variables
   integer(kind=i_def) :: k
@@ -69,7 +69,7 @@ subroutine conservative_neg_fix_code(nlayers,                 &
   ! Extract values to put into local array
   do k = 0, nlayers-1
     field_local(k+1) = field(map_w3(1)+k)
-    mm_local(k+1) = real(mm_w3_diag(map_w3(1)+k), r_tran)
+    mm_local(k+1) = mm_w3_diag(map_w3(1)+k)
   end do
 
   min_value = minval(field_local)

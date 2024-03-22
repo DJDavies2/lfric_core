@@ -80,6 +80,7 @@ contains
     type( field_type ), pointer :: sea_u_current       => null()
     type( field_type ), pointer :: sea_v_current       => null()
     type( field_type ), pointer :: sea_current_w2      => null()
+    type( field_type ), pointer :: wspd10m             => null()
     type( integer_field_type ), pointer :: ocn_cpl_point  => null()
 
     ! Local variables
@@ -111,6 +112,7 @@ contains
     call surface_fields%get_field('sea_v_current',sea_v_current)
     call surface_fields%get_field('sea_current_w2',sea_current_w2)
     call surface_fields%get_field('ocn_cpl_point',ocn_cpl_point)
+    call surface_fields%get_field('wspd10m', wspd10m)
 
     call invoke(                                                              &
                  ! Need initialising for aquaplanet
@@ -143,7 +145,9 @@ contains
                  setval_c(sea_u_current, 0.0_r_def ),                         &
                  setval_c(sea_v_current, 0.0_r_def ),                         &
                  setval_c(sea_current_w2, 0.0_r_def ),                        &
-                 int_setval_c(ocn_cpl_point, 0_i_def )  )
+                 int_setval_c(ocn_cpl_point, 0_i_def ),                       &
+                 ! Set 10m wind speed to zero
+                 setval_c(wspd10m, 0.0_r_def) )
 
     if (init_option == init_option_analytic .or. &
          ancil_option == ancil_option_none) then

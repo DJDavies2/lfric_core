@@ -1,0 +1,128 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2024 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!> Test the shift_mass_w3_kernel
+module shift_mass_w3_kernel_mod_test
+
+  use constants_mod,                       only : i_def, r_def
+  use get_unit_test_m3x3_q3x3x3_sizes_mod, only : get_w3_m3x3_q3x3x3_size
+  use get_unit_test_m3x3_dofmap_mod,       only : get_w3_m3x3_dofmap
+  use pFUnit_Mod
+
+  implicit none
+
+  private
+  public :: test_all
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @Test
+  subroutine test_all( )
+
+    use shift_mass_w3_kernel_mod, only : shift_mass_w3_code
+
+   implicit none
+
+    real(kind=r_def),      parameter :: tol = 1.0e-12_r_def
+    real(kind=r_def),      parameter :: dx = 5.0_r_def
+    real(kind=r_def),      parameter :: dy = 3.0_r_def
+    real(kind=r_def),      parameter :: dz = 7.0_r_def
+    real(kind=r_def),      parameter :: dV = dx * dy * dz
+
+    ! Fields
+    real(kind=r_def),    allocatable :: field_w3_sh(:)
+    real(kind=r_def),    allocatable :: field_w3(:)
+    real(kind=r_def),    allocatable :: answer(:)
+    real(kind=r_def),    allocatable :: detj_shifted(:), detj_prime(:)
+
+    integer(kind=i_def)              :: i, j, k, cell
+    integer(kind=i_def)              :: nlayers, nlayers_sh, ncells, ncells_sh
+    integer(kind=i_def)              :: nqp_h, nqp_v
+    integer(kind=i_def)              :: ndf_w3_sh, ndf_w3
+    integer(kind=i_def)              :: dim_space, dim_space_diff
+    integer(kind=i_def)              :: undf_w3_sh, undf_w3
+
+    ! Dofmaps
+    integer(kind=i_def), allocatable :: map_w3_sh(:,:)
+    integer(kind=i_def), allocatable :: map_w3(:,:)
+
+    nlayers = 3
+    nlayers_sh = nlayers + 1
+    call get_w3_m3x3_q3x3x3_size( ndf_w3, undf_w3, ncells,   &
+                                  dim_space, dim_space_diff, &
+                                  nqp_h, nqp_v,              &
+                                  nlayers )
+    call get_w3_m3x3_q3x3x3_size( ndf_w3_sh, undf_w3_sh, ncells_sh, &
+                                  dim_space, dim_space_diff,        &
+                                  nqp_h, nqp_v,                     &
+                                  nlayers_sh )
+
+
+    call get_w3_m3x3_dofmap(map_w3, nlayers)
+    call get_w3_m3x3_dofmap(map_w3_sh, nlayers_sh)
+    cell = 1
+
+    ! Create the data
+    allocate( field_w3_sh( undf_w3_sh ) )
+    allocate( answer( undf_w3_sh ) )
+    allocate( field_w3( undf_w3 ) )
+    allocate( detj_shifted( undf_w3_sh ) )
+    allocate( detj_prime( undf_w3 ) )
+
+    field_w3_sh(:) = 0.0_r_def
+
+    do cell = 1, ncells
+      ! Fill values for interior of domain
+      do k = 0, nlayers - 1
+        ! Density increasing linearly with height
+        field_w3(map_w3(1, cell) + k) = real(k+1, r_def) * dV
+        detj_prime(map_w3(1, cell) + k) = dV
+      end do
+
+      detj_shifted(map_w3_sh(1, cell)) = dV / 2.0_r_def
+      detj_shifted(map_w3_sh(1, cell)+nlayers) = dV / 2.0_r_def
+      do k = 1, nlayers - 1
+        detj_shifted(map_w3_sh(1, cell) + k) = dV
+      end do
+
+    end do
+
+    cell = 1
+    call shift_mass_w3_code(                    &
+                             nlayers_sh,        &
+                             field_w3_sh,       &
+                             field_w3,          &
+                             ndf_w3_sh,         &
+                             undf_w3_sh,        &
+                             map_w3_sh(:,cell), &
+                             ndf_w3,            &
+                             undf_w3,           &
+                             map_w3(:,cell)     &
+                           )
+
+    ! Look at first column
+    answer(:) = 0.0_r_def
+    answer(map_w3_sh(1,cell)+0) = 1.0_r_def * detj_shifted(map_w3_sh(1, cell))
+    answer(map_w3_sh(1,cell)+1) = 1.5_r_def * detj_shifted(map_w3_sh(1, cell)+1)
+    answer(map_w3_sh(1,cell)+2) = 2.5_r_def * detj_shifted(map_w3_sh(1, cell)+2)
+    answer(map_w3_sh(1,cell)+3) = 3.0_r_def * detj_shifted(map_w3_sh(1, cell)+3)
+
+    do k = 0, nlayers_sh - 1
+        @assertEqual(answer(map_w3_sh(1, cell)+k), field_w3_sh(map_w3_sh(1, cell)+k), tol)
+    end do
+
+
+    deallocate( field_w3_sh )
+    deallocate( answer )
+    deallocate( field_w3 )
+    deallocate( detj_shifted )
+    deallocate( detj_prime )
+    deallocate( map_w3_sh )
+    deallocate( map_w3 )
+
+  end subroutine test_all
+
+end module shift_mass_w3_kernel_mod_test

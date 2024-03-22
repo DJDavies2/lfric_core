@@ -562,7 +562,7 @@ subroutine add_integer_field(self, field, fs, local_mesh, name)
   type(function_space_type),  pointer, intent(in)    :: fs
   type(local_mesh_type),               intent(in)    :: local_mesh
   character(*),              optional, intent(in)    :: name
-  type(id_r64_field_pair_type)                       :: paired_object
+  type(id_integer_field_pair_type)                   :: paired_object
   character(str_def)                                 :: local_name
 
   if ( present(name) ) then

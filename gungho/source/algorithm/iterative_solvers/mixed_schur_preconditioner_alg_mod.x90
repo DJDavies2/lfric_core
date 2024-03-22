@@ -91,6 +91,7 @@ module mixed_schur_preconditioner_alg_mod
   use vector_mod,                      only: abstract_vector_type
   use r_solver_field_mod,              only: r_solver_field_type
   use r_solver_field_vector_mod,       only: r_solver_field_vector_type
+  use integer_field_mod,               only: integer_field_type
   use constants_mod,                   only: i_def, r_def, r_solver
   use preconditioner_mod,              only: abstract_preconditioner_type
   use iterative_solver_mod,            only: abstract_iterative_solver_type
@@ -112,6 +113,8 @@ module mixed_schur_preconditioner_alg_mod
                                              get_helm_diag, &
                                              get_Hb_lumped_inv, &
                                              get_eliminated_q32
+  use geometric_constants_mod,         only: get_face_selector_ew, &
+                                             get_face_selector_ns
   use fem_constants_mod,               only: get_normalisation_r_solver
   use limited_area_constants_mod,      only: get_mask_r_solver
   use fs_continuity_mod,               only: W2, W3, Wtheta
@@ -195,8 +198,8 @@ contains
 
     type(mixed_schur_preconditioner_type)  :: self
 
-    type(mesh_type),           pointer :: mesh_ptr => null()
-    type(function_space_type), pointer :: fs => null()
+    type(mesh_type),           pointer :: mesh_ptr
+    type(function_space_type), pointer :: fs
 
     call log_event( 'Constructing approximate Schur mixed preconditioner...', &
                     LOG_LEVEL_INFO )
@@ -213,8 +216,6 @@ contains
     fs => function_space_collection%get_fs( mesh_ptr, p, W3 )
     call self%pressure_b%initialise_field( 1, fs )
     call self%pressure_x%initialise_field( 1, fs )
-
-    nullify( mesh_ptr, fs )
 
     ! Set pressure solver
     self%pressure_solver => pressure_solver
@@ -307,25 +308,27 @@ contains
     class( mixed_schur_preconditioner_type ),   intent( inout ) :: self
     type( r_solver_field_vector_type ), target, intent(in)      :: rhs0
 
-    type( r_solver_operator_type ), pointer :: m3_rho_star => null(),    &
-                                               ptheta2 => null(),        &
-                                               p3theta => null(),        &
-                                               compound_div => null(),   &
-                                               q32_op => null()
-    type( r_solver_field_type ),    pointer :: mt_lumped_inv => null(),  &
-                                               h_diag => null(),         &
-                                               Hb_lumped_inv => null()
+    type( r_solver_operator_type ), pointer :: m3_rho_star
+    type( r_solver_operator_type ), pointer :: ptheta2
+    type( r_solver_operator_type ), pointer :: p3theta
+    type( r_solver_operator_type ), pointer :: compound_div
+    type( r_solver_operator_type ), pointer :: q32_op
+    type( r_solver_field_type ),    pointer :: mt_lumped_inv
+    type( r_solver_field_type ),    pointer :: h_diag
+    type( r_solver_field_type ),    pointer :: Hb_lumped_inv
     type( r_solver_field_type )             :: r_p, rhs_d
-    real( kind=r_solver ), parameter        :: minus_one = -1.0_r_solver
+    real( kind=r_solver ),        parameter :: minus_one = -1.0_r_solver
     type( r_solver_field_type )             :: rhs_uvw
-    type( r_solver_field_type ), pointer    :: w2_mask => null(), &
-                                               w3_mask => null()
+    type( r_solver_field_type ),    pointer :: w2_mask
+    type( r_solver_field_type ),    pointer :: w3_mask
     integer( kind=i_def )                   :: mesh_id
-    type( r_solver_field_type ), pointer :: rhs_uv => null(), &
-                                            rhs_p => null(), &
-                                            rhs_w => null(), &
-                                            rhs => null()
+    type( r_solver_field_type ),    pointer :: rhs_uv
+    type( r_solver_field_type ),    pointer :: rhs_p
+    type( r_solver_field_type ),    pointer :: rhs_w
+    type( r_solver_field_type ),    pointer :: rhs
 
+    type(integer_field_type), pointer :: face_selector_ew
+    type(integer_field_type), pointer :: face_selector_ns
 
     if ( subroutine_timers ) call timer('mixed_schur rhs')
 
@@ -337,15 +340,20 @@ contains
       rhs_w  => rhs0%vector(isol_w)
     end if
 
+    mesh_id = rhs_uv%get_mesh_id()
+
     call rhs_uvw%initialise( vector_space = self%rhs_u%get_function_space() )
-    if ( split_w )then
+    if ( split_w ) then
+      face_selector_ew => get_face_selector_ew(mesh_id)
+      face_selector_ns => get_face_selector_ns(mesh_id)
       call invoke( name="combine_wind", &
-                   combine_w2_field_kernel_type( rhs_uvw, rhs_uv, rhs_w ) )
+                   combine_w2_field_kernel_type( rhs_uvw, rhs_uv, rhs_w, &
+                                                 face_selector_ew,       &
+                                                 face_selector_ns ) )
     else
       call invoke( setval_X( rhs_uvw, rhs_uv ) )
     end if
 
-    mesh_id = rhs_uv%get_mesh_id()
     ptheta2       => get_ptheta2v()
     p3theta       => get_p3theta()
     m3_rho_star   => get_m3_rho_star()
@@ -358,7 +366,6 @@ contains
     if ( limited_area ) then
       w2_mask => get_mask_r_solver(W2, mesh_id)
       call invoke( inc_X_times_Y(self%rhs_u, w2_mask) )
-      nullify(w2_mask)
     end if
 
     ! Compute H(rhs_u)
@@ -392,17 +399,12 @@ contains
     if ( limited_area ) then
       w3_mask => get_mask_r_solver(W3, mesh_id)
       call invoke( inc_X_times_Y(rhs, w3_mask) )
-      nullify( w2_mask, w3_mask )
     end if
 
     if ( normalise ) then
        h_diag => get_helm_diag()
        call invoke( inc_X_times_Y(rhs, h_diag) )
     end if
-
-    nullify( m3_rho_star, ptheta2, p3theta, &
-             compound_div, mt_lumped_inv, h_diag, &
-             Hb_lumped_inv )
 
     if ( subroutine_timers ) call timer('mixed_schur rhs')
 
@@ -429,17 +431,19 @@ contains
     class( mixed_schur_preconditioner_type ), intent( inout ) :: self
     type( r_solver_field_vector_type ),       intent( inout ) :: state
 
-    type( r_solver_field_type ),    pointer :: u_normalisation => null(), &
-                                               Hb_lumped_inv => null()
-    type( r_solver_operator_type ), pointer :: div_star => null()
+    type( r_solver_field_type ),    pointer :: u_normalisation
+    type( r_solver_field_type ),    pointer :: Hb_lumped_inv
+    type( r_solver_operator_type ), pointer :: div_star
     type( r_solver_field_type )             :: u_inc
-    type(r_solver_field_type),      pointer :: w2_mask => null()
+    type(r_solver_field_type),      pointer :: w2_mask
     integer( kind=i_def )                   :: mesh_id
 
-    type(r_solver_field_type), pointer :: state_uv   => null(), &
-                                          state_p   => null(),  &
-                                          state_w   => null(),  &
-                                          exner_inc => null()
+    type(r_solver_field_type), pointer :: state_uv
+    type(r_solver_field_type), pointer :: state_p
+    type(r_solver_field_type), pointer :: state_w
+    type(r_solver_field_type), pointer :: exner_inc
+    type(integer_field_type),  pointer :: face_selector_ew
+    type(integer_field_type),  pointer :: face_selector_ns
 
     if ( subroutine_timers ) call timer('Schur back substitute')
 
@@ -473,20 +477,17 @@ contains
     if ( split_w )then
       state_uv => state%get_field_from_position( isol_uv )
       state_w  => state%get_field_from_position( isol_w )
+      face_selector_ew => get_face_selector_ew(mesh_id)
+      face_selector_ns => get_face_selector_ns(mesh_id)
+
       call invoke( name="split_wind", &
                    setval_c( state_uv, 0.0_r_solver ), &
-                   split_w2_field_kernel_type( state_uv, state_w, u_inc ) )
+                   split_w2_field_kernel_type( state_uv, state_w, u_inc, &
+                                               face_selector_ew, face_selector_ns ) )
     else
       state_uv => state%get_field_from_position( isol_u )
       call invoke( setval_X( state_uv, u_inc ) )
     end if
-
-    nullify( exner_inc,       &
-             div_star,        &
-             u_normalisation, &
-             state_uv,        &
-             state_p,         &
-             state_w )
 
     if ( subroutine_timers ) call timer('Schur back substitute')
 

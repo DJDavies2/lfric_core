@@ -61,19 +61,17 @@ contains
 
     ! Set Det(J) and time step
     detj = (/ 2.0_r_tran, 4.0_r_tran, 5.0_r_tran, 6.0_r_tran, 8.0_r_tran /)
-    dt   = 2.0_r_tran
 
     ! Set departure points
     dep_pts = (/ 0.0_r_tran, 0.5_r_tran, 1.2_r_tran, -1.3_r_tran, -0.8_r_tran, 0.0_r_tran /)
 
-    ! Answer is fractional_departure_distance * upwind Det(j) / dt
-    answer = (/ 0.0_r_tran,  0.5_r_tran,  0.2_r_tran,  -1.2_r_tran,  -3.2_r_tran,  0.0_r_tran /)
+    ! Answer is fractional_departure_distance * upwind Det(j)
+    answer = (/ 0.0_r_tran,  1.0_r_tran,  0.4_r_tran,  -2.4_r_tran,  -6.4_r_tran,  0.0_r_tran /)
 
     call fractional_vertical_wind_code( nlayers,   &
                                         frac_wind, &
                                         dep_pts,   &
                                         detj,      &
-                                        dt,        &
                                         ndf_w2v,   &
                                         undf_w2v,  &
                                         map_w2v,   &

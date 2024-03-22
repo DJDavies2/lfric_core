@@ -13,6 +13,8 @@ module intermesh_mappings_alg_mod
   use constants_mod,                  only : i_def, r_def, l_def
   use enforce_lower_bound_kernel_mod, only : enforce_lower_bound_kernel_type
   use extrusion_mod,                  only : SHIFTED, TWOD
+  use geometric_constants_mod,        only : get_face_selector_ew, &
+                                             get_face_selector_ns
   use field_collection_mod,           only : field_collection_type
   use finite_element_config_mod,      only : element_order
   use field_mod,                      only : field_type
@@ -20,6 +22,7 @@ module intermesh_mappings_alg_mod
   use function_space_mod,             only : function_space_type
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : W2, Wtheta, W3
+  use integer_field_mod,              only : integer_field_type
   use log_mod,                        only : log_event, LOG_LEVEL_ERROR
   use mesh_collection_mod,            only : mesh_collection
   use mesh_mod,                       only : mesh_type
@@ -75,11 +78,11 @@ contains
     type(field_type), intent(inout) :: shifted_rho
     type(field_type), intent(in)    :: primary_rho
 
-    type(mesh_type),  pointer :: prime_extrusion_mesh => null()
-    type(mesh_type),  pointer :: shifted_mesh => null()
-    type(field_type), pointer :: detj_shifted => null()
-    type(field_type), pointer :: detj_primary => null()
-    type(function_space_type), pointer :: sh_w3_fs => null()
+    type(mesh_type),  pointer :: prime_extrusion_mesh
+    type(mesh_type),  pointer :: shifted_mesh
+    type(field_type), pointer :: detj_shifted
+    type(field_type), pointer :: detj_primary
+    type(function_space_type), pointer :: sh_w3_fs
 
     ! Obtain shifted densities
     prime_extrusion_mesh => primary_rho%get_mesh()
@@ -95,8 +98,6 @@ contains
                                                primary_rho,  &
                                                detj_shifted, &
                                                detj_primary) )
-
-    nullify(prime_extrusion_mesh, shifted_mesh, sh_w3_fs, detj_shifted, detj_primary)
 
   end subroutine obtain_shifted_rho
 
@@ -237,8 +238,8 @@ contains
     type(field_type)                          :: recovered_field_coarse
     type(field_type)                          :: rev_correction_fine
     type(field_type)                          :: rev_correction_coarse
-    type(function_space_type),        pointer :: fs_coarse => null()
-    type(function_space_type),        pointer :: fs_fine => null()
+    type(function_space_type),        pointer :: fs_coarse
+    type(function_space_type),        pointer :: fs_fine
 
     fs_coarse => source_field%get_function_space()
     fs_fine => target_field%get_function_space()
@@ -255,8 +256,6 @@ contains
     call prolong_scalar_simple(rev_correction_fine, rev_correction_coarse, recovery_order_constant)
     ! Add together constituent fields
     call invoke( X_plus_Y(target_field, recovered_field_fine, rev_correction_fine) )
-
-    nullify(fs_coarse, fs_fine)
 
   end subroutine prolong_scalar_reversible
 
@@ -282,16 +281,16 @@ contains
     logical(kind=l_def), optional, intent(in)    :: lowest_order_flag
 
 
-    type(mesh_type), pointer  :: source_mesh => null()
-    type(mesh_type), pointer  :: source_mesh_2d => null()
-    type(mesh_type), pointer  :: target_mesh => null()
+    type(mesh_type), pointer  :: source_mesh
+    type(mesh_type), pointer  :: source_mesh_2d
+    type(mesh_type), pointer  :: target_mesh
     type(field_type)          :: source_mask_temp
     integer(kind=i_def)       :: source_ncells
     integer(kind=i_def)       :: target_ncells
     integer(kind=i_def)       :: recovery_order_arg
     integer(kind=i_def)       :: ndata, nlayers
-    type(function_space_type), pointer :: fs_type => null()
-    type(function_space_type), pointer :: fs_source_2d => null()
+    type(function_space_type), pointer :: fs_type
+    type(function_space_type), pointer :: fs_source_2d
 
     ! Get source and target mesh ids and meshes
     source_mesh => source_field%get_mesh()
@@ -348,8 +347,6 @@ contains
       end if
     end if
 
-    nullify(source_mesh, target_mesh, fs_type, fs_source_2d)
-
   end subroutine map_scalar_intermesh
 
   !> @brief Interface to map_scalar_intermesh where lowest_order_flag option is not required
@@ -380,15 +377,13 @@ contains
 
     type(field_type),           intent(in)    :: source_field
     type(field_type),           intent(inout) :: target_field
-    type(field_type),           pointer       :: weights => null()
+    type(field_type),           pointer       :: weights
 
     weights => get_intermesh_weights_w3_rdef(source_field%get_mesh(), &
                                              target_field%get_mesh())
 
     call invoke( name='restrict_scalar_weighted',                              &
       restrict_scalar_weighted_kernel_type(target_field, source_field, weights) )
-
-    nullify(weights)
 
   end subroutine restrict_rho
 
@@ -405,7 +400,7 @@ contains
 
     type(field_type),           intent(in)    :: source_field
     type(field_type),           intent(inout) :: target_field
-    type(field_type),           pointer       :: weights => null()
+    type(field_type),           pointer       :: weights
 
     weights => get_intermesh_weights_w3_rdef(target_field%get_mesh(), &
                                              source_field%get_mesh())
@@ -413,8 +408,6 @@ contains
     call invoke(                                                       &
       setval_c(target_field, 0.0_r_def),                               &
       prolong_scalar_weighted_kernel_type(target_field, source_field, weights) )
-
-    nullify(weights)
 
   end subroutine inject_rho
 
@@ -431,8 +424,8 @@ contains
     type(field_type)                          :: recovered_field_coarse
     type(field_type)                          :: mass_correction_fine
     type(field_type)                          :: mass_correction_coarse
-    type(function_space_type),        pointer :: w3_fs_coarse => null()
-    type(function_space_type),        pointer :: w3_fs_fine => null()
+    type(function_space_type),        pointer :: w3_fs_coarse
+    type(function_space_type),        pointer :: w3_fs_fine
 
     w3_fs_coarse => source_field%get_function_space()
     w3_fs_fine => target_field%get_function_space()
@@ -450,8 +443,6 @@ contains
     ! Add together constituent fields
     call invoke( X_plus_Y(target_field, recovered_field_fine, mass_correction_fine) )
 
-    nullify(w3_fs_coarse, w3_fs_fine)
-
   end subroutine prolong_rho_reversible
 
   !> @brief Public routine for conservatively mapping a W3 field between meshes
@@ -468,8 +459,8 @@ contains
     type(field_type),           intent(in)    :: source_field
     type(field_type),           intent(inout) :: target_field
 
-    type(mesh_type),           pointer :: source_mesh => null()
-    type(mesh_type),           pointer :: target_mesh => null()
+    type(mesh_type),           pointer :: source_mesh
+    type(mesh_type),           pointer :: target_mesh
     integer(kind=i_def)                :: source_ncells
     integer(kind=i_def)                :: target_ncells
 
@@ -503,8 +494,6 @@ contains
       end if
     end if
 
-    nullify(source_mesh, target_mesh)
-
   end subroutine map_rho_intermesh
 
   !> @details An algorithm for mapping W2 vector fields
@@ -521,9 +510,11 @@ contains
     type(field_type),    intent(in)    :: source_field
     type(field_type),    intent(inout) :: target_field
 
-    type(field_type),          pointer :: weights => null()
-    type(mesh_type),           pointer :: source_mesh => null()
-    type(mesh_type),           pointer :: target_mesh => null()
+    type(field_type),          pointer :: weights
+    type(mesh_type),           pointer :: source_mesh
+    type(mesh_type),           pointer :: target_mesh
+    type(integer_field_type),  pointer :: face_selector_ew
+    type(integer_field_type),  pointer :: face_selector_ns
     integer(kind=i_def)                :: source_ncells
     integer(kind=i_def)                :: target_ncells
 
@@ -537,13 +528,16 @@ contains
 
     ! Map W2 vector field from source to target
     if ( source_ncells > target_ncells ) then
-      call invoke( restrict_w2_kernel_type(target_field, source_field) )
+      face_selector_ew => get_face_selector_ew(target_mesh%get_id())
+      face_selector_ns => get_face_selector_ns(target_mesh%get_id())
+      call invoke( restrict_w2_kernel_type(target_field, source_field, &
+                                           face_selector_ew, face_selector_ns) )
+
     else if ( source_ncells < target_ncells ) then
       weights => get_intermesh_weights_w2(target_mesh, source_mesh)
       ! Prolong kernel increments target_field, so need to set it to be 0 first
       call invoke( setval_c(target_field, 0.0_r_def), &
                    prolong_w2_kernel_type(target_field, source_field, weights) )
-      nullify(weights)
 
     else
       call invoke( setval_X(target_field, source_field) )
@@ -565,8 +559,8 @@ contains
     type(field_type),    intent(in)    :: source_field
     type(field_type),    intent(inout) :: target_field
 
-    type(mesh_type), pointer  :: source_mesh => null()
-    type(mesh_type), pointer  :: target_mesh => null()
+    type(mesh_type), pointer  :: source_mesh
+    type(mesh_type), pointer  :: target_mesh
     integer(kind=i_def)       :: source_ncells
     integer(kind=i_def)       :: target_ncells
 
@@ -615,8 +609,8 @@ contains
     type(field_type)                   :: target_field_sh_w3
     type(field_type)                   :: source_field_sh_w3
     type(field_type)                   :: rho_X_source, rho_X_target
-    type(function_space_type), pointer :: target_sh_w3_fs => null()
-    type(function_space_type), pointer :: source_sh_w3_fs => null()
+    type(function_space_type), pointer :: target_sh_w3_fs
+    type(function_space_type), pointer :: source_sh_w3_fs
 
     target_sh_w3_fs => target_rho_sh_w3%get_function_space()
     source_sh_w3_fs => source_rho_sh_w3%get_function_space()
@@ -638,8 +632,6 @@ contains
     call invoke( setval_c(target_field, 0.0_r_def))
     call invoke( X_divideby_Y(target_field_sh_w3, rho_X_target, target_rho_sh_w3) )
     call invoke( inject_sh_w3_to_wt_kernel_type(target_field, target_field_sh_w3) )
-
-    nullify(target_sh_w3_fs, source_sh_w3_fs)
 
   end subroutine restrict_mr
 
@@ -665,8 +657,8 @@ contains
     type(field_type)                   :: target_field_sh_w3
     type(field_type)                   :: source_field_sh_w3
     type(field_type)                   :: rho_X_source, rho_X_target
-    type(function_space_type), pointer :: target_sh_w3_fs => null()
-    type(function_space_type), pointer :: source_sh_w3_fs => null()
+    type(function_space_type), pointer :: target_sh_w3_fs
+    type(function_space_type), pointer :: source_sh_w3_fs
 
     target_sh_w3_fs => target_rho_sh_w3%get_function_space()
     source_sh_w3_fs => source_rho_sh_w3%get_function_space()
@@ -688,8 +680,6 @@ contains
     call invoke( setval_c(target_field, 0.0_r_def))
     call invoke( X_divideby_Y(target_field_sh_w3, rho_X_target, target_rho_sh_w3) )
     call invoke( inject_sh_w3_to_wt_kernel_type(target_field, target_field_sh_w3) )
-
-    nullify(target_sh_w3_fs, source_sh_w3_fs)
 
   end subroutine inject_mr
 
@@ -721,8 +711,8 @@ contains
     type(field_type)                   :: recovered_field_fine
     type(field_type)                   :: recovered_field_coarse
     type(field_type)                   :: rev_correction_fine
-    type(function_space_type), pointer :: wt_fs_coarse => null()
-    type(function_space_type), pointer :: wt_fs_fine => null()
+    type(function_space_type), pointer :: wt_fs_coarse
+    type(function_space_type), pointer :: wt_fs_fine
     logical(kind=l_def)                :: moisture_advective
 
     wt_fs_coarse => source_field%get_function_space()
@@ -752,8 +742,6 @@ contains
     call invoke( inc_X_minus_Y(rev_correction_fine, inject_field), &
                  X_minus_Y(target_field, recovered_field_fine, rev_correction_fine) )
 
-    nullify(wt_fs_coarse, wt_fs_fine)
-
   end subroutine prolong_mr_reversible
 
   !> @brief Maps a bundle of mixing ratios between meshes
@@ -779,8 +767,8 @@ contains
     type(field_type), intent(in)    :: target_rho
     type(field_type), intent(in)    :: source_rho
 
-    type(mesh_type),        pointer :: source_mesh => null()
-    type(mesh_type),        pointer :: target_mesh => null()
+    type(mesh_type),        pointer :: source_mesh
+    type(mesh_type),        pointer :: target_mesh
     integer(kind=i_def)             :: source_ncells
     integer(kind=i_def)             :: target_ncells
     integer(kind=i_def)             :: imr, bundle_size
@@ -932,8 +920,8 @@ contains
     integer(kind=i_def)                :: source_ncells
     integer(kind=i_def)                :: target_ncells
     integer(kind=i_def)                :: imr, bundle_size
-    type(mesh_type),           pointer :: source_mesh => null()
-    type(mesh_type),           pointer :: target_mesh => null()
+    type(mesh_type),           pointer :: source_mesh
+    type(mesh_type),           pointer :: target_mesh
     type(field_type)                   :: target_rho_sh_w3
     type(field_type)                   :: source_rho_sh_w3
     type(field_type)                   :: lambda
@@ -1078,8 +1066,6 @@ contains
       deallocate(target_mr_inc)
       if (allocated(inject_mr_np1)) deallocate(inject_mr_np1)
     end if
-
-    nullify(source_mesh, target_mesh)
 
   end subroutine apply_mr_incs
 

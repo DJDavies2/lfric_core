@@ -6,12 +6,12 @@ prime_mesh_name='C6',
 topology='fully_periodic',
 /
 &departure_points
-departure_grid='uniform',
 horizontal_limit='none',
-method='euler',
+horizontal_method='euler',
 n_dep_pt_iterations=1,
 vertical_limit='exponential',
 vertical_method='trapezoidal',
+vertical_sorting=.false.
 /
 &boundaries
 limited_area=.false.,
@@ -241,6 +241,7 @@ cfl_mol_3d_stab = 2.0
 cheap_update=.false.
 consistent_metric=.false.,
 dry_field_name='density'
+extended_mesh=.false.
 fv_horizontal_order=2,
 fv_vertical_order=2,
 adjust_theta=.false.

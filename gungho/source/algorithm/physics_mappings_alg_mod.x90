@@ -18,7 +18,10 @@ module physics_mappings_alg_mod
   use function_space_collection_mod,         only: function_space_collection
   use galerkin_projection_algorithm_mod,     only: galerkin_projection_algorithm
   use geometric_constants_mod,               only: get_height, get_panel_id, &
-                                                   get_coordinates
+                                                   get_coordinates,          &
+                                                   get_face_selector_ew,     &
+                                                   get_face_selector_ns
+  use integer_field_mod,                     only: integer_field_type
   use log_mod,                               only: LOG_LEVEL_ERROR, log_event, &
                                                    LOG_LEVEL_DEBUG
   use mesh_mod,                              only: mesh_type
@@ -58,9 +61,9 @@ contains
     type( quadrature_xyoz_type )          :: qr
     type( quadrature_rule_gaussian_type ) :: quadrature_rule
     type( field_type )                    :: projected_field(1)
-    type( field_type ), pointer           :: height_w3 => null()
-    type( field_type ), pointer           :: height_wt => null()
-    type( mesh_type ),  pointer           :: mesh => null()
+    type( field_type ), pointer           :: height_w3
+    type( field_type ), pointer           :: height_wt
+    type( mesh_type ),  pointer           :: mesh
     integer( kind=i_def )                 :: space_dim
 
     call log_field_minmax( LOG_LEVEL_DEBUG, 'source field', source_field )
@@ -84,7 +87,6 @@ contains
         height_wt => get_height(WTHETA, mesh%get_id() )
         call invoke( sample_w3_to_wtheta_kernel_type(target_field, source_field, &
                                                      height_wt, height_w3 ) )
-        nullify(height_w3, height_wt)
 
       elseif (( target_field%which_function_space() == W3 ) &
               .and. ( source_field%which_function_space() == WTHETA )) then
@@ -123,8 +125,8 @@ contains
     type( field_type ), intent( inout ) :: u1_field, u2_field, u3_field
     type( field_type ), intent( in )    :: source_field
     type( field_type )                  :: wind_map(3), physical_chi(3)
-    type( field_type ), pointer         :: chi(:) => null()
-    type( field_type ), pointer         :: panel_id => null()
+    type( field_type ), pointer         :: chi(:)
+    type( field_type ), pointer         :: panel_id
     ! quatrature rule
     type( quadrature_xyoz_type )          :: qr
     type( quadrature_rule_gaussian_type ) :: quadrature_rule
@@ -201,11 +203,13 @@ contains
     type(field_type), intent(in)     :: wind
     type(mesh_type),  intent(in), pointer :: mesh
 
-    type(field_type), pointer    :: chi(:) => null(), &
-                                    panel_id => null()
+    type(field_type), pointer    :: chi(:)
+    type(field_type), pointer    :: panel_id
     type(field_type)             :: physical_wind(3)
     type(field_type)             :: physical_chi(3)
     type(field_type), pointer    :: w2_rmultiplicity
+    type(integer_field_type), pointer :: face_selector_ew
+    type(integer_field_type), pointer :: face_selector_ns
 
     integer(i_def)               :: i, fs_id
 
@@ -250,15 +254,26 @@ contains
 
     fs_id = wind%which_function_space()
 
+    face_selector_ew => get_face_selector_ew(mesh%get_id())
+    face_selector_ns => get_face_selector_ns(mesh%get_id())
+
     select case( fs_id )
       case ( W2 )
         call invoke( extract_w_kernel_type(u3_wind, physical_wind(3)),  &
-                     extract_uv_kernel_type(u1_wind, physical_wind(1)), &
-                     extract_uv_kernel_type(u2_wind, physical_wind(2)) )
+                     extract_uv_kernel_type(u1_wind, physical_wind(1),  &
+                                            face_selector_ew,           &
+                                            face_selector_ns),          &
+                     extract_uv_kernel_type(u2_wind, physical_wind(2),  &
+                                            face_selector_ew,           &
+                                            face_selector_ns) )
       case ( W2H )
         call invoke( setval_c(u3_wind, 0.0_r_def),                      &
-                     extract_uv_kernel_type(u1_wind, physical_wind(1)), &
-                     extract_uv_kernel_type(u2_wind, physical_wind(2)) )
+                     extract_uv_kernel_type(u1_wind, physical_wind(1),  &
+                                            face_selector_ew,           &
+                                            face_selector_ns),          &
+                     extract_uv_kernel_type(u2_wind, physical_wind(2),  &
+                                            face_selector_ew,           &
+                                            face_selector_ns) )
       case default
         call log_event("Not possible to extract winds for this function space", &
                         LOG_LEVEL_ERROR )

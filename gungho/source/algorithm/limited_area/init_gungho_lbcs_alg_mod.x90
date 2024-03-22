@@ -9,11 +9,14 @@ module init_gungho_lbcs_alg_mod
 
   use constants_mod,                   only: i_def, r_def, str_def
   use field_mod,                       only: field_type
+  use integer_field_mod,               only: integer_field_type
   use field_collection_mod,            only: field_collection_type
   use formulation_config_mod,          only: moisture_formulation,    &
                                              moisture_formulation_dry
   use fs_continuity_mod,               only: W2, W3, Wtheta
-  use geometric_constants_mod,         only: get_da_at_w2
+  use geometric_constants_mod,         only: get_da_at_w2,         &
+                                             get_face_selector_ew, &
+                                             get_face_selector_ns
   use initialization_config_mod,       only: lbc_option,             &
                                              lbc_option_gungho_file, &
                                              lbc_option_um2lfric_file
@@ -64,27 +67,27 @@ module init_gungho_lbcs_alg_mod
     type( field_collection_type ), intent(in)    :: prognostic_fields
     type( field_collection_type ), intent(inout) :: lbc_fields
 
-    type( field_type ), pointer :: theta => null()
-    type( field_type ), pointer :: u     => null()
-    type( field_type ), pointer :: rho   => null()
-    type( field_type ), pointer :: exner => null()
-    type( field_type ), pointer :: mr => null()
+    type( field_type ), pointer :: theta
+    type( field_type ), pointer :: u
+    type( field_type ), pointer :: rho
+    type( field_type ), pointer :: exner
+    type( field_type ), pointer :: mr
 
-    type( field_type ), pointer :: lbc_theta  => null()
-    type( field_type ), pointer :: lbc_u      => null()
-    type( field_type ), pointer :: lbc_rho    => null()
-    type( field_type ), pointer :: lbc_exner  => null()
-    type( field_type ), pointer :: lbc_mr  => null()
-    type( field_type ), pointer :: boundary_u => null()
+    type( field_type ), pointer :: lbc_theta
+    type( field_type ), pointer :: lbc_u
+    type( field_type ), pointer :: lbc_rho
+    type( field_type ), pointer :: lbc_exner
+    type( field_type ), pointer :: lbc_mr
+    type( field_type ), pointer :: boundary_u
 
-    type( field_type ), pointer :: w2_lbc_mask      => null()
-    type( field_type ), pointer :: w3_lbc_mask      => null()
-    type( field_type ), pointer :: wtheta_lbc_mask  => null()
-    type( field_type ), pointer :: w2_boundary_mask => null()
+    type( field_type ), pointer :: w2_lbc_mask
+    type( field_type ), pointer :: w3_lbc_mask
+    type( field_type ), pointer :: wtheta_lbc_mask
+    type( field_type ), pointer :: w2_boundary_mask
 
     character(str_def)          :: lbc_name
     integer(i_def)              :: imr
-    type(mesh_type), pointer    :: mesh => null()
+    type(mesh_type), pointer    :: mesh
 
     call prognostic_fields%get_field( 'theta', theta )
     call prognostic_fields%get_field( 'u', u )
@@ -118,14 +121,9 @@ module init_gungho_lbcs_alg_mod
 
         call invoke( X_times_Y( lbc_mr, mr, wtheta_lbc_mask ) )
 
-      enddo
+      end do
 
-    endif
-
-    nullify( w2_lbc_mask, w3_lbc_mask, wtheta_lbc_mask, w2_boundary_mask )
-    nullify( theta, u, rho, exner, mr )
-    nullify( lbc_theta, lbc_u, lbc_rho, lbc_exner, lbc_mr, boundary_u )
-    nullify( mesh )
+    end if
 
   end subroutine init_lbcs_analytic_alg
 
@@ -240,11 +238,13 @@ module init_gungho_lbcs_alg_mod
 
     type( field_collection_type ), intent(inout) :: fields
     logical, intent(in)                          :: extensive
-    type(field_type), pointer                    :: wind => null()
-    type(field_type), pointer                    :: h_wind => null()
-    type(field_type), pointer                    :: v_wind => null()
+    type(field_type), pointer                    :: wind
+    type(field_type), pointer                    :: h_wind
+    type(field_type), pointer                    :: v_wind
+    type(integer_field_type), pointer            :: face_selector_ew
+    type(integer_field_type), pointer            :: face_selector_ns
 
-    type( field_type ), pointer :: dA => null()
+    type( field_type ), pointer :: dA
     integer(i_def)              :: mesh_id
 
     write(log_scratch_space,'(A)') "Combining winds "
@@ -254,12 +254,20 @@ module init_gungho_lbcs_alg_mod
     call fields%get_field("lbc_v_u", v_wind)
     call fields%get_field("lbc_u", wind)
 
+    mesh_id = wind%get_mesh_id()
+
+    face_selector_ew => get_face_selector_ew(mesh_id)
+    face_selector_ns => get_face_selector_ns(mesh_id)
+
     if (extensive)then
-      call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind))
+      call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind,          &
+                                                face_selector_ew,              &
+                                                face_selector_ns) )
     else
-      mesh_id = wind%get_mesh_id()
       dA => get_da_at_w2(mesh_id)
-      call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind),    &
+      call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind,          &
+                                                face_selector_ew,              &
+                                                face_selector_ns),             &
                    inc_X_times_Y(wind, dA) )
     end if
 
@@ -274,11 +282,11 @@ module init_gungho_lbcs_alg_mod
     implicit none
 
     type( field_collection_type ), intent(inout) :: lbc_fields
-    type( field_type ), pointer :: lbc_field  => null()
-    type( field_type ), pointer :: boundary_u => null()
-    type( field_type ), pointer :: w2_boundary_mask => null()
+    type( field_type ), pointer :: lbc_field
+    type( field_type ), pointer :: boundary_u
+    type( field_type ), pointer :: w2_boundary_mask
 
-    type( mesh_type ), pointer :: mesh => null()
+    type( mesh_type ), pointer :: mesh
 
     call lbc_fields%get_field( 'lbc_u', lbc_field )
     call lbc_fields%get_field( 'boundary_u_driving', boundary_u )

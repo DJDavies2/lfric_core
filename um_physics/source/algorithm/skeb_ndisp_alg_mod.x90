@@ -14,6 +14,7 @@ module skeb_ndisp_alg_mod
     use field_mod,            only: field_type
     use field_collection_mod, only: field_collection_type
     use function_space_mod,   only: function_space_type
+    use integer_field_mod,    only: integer_field_type
     use mesh_mod,             only: mesh_type
     use operator_mod,         only: operator_type
     ! use collections
@@ -58,8 +59,10 @@ module skeb_ndisp_alg_mod
   use um_domain_init_mod,        only: model_wavenumber_max
 
   ! Gemoetrical and vectorial operators
-  use geometric_constants_mod,        only: get_coordinates, &
-                                            get_panel_id
+  use geometric_constants_mod,        only: get_coordinates,      &
+                                            get_panel_id,         &
+                                            get_face_selector_ew, &
+                                            get_face_selector_ns
 
   use fem_constants_mod,              only: get_div_h,               &
                                             get_div,                 &
@@ -100,8 +103,10 @@ module skeb_ndisp_alg_mod
   type(function_space_type) , pointer :: w3_fs => null()
 
   ! from operators
-  type(field_type), pointer       :: chi(:) => null()
-  type(field_type), pointer       :: panel_id => null()
+  type(field_type),         pointer :: chi(:) => null()
+  type(field_type),         pointer :: panel_id => null()
+  type(integer_field_type), pointer :: face_selector_ew => null()
+  type(integer_field_type), pointer :: face_selector_ns => null()
 
   ! Horizontal wind and Divergence of Horizontal Wind
   type(field_type) :: u_h, r_div_u, div_u_h, grad_div_u
@@ -163,6 +168,8 @@ module skeb_ndisp_alg_mod
   div_h            => get_div_h(mesh%get_id())
   m3_inv           => get_inverse_w3_mass_matrix(mesh%get_id())
   curl             => get_curl(mesh%get_id())
+  face_selector_ew => get_face_selector_ew(mesh%get_id())
+  face_selector_ns => get_face_selector_ns(mesh%get_id())
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!  2)  calculate horizontal divergence & vertical component of vorticity  !!
@@ -171,7 +178,9 @@ module skeb_ndisp_alg_mod
   ! Calculate horizontal divergence of wind in W3, div_u_h
   call invoke( setval_c(u_h, 0.0_r_def),                                  &
                ! Extract wind horizontal coords
-               extract_uv_kernel_type(u_h, u ),                           &
+               extract_uv_kernel_type( u_h, u,                            &
+                                       face_selector_ew,                  &
+                                       face_selector_ns ),                &
                ! Do divergence: apply diverge operator (div_h) to horizontal
                ! wind u_h, output is r_div_u on W3
                dg_matrix_vector_kernel_type( r_div_u, u_h, div_h ),       &

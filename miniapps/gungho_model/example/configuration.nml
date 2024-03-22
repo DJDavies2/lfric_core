@@ -220,12 +220,12 @@ stretching_method='linear',
 /
 
 &departure_points
-  departure_grid      = 'uniform'
   horizontal_limit    = 'none'
-  method              = 'euler'
+  horizontal_method   = 'euler'
   n_dep_pt_iterations = 1
   vertical_limit      = 'exponential'
   vertical_method     = 'euler'
+  vertical_sorting    = .false.
 /
 
 &transport

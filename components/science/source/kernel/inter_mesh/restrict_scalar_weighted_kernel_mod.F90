@@ -54,7 +54,7 @@ contains
   !!                                         cells lie in the coarse grid cell
   !> @param[in]     ncell_fine_per_coarse_x  Number of fine cells per coarse
   !!                                         cell in the horizontal x-direction
-  !> @param[in]     ncell_fine_per_coarse_x  Number of fine cells per coarse
+  !> @param[in]     ncell_fine_per_coarse_y  Number of fine cells per coarse
   !!                                         cell in the horizontal y-direction
   !> @param[in]     ncell_fine               Number of cells in the partition
   !!                                         for the fine grid

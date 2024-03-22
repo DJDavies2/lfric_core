@@ -21,14 +21,16 @@ module geometric_constants_mod
   use fs_continuity_mod,                  only: W0, W1, W2, W2H, W3, Wtheta, Wchi
   use function_space_collection_mod,      only: function_space_collection
   use function_space_mod,                 only: function_space_type
-  use inventory_by_local_mesh_mod,        only: inventory_by_local_mesh_type
+  use integer_field_mod,                  only: integer_field_type
   use inventory_by_mesh_mod,              only: inventory_by_mesh_type
+  use inventory_by_local_mesh_mod,        only: inventory_by_local_mesh_type
   use io_config_mod,                      only: subroutine_timers
   use local_mesh_mod,                     only: local_mesh_type
   use log_mod,                            only: log_event, LOG_LEVEL_INFO, &
                                                 LOG_LEVEL_ERROR
   use mesh_collection_mod,                only: mesh_collection
   use mesh_mod,                           only: mesh_type
+  use reference_element_mod,              only: S, W
   use timer_mod,                          only: timer
 
   ! Other algorithms
@@ -51,6 +53,8 @@ module geometric_constants_mod
   use compute_latlon_kernel_mod,          only: compute_latlon_kernel_type
   use get_height_kernel_mod,              only: get_height_kernel_type
   use get_dz_w3_kernel_mod,               only: get_dz_w3_kernel_type
+  use set_any_int_dof_kernel_mod,         only: set_any_int_dof_kernel_type
+  use face_selector_kernel_mod,           only: face_selector_kernel_type
 
   use extend_chi_field_kernel_mod,        only: extend_chi_field
   implicit none
@@ -77,6 +81,8 @@ module geometric_constants_mod
   type(inventory_by_mesh_type) :: lat_w3_inventory
   type(inventory_by_mesh_type) :: lat_w2_inventory
   type(inventory_by_mesh_type) :: long_w3_inventory
+  type(inventory_by_local_mesh_type) :: face_selector_ew_inventory
+  type(inventory_by_local_mesh_type) :: face_selector_ns_inventory
   type(inventory_by_local_mesh_type) :: w3_to_w2_displacement_inventory
 
   ! Public functions to create and access the module contents
@@ -94,6 +100,8 @@ module geometric_constants_mod
   public :: get_longitude
   public :: get_chi_inventory
   public :: get_panel_id_inventory
+  public :: get_face_selector_ew
+  public :: get_face_selector_ns
   public :: get_w3_to_w2_displacement
 
 contains
@@ -123,6 +131,7 @@ contains
     type(function_space_type), pointer :: wchi_fs  => null()
     type(function_space_type), pointer :: w2_2d_fs  => null() ! lowest order w2 fs
     type(function_space_type), pointer :: w3_2d_fs  => null() ! lowest order w3 fs
+    type(function_space_type), pointer :: w2h_2d_fs  => null() ! lowest order w2 fs
 
     ! Temporary runtime constants
     type(field_type), pointer :: extended_chi(:) => null()
@@ -136,9 +145,13 @@ contains
     type(field_type), pointer :: lat_w3 => null()
     type(field_type), pointer :: lat_w2 => null()
     type(field_type)          :: long_w2
+    type(integer_field_type)  :: face_counter
+    type(integer_field_type), pointer :: face_selector_ew => null()
+    type(integer_field_type), pointer :: face_selector_ns => null()
 
-    type(mesh_type), pointer :: mesh => null()
-    type(mesh_type), pointer :: twod_mesh => null()
+    type(mesh_type),       pointer :: mesh => null()
+    type(mesh_type),       pointer :: twod_mesh => null()
+    type(local_mesh_type), pointer :: local_mesh => null()
 
     ! Temporary values for iterating through list
     integer(kind=i_def) :: i, num_meshes
@@ -157,6 +170,8 @@ contains
     call long_w3_inventory%initialise(name="lon_w3", table_len=num_meshes)
     call lat_w3_inventory%initialise(name="lat_w3", table_len=num_meshes)
     call lat_w2_inventory%initialise(name="lat_w2", table_len=num_meshes)
+    call face_selector_ew_inventory%initialise(name="face_selector_ew", table_len=num_meshes)
+    call face_selector_ns_inventory%initialise(name="face_selector_ns", table_len=num_meshes)
     if ( extended_mesh ) call extended_chi_inventory%initialise(name="extended_chi", table_len=num_meshes)
 
     !==========================================================================!
@@ -283,6 +298,26 @@ contains
                                                chi_in(:,i),      &
                                                panel_id_in(i)  ) )
         nullify(dA_at_w2)
+      end if
+
+      !============================ Face selector =============================!
+
+      if ( label_list(i) == twod_mesh_label ) then
+        w2h_2d_fs  => function_space_collection%get_fs( mesh, 0, W2H )
+        local_mesh => mesh%get_local_mesh()
+        call face_counter%initialise( w2h_2d_fs )
+        call face_selector_ew_inventory%add_field(face_selector_ew, w3_k0_fs, local_mesh)
+        call face_selector_ns_inventory%add_field(face_selector_ns, w3_k0_fs, local_mesh)
+        call invoke( int_setval_c(face_counter, 0),                            &
+                     ! Do West and South faces for every cell
+                     int_setval_c(face_selector_ew, 1),                        &
+                     int_setval_c(face_selector_ns, 1),                        &
+                     set_any_int_dof_kernel_type(face_counter, W, 1),          &
+                     set_any_int_dof_kernel_type(face_counter, S, 1),          &
+                     face_selector_kernel_type(face_selector_ew,               &
+                                               face_selector_ns,               &
+                                               face_counter ) )
+        nullify(face_selector_ew, face_selector_ns)
       end if
 
     !========================= End loop through meshes ========================!
@@ -442,6 +477,40 @@ contains
     nullify(mesh)
 
   end function get_latitude_w2
+
+  !> @brief Returns a pointer to the east-west face selector
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The east-west face selector
+  function get_face_selector_ew(mesh_id) result(selector)
+    implicit none
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh => null()
+    type(local_mesh_type),    pointer :: local_mesh => null()
+    type(integer_field_type), pointer :: selector
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    local_mesh => mesh%get_local_mesh()
+    call face_selector_ew_inventory%get_field(local_mesh, selector)
+    nullify(mesh, local_mesh)
+
+  end function get_face_selector_ew
+
+  !> @brief Returns a pointer to the north-south face selector
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The north-south face selector
+  function get_face_selector_ns(mesh_id) result(selector)
+    implicit none
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh => null()
+    type(local_mesh_type),    pointer :: local_mesh => null()
+    type(integer_field_type), pointer :: selector
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    local_mesh => mesh%get_local_mesh()
+    call face_selector_ns_inventory%get_field(local_mesh, selector)
+    nullify(mesh, local_mesh)
+
+  end function get_face_selector_ns
 
   !> @brief Returns a pointer to the longitude map
   !> @param[in] mesh_id The ID of the mesh to get the object for

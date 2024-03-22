@@ -18,36 +18,50 @@ module transport_runtime_alg_mod
                                             check_any_hori_scheme_sl,        &
                                             check_any_vert_scheme_sl,        &
                                             check_any_reversible_sl,         &
-                                            check_any_shifted,               &
+                                            check_wind_shifted,              &
                                             check_horz_dep_pts,              &
                                             check_vert_dep_pts,              &
                                             check_any_splitting_vhv,         &
+                                            check_any_splitting_hvh,         &
                                             check_any_eqn_consistent,        &
                                             check_any_consistent_swift,      &
                                             check_any_consistent_cosmic,     &
                                             get_required_stencil_depth
-
-  use constants_mod,                  only: r_def, r_second, i_def, l_def,  &
-                                            str_def, tiny_eps, imdi, r_tran
-  use cosmic_index_alg_mod,           only: cosmic_index_alg
+  use constants_mod,                  only: r_def, r_second, i_def, l_def,   &
+                                            str_def, tiny_eps, imdi, r_tran, &
+                                            EPS_R_TRAN
   use extrusion_mod,                  only: SHIFTED, TWOD
-  use r_tran_field_mod,               only: r_tran_field_type
-  use integer_field_mod,              only: integer_field_type
+  use fem_constants_mod,              only: get_detj_at_w3_r_tran
   use field_mod,                      only: field_type
+  use field_minmax_alg_mod,           only: get_field_minmax, &
+                                            log_field_minmax
   use finite_element_config_mod,      only: element_order
   use fs_continuity_mod,              only: W2, W2h, W2v, W3, Wtheta
   use function_space_mod,             only: function_space_type
   use function_space_collection_mod,  only: function_space_collection
+  use geometric_constants_mod,        only: get_panel_id,         &
+                                            get_face_selector_ew, &
+                                            get_face_selector_ns
+  use integer_field_mod,              only: integer_field_type
   use io_config_mod,                  only: subroutine_timers
+  use lipschitz_horizontal_kernel_mod, &
+                                      only: lipschitz_horizontal_kernel_type
+  use lipschitz_vertical_kernel_mod, &
+                                      only: lipschitz_vertical_kernel_type
   use local_mesh_mod,                 only: local_mesh_type
   use log_mod,                        only: log_event,            &
                                             log_scratch_space,    &
                                             LOG_LEVEL_ERROR,      &
+                                            LOG_LEVEL_DEBUG,      &
                                             LOG_LEVEL_INFO,       &
                                             log_level
   use mesh_mod,                       only: mesh_type
   use mesh_collection_mod,            only: mesh_collection
   use model_clock_mod,                only: model_clock_type
+  use r_tran_field_mod,               only: r_tran_field_type
+  use remap_on_extended_mesh_alg_mod, only: initialise_remap_on_extended_mesh, &
+                                            remap_field_on_extended_mesh,      &
+                                            linear_remap
   use runtime_tools_mod,              only: check_initialised_field
   use subgrid_config_mod,             only: dep_pt_stencil_extent, &
                                             outer_order,           &
@@ -66,10 +80,7 @@ module transport_runtime_alg_mod
                                             splitting_none
 
   use psykal_lite_mod,                only: invoke_copy_to_rtran
-  use field_minmax_alg_mod,           only: get_field_minmax
-  use remap_on_extended_mesh_alg_mod, only: initialise_remap_on_extended_mesh, &
-                                            remap_field_on_extended_mesh,      &
-                                            linear_remap
+  use psykal_lite_transport_mod,      only: invoke_deep_X_times_Y
 
   implicit none
 
@@ -81,94 +92,66 @@ module transport_runtime_alg_mod
 
     private
 
-    integer(kind=i_def)                                     :: n_meshes
-    integer(kind=i_def)                                     :: local_mesh_id
-    integer(kind=i_def)                                     :: num_dry_steps
-    integer(kind=i_def)                                     :: tracer_step_ctr
-    integer(kind=i_def),        allocatable, dimension(:)   :: mesh_ids
-    integer(kind=i_def),        allocatable, dimension(:)   :: dep_stencil_extent_x
-    integer(kind=i_def),        allocatable, dimension(:)   :: dep_stencil_extent_y
-    integer(kind=i_def),        allocatable, dimension(:,:) :: tracer_stencil_extent_ix
-    integer(kind=i_def),        allocatable, dimension(:,:) :: tracer_stencil_extent_iy
-    integer(kind=i_def),        allocatable, dimension(:,:) :: tracer_stencil_extent_ox
-    integer(kind=i_def),        allocatable, dimension(:,:) :: tracer_stencil_extent_oy
-    type(r_tran_field_type),    allocatable, dimension(:)   :: advecting_wind
-    type(r_tran_field_type),    allocatable, dimension(:)   :: horizontal_advecting_wind
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vertical_advecting_wind
-    type(r_tran_field_type),    allocatable, dimension(:)   :: departure_points_x_w2
-    type(r_tran_field_type),    allocatable, dimension(:)   :: departure_points_y_w2
-    type(r_tran_field_type),    allocatable, dimension(:)   :: departure_points_z_w2
-    type(r_tran_field_type),    allocatable, dimension(:)   :: departure_points_z_half_w2
-    type(r_tran_field_type),    allocatable, dimension(:)   :: frac_wind_z
-    type(r_tran_field_type),    allocatable, dimension(:)   :: frac_wind_z_half
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: tracer_dep_pts_ix
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: tracer_dep_pts_iy
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: tracer_dep_pts_ox
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: tracer_dep_pts_oy
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: tracer_dep_pts_z
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: dry_frac_flux_ix
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: dry_frac_flux_iy
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: dry_frac_flux_ox
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: dry_frac_flux_oy
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: dry_frac_flux_z
-    type(r_tran_field_type),    allocatable, dimension(:)   :: adv_unity_x
-    type(r_tran_field_type),    allocatable, dimension(:)   :: adv_unity_y
-    type(r_tran_field_type),    allocatable, dimension(:)   :: adv_unity_z
-    type(r_tran_field_type),    allocatable, dimension(:)   :: adv_unity_half_x
-    type(r_tran_field_type),    allocatable, dimension(:)   :: adv_unity_half_y
-    type(r_tran_field_type),    allocatable, dimension(:)   :: adv_unity_half_z
-    type(r_tran_field_type)                                 :: field_n
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: rho_d
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: rho_d_ffsl_x
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: rho_d_ffsl_y
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: flux
-    type(r_tran_field_type),    allocatable, dimension(:,:) :: dry_flux
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vert_cubic_coef_w3
-    type(integer_field_type),   allocatable, dimension(:)   :: vert_cubic_index_w3
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vert_hermite_coef_w3
-    type(integer_field_type),   allocatable, dimension(:)   :: vert_hermite_index_w3
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vert_quintic_coef_w3
-    type(integer_field_type),   allocatable, dimension(:)   :: vert_quintic_index_w3
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vert_linear_coef_w3
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vert_cubic_coef_wt
-    type(integer_field_type),   allocatable, dimension(:)   :: vert_cubic_index_wt
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vert_hermite_coef_wt
-    type(integer_field_type),   allocatable, dimension(:)   :: vert_hermite_index_wt
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vert_quintic_coef_wt
-    type(integer_field_type),   allocatable, dimension(:)   :: vert_quintic_index_wt
-    type(r_tran_field_type),    allocatable, dimension(:)   :: vert_linear_coef_wt
-    type(integer_field_type),   allocatable, dimension(:)   :: cosmic_istart_x
-    type(integer_field_type),   allocatable, dimension(:)   :: cosmic_iend_x
-    type(integer_field_type),   allocatable, dimension(:)   :: cosmic_istart_y
-    type(integer_field_type),   allocatable, dimension(:)   :: cosmic_iend_y
-    type(integer_field_type),   allocatable, dimension(:,:) :: tracer_istart_ix
-    type(integer_field_type),   allocatable, dimension(:,:) :: tracer_iend_ix
-    type(integer_field_type),   allocatable, dimension(:,:) :: tracer_istart_iy
-    type(integer_field_type),   allocatable, dimension(:,:) :: tracer_iend_iy
-    type(integer_field_type),   allocatable, dimension(:,:) :: tracer_istart_ox
-    type(integer_field_type),   allocatable, dimension(:,:) :: tracer_iend_ox
-    type(integer_field_type),   allocatable, dimension(:,:) :: tracer_istart_oy
-    type(integer_field_type),   allocatable, dimension(:,:) :: tracer_iend_oy
-    real(kind=r_tran),          allocatable, dimension(:)   :: horizontal_cfl_max
-    real(kind=r_tran),          allocatable, dimension(:)   :: vertical_cfl_max
-    real(kind=r_tran),          allocatable, dimension(:)   :: total_cfl_max
-    class(model_clock_type),    pointer                     :: model_clock
-    logical(kind=l_def)                                     :: rho_monotone_remap
-    logical(kind=l_def)                                     :: rho_enforce_minvalue
-    real(kind=r_tran)                                       :: rho_minvalue
-    type(r_tran_field_type)                                 :: remap_weights
-    type(integer_field_type)                                :: remap_indices
-    logical(kind=l_def)                                     :: computed_remapping
-    logical(kind=l_def)                                     :: computed_dep_pt_idxs
-    type(integer_field_type)                                :: dep_pt_istart_x
-    type(integer_field_type)                                :: dep_pt_iend_x
-    type(integer_field_type)                                :: dep_pt_istart_y
-    type(integer_field_type)                                :: dep_pt_iend_y
+    integer(kind=i_def)                                       :: n_meshes
+    integer(kind=i_def)                                       :: local_mesh_id
+    integer(kind=i_def)                                       :: num_dry_steps
+    integer(kind=i_def)                                       :: tracer_step_ctr
+    integer(kind=i_def),        allocatable, dimension(:)     :: mesh_ids
+    integer(kind=i_def),        allocatable, dimension(:)     :: dep_stencil_extent_xy
+    integer(kind=i_def),        allocatable, dimension(:,:)   :: tracer_stencil_extent_ixy
+    integer(kind=i_def),        allocatable, dimension(:,:)   :: tracer_stencil_extent_oxy
+    type(r_tran_field_type),    allocatable, dimension(:)     :: advecting_wind
+    type(r_tran_field_type),    allocatable, dimension(:)     :: horizontal_advecting_wind
+    type(r_tran_field_type),    allocatable, dimension(:)     :: vertical_advecting_wind
+    type(r_tran_field_type),    allocatable, dimension(:)     :: dep_dist_xy_w2
+    type(r_tran_field_type),    allocatable, dimension(:)     :: dep_dist_xy_half_w2
+    type(r_tran_field_type),    allocatable, dimension(:)     :: dep_dist_z_w2
+    type(r_tran_field_type),    allocatable, dimension(:)     :: dep_dist_z_half_w2
+    type(r_tran_field_type),    allocatable, dimension(:)     :: frac_wind_z
+    type(r_tran_field_type),    allocatable, dimension(:)     :: frac_wind_z_half
+    type(r_tran_field_type),    allocatable, dimension(:)     :: frac_wind_xy
+    type(r_tran_field_type),    allocatable, dimension(:)     :: frac_wind_xy_half
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: tracer_dep_dist_z
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: tracer_dep_dist_ixy
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: tracer_dep_dist_oxy
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: dry_frac_flux_z
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: dry_frac_flux_ixy
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: dry_frac_flux_oxy
+    type(r_tran_field_type),    allocatable, dimension(:)     :: adv_unity_x
+    type(r_tran_field_type),    allocatable, dimension(:)     :: adv_unity_y
+    type(r_tran_field_type),    allocatable, dimension(:)     :: adv_unity_z
+    type(r_tran_field_type),    allocatable, dimension(:)     :: adv_unity_half_x
+    type(r_tran_field_type),    allocatable, dimension(:)     :: adv_unity_half_y
+    type(r_tran_field_type),    allocatable, dimension(:)     :: adv_unity_half_z
+    type(r_tran_field_type)                                   :: field_n
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: rho_d
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: dry_mass
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: dry_mass_ffsl_x
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: dry_mass_ffsl_y
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: flux
+    type(r_tran_field_type),    allocatable, dimension(:,:)   :: dry_flux
+    type(r_tran_field_type),    allocatable, dimension(:,:,:) :: vert_cubic_coef
+    type(integer_field_type),   allocatable, dimension(:,:,:) :: vert_cubic_index
+    type(r_tran_field_type),    allocatable, dimension(:,:,:) :: vert_quintic_coef
+    type(integer_field_type),   allocatable, dimension(:,:,:) :: vert_quintic_index
+    type(r_tran_field_type),    allocatable, dimension(:,:,:) :: vert_linear_coef
+    real(kind=r_tran),          allocatable, dimension(:)     :: horizontal_cfl_max
+    real(kind=r_tran),          allocatable, dimension(:)     :: vertical_cfl_max
+    real(kind=r_tran),          allocatable, dimension(:)     :: total_cfl_max
+    class(model_clock_type),    pointer                       :: model_clock
+    logical(kind=l_def)                                       :: rho_monotone_remap
+    logical(kind=l_def)                                       :: rho_enforce_minvalue
+    real(kind=r_tran)                                         :: rho_minvalue
+    type(r_tran_field_type)                                   :: remap_weights
+    type(integer_field_type)                                  :: remap_indices
+    logical(kind=l_def)                                       :: computed_remapping
+    logical(kind=l_def)                                       :: computed_dep_pt_idxs
 
     contains
 
     procedure, private :: idx_from_mesh_id
     procedure, private :: compute_num_dry_steps
+    procedure, private :: check_negative_field
     procedure, public  :: direction_w2_fs
     procedure, public  :: get_local_mesh_id
     procedure, public  :: get_prime_extrusion_mesh_id
@@ -181,21 +164,18 @@ module transport_runtime_alg_mod
     procedure, public  :: get_directional_advecting_wind
     procedure, public  :: get_horizontal_advecting_wind
     procedure, public  :: get_vertical_advecting_wind
-    procedure, public  :: get_departure_points_x_w2
-    procedure, public  :: get_departure_points_y_w2
-    procedure, public  :: get_departure_points_z_w2
+    procedure, public  :: get_dep_dist_z_w2
+    procedure, public  :: get_dep_dist_xy_w2
     procedure, public  :: get_frac_wind_z
     procedure, public  :: get_frac_wind_z_half
-    procedure, public  :: get_tracer_dep_pts_x
-    procedure, public  :: get_tracer_dep_pts_y
-    procedure, public  :: get_tracer_dep_pts_z
-    procedure, public  :: get_dry_frac_flux_x
-    procedure, public  :: get_dry_frac_flux_y
+    procedure, public  :: get_frac_wind_xy_half
+    procedure, public  :: get_frac_wind_xy
+    procedure, public  :: get_tracer_dep_dist_z
+    procedure, public  :: get_tracer_dep_dist_xy
     procedure, public  :: get_dry_frac_flux_z
-    procedure, public  :: get_dep_stencil_extent_x
-    procedure, public  :: get_dep_stencil_extent_y
-    procedure, public  :: get_tracer_stencil_extent_x
-    procedure, public  :: get_tracer_stencil_extent_y
+    procedure, public  :: get_dry_frac_flux_xy
+    procedure, public  :: get_dep_stencil_extent_xy
+    procedure, public  :: get_tracer_stencil_extent_xy
     procedure, public  :: get_adv_unity_x
     procedure, public  :: get_adv_unity_y
     procedure, public  :: get_adv_unity_z
@@ -204,21 +184,14 @@ module transport_runtime_alg_mod
     procedure, public  :: get_adv_unity_half_z
     procedure, public  :: get_vert_sl_coef
     procedure, public  :: get_vert_sl_index
-    procedure, public  :: get_cosmic_istart_x
-    procedure, public  :: get_cosmic_iend_x
-    procedure, public  :: get_cosmic_istart_y
-    procedure, public  :: get_cosmic_iend_y
-    procedure, public  :: get_tracer_istart_x
-    procedure, public  :: get_tracer_iend_x
-    procedure, public  :: get_tracer_istart_y
-    procedure, public  :: get_tracer_iend_y
     procedure, public  :: get_field_n
     procedure, public  :: set_field_n
     procedure, public  :: get_rho_d
     procedure, public  :: set_rho_d
-    procedure, public  :: get_rho_d_ffsl_x
+    procedure, public  :: get_dry_mass
+    procedure, public  :: get_dry_mass_ffsl_x
     procedure, public  :: set_rho_d_ffsl_x
-    procedure, public  :: get_rho_d_ffsl_y
+    procedure, public  :: get_dry_mass_ffsl_y
     procedure, public  :: set_rho_d_ffsl_y
     procedure, public  :: get_flux
     procedure, public  :: set_flux
@@ -261,8 +234,7 @@ contains
 
     use calc_dep_pts_alg_mod,          only: calc_vert_dep_pts, &
                                              calc_hori_dep_pts, &
-                                             select_detj_at_w2, &
-                                             calc_frac_vert_wind_alg
+                                             select_detj_at_w2
     use compute_sl_coefficients_alg_mod, &
                                        only: compute_vert_quintic_coefficients_alg, &
                                              compute_vert_cubic_coefficients_alg
@@ -298,7 +270,7 @@ contains
     type(r_tran_field_type)          :: sum_cfl, sum_horizontal_cfl, hori_cfl_dep
     type(r_tran_field_type)          :: dep_pt_wind_n, dep_pt_wind_np1
     integer(kind=i_def)              :: mesh_idx, num_compute_meshes
-    integer(kind=i_def)              :: n_steps, n_meshes
+    integer(kind=i_def)              :: n_steps, n_meshes, i_coef
     type(mesh_type),         pointer :: mesh => null()
     type(local_mesh_type),   pointer :: local_mesh => null()
     type(r_tran_field_type), pointer :: wind_n   => null()
@@ -308,35 +280,35 @@ contains
     type(field_type),        target  :: shifted_wind_n_rdef
     type(field_type),        target  :: shifted_wind_np1_rdef
     type(r_tran_field_type)          :: detj_at_w2_transport
+    type(r_tran_field_type)          :: lipschitz_horizontal
+    type(r_tran_field_type)          :: lipschitz_vertical
     real(kind=r_tran)                :: cfl_min, cfl_max
     real(kind=r_tran)                :: dep_min, dep_max
     real(kind=r_tran)                :: h_cfl_min, h_cfl_max
     real(kind=r_tran)                :: v_cfl_min, v_cfl_max
     real(r_tran)                     :: cast_dt, half_dt
     logical(kind=l_def)              :: any_scheme_mol, any_scheme_split
-    logical(kind=l_def)              :: any_scheme_ffsl, any_shifted
-    logical(kind=l_def)              :: any_splitting_vhv, any_scheme_slice
+    logical(kind=l_def)              :: any_scheme_ffsl
+    logical(kind=l_def)              :: any_wind_shifted
+    logical(kind=l_def)              :: any_splitting_vhv, any_splitting_hvh
+    logical(kind=l_def)              :: any_scheme_slice
     logical(kind=l_def)              :: any_hori_scheme_sl, any_vert_scheme_sl
     logical(kind=l_def)              :: any_reversible_sl
     logical(kind=l_def)              :: any_consistent_swift
-    logical(kind=l_def)              :: any_horz_dep_pts, any_vert_dep_pts
+    logical(kind=l_def)              :: any_horz_dep_dist, any_vert_dep_dist
     logical(kind=l_def)              :: hermite_sl, vhv_split_sl
-    integer(kind=i_def)              :: full_stencil_extent_x
-    integer(kind=i_def)              :: full_stencil_extent_y
+    logical(kind=l_def)              :: compute_cfl_dep
 
     type(mesh_type),           pointer :: tmp_mesh => null()
     type(mesh_type),           pointer :: twod_mesh => null()
+    type(function_space_type), pointer :: wt_fs => null()
     type(function_space_type), pointer :: w3_fs => null()
     type(function_space_type), pointer :: w2_fs => null()
     type(function_space_type), pointer :: w2h_fs => null()
     type(function_space_type), pointer :: w2v_fs => null()
     type(function_space_type), pointer :: w3_2d_fs => null()
-    type(function_space_type), pointer :: w3_md6_fs => null()
-    type(function_space_type), pointer :: w3_md4_fs => null()
-    type(function_space_type), pointer :: w3_md2_fs => null()
-    type(function_space_type), pointer :: wt_md6_fs => null()
-    type(function_space_type), pointer :: wt_md4_fs => null()
-    type(function_space_type), pointer :: wt_md2_fs => null()
+    type(integer_field_type),  pointer :: face_selector_ew => null()
+    type(integer_field_type),  pointer :: face_selector_ns => null()
 
     ! r_tran type fields
     type(r_tran_field_type), target :: primal_wind_n
@@ -371,14 +343,17 @@ contains
     any_scheme_ffsl = check_any_scheme_ffsl()
     any_scheme_split = check_any_scheme_split()
     any_scheme_slice = check_any_scheme_slice()
-    any_horz_dep_pts = check_horz_dep_pts()
-    any_vert_dep_pts = check_vert_dep_pts()
+    any_horz_dep_dist = check_horz_dep_pts()
+    any_vert_dep_dist = check_vert_dep_pts()
     any_splitting_vhv = check_any_splitting_vhv()
+    any_splitting_hvh = check_any_splitting_hvh()
     any_reversible_sl = check_any_reversible_sl()
     any_hori_scheme_sl = check_any_hori_scheme_sl()
     any_vert_scheme_sl = check_any_vert_scheme_sl()
-    any_shifted = check_any_shifted()
+    any_wind_shifted = check_wind_shifted()
     any_consistent_swift = check_any_consistent_swift()
+    compute_cfl_dep = ((any_scheme_mol .or. log_level() <= LOG_LEVEL_INFO) &
+                       .and. max_vert_cfl_calc == max_vert_cfl_calc_dep_point)
 
     ! ======================================================================== !
     ! Determine number of meshes
@@ -389,7 +364,7 @@ contains
     if ( present(shifted_mesh) ) then
       self%n_meshes = 2
       ! Only compute things on the shifted mesh if we need to
-      if (any_shifted) then
+      if (any_wind_shifted) then
         num_compute_meshes = 2
       end if
     else
@@ -413,38 +388,26 @@ contains
                 self%advecting_wind(self%n_meshes),             &
                 self%horizontal_advecting_wind(self%n_meshes),  &
                 self%vertical_advecting_wind(self%n_meshes),    &
-                self%departure_points_x_w2(self%n_meshes),      &
-                self%departure_points_y_w2(self%n_meshes),      &
-                self%departure_points_z_w2(self%n_meshes),      &
-                self%departure_points_z_half_w2(self%n_meshes), &
+                self%dep_dist_z_w2(self%n_meshes),              &
+                self%dep_dist_z_half_w2(self%n_meshes),         &
+                self%dep_dist_xy_w2(self%n_meshes),             &
+                self%dep_dist_xy_half_w2(self%n_meshes),        &
                 self%frac_wind_z(self%n_meshes),                &
                 self%frac_wind_z_half(self%n_meshes),           &
-                self%dep_stencil_extent_x(self%n_meshes),       &
-                self%dep_stencil_extent_y(self%n_meshes),       &
+                self%frac_wind_xy(self%n_meshes),               &
+                self%frac_wind_xy_half(self%n_meshes),          &
+                self%dep_stencil_extent_xy(self%n_meshes),      &
                 self%adv_unity_x(self%n_meshes),                &
                 self%adv_unity_y(self%n_meshes),                &
                 self%adv_unity_z(self%n_meshes),                &
                 self%adv_unity_half_x(self%n_meshes),           &
                 self%adv_unity_half_y(self%n_meshes),           &
                 self%adv_unity_half_z(self%n_meshes),           &
-                self%vert_cubic_coef_w3(self%n_meshes),         &
-                self%vert_cubic_index_w3(self%n_meshes),        &
-                self%vert_hermite_coef_w3(self%n_meshes),       &
-                self%vert_hermite_index_w3(self%n_meshes),      &
-                self%vert_quintic_coef_w3(self%n_meshes),       &
-                self%vert_quintic_index_w3(self%n_meshes),      &
-                self%vert_linear_coef_w3(self%n_meshes),        &
-                self%vert_cubic_coef_wt(self%n_meshes),         &
-                self%vert_cubic_index_wt(self%n_meshes),        &
-                self%vert_hermite_coef_wt(self%n_meshes),       &
-                self%vert_hermite_index_wt(self%n_meshes),      &
-                self%vert_quintic_coef_wt(self%n_meshes),       &
-                self%vert_quintic_index_wt(self%n_meshes),      &
-                self%vert_linear_coef_wt(self%n_meshes),        &
-                self%cosmic_istart_x(self%n_meshes),            &
-                self%cosmic_iend_x(self%n_meshes),              &
-                self%cosmic_istart_y(self%n_meshes),            &
-                self%cosmic_iend_y(self%n_meshes),              &
+                self%vert_cubic_coef(self%n_meshes,4,4),        &
+                self%vert_cubic_index(self%n_meshes,4,4),       &
+                self%vert_quintic_coef(self%n_meshes,2,6),      &
+                self%vert_quintic_index(self%n_meshes,2,6),     &
+                self%vert_linear_coef(self%n_meshes,2,2),       &
                 self%horizontal_cfl_max(self%n_meshes),         &
                 self%vertical_cfl_max(self%n_meshes),           &
                 self%total_cfl_max(self%n_meshes) )
@@ -493,7 +456,7 @@ contains
     ! TODO #3008: we should only initialise fields that we actually use
     if ( subroutine_timers ) call timer('transport.field_initialise')
 
-    do mesh_idx = 1, self%n_meshes
+    do mesh_idx = 1, num_compute_meshes
       tmp_mesh => mesh_collection%get_mesh(self%mesh_ids(mesh_idx))
       twod_mesh => mesh_collection%get_mesh(tmp_mesh, TWOD)
       w2_fs => function_space_collection%get_fs(tmp_mesh, element_order, W2)
@@ -502,25 +465,35 @@ contains
       w3_fs => function_space_collection%get_fs(tmp_mesh, element_order, W3)
       w3_2d_fs => function_space_collection%get_fs(twod_mesh, element_order, W3)
 
-      call self%advecting_wind(mesh_idx)%initialise( w2_fs )
-      call self%horizontal_advecting_wind(mesh_idx)%initialise( w2h_fs )
-      call self%vertical_advecting_wind(mesh_idx)%initialise( w2v_fs )
-      call self%departure_points_z_w2(mesh_idx)%initialise( w2v_fs )
-      call self%departure_points_z_half_w2(mesh_idx)%initialise( w2v_fs )
-      call self%departure_points_x_w2(mesh_idx)%initialise( w2h_fs )
-      call self%departure_points_y_w2(mesh_idx)%initialise( w2h_fs )
-      call self%frac_wind_z(mesh_idx)%initialise( w2v_fs )
-      call self%frac_wind_z_half(mesh_idx)%initialise( w2v_fs )
-      call self%adv_unity_x(mesh_idx)%initialise( w3_fs )
-      call self%adv_unity_y(mesh_idx)%initialise( w3_fs )
-      call self%adv_unity_z(mesh_idx)%initialise( w3_fs )
-      call self%adv_unity_half_x(mesh_idx)%initialise( w3_fs )
-      call self%adv_unity_half_y(mesh_idx)%initialise( w3_fs )
-      call self%adv_unity_half_z(mesh_idx)%initialise( w3_fs )
-      call self%cosmic_istart_x(mesh_idx)%initialise( w3_2d_fs )
-      call self%cosmic_iend_x(mesh_idx)%initialise( w3_2d_fs )
-      call self%cosmic_istart_y(mesh_idx)%initialise( w3_2d_fs )
-      call self%cosmic_iend_y(mesh_idx)%initialise( w3_2d_fs )
+      if (.not. self%advecting_wind(mesh_idx)%is_initialised()) then
+        call self%advecting_wind(mesh_idx)%initialise( w2_fs )
+        call self%horizontal_advecting_wind(mesh_idx)%initialise( w2h_fs )
+        call self%vertical_advecting_wind(mesh_idx)%initialise( w2v_fs )
+
+        ! TODO #4160: this assumes that if any_splitting_vhv=.true. then all transport uses VHV splitting
+        if (any_splitting_vhv) then
+          call self%adv_unity_half_z(mesh_idx)%initialise( w3_fs )
+          call self%frac_wind_z_half(mesh_idx)%initialise( w2v_fs )
+          call self%dep_dist_z_half_w2(mesh_idx)%initialise( w2v_fs )
+        else
+          call self%dep_dist_z_w2(mesh_idx)%initialise( w2v_fs )
+          call self%frac_wind_z(mesh_idx)%initialise( w2v_fs )
+          call self%adv_unity_z(mesh_idx)%initialise( w3_fs )
+        end if
+
+        if (any_splitting_hvh) then
+          call self%adv_unity_half_x(mesh_idx)%initialise( w3_fs )
+          call self%adv_unity_half_y(mesh_idx)%initialise( w3_fs )
+          call self%dep_dist_xy_half_w2(mesh_idx)%initialise( w2h_fs )
+          call self%frac_wind_xy_half(mesh_idx)%initialise( w2h_fs )
+        else
+          call self%adv_unity_x(mesh_idx)%initialise( w3_fs )
+          call self%adv_unity_y(mesh_idx)%initialise( w3_fs )
+          call self%dep_dist_xy_w2(mesh_idx)%initialise( w2h_fs )
+          call self%frac_wind_xy(mesh_idx)%initialise( w2h_fs )
+        end if
+
+      end if
     end do
 
     if ( subroutine_timers ) call timer('transport.field_initialise')
@@ -558,29 +531,28 @@ contains
       end if
 
       ! Split into horizontal and vertical advecting winds
+      face_selector_ew => get_face_selector_ew(self%mesh_ids(mesh_idx))
+      face_selector_ns => get_face_selector_ns(self%mesh_ids(mesh_idx))
       call invoke( setval_c(self%horizontal_advecting_wind(mesh_idx), 0.0_r_tran),      &
                    setval_c(self%vertical_advecting_wind(mesh_idx), 0.0_r_tran),        &
                    split_w2_field_kernel_type(self%horizontal_advecting_wind(mesh_idx), &
                                               self%vertical_advecting_wind(mesh_idx),   &
-                                              self%advecting_wind(mesh_idx)) )
+                                              self%advecting_wind(mesh_idx),            &
+                                              face_selector_ew,                         &
+                                              face_selector_ns) )
 
       !=======================================================================!
       ! Compute departure points
 
-      ! Get detj_at_w2 using wind_n
-      w2_fs => function_space_collection%get_fs(tmp_mesh, element_order, W2)
-      call detj_at_w2_transport%initialise( w2_fs )
-      call select_detj_at_w2( wind_n, detj_at_w2_transport )
-
       ! Set winds for computing departure points based on cheap update flag
-      if (any_vert_dep_pts .OR. any_horz_dep_pts) then
+      if (any_vert_dep_dist .OR. any_horz_dep_dist) then
         call dep_pt_wind_n%initialise( wind_n%get_function_space() )
         call dep_pt_wind_np1%initialise( wind_np1%get_function_space() )
         if ( cheap_update .AND. outer > 1 ) then
           ! Set up winds for cheap update with FFSL/SL
-          call invoke( aX_minus_bY(dep_pt_wind_n, 0.5_r_tran, wind_np1,   &
-                                                  0.5_r_tran, wind_n),    &
-                       aX_minus_bY(dep_pt_wind_np1, 0.5_r_tran, wind_np1, &
+          call invoke( aX_minus_bY(dep_pt_wind_n, 0.5_r_tran, wind_np1,        &
+                                                  0.5_r_tran, wind_n),         &
+                       aX_minus_bY(dep_pt_wind_np1, 0.5_r_tran, wind_np1,      &
                                                     0.5_r_tran, wind_n) )
         else
           ! Use wind_n and wind_np1
@@ -590,57 +562,106 @@ contains
       end if
 
       ! If any vertical scheme is ffsl/sl compute vertical departure points
-      if (any_vert_dep_pts) then
+      if (any_vert_dep_dist) then
+        w2v_fs => function_space_collection%get_fs(tmp_mesh, element_order, W2v)
+        w2_fs => function_space_collection%get_fs(tmp_mesh, element_order, W2)
 
-        call cfl_dep%initialise( vector_space = &
-                function_space_collection%get_fs(tmp_mesh, element_order, W2) )
+        call cfl_dep%initialise( w2_fs )
 
-        ! TODO #4160: this assumes that if any_splitting_vhv=.true. then all transport uses VHV splitting
+        ! TODO #4160: this assumes that if any_splitting_vhv=.true.
+        ! then all transport uses VHV splitting
         if (any_splitting_vhv) then
           ! If any splitting is VHV then compute departure points with half time step
           half_dt = 0.5_r_tran * cast_dt
-          call cfl_dep_half%initialise( vector_space = &
-                  function_space_collection%get_fs(tmp_mesh, element_order, W2) )
-          call calc_vert_dep_pts( self%departure_points_z_half_w2(mesh_idx), &
-                                  cfl_dep_half,                              &
-                                  dep_pt_wind_n,                             &
-                                  dep_pt_wind_np1,                           &
-                                  half_dt )
-          ! Multiply CFL by 2 to get full CFL
-          call invoke( a_times_X(cfl_dep, 2.0_r_tran, cfl_dep_half) )
-          ! Compute fractional wind with half time step
-          call calc_frac_vert_wind_alg( self%frac_wind_z_half(mesh_idx),           &
-                                        self%departure_points_z_half_w2(mesh_idx), &
-                                        half_dt )
+          call cfl_dep_half%initialise( w2_fs )
+          call calc_vert_dep_pts( self%dep_dist_z_half_w2(mesh_idx),           &
+                                  self%frac_wind_z_half(mesh_idx),             &
+                                  cfl_dep_half,                                &
+                                  dep_pt_wind_n,                               &
+                                  dep_pt_wind_np1,                             &
+                                  half_dt,                                     &
+                                  compute_cfl_dep )
+          if (compute_cfl_dep) then
+            ! Multiply CFL by 2 to get full CFL
+            call invoke( a_times_X(cfl_dep, 2.0_r_tran, cfl_dep_half) )
+          end if
+
+          if (log_level() <= LOG_LEVEL_INFO) then
+            call lipschitz_vertical%initialise( w2v_fs )
+            call invoke( lipschitz_vertical_kernel_type(                       &
+                                            lipschitz_vertical,                &
+                                            self%dep_dist_z_half_w2(mesh_idx)) )
+            call log_field_minmax(LOG_LEVEL_INFO, 'lipschitz_vertical', lipschitz_vertical)
+          end if
         else
           ! If splitting is not VHV then compute full departure points
-          call calc_vert_dep_pts( self%departure_points_z_w2(mesh_idx), &
-                                  cfl_dep,                              &
-                                  dep_pt_wind_n,                        &
-                                  dep_pt_wind_np1,                      &
-                                  cast_dt )
-          ! Compute fractional wind
-          call calc_frac_vert_wind_alg( self%frac_wind_z(mesh_idx),           &
-                                        self%departure_points_z_w2(mesh_idx), &
-                                        cast_dt )
+          call calc_vert_dep_pts( self%dep_dist_z_w2(mesh_idx),                &
+                                  self%frac_wind_z(mesh_idx),                  &
+                                  cfl_dep,                                     &
+                                  dep_pt_wind_n,                               &
+                                  dep_pt_wind_np1,                             &
+                                  cast_dt,                                     &
+                                  compute_cfl_dep )
+
+          if (log_level() <= LOG_LEVEL_INFO) then
+            call lipschitz_vertical%initialise( w2v_fs )
+            call invoke( lipschitz_vertical_kernel_type(                       &
+                                            lipschitz_vertical,                &
+                                            self%dep_dist_z_w2(mesh_idx)) )
+            call log_field_minmax(LOG_LEVEL_INFO, 'lipschitz_vertical', lipschitz_vertical)
+          end if
         end if
 
       end if
 
       ! If any horizontal scheme is ffsl compute horizontal departure points
-      if (any_horz_dep_pts) then
-        call calc_hori_dep_pts( self%departure_points_x_w2(mesh_idx),  &
-                                self%departure_points_y_w2(mesh_idx),  &
-                                dep_pt_wind_n,                         &
-                                dep_pt_wind_np1,                       &
-                                cast_dt )
+      if (any_horz_dep_dist) then
+        ! TODO #4160: this assumes that if any_splitting_hvh =.true.
+        ! then all transport uses HVH splitting
+        w2h_fs => function_space_collection%get_fs(tmp_mesh, element_order, W2h)
 
-        ! Get the required stencil size from the departure points
-        call get_field_minmax( self%departure_points_x_w2(mesh_idx), dep_min, dep_max )
-        self%dep_stencil_extent_x(mesh_idx) = int( max( abs(dep_max), abs(dep_min) ) )
-        call get_field_minmax( self%departure_points_y_w2(mesh_idx), dep_min, dep_max )
-        self%dep_stencil_extent_y(mesh_idx) = int( max( abs(dep_max), abs(dep_min) ) )
+        if (any_splitting_hvh) then
+          ! If any splitting is VHV then compute departure points with half time step
+          half_dt = 0.5_r_tran * cast_dt
+          call calc_hori_dep_pts( self%dep_dist_xy_half_w2(mesh_idx),          &
+                                  self%frac_wind_xy_half(mesh_idx),            &
+                                  dep_pt_wind_n,                               &
+                                  dep_pt_wind_np1,                             &
+                                  half_dt )
 
+          ! Get the required stencil size from the departure points
+          call get_field_minmax(self%dep_dist_xy_half_w2(mesh_idx), dep_min, dep_max)
+          self%dep_stencil_extent_xy(mesh_idx) = int( max( abs(dep_max), abs(dep_min) ) )
+
+          if (log_level() <= LOG_LEVEL_INFO) then
+            call lipschitz_horizontal%initialise( w2h_fs )
+            call invoke( setval_c(lipschitz_horizontal, 0.0_r_tran),           &
+                         lipschitz_horizontal_kernel_type(                     &
+                                            lipschitz_horizontal,              &
+                                            self%dep_dist_xy_half_w2(mesh_idx)) )
+            call log_field_minmax(LOG_LEVEL_INFO, 'lipschitz_horizontal', lipschitz_horizontal)
+          end if
+
+        else
+          call calc_hori_dep_pts( self%dep_dist_xy_w2(mesh_idx),               &
+                                  self%frac_wind_xy(mesh_idx),                 &
+                                  dep_pt_wind_n,                               &
+                                  dep_pt_wind_np1,                             &
+                                  cast_dt )
+
+          ! Get the required stencil size from the departure points
+          call get_field_minmax(self%dep_dist_xy_w2(mesh_idx), dep_min, dep_max)
+          self%dep_stencil_extent_xy(mesh_idx) = int( max( abs(dep_max), abs(dep_min) ) )
+
+          if (log_level() <= LOG_LEVEL_INFO) then
+            call lipschitz_horizontal%initialise( w2h_fs )
+            call invoke( setval_c(lipschitz_horizontal, 0.0_r_tran),           &
+                         lipschitz_horizontal_kernel_type(                     &
+                                            lipschitz_horizontal,              &
+                                            self%dep_dist_xy_w2(mesh_idx)) )
+            call log_field_minmax(LOG_LEVEL_INFO, 'lipschitz_horizontal', lipschitz_horizontal)
+          end if
+        end if
       end if
 
       !=======================================================================!
@@ -656,12 +677,19 @@ contains
         call sum_cfl%initialise( vector_space = &
                   function_space_collection%get_fs(tmp_mesh, element_order, W3) )
 
+        ! Get detj_at_w2 using wind_n
+        w2_fs => function_space_collection%get_fs(tmp_mesh, element_order, W2)
+        call detj_at_w2_transport%initialise( w2_fs )
+        call select_detj_at_w2( wind_n, detj_at_w2_transport )
+
         call invoke( setval_X(cfl, self%advecting_wind(mesh_idx)),             &
                      inc_X_divideby_Y(cfl, detj_at_w2_transport),              &
                      inc_a_times_X(cast_dt, cfl),                              &
                      split_w2_field_kernel_type(horizontal_cfl,                &
                                                 vertical_cfl,                  &
-                                                cfl) )
+                                                cfl,                           &
+                                                face_selector_ew,              &
+                                                face_selector_ns) )
 
         select case(max_vert_cfl_calc)
         ! Calculate the maximum vertical cfl for substepping
@@ -669,9 +697,11 @@ contains
           call get_field_minmax( vertical_cfl, v_cfl_min, v_cfl_max )
         case(max_vert_cfl_calc_dep_point)
           call hori_cfl_dep%initialise( self%horizontal_advecting_wind(mesh_idx)%get_function_space() )
-          call invoke( split_w2_field_kernel_type(hori_cfl_dep, &
-                                                  vertical_cfl, &
-                                                  cfl_dep) )
+          call invoke( split_w2_field_kernel_type(hori_cfl_dep,     &
+                                                  vertical_cfl,     &
+                                                  cfl_dep,          &
+                                                  face_selector_ew, &
+                                                  face_selector_ns) )
           call get_field_minmax( cfl_dep, v_cfl_min, v_cfl_max )
         case default
           write(log_scratch_space, '(A)') &
@@ -716,41 +746,45 @@ contains
       ! For FFSL schemes we require the transport of a unity field to get
       ! the advective FFSL transport
       if (any_scheme_ffsl) then
-        call ffsl_unity_transport_alg( self%departure_points_x_w2(mesh_idx),      &
-                                       self%departure_points_y_w2(mesh_idx),      &
-                                       self%departure_points_z_w2(mesh_idx),      &
-                                       self%departure_points_z_half_w2(mesh_idx), &
-                                       self%dep_stencil_extent_x(mesh_idx),       &
-                                       self%dep_stencil_extent_y(mesh_idx),       &
-                                       cast_dt,                                   &
-                                       self%adv_unity_x(mesh_idx),                &
-                                       self%adv_unity_y(mesh_idx),                &
-                                       self%adv_unity_z(mesh_idx),                &
-                                       self%adv_unity_half_x(mesh_idx),           &
-                                       self%adv_unity_half_y(mesh_idx),           &
+        call ffsl_unity_transport_alg( self%dep_dist_xy_w2(mesh_idx),          &
+                                       self%dep_dist_xy_half_w2(mesh_idx),     &
+                                       self%dep_dist_z_w2(mesh_idx),           &
+                                       self%dep_dist_z_half_w2(mesh_idx),      &
+                                       self%frac_wind_xy(mesh_idx),            &
+                                       self%frac_wind_xy_half(mesh_idx),       &
+                                       self%frac_wind_z(mesh_idx),             &
+                                       self%frac_wind_z_half(mesh_idx),        &
+                                       self%dep_stencil_extent_xy(mesh_idx),   &
+                                       cast_dt,                                &
+                                       tmp_mesh,                               &
+                                       self%adv_unity_x(mesh_idx),             &
+                                       self%adv_unity_y(mesh_idx),             &
+                                       self%adv_unity_z(mesh_idx),             &
+                                       self%adv_unity_half_x(mesh_idx),        &
+                                       self%adv_unity_half_y(mesh_idx),        &
                                        self%adv_unity_half_z(mesh_idx) )
       end if
 
       !==========================================================================!
       ! Compute vertical semi-Lagrangian interpolation coefficients
       if (any_vert_scheme_sl) then
-        ! Initialise multi-data field function spaces and coefficient
-        ! fields for the primal mesh only unless SLICE is used
+        ! Initialise coefficient fields with array index
+        ! (mesh,function_space,coefficient_number)
+        ! for the primal mesh only unless SLICE is used
         if ( subroutine_timers ) call timer('transport.calc_sl_coeffs')
 
         if ( mesh_idx == 1 .OR. any_scheme_slice ) then
-          w3_md4_fs => function_space_collection%get_fs( tmp_mesh, element_order, &
-                                                         W3, 4, ndata_first = .false. )
-          w3_md2_fs => function_space_collection%get_fs( tmp_mesh, element_order, &
-                                                         W3, 2, ndata_first = .false. )
-          wt_md4_fs => function_space_collection%get_fs( tmp_mesh, element_order, &
-                                                         Wtheta, 4, ndata_first = .false. )
-          wt_md2_fs => function_space_collection%get_fs( tmp_mesh, element_order, &
-                                                         Wtheta, 2, ndata_first = .false. )
 
-          if (.not. self%vert_linear_coef_w3(mesh_idx)%is_initialised()) then
-            call self%vert_linear_coef_w3(mesh_idx)%initialise( vector_space=w3_md2_fs )
-            call self%vert_linear_coef_wt(mesh_idx)%initialise( vector_space=wt_md2_fs )
+          ! Get W3 and Wtheta function space
+          w3_fs => function_space_collection%get_fs(tmp_mesh, element_order, W3)
+          wt_fs => function_space_collection%get_fs(tmp_mesh, element_order, Wtheta)
+
+          ! Initialise linear coefficients
+          if (.not. self%vert_linear_coef(mesh_idx,1,1)%is_initialised()) then
+            do i_coef=1, 2
+              call self%vert_linear_coef(mesh_idx,1,i_coef)%initialise( vector_space=w3_fs )
+              call self%vert_linear_coef(mesh_idx,2,i_coef)%initialise( vector_space=wt_fs )
+            end do
           end if
 
           ! TODO: this assumes that if any_splitting_vhv=.true. then all transport uses VHV splitting
@@ -761,121 +795,80 @@ contains
           end if
 
           if ( any_reversible_sl .OR. vertical_sl_order == vertical_sl_order_cubic_hermite) then
-            ! Compute cubic-Hermite coefficients
+            ! Compute cubic-Hermite coefficients (as part of vert_cubic_coef/index)
             hermite_sl = .true.
 
-            if (.not. self%vert_hermite_coef_w3(mesh_idx)%is_initialised()) then
-              call self%vert_hermite_coef_w3(mesh_idx)%initialise(  vector_space=w3_md4_fs )
-              call self%vert_hermite_index_w3(mesh_idx)%initialise( vector_space=w3_md4_fs )
-              call self%vert_hermite_coef_wt(mesh_idx)%initialise(  vector_space=wt_md4_fs )
-              call self%vert_hermite_index_wt(mesh_idx)%initialise( vector_space=wt_md4_fs )
+            if (.not. self%vert_cubic_coef(mesh_idx,3,1)%is_initialised()) then
+              do i_coef=1, 4
+                call self%vert_cubic_coef(mesh_idx,3,i_coef)%initialise(  vector_space=w3_fs )
+                call self%vert_cubic_index(mesh_idx,3,i_coef)%initialise( vector_space=w3_fs )
+                call self%vert_cubic_coef(mesh_idx,4,i_coef)%initialise(  vector_space=wt_fs )
+                call self%vert_cubic_index(mesh_idx,4,i_coef)%initialise( vector_space=wt_fs )
+              end do
             end if
 
-            call compute_vert_cubic_coefficients_alg( self%vert_hermite_coef_w3(mesh_idx),       &
-                                                      self%vert_hermite_index_w3(mesh_idx),      &
-                                                      self%vert_linear_coef_w3(mesh_idx),        &
-                                                      self%vert_hermite_coef_wt(mesh_idx),       &
-                                                      self%vert_hermite_index_wt(mesh_idx),      &
-                                                      self%vert_linear_coef_wt(mesh_idx),        &
-                                                      self%departure_points_z_w2(mesh_idx),      &
-                                                      self%departure_points_z_half_w2(mesh_idx), &
+            call compute_vert_cubic_coefficients_alg( self%vert_cubic_coef(mesh_idx,3,1:4),  &
+                                                      self%vert_cubic_index(mesh_idx,3,1:4), &
+                                                      self%vert_linear_coef(mesh_idx,1,1:2), &
+                                                      self%vert_cubic_coef(mesh_idx,4,1:4),  &
+                                                      self%vert_cubic_index(mesh_idx,4,1:4), &
+                                                      self%vert_linear_coef(mesh_idx,2,1:2), &
+                                                      self%dep_dist_z_w2(mesh_idx),      &
+                                                      self%dep_dist_z_half_w2(mesh_idx), &
                                                       hermite_sl, vhv_split_sl )
 
           end if
 
           if ( vertical_sl_order == vertical_sl_order_quintic ) then
-            ! Compute quintic coefficients
-            if (.not. self%vert_quintic_coef_w3(mesh_idx)%is_initialised()) then
-              w3_md6_fs => function_space_collection%get_fs( tmp_mesh, element_order, &
-                                                            W3, 6, ndata_first = .false. )
-              wt_md6_fs => function_space_collection%get_fs( tmp_mesh, element_order, &
-                                                            Wtheta, 6, ndata_first = .false. )
-
-              call self%vert_quintic_coef_w3(mesh_idx)%initialise(  vector_space=w3_md6_fs )
-              call self%vert_quintic_index_w3(mesh_idx)%initialise( vector_space=w3_md6_fs )
-              call self%vert_quintic_coef_wt(mesh_idx)%initialise(  vector_space=wt_md6_fs )
-              call self%vert_quintic_index_wt(mesh_idx)%initialise( vector_space=wt_md6_fs )
+            ! Initialise and compute quintic coefficients
+            if (.not. self%vert_quintic_coef(mesh_idx,1,1)%is_initialised()) then
+              do i_coef=1, 6
+                call self%vert_quintic_coef(mesh_idx,1,i_coef)%initialise(  vector_space=w3_fs )
+                call self%vert_quintic_index(mesh_idx,1,i_coef)%initialise( vector_space=w3_fs )
+                call self%vert_quintic_coef(mesh_idx,2,i_coef)%initialise(  vector_space=wt_fs )
+                call self%vert_quintic_index(mesh_idx,2,i_coef)%initialise( vector_space=wt_fs )
+              end do
             end if
 
-            call compute_vert_quintic_coefficients_alg( self%vert_quintic_coef_w3(mesh_idx),       &
-                                                        self%vert_quintic_index_w3(mesh_idx),      &
-                                                        self%vert_linear_coef_w3(mesh_idx),        &
-                                                        self%vert_quintic_coef_wt(mesh_idx),       &
-                                                        self%vert_quintic_index_wt(mesh_idx),      &
-                                                        self%vert_linear_coef_wt(mesh_idx),        &
-                                                        self%departure_points_z_w2(mesh_idx),      &
-                                                        self%departure_points_z_half_w2(mesh_idx), &
+            call compute_vert_quintic_coefficients_alg( self%vert_quintic_coef(mesh_idx,1,1:6),  &
+                                                        self%vert_quintic_index(mesh_idx,1,1:6), &
+                                                        self%vert_linear_coef(mesh_idx,1,1:2),   &
+                                                        self%vert_quintic_coef(mesh_idx,1,1:6),  &
+                                                        self%vert_quintic_index(mesh_idx,1,1:6), &
+                                                        self%vert_linear_coef(mesh_idx,1,1:2),   &
+                                                        self%dep_dist_z_w2(mesh_idx),            &
+                                                        self%dep_dist_z_half_w2(mesh_idx),       &
                                                         vhv_split_sl )
-            nullify( w3_md6_fs, wt_md6_fs )
           else
-            ! Compute cubic coefficients
-            if (.not. self%vert_cubic_coef_w3(mesh_idx)%is_initialised()) then
-              call self%vert_cubic_coef_w3(mesh_idx)%initialise(  vector_space=w3_md4_fs )
-              call self%vert_cubic_index_w3(mesh_idx)%initialise( vector_space=w3_md4_fs )
-              call self%vert_cubic_coef_wt(mesh_idx)%initialise(  vector_space=wt_md4_fs )
-              call self%vert_cubic_index_wt(mesh_idx)%initialise( vector_space=wt_md4_fs )
+            ! Initialise and compute cubic coefficients
+            if (.not. self%vert_cubic_coef(mesh_idx,1,1)%is_initialised()) then
+              do i_coef=1, 4
+                call self%vert_cubic_coef(mesh_idx,1,i_coef)%initialise(  vector_space=w3_fs )
+                call self%vert_cubic_index(mesh_idx,1,i_coef)%initialise( vector_space=w3_fs )
+                call self%vert_cubic_coef(mesh_idx,2,i_coef)%initialise(  vector_space=wt_fs )
+                call self%vert_cubic_index(mesh_idx,2,i_coef)%initialise( vector_space=wt_fs )
+              end do
             end if
 
             hermite_sl = .false.
-            call compute_vert_cubic_coefficients_alg( self%vert_cubic_coef_w3(mesh_idx),         &
-                                                      self%vert_cubic_index_w3(mesh_idx),        &
-                                                      self%vert_linear_coef_w3(mesh_idx),        &
-                                                      self%vert_cubic_coef_wt(mesh_idx),         &
-                                                      self%vert_cubic_index_wt(mesh_idx),        &
-                                                      self%vert_linear_coef_wt(mesh_idx),        &
-                                                      self%departure_points_z_w2(mesh_idx),      &
-                                                      self%departure_points_z_half_w2(mesh_idx), &
+            call compute_vert_cubic_coefficients_alg( self%vert_cubic_coef(mesh_idx,1,1:4),   &
+                                                      self%vert_cubic_index(mesh_idx,1,1:4),  &
+                                                      self%vert_linear_coef(mesh_idx,1,1:2),  &
+                                                      self%vert_cubic_coef(mesh_idx,2,1:4),   &
+                                                      self%vert_cubic_index(mesh_idx,2,1:4),  &
+                                                      self%vert_linear_coef(mesh_idx,2,1:2),  &
+                                                      self%dep_dist_z_w2(mesh_idx),           &
+                                                      self%dep_dist_z_half_w2(mesh_idx),      &
                                                       hermite_sl, vhv_split_sl )
           end if
 
-          nullify( w3_md4_fs, wt_md4_fs, w3_md2_fs, wt_md2_fs )
+          nullify( w3_fs, wt_fs )
 
         end if
 
         if ( subroutine_timers ) call timer('transport.calc_sl_coeffs')
 
       end if ! vertical SL interpolation coefficients
-
-      !==========================================================================!
-      ! Compute index for panel ID change for horizontal schemes that use
-      ! COSMIC splitting (to get the correct field_x/y at panel edge)
-      ! and the required horizontal stencil size based on the maximum CFL
-      if (any_horz_dep_pts) then
-        if ( special_edges_treatment ) then
-          full_stencil_extent_x = self%dep_stencil_extent_x(mesh_idx) + 2 + outer_order
-          full_stencil_extent_y = self%dep_stencil_extent_y(mesh_idx) + 2 + outer_order
-        else
-          full_stencil_extent_x = self%dep_stencil_extent_x(mesh_idx) + 1 + outer_order
-          full_stencil_extent_y = self%dep_stencil_extent_y(mesh_idx) + 1 + outer_order
-        end if
-
-        call cosmic_index_alg( self%cosmic_istart_x(mesh_idx),      &
-                               self%cosmic_iend_x(mesh_idx),        &
-                               self%cosmic_istart_y(mesh_idx),      &
-                               self%cosmic_iend_y(mesh_idx),        &
-                               full_stencil_extent_x,               &
-                               full_stencil_extent_y )
-
-        if (any_consistent_swift .and. .not. self%computed_dep_pt_idxs) then
-
-          ! Compute indices for computing outer tracer departure points
-          call self%dep_pt_istart_x%initialise( w3_2d_fs )
-          call self%dep_pt_iend_x%initialise( w3_2d_fs )
-          call self%dep_pt_istart_y%initialise( w3_2d_fs )
-          call self%dep_pt_iend_y%initialise( w3_2d_fs )
-          ! Use departure point stencil extent as the departure point
-          ! calculation only uses this extent
-          call cosmic_index_alg( self%dep_pt_istart_x,  &
-                                 self%dep_pt_iend_x,    &
-                                 self%dep_pt_istart_y,  &
-                                 self%dep_pt_iend_y,    &
-                                 dep_pt_stencil_extent, &
-                                 dep_pt_stencil_extent )
-
-          self%computed_dep_pt_idxs = .true.
-        end if
-
-      end if ! COSMIC panel ID index
 
     end do ! loop over meshes
 
@@ -886,35 +879,23 @@ contains
     ! Allocate arrays for dry fields
     if ( .not. allocated( self%rho_d ) ) then
       if ( subroutine_timers ) call timer('transport.runtime_allocate')
+      ! We allocate fields for the shifted mesh here
       n_meshes = self%n_meshes
       n_steps = self%num_dry_steps
       allocate( self%rho_d(n_meshes, n_steps+1),                               &
-                self%rho_d_ffsl_x(n_meshes, n_steps),                          &
-                self%rho_d_ffsl_y(n_meshes, n_steps),                          &
+                self%dry_mass(n_meshes, n_steps+1),                            &
+                self%dry_mass_ffsl_x(n_meshes, n_steps),                       &
+                self%dry_mass_ffsl_y(n_meshes, n_steps),                       &
                 self%flux(n_meshes, n_steps-1),                                &
                 self%dry_flux(n_meshes, n_steps),                              &
-                self%tracer_dep_pts_ix(n_meshes, n_steps),                     &
-                self%tracer_dep_pts_iy(n_meshes, n_steps),                     &
-                self%tracer_dep_pts_ox(n_meshes, n_steps),                     &
-                self%tracer_dep_pts_oy(n_meshes, n_steps),                     &
-                self%tracer_dep_pts_z(n_meshes, n_steps),                      &
-                self%dry_frac_flux_ix(n_meshes, n_steps),                      &
-                self%dry_frac_flux_iy(n_meshes, n_steps),                      &
-                self%dry_frac_flux_ox(n_meshes, n_steps),                      &
-                self%dry_frac_flux_oy(n_meshes, n_steps),                      &
+                self%tracer_dep_dist_ixy(n_meshes, n_steps),                   &
+                self%tracer_dep_dist_oxy(n_meshes, n_steps),                   &
+                self%tracer_dep_dist_z(n_meshes, n_steps),                     &
                 self%dry_frac_flux_z(n_meshes, n_steps),                       &
-                self%tracer_stencil_extent_ix(n_meshes, n_steps),              &
-                self%tracer_stencil_extent_iy(n_meshes, n_steps),              &
-                self%tracer_stencil_extent_ox(n_meshes, n_steps),              &
-                self%tracer_stencil_extent_oy(n_meshes, n_steps),              &
-                self%tracer_istart_ix(n_meshes, n_steps),                      &
-                self%tracer_istart_iy(n_meshes, n_steps),                      &
-                self%tracer_istart_ox(n_meshes, n_steps),                      &
-                self%tracer_istart_oy(n_meshes, n_steps),                      &
-                self%tracer_iend_ix(n_meshes, n_steps),                        &
-                self%tracer_iend_iy(n_meshes, n_steps),                        &
-                self%tracer_iend_ox(n_meshes, n_steps),                        &
-                self%tracer_iend_oy(n_meshes, n_steps)                         &
+                self%dry_frac_flux_ixy(n_meshes, n_steps),                     &
+                self%dry_frac_flux_oxy(n_meshes, n_steps),                     &
+                self%tracer_stencil_extent_ixy(n_meshes, n_steps),             &
+                self%tracer_stencil_extent_oxy(n_meshes, n_steps)              &
       )
       if ( subroutine_timers ) call timer('transport.runtime_allocate')
     end if
@@ -922,7 +903,8 @@ contains
     ! Set step counter to be 1
     self%tracer_step_ctr = 1
 
-    nullify(mesh, local_mesh, w2_fs, w3_fs, tmp_mesh, w2h_fs, w2v_fs, w3_2d_fs)
+    nullify(mesh, local_mesh, w2_fs, w3_fs, tmp_mesh, w2h_fs, w2v_fs, &
+            w3_2d_fs, face_selector_ew, face_selector_ns)
 
     if ( subroutine_timers ) call timer('transport.runtime_init')
 
@@ -938,65 +920,41 @@ contains
     if ( allocated( self%advecting_wind ) )            deallocate( self%advecting_wind )
     if ( allocated( self%horizontal_advecting_wind ) ) deallocate( self%horizontal_advecting_wind )
     if ( allocated( self%vertical_advecting_wind ) )   deallocate( self%vertical_advecting_wind )
-    if ( allocated( self%departure_points_x_w2 ) )     deallocate( self%departure_points_x_w2 )
-    if ( allocated( self%departure_points_y_w2 ) )     deallocate( self%departure_points_y_w2 )
-    if ( allocated( self%departure_points_z_w2 ) )     deallocate( self%departure_points_z_w2 )
+    if ( allocated( self%dep_dist_xy_w2 ) )            deallocate( self%dep_dist_xy_w2 )
+    if ( allocated( self%dep_dist_xy_half_w2 ) )       deallocate( self%dep_dist_xy_half_w2 )
+    if ( allocated( self%dep_dist_z_w2 ) )             deallocate( self%dep_dist_z_w2 )
     if ( allocated( self%frac_wind_z ) )               deallocate( self%frac_wind_z )
     if ( allocated( self%frac_wind_z_half ) )          deallocate( self%frac_wind_z_half )
+    if ( allocated( self%frac_wind_xy ) )              deallocate( self%frac_wind_xy )
+    if ( allocated( self%frac_wind_xy_half ) )         deallocate( self%frac_wind_xy_half )
     if ( allocated( self%adv_unity_x ) )               deallocate( self%adv_unity_x )
     if ( allocated( self%adv_unity_y ) )               deallocate( self%adv_unity_y )
     if ( allocated( self%adv_unity_z ) )               deallocate( self%adv_unity_z )
     if ( allocated( self%adv_unity_half_x ) )          deallocate( self%adv_unity_half_x )
     if ( allocated( self%adv_unity_half_y ) )          deallocate( self%adv_unity_half_y )
     if ( allocated( self%adv_unity_half_z ) )          deallocate( self%adv_unity_half_z )
-    if ( allocated( self%vert_cubic_coef_w3 ) )        deallocate( self%vert_cubic_coef_w3 )
-    if ( allocated( self%vert_cubic_index_w3 ) )       deallocate( self%vert_cubic_index_w3 )
-    if ( allocated( self%vert_hermite_coef_w3 ) )      deallocate( self%vert_hermite_coef_w3 )
-    if ( allocated( self%vert_hermite_index_w3 ) )     deallocate( self%vert_hermite_index_w3 )
-    if ( allocated( self%vert_quintic_coef_w3 ) )      deallocate( self%vert_quintic_coef_w3 )
-    if ( allocated( self%vert_quintic_index_w3 ) )     deallocate( self%vert_quintic_index_w3 )
-    if ( allocated( self%vert_linear_coef_w3 ) )       deallocate( self%vert_linear_coef_w3 )
-    if ( allocated( self%vert_cubic_coef_wt ) )        deallocate( self%vert_cubic_coef_wt )
-    if ( allocated( self%vert_cubic_index_wt ) )       deallocate( self%vert_cubic_index_wt )
-    if ( allocated( self%vert_hermite_coef_wt ) )      deallocate( self%vert_hermite_coef_wt )
-    if ( allocated( self%vert_hermite_index_wt ) )     deallocate( self%vert_hermite_index_wt )
-    if ( allocated( self%vert_quintic_coef_wt ) )      deallocate( self%vert_quintic_coef_wt )
-    if ( allocated( self%vert_quintic_index_wt ) )     deallocate( self%vert_quintic_index_wt )
-    if ( allocated( self%vert_linear_coef_wt ) )       deallocate( self%vert_linear_coef_wt )
-    if ( allocated( self%cosmic_istart_x ) )           deallocate( self%cosmic_istart_x )
-    if ( allocated( self%cosmic_iend_x ) )             deallocate( self%cosmic_iend_x )
-    if ( allocated( self%cosmic_istart_y ) )           deallocate( self%cosmic_istart_y )
-    if ( allocated( self%cosmic_iend_y ) )             deallocate( self%cosmic_iend_y )
+    if ( allocated( self%vert_cubic_coef ) )           deallocate( self%vert_cubic_coef )
+    if ( allocated( self%vert_cubic_index ) )          deallocate( self%vert_cubic_index )
+    if ( allocated( self%vert_quintic_coef ) )         deallocate( self%vert_quintic_coef )
+    if ( allocated( self%vert_quintic_index ) )        deallocate( self%vert_quintic_index )
+    if ( allocated( self%vert_linear_coef ) )          deallocate( self%vert_linear_coef )
     if ( allocated( self%rho_d ) )                     deallocate( self%rho_d )
-    if ( allocated( self%rho_d_ffsl_x ) )              deallocate( self%rho_d_ffsl_x )
-    if ( allocated( self%rho_d_ffsl_y ) )              deallocate( self%rho_d_ffsl_y )
+    if ( allocated( self%dry_mass ) )                  deallocate( self%dry_mass )
+    if ( allocated( self%dry_mass_ffsl_x ) )           deallocate( self%dry_mass_ffsl_x )
+    if ( allocated( self%dry_mass_ffsl_y ) )           deallocate( self%dry_mass_ffsl_y )
     if ( allocated( self%flux ) )                      deallocate( self%flux )
     if ( allocated( self%dry_flux ) )                  deallocate( self%dry_flux )
     if ( allocated( self%horizontal_cfl_max ) )        deallocate( self%horizontal_cfl_max )
     if ( allocated( self%vertical_cfl_max ) )          deallocate( self%vertical_cfl_max )
     if ( allocated( self%total_cfl_max ) )             deallocate( self%total_cfl_max )
-    if ( allocated( self%tracer_dep_pts_ix ) )         deallocate( self%tracer_dep_pts_ix )
-    if ( allocated( self%tracer_dep_pts_iy ) )         deallocate( self%tracer_dep_pts_iy )
-    if ( allocated( self%tracer_dep_pts_ox ) )         deallocate( self%tracer_dep_pts_ox )
-    if ( allocated( self%tracer_dep_pts_oy ) )         deallocate( self%tracer_dep_pts_oy )
-    if ( allocated( self%tracer_dep_pts_z ) )          deallocate( self%tracer_dep_pts_z )
-    if ( allocated( self%dry_frac_flux_ix ) )          deallocate( self%dry_frac_flux_ix )
-    if ( allocated( self%dry_frac_flux_iy ) )          deallocate( self%dry_frac_flux_iy )
-    if ( allocated( self%dry_frac_flux_ox ) )          deallocate( self%dry_frac_flux_ox )
-    if ( allocated( self%dry_frac_flux_oy ) )          deallocate( self%dry_frac_flux_oy )
+    if ( allocated( self%tracer_dep_dist_z ) )         deallocate( self%tracer_dep_dist_z )
+    if ( allocated( self%tracer_dep_dist_ixy ) )       deallocate( self%tracer_dep_dist_ixy )
+    if ( allocated( self%tracer_dep_dist_oxy ) )       deallocate( self%tracer_dep_dist_oxy )
+    if ( allocated( self%dry_frac_flux_ixy ) )         deallocate( self%dry_frac_flux_ixy )
+    if ( allocated( self%dry_frac_flux_oxy ) )         deallocate( self%dry_frac_flux_oxy )
     if ( allocated( self%dry_frac_flux_z ) )           deallocate( self%dry_frac_flux_z )
-    if ( allocated( self%tracer_istart_ix ) )          deallocate( self%tracer_istart_ix )
-    if ( allocated( self%tracer_iend_ix ) )            deallocate( self%tracer_iend_ix )
-    if ( allocated( self%tracer_istart_iy ) )          deallocate( self%tracer_istart_iy )
-    if ( allocated( self%tracer_iend_iy ) )            deallocate( self%tracer_iend_iy )
-    if ( allocated( self%tracer_istart_ox ) )          deallocate( self%tracer_istart_ox )
-    if ( allocated( self%tracer_iend_ox ) )            deallocate( self%tracer_iend_ox )
-    if ( allocated( self%tracer_istart_oy ) )          deallocate( self%tracer_istart_oy )
-    if ( allocated( self%tracer_iend_oy ) )            deallocate( self%tracer_iend_oy )
-    if ( allocated( self%tracer_stencil_extent_ix ) )  deallocate( self%tracer_stencil_extent_ix )
-    if ( allocated( self%tracer_stencil_extent_iy ) )  deallocate( self%tracer_stencil_extent_iy )
-    if ( allocated( self%tracer_stencil_extent_ox ) )  deallocate( self%tracer_stencil_extent_ox )
-    if ( allocated( self%tracer_stencil_extent_oy ) )  deallocate( self%tracer_stencil_extent_oy )
+    if ( allocated( self%tracer_stencil_extent_ixy ) ) deallocate( self%tracer_stencil_extent_ixy )
+    if ( allocated( self%tracer_stencil_extent_oxy ) ) deallocate( self%tracer_stencil_extent_oxy )
 
   end subroutine destroy_transport_runtime
 
@@ -1033,7 +991,8 @@ contains
 
   end subroutine set_dry_flux
 
-  !> @brief Sets dry density field to use in tracer transport
+  !> @brief Sets a dry density field to use in tracer transport, and computes
+  !!        the corresponding mass field
   !> @pre Fields passed to this routine must be on the prime extrusion mesh
   !> @param[in,out] self        The transport_runtime object
   !> @param[in]     rho_d       Dry density field
@@ -1048,11 +1007,13 @@ contains
 
     logical(kind=l_def)              :: next_step_hori
     type(mesh_type),         pointer :: prime_extrusion_mesh => null()
+    type(r_tran_field_type), pointer :: detj => null()
     integer(kind=i_def)              :: w2_fs_idx
     integer(kind=i_def)              :: remap_depth
 
     ! The dry flux is on the prime extrusion mesh
     prime_extrusion_mesh => rho_d%get_mesh()
+    detj => get_detj_at_w3_r_tran(prime_extrusion_mesh%get_id())
 
     if (prime_extrusion_mesh%get_id() /= self%mesh_ids(1)) then
       call log_event('Can only set dry fields using fields from the prime extrusion mesh', LOG_LEVEL_ERROR)
@@ -1062,6 +1023,13 @@ contains
     next_step_hori = (step < self%get_num_dry_steps() + 1 .and. &
                       w2_fs_idx == W2H .or. w2_fs_idx == W2)
 
+    if (.not. self%dry_mass(1,step)%is_initialised()) then
+      call self%dry_mass(1,step)%initialise( vector_space = rho_d%get_function_space(), &
+                                             halo_depth = get_required_stencil_depth() )
+      call self%rho_d(1,step)%initialise( vector_space = rho_d%get_function_space(), &
+                                          halo_depth = get_required_stencil_depth() )
+    end if
+
     if (extended_mesh .and. next_step_hori) then
       if ( check_any_horizontal_method_mol() ) then
         remap_depth = get_required_stencil_depth()
@@ -1069,25 +1037,31 @@ contains
         ! For consistent transport the cfl may be slightly higher than expected
         ! due to using the dry mass flux to compute departure points, therefore
         ! an extra + 1 is added to remap_depth for safety
-        remap_depth = max(self%get_dep_stencil_extent_x(self%mesh_ids(1)), &
-                          self%get_dep_stencil_extent_y(self%mesh_ids(1))) &
+        remap_depth = self%get_dep_stencil_extent_xy(self%mesh_ids(1)) &
                     + 2_i_def + max(inner_order, outer_order)
       end if
       call self%remap_on_extended_mesh(self%rho_d(1,step), rho_d, &
                                        self%rho_monotone_remap,   &
                                        self%rho_enforce_minvalue, &
-                                       self%rho_minvalue,         &
-                                       remap_depth)
+                                       self%rho_minvalue, remap_depth)
+      ! Now compute mass field
+      ! @todo #4302: replace this with redundant computation
+      call invoke_deep_X_times_Y(self%dry_mass(1,step), &
+                                 self%rho_d(1,step),    &
+                                 detj)
+
     else
-      call rho_d%copy_field_properties(self%rho_d(1,step))
-      call invoke( setval_X(self%rho_d(1,step), rho_d) )
+      call invoke( setval_X(self%rho_d(1,step), rho_d), &
+                   X_times_Y(self%dry_mass(1,step), rho_d, detj) )
     end if
 
-    nullify( prime_extrusion_mesh )
+    nullify( prime_extrusion_mesh, detj )
 
   end subroutine set_rho_d
 
-  !> @brief Sets a dry density field to use in FFSL tracer transport
+  !> @brief Sets a dry density field to use in FFSL tracer transport, and
+  !!        computes the corresponding mass field. This should be the dry
+  !!        density field from a horizontal x step
   !> @pre Fields passed to this routine must be on the prime extrusion mesh
   !> @param[in,out] self        The transport_runtime object
   !> @param[in]     rho_d       Dry density field
@@ -1101,38 +1075,48 @@ contains
     integer(kind=i_def),                   intent(in)    :: step
 
     type(mesh_type),         pointer :: prime_extrusion_mesh => null()
-
-    integer(kind=i_def) :: remap_depth
+    type(r_tran_field_type), pointer :: detj => null()
+    type(r_tran_field_type)          :: rho_d_ffsl_x
+    integer(kind=i_def)              :: remap_depth
 
     ! The dry flux is on the prime extrusion mesh
     prime_extrusion_mesh => rho_d%get_mesh()
+    detj => get_detj_at_w3_r_tran(prime_extrusion_mesh%get_id())
 
     if (prime_extrusion_mesh%get_id() /= self%mesh_ids(1)) then
       call log_event('Can only set dry fields using fields from the prime extrusion mesh', LOG_LEVEL_ERROR)
     end if
 
-    if (extended_mesh) then
-      ! For consistent transport the cfl may be slightly higher than expected
-      ! due to using the dry mass flux to compute departure points, therefore
-      ! an extra + 1 is added to remap_depth for safety
-      remap_depth = max(self%get_dep_stencil_extent_x(self%mesh_ids(1)), &
-                        self%get_dep_stencil_extent_y(self%mesh_ids(1))) &
-                  + 2_i_def + max(inner_order, outer_order)
-      call self%remap_on_extended_mesh(self%rho_d_ffsl_x(1,step), rho_d, &
-                                       self%rho_monotone_remap,          &
-                                       self%rho_enforce_minvalue,        &
-                                       self%rho_minvalue,                &
-                                       remap_depth)
-    else
-      call rho_d%copy_field_properties(self%rho_d_ffsl_x(1,step))
-      call invoke( setval_X(self%rho_d_ffsl_x(1,step), rho_d) )
+    if (.not. self%dry_mass_ffsl_x(1,step)%is_initialised()) then
+      call self%dry_mass_ffsl_x(1,step)%initialise( vector_space = rho_d%get_function_space(), &
+                                                    halo_depth = get_required_stencil_depth() )
     end if
 
-    nullify( prime_extrusion_mesh )
+    if (extended_mesh) then
+      ! First remap rho
+      ! As this will be used for computing departure distances, compute to
+      ! full stencil depth
+      remap_depth = get_required_stencil_depth()
+      call self%remap_on_extended_mesh(rho_d_ffsl_x, rho_d,              &
+                                       self%rho_monotone_remap,          &
+                                       self%rho_enforce_minvalue,        &
+                                       self%rho_minvalue, remap_depth)
+
+      ! Now compute mass field
+      ! @todo #4302: replace this with redundant computation
+      call invoke_deep_X_times_Y(self%dry_mass_ffsl_x(1,step), &
+                                 rho_d_ffsl_x, detj)
+    else
+      call invoke( X_times_Y(self%dry_mass_ffsl_x(1,step), rho_d, detj) )
+    end if
+
+    nullify( prime_extrusion_mesh, detj )
 
   end subroutine set_rho_d_ffsl_x
 
-  !> @brief Sets a dry density field to use in FFSL tracer transport
+  !> @brief Sets a dry density field to use in FFSL tracer transport, and
+  !!        computes the corresponding mass field. This should be the dry
+  !!        density field from a horizontal y step
   !> @pre Fields passed to this routine must be on the prime extrusion mesh
   !> @param[in,out] self        The transport_runtime object
   !> @param[in]     rho_d       Dry density field
@@ -1145,38 +1129,42 @@ contains
     type(r_tran_field_type),               intent(in)    :: rho_d
     integer(kind=i_def),                   intent(in)    :: step
 
-    type(mesh_type), pointer :: prime_extrusion_mesh => null()
-    integer(kind=i_def)      :: remap_depth
+    type(mesh_type),         pointer :: prime_extrusion_mesh => null()
+    type(r_tran_field_type), pointer :: detj => null()
+    type(r_tran_field_type)          :: rho_d_ffsl_y
+    integer(kind=i_def)              :: remap_depth
 
     ! The dry flux is on the prime extrusion mesh
     prime_extrusion_mesh => rho_d%get_mesh()
+    detj => get_detj_at_w3_r_tran(prime_extrusion_mesh%get_id())
 
     if (prime_extrusion_mesh%get_id() /= self%mesh_ids(1)) then
       call log_event('Can only set dry fields using fields from the prime extrusion mesh', LOG_LEVEL_ERROR)
     end if
 
-    if (extended_mesh) then
-      if ( check_any_horizontal_method_mol() ) then
-        remap_depth = get_required_stencil_depth()
-      else
-        ! For consistent transport the cfl may be slightly higher than expected
-        ! due to using the dry mass flux to compute departure points, therefore
-        ! an extra + 1 is added to remap_depth for safety
-        remap_depth = max(self%get_dep_stencil_extent_x(self%mesh_ids(1)), &
-                          self%get_dep_stencil_extent_y(self%mesh_ids(1))) &
-                    + 2_i_def + max(inner_order, outer_order)
-      end if
-      call self%remap_on_extended_mesh(self%rho_d_ffsl_y(1,step), rho_d, &
-                                       self%rho_monotone_remap,          &
-                                       self%rho_enforce_minvalue,        &
-                                       self%rho_minvalue,                &
-                                       remap_depth)
-    else
-      call rho_d%copy_field_properties(self%rho_d_ffsl_y(1,step))
-      call invoke( setval_X(self%rho_d_ffsl_y(1,step), rho_d) )
+    if (.not. self%dry_mass_ffsl_y(1,step)%is_initialised()) then
+      call self%dry_mass_ffsl_y(1,step)%initialise( vector_space = rho_d%get_function_space(), &
+                                                    halo_depth = get_required_stencil_depth() )
     end if
 
-    nullify( prime_extrusion_mesh )
+    if (extended_mesh) then
+      ! First remap rho
+      ! As this will be used for computing departure distances, compute to
+      ! full stencil depth
+      remap_depth = get_required_stencil_depth()
+      call self%remap_on_extended_mesh(rho_d_ffsl_y, rho_d,              &
+                                       self%rho_monotone_remap,          &
+                                       self%rho_enforce_minvalue,        &
+                                       self%rho_minvalue, remap_depth)
+      ! Now compute mass field
+      ! @todo #4302: replace this with redundant computation
+      call invoke_deep_X_times_Y(self%dry_mass_ffsl_y(1,step), &
+                                 rho_d_ffsl_y, detj)
+    else
+      call invoke( X_times_Y(self%dry_mass_ffsl_y(1,step), rho_d, detj) )
+    end if
+
+    nullify( prime_extrusion_mesh, detj )
 
   end subroutine set_rho_d_ffsl_y
 
@@ -1226,6 +1214,8 @@ contains
 
     use intermesh_constants_mod,   only: get_intermesh_weights_w3_rtran
     use mesh_collection_mod,       only: mesh_collection
+    use restrict_mass_w3_kernel_mod, &
+                                   only: restrict_mass_w3_kernel_type
     use restrict_scalar_weighted_kernel_mod, &
                                    only: restrict_scalar_weighted_kernel_type
     use restrict_w2_kernel_mod,    only: restrict_w2_kernel_type
@@ -1237,23 +1227,30 @@ contains
     class(transport_runtime_type), target, intent(inout) :: self
     class(transport_runtime_type),         intent(in)    :: source_transport_runtime
 
-    type(function_space_type), pointer       :: w2_fs => null()
-    type(function_space_type), pointer       :: w3_fs => null()
-    type(mesh_type),           pointer       :: source_mesh => null()
-    type(mesh_type),           pointer       :: target_mesh => null()
-    type(r_tran_field_type),   pointer       :: source_rho_d => null()
-    type(r_tran_field_type),   pointer       :: source_rho_d_ffsl_x => null()
-    type(r_tran_field_type),   pointer       :: source_rho_d_ffsl_y => null()
-    type(r_tran_field_type),   pointer       :: source_dry_flux => null()
-    type(r_tran_field_type),   pointer       :: weights_w3 => null()
-    type(r_tran_field_type)                  :: tmp_rho_d
-    integer(kind=i_def)                      :: source_ncells
-    integer(kind=i_def)                      :: target_ncells
-    integer(kind=i_def)                      :: source_mesh_id
-    integer(kind=i_def)                      :: target_mesh_id
-    integer(kind=i_def)                      :: step, num_steps, fs_idx
-    logical(kind=l_def)                      :: any_hori_dep_pts
-    integer(kind=i_def)                      :: remap_depth
+    type(function_space_type), pointer :: w2_fs => null()
+    type(function_space_type), pointer :: w3_fs => null()
+    type(mesh_type),           pointer :: source_mesh => null()
+    type(mesh_type),           pointer :: target_mesh => null()
+    type(r_tran_field_type),   pointer :: source_rho_d => null()
+    type(r_tran_field_type),   pointer :: source_dry_mass => null()
+    type(r_tran_field_type),   pointer :: source_dry_mass_ffsl_x => null()
+    type(r_tran_field_type),   pointer :: source_dry_mass_ffsl_y => null()
+    type(r_tran_field_type),   pointer :: source_dry_flux => null()
+    type(r_tran_field_type),   pointer :: weights_w3 => null()
+    type(r_tran_field_type),   pointer :: source_detj => null()
+    type(r_tran_field_type),   pointer :: target_detj => null()
+    type(integer_field_type),  pointer :: face_selector_ew => null()
+    type(integer_field_type),  pointer :: face_selector_ns => null()
+    type(r_tran_field_type)            :: tmp_rho_d
+    type(r_tran_field_type)            :: source_rho_ffsl
+    type(r_tran_field_type)            :: target_rho_ffsl
+    integer(kind=i_def)                :: source_ncells
+    integer(kind=i_def)                :: target_ncells
+    integer(kind=i_def)                :: source_mesh_id
+    integer(kind=i_def)                :: target_mesh_id
+    integer(kind=i_def)                :: step, num_steps, fs_idx
+    logical(kind=l_def)                :: any_hori_dep_dist
+    integer(kind=i_def)                :: remap_depth
 
     if ( subroutine_timers ) call timer('transport.runtime_restrict')
 
@@ -1269,30 +1266,49 @@ contains
     source_ncells = source_mesh%get_ncells()
     target_ncells = target_mesh%get_ncells()
 
+    face_selector_ew => get_face_selector_ew(target_mesh_id)
+    face_selector_ns => get_face_selector_ns(target_mesh_id)
+
+    target_detj => get_detj_at_w3_r_tran(target_mesh_id)
+    source_detj => get_detj_at_w3_r_tran(source_mesh_id)
+
     if (source_ncells > target_ncells) then
       ! Loop through fields for each step for prime extrusion
       num_steps = source_transport_runtime%get_num_dry_steps()
       do step = 1, num_steps + 1
 
         ! -------------------------------------------------------------------- !
-        ! rho_d
+        ! rho_d and dry_mass
         ! -------------------------------------------------------------------- !
         ! Restrict densities conservatively
         source_rho_d => source_transport_runtime%get_rho_d(source_mesh_id, step)
         weights_w3 => get_intermesh_weights_w3_rtran(source_mesh, target_mesh)
         w3_fs => function_space_collection%get_fs(target_mesh, 0, W3)
 
+        if (.not. self%rho_d(1,step)%is_initialised()) then
+          call self%rho_d(1,step)%initialise( vector_space = w3_fs, &
+                                              halo_depth=target_mesh%get_halo_depth() )
+          call self%dry_mass(1,step)%initialise( vector_space = w3_fs, &
+                                                 halo_depth=target_mesh%get_halo_depth() )
+        end if
+
         if (extended_mesh) then
+          ! TODO: we should be able to get away with not doing all of these
+          ! remappings, based on the direction and last step
+          ! Need to remap on the ext. mesh, and make rho and mass consistent
+          ! Restrict rho, remap, and then calculate mass
+          weights_w3 => get_intermesh_weights_w3_rtran(source_mesh, target_mesh)
+          source_rho_d => source_transport_runtime%get_rho_d(source_mesh_id, step)
           if ( check_any_horizontal_method_mol() ) then
             remap_depth = get_required_stencil_depth()
           else
             ! TODO: we should be able to get away with not doing all of these
             ! remappings, based on the direction and last step
             ! Restrict, then remap
-            remap_depth = max(self%get_dep_stencil_extent_x(self%mesh_ids(1)), &
-                              self%get_dep_stencil_extent_y(self%mesh_ids(1))) &
-                        + 1_i_def + max(inner_order, outer_order)
+            remap_depth = self%get_dep_stencil_extent_xy(self%mesh_ids(1)) &
+                        + 2_i_def + max(inner_order, outer_order)
           end if
+          ! Restrict and remap rho
           call tmp_rho_d%initialise( vector_space = w3_fs, &
                                      halo_depth=target_mesh%get_halo_depth() )
           call invoke( restrict_scalar_weighted_kernel_type(tmp_rho_d,         &
@@ -1301,68 +1317,89 @@ contains
           call self%remap_on_extended_mesh(self%rho_d(1,step), tmp_rho_d,      &
                                            self%rho_monotone_remap,            &
                                            self%rho_enforce_minvalue,          &
-                                           self%rho_minvalue,                  &
-                                           remap_depth)
+                                           self%rho_minvalue, remap_depth)
+          ! Now compute mass by multiplying remapped field by det(J)
+          ! @todo #4302: replace this with redundant computation
+          call invoke_deep_X_times_Y(self%dry_mass(1,step),                    &
+                                     self%rho_d(1,step),                       &
+                                     target_detj)
         else
-          if (.not. self%rho_d(1,step)%is_initialised()) then
-            call self%rho_d(1,step)%initialise( vector_space = w3_fs, &
-                                                halo_depth = target_mesh%get_halo_depth() )
-          end if
-          ! Can restrict straight into self%rho_d
-          call invoke( restrict_scalar_weighted_kernel_type(                   &
-                                                    self%rho_d(1,step),        &
-                                                    source_rho_d,              &
-                                                    weights_w3) )
+          ! Can restrict mass and then obtain density through division
+          source_dry_mass => source_transport_runtime%get_dry_mass(source_mesh_id, step)
+          call invoke( restrict_mass_w3_kernel_type(self%dry_mass(1,step),     &
+                                                    source_dry_mass),          &
+                       X_divideby_Y(self%rho_d(1,step), self%dry_mass(1,step), &
+                                    target_detj) )
         end if
 
         ! -------------------------------------------------------------------- !
-        ! rho_d_ffsl: only used with FFSL and only for number of dry steps
+        ! dry_mass_ffsl: only used with FFSL and only for number of dry steps
         ! -------------------------------------------------------------------- !
-        any_hori_dep_pts = check_horz_dep_pts()
-        if ( any_hori_dep_pts .and. step < num_steps + 1 ) then
-          if ( source_transport_runtime%rho_d_ffsl_x(1,step)%is_initialised() ) then
-            source_rho_d_ffsl_x => source_transport_runtime%get_rho_d_ffsl_x(source_mesh_id, step)
-            source_rho_d_ffsl_y => source_transport_runtime%get_rho_d_ffsl_y(source_mesh_id, step)
+        any_hori_dep_dist = check_horz_dep_pts()
+        if ( any_hori_dep_dist .and. step < num_steps + 1 ) then
+          if ( source_transport_runtime%dry_mass_ffsl_x(1,step)%is_initialised() ) then
+            source_dry_mass_ffsl_x => source_transport_runtime%get_dry_mass_ffsl_x(source_mesh_id, step)
+            source_dry_mass_ffsl_y => source_transport_runtime%get_dry_mass_ffsl_y(source_mesh_id, step)
 
-            if (.not. self%rho_d_ffsl_x(1,step)%is_initialised()) then
-              call self%rho_d_ffsl_x(1,step)%initialise( vector_space = w3_fs, &
-                                                halo_depth = target_mesh%get_halo_depth() )
-              call self%rho_d_ffsl_y(1,step)%initialise( vector_space = w3_fs, &
-                                                halo_depth = target_mesh%get_halo_depth() )
+            if (.not. self%dry_mass_ffsl_x(1,step)%is_initialised()) then
+              call self%dry_mass_ffsl_x(1,step)%initialise( vector_space = w3_fs, &
+                                                            halo_depth=target_mesh%get_halo_depth() )
+              call self%dry_mass_ffsl_y(1,step)%initialise( vector_space = w3_fs, &
+                                                            halo_depth=target_mesh%get_halo_depth() )
             end if
 
+            call source_rho_ffsl%initialise( source_dry_mass_ffsl_x%get_function_space(), &
+                                             halo_depth=source_mesh%get_halo_depth() )
+            call target_rho_ffsl%initialise( w3_fs, &
+                                             halo_depth=target_mesh%get_halo_depth() )
+
             if (extended_mesh) then
-              ! Restrict, then remap
-              call invoke( restrict_scalar_weighted_kernel_type(               &
-                                                    tmp_rho_d,                 &
-                                                    source_rho_d_ffsl_x,       &
-                                                    weights_w3) )
-              call self%remap_on_extended_mesh(self%rho_d_ffsl_x(1, step),     &
-                                               tmp_rho_d,                      &
-                                               self%rho_monotone_remap,        &
-                                               self%rho_enforce_minvalue,      &
-                                               self%rho_minvalue,              &
-                                               remap_depth)
-              call invoke( restrict_scalar_weighted_kernel_type(               &
-                                                    tmp_rho_d,                 &
-                                                    source_rho_d_ffsl_y,       &
-                                                    weights_w3) )
-              call self%remap_on_extended_mesh(self%rho_d_ffsl_y(1, step),     &
-                                               tmp_rho_d,                      &
-                                               self%rho_monotone_remap,        &
-                                               self%rho_enforce_minvalue,      &
-                                               self%rho_minvalue,              &
-                                               remap_depth)
-            else
-              ! Can restrict straight into self%rho_d fields
-              call invoke( restrict_scalar_weighted_kernel_type(               &
-                                                    self%rho_d_ffsl_x(1,step), &
-                                                    source_rho_d_ffsl_x,       &
-                                                    weights_w3),               &
+              ! As this will be used for computing departure distances, compute to
+              ! full stencil depth
+              remap_depth = get_required_stencil_depth()
+
+              ! Restrict and remap rho
+              call invoke( X_divideby_Y(source_rho_ffsl,                       &
+                                        source_dry_mass_ffsl_x, source_detj),  &
                            restrict_scalar_weighted_kernel_type(               &
-                                                    self%rho_d_ffsl_y(1,step), &
-                                                    source_rho_d_ffsl_y,       &
+                                                    tmp_rho_d,                 &
+                                                    source_rho_ffsl,           &
                                                     weights_w3) )
+              call self%remap_on_extended_mesh(target_rho_ffsl,                &
+                                               tmp_rho_d,                      &
+                                               self%rho_monotone_remap,        &
+                                               self%rho_enforce_minvalue,      &
+                                               self%rho_minvalue, remap_depth)
+              ! @todo #4302: replace this with redundant computation
+              call invoke_deep_X_times_Y(self%dry_mass_ffsl_x(1, step),        &
+                                         target_rho_ffsl,                      &
+                                         target_detj)
+              call invoke( X_divideby_Y(source_rho_ffsl,                       &
+                                        source_dry_mass_ffsl_y, source_detj),  &
+                           restrict_scalar_weighted_kernel_type(               &
+                                                    tmp_rho_d,                 &
+                                                    source_rho_ffsl,           &
+                                                    weights_w3) )
+              call self%remap_on_extended_mesh(target_rho_ffsl,                &
+                                               tmp_rho_d,                      &
+                                               self%rho_monotone_remap,        &
+                                               self%rho_enforce_minvalue,      &
+                                               self%rho_minvalue, remap_depth)
+              ! Now remap mass
+              ! @todo #4302: replace this with redundant computation
+              call invoke_deep_X_times_Y(self%dry_mass_ffsl_y(1, step),        &
+                                         target_rho_ffsl,                      &
+                                         target_detj)
+
+            else
+              ! Can restrict straight into mass fields fields
+              call invoke( restrict_mass_w3_kernel_type(                       &
+                                                self%dry_mass_ffsl_x(1, step), &
+                                                source_dry_mass_ffsl_x),       &
+                           restrict_mass_w3_kernel_type(                       &
+                                                self%dry_mass_ffsl_y(1, step), &
+                                                source_dry_mass_ffsl_y) )
+
             end if
           end if
         end if
@@ -1383,13 +1420,19 @@ contains
           ! Restrict flux, which depends on split direction
           select case ( source_dry_flux%which_function_space() )
           case ( W2 )
-            call invoke(                                                         &
-                restrict_w2_kernel_type(self%dry_flux(1,step), source_dry_flux) )
+            call invoke(                                                       &
+                restrict_w2_kernel_type(self%dry_flux(1,step),                 &
+                                        source_dry_flux,                       &
+                                        face_selector_ew,                      &
+                                        face_selector_ns) )
           case ( W2H )
-            call invoke(                                                         &
-                restrict_w2h_kernel_type(self%dry_flux(1,step), source_dry_flux) )
+            call invoke(                                                       &
+                restrict_w2h_kernel_type(self%dry_flux(1,step),                &
+                                         source_dry_flux,                     &
+                                         face_selector_ew,                     &
+                                         face_selector_ns) )
           case ( W2V )
-            call invoke(                                                         &
+            call invoke(                                                       &
                 restrict_w2v_kernel_type(self%dry_flux(1,step), source_dry_flux) )
           case default
             call log_event('Dry flux space not recognised', LOG_LEVEL_ERROR)
@@ -1402,8 +1445,9 @@ contains
                       'target mesh is coarser than source mesh', LOG_LEVEL_ERROR)
     end if
 
-    nullify( source_mesh, target_mesh, source_rho_d, source_rho_d_ffsl_x, &
-             source_rho_d_ffsl_y, source_dry_flux, w3_fs, w2_fs, weights_w3 )
+    nullify( source_mesh, target_mesh, source_rho_d, source_dry_mass_ffsl_x,   &
+             source_dry_mass_ffsl_y, source_dry_flux, w3_fs, w2_fs,            &
+             weights_w3, face_selector_ew, face_selector_ns )
 
     if ( subroutine_timers ) call timer('transport.runtime_restrict')
 
@@ -1414,12 +1458,12 @@ contains
   !> @param[in,out] self   The transport_runtime object
   subroutine shift_dry_fields(self)
 
-    use apply_w3_to_sh_w3_kernel_mod,     only: apply_w3_to_sh_w3_kernel_type
     use consist_w2_to_sh_w2_kernel_mod,   only: consist_w2_to_sh_w2_kernel_type
     use consist_w2h_to_sh_w2h_kernel_mod, only: consist_w2h_to_sh_w2h_kernel_type
     use consist_w2v_to_sh_w2v_kernel_mod, only: consist_w2v_to_sh_w2v_kernel_type
-    use fem_constants_mod,                only: get_rmultiplicity, &
-                                                get_detj_at_w3_r_tran
+    use psykal_lite_transport_mod,        only: invoke_deep_shift_mass, &
+                                                invoke_deep_X_divideby_Y
+    use shift_mass_w3_kernel_mod,         only: shift_mass_w3_kernel_type
 
     implicit none
 
@@ -1428,18 +1472,19 @@ contains
     integer(kind=i_def)                :: prime_mesh_id, fs_idx, step
     type(mesh_type),           pointer :: prime_extrusion_mesh => null()
     type(mesh_type),           pointer :: shifted_mesh => null()
-    type(field_type),          pointer :: rmultiplicity_w2 => null()
     type(r_tran_field_type),   pointer :: detj_shifted => null()
     type(r_tran_field_type),   pointer :: detj_prime => null()
-    type(r_tran_field_type)            :: tmp_rho_d_shifted
+    type(r_tran_field_type)            :: rho_d_prime
+    type(r_tran_field_type)            :: rho_d_shifted
+    type(integer_field_type),  pointer :: face_selector_ew => null()
+    type(integer_field_type),  pointer :: face_selector_ns => null()
     type(function_space_type), pointer :: w3_fs => null()
     type(function_space_type), pointer :: w2_fs => null()
-    logical(kind=l_def)                :: any_hori_dep_pts
-    integer(kind=i_def)                :: remap_depth
+    logical(kind=l_def)                :: any_hori_dep_dist
 
     if ( subroutine_timers ) call timer('transport.runtime_shift')
 
-    any_hori_dep_pts = check_horz_dep_pts()
+    any_hori_dep_dist = check_horz_dep_pts()
 
     if (self%n_meshes > 1) then
       prime_extrusion_mesh => mesh_collection%get_mesh(self%mesh_ids(1))
@@ -1450,101 +1495,76 @@ contains
       detj_prime => get_detj_at_w3_r_tran(prime_mesh_id)
       w3_fs => function_space_collection%get_fs(shifted_mesh, 0, W3)
 
-      if (extended_mesh) then
-        if ( check_any_horizontal_method_mol() ) then
-          remap_depth = get_required_stencil_depth()
-        else
-          ! For consistent transport the cfl may be slightly higher than expected
-          ! due to using the dry mass flux to compute departure points, therefore
-          ! an extra + 1 is added to remap_depth for safety
-          remap_depth = max(self%get_dep_stencil_extent_x(self%mesh_ids(1)), &
-                            self%get_dep_stencil_extent_y(self%mesh_ids(1))) &
-                      + 2_i_def + max(inner_order, outer_order)
-        end if
-
-      end if
-      if (extended_mesh) call tmp_rho_d_shifted%initialise( w3_fs, &
-                                 halo_depth=shifted_mesh%get_halo_depth() )
+      face_selector_ew => get_face_selector_ew(prime_mesh_id)
+      face_selector_ns => get_face_selector_ns(prime_mesh_id)
 
       do step = 1, self%num_dry_steps + 1
 
         ! -------------------------------------------------------------------- !
-        ! rho_d
+        ! rho_d and dry_mass
         ! -------------------------------------------------------------------- !
+        if (.not. self%rho_d(2,step)%is_initialised()) then
+          call self%rho_d(2,step)%initialise( vector_space = w3_fs, &
+                                 halo_depth=shifted_mesh%get_halo_depth() )
+          call self%dry_mass(2,step)%initialise( vector_space = w3_fs, &
+                                 halo_depth=shifted_mesh%get_halo_depth() )
+        end if
 
         if (extended_mesh) then
-          call invoke( apply_w3_to_sh_w3_kernel_type(                          &
-                                           tmp_rho_d_shifted,                  &
-                                           self%rho_d(1,step),                 &
-                                           detj_shifted,                       &
-                                           detj_prime) )
-         call self%remap_on_extended_mesh(self%rho_d(2,step),                 &
-                                           tmp_rho_d_shifted,                  &
-                                           self%rho_monotone_remap,            &
-                                           self%rho_enforce_minvalue,          &
-                                           self%rho_minvalue,                  &
-                                           remap_depth)
+          ! Original field has already been remapped, so can perform a "deep"
+          ! shift on the original field to get the shifted, remapped density
+          ! @todo #4302: replace this with redundant computation
+          call invoke_deep_shift_mass(self%dry_mass(2,step),                   &
+                                      self%dry_mass(1,step))
+          call invoke_deep_X_divideby_Y(self%rho_d(2,step),                    &
+                                        self%dry_mass(2,step),                 &
+                                        detj_shifted)
         else
-          if (.not. self%rho_d(2,step)%is_initialised()) then
-            call self%rho_d(2,step)%initialise( vector_space = w3_fs, &
-                                                halo_depth = shifted_mesh%get_halo_depth() )
-          end if
-          call invoke( apply_w3_to_sh_w3_kernel_type(                          &
-                                           self%rho_d(2,step),                 &
-                                           self%rho_d(1,step),                 &
-                                           detj_shifted,                       &
-                                           detj_prime) )
+          ! Can directly shift mass, then obtain rho by dividing by volume
+          call invoke( shift_mass_w3_kernel_type(self%dry_mass(2,step),        &
+                                                 self%dry_mass(1,step)),       &
+                       X_divideby_Y(self%rho_d(2,step), self%dry_mass(2,step), &
+                                    detj_shifted) )
         end if
 
         ! -------------------------------------------------------------------- !
-        ! rho_d_ffsl: only used with FFSL and only for number of dry steps
+        ! dry_mass_ffsl: only used with FFSL and only for number of dry steps
         ! -------------------------------------------------------------------- !
-        if ( any_hori_dep_pts .and. step < self%num_dry_steps + 1 ) then
-          if ( self%rho_d_ffsl_x(1,step)%is_initialised() ) then
-            if (.not. self%rho_d_ffsl_x(2,step)%is_initialised()) then
-              call self%rho_d_ffsl_x(2,step)%initialise( vector_space = w3_fs, &
-                                                halo_depth = shifted_mesh%get_halo_depth() )
-              call self%rho_d_ffsl_y(2,step)%initialise( vector_space = w3_fs, &
-                                                halo_depth = shifted_mesh%get_halo_depth() )
+        if ( any_hori_dep_dist .and. step < self%num_dry_steps + 1 ) then
+          if ( self%dry_mass_ffsl_x(1,step)%is_initialised() ) then
+            if (.not. self%dry_mass_ffsl_x(2,step)%is_initialised()) then
+              call self%dry_mass_ffsl_x(2,step)%initialise( vector_space = w3_fs, &
+                                        halo_depth=shifted_mesh%get_halo_depth() )
+              call self%dry_mass_ffsl_y(2,step)%initialise( vector_space = w3_fs, &
+                                        halo_depth=shifted_mesh%get_halo_depth() )
             end if
+
+            call rho_d_prime%initialise( self%dry_mass_ffsl_x(1,step)%get_function_space(), &
+                                         halo_depth=prime_extrusion_mesh%get_halo_depth() )
+            call rho_d_shifted%initialise( w3_fs, &
+                                         halo_depth=shifted_mesh%get_halo_depth() )
 
             if (extended_mesh) then
-              call invoke( apply_w3_to_sh_w3_kernel_type(                      &
-                                               tmp_rho_d_shifted,              &
-                                               self%rho_d_ffsl_x(1,step),      &
-                                               detj_shifted,                   &
-                                               detj_prime) )
-              call self%remap_on_extended_mesh(self%rho_d_ffsl_x(2,step),      &
-                                               tmp_rho_d_shifted,              &
-                                               self%rho_monotone_remap,        &
-                                               self%rho_enforce_minvalue,      &
-                                               self%rho_minvalue,              &
-                                               remap_depth)
-              call invoke( apply_w3_to_sh_w3_kernel_type(                      &
-                                               tmp_rho_d_shifted,              &
-                                               self%rho_d_ffsl_y(1,step),      &
-                                               detj_shifted,                   &
-                                               detj_prime) )
-              call self%remap_on_extended_mesh(self%rho_d_ffsl_y(2,step),      &
-                                               tmp_rho_d_shifted,              &
-                                               self%rho_monotone_remap,        &
-                                               self%rho_enforce_minvalue,      &
-                                               self%rho_minvalue,              &
-                                               remap_depth)
+              ! Mass should already correspond to remapped density
+              ! Rather than remapping, perform deep shifting of mass into halos
+              ! @todo #4302: replace this with redundant computation
+              call invoke_deep_shift_mass(self%dry_mass_ffsl_x(2,step),        &
+                                          self%dry_mass_ffsl_x(1,step))
+              call invoke_deep_shift_mass(self%dry_mass_ffsl_y(2,step),        &
+                                          self%dry_mass_ffsl_y(1,step))
+
             else
-              call invoke( apply_w3_to_sh_w3_kernel_type(                      &
-                                               self%rho_d_ffsl_x(2,step),      &
-                                               self%rho_d_ffsl_x(1,step),      &
-                                               detj_shifted,                   &
-                                               detj_prime),                    &
-                           apply_w3_to_sh_w3_kernel_type(                      &
-                                               self%rho_d_ffsl_y(2,step),      &
-                                               self%rho_d_ffsl_y(1,step),      &
-                                               detj_shifted,                   &
-                                               detj_prime) )
+              ! Can just directly shift mass
+              call invoke( shift_mass_w3_kernel_type(                          &
+                                               self%dry_mass_ffsl_x(2,step),   &
+                                               self%dry_mass_ffsl_x(1,step)),  &
+                           shift_mass_w3_kernel_type(                          &
+                                               self%dry_mass_ffsl_y(2,step),   &
+                                               self%dry_mass_ffsl_y(1,step)) )
             end if
           end if
         end if
+
 
         ! -------------------------------------------------------------------- !
         ! dry_flux: kernel depends on the direction
@@ -1560,19 +1580,19 @@ contains
 
           select case (fs_idx)
           case (W2)
-            rmultiplicity_w2 => get_rmultiplicity(W2, prime_mesh_id)
             call invoke(                                              &
               setval_c(self%dry_flux(2,step), 0.0_r_tran),            &
               consist_w2_to_sh_w2_kernel_type(self%dry_flux(2,step),  &
                                               self%dry_flux(1,step),  &
-                                              rmultiplicity_w2) )
+                                              face_selector_ew,       &
+                                              face_selector_ns) )
           case (W2h)
-            rmultiplicity_w2 => get_rmultiplicity(W2h, prime_mesh_id)
             call invoke(                                               &
               setval_c(self%dry_flux(2,step), 0.0_r_tran),             &
               consist_w2h_to_sh_w2h_kernel_type(self%dry_flux(2,step), &
                                                 self%dry_flux(1,step), &
-                                                rmultiplicity_w2) )
+                                                face_selector_ew,      &
+                                                face_selector_ns) )
           case (W2v)
             call invoke(                                               &
               consist_w2v_to_sh_w2v_kernel_type(self%dry_flux(2,step), &
@@ -1586,7 +1606,7 @@ contains
     end if  ! there is a shifted mesh
 
     nullify( prime_extrusion_mesh, shifted_mesh, detj_shifted, detj_prime, &
-             rmultiplicity_w2, w3_fs, w2_fs )
+             w3_fs, w2_fs, face_selector_ew, face_selector_ns )
 
     if ( subroutine_timers ) call timer('transport.runtime_shift')
 
@@ -1598,14 +1618,11 @@ contains
   !> @param[in]     mesh   The mesh to compute consistent quantities on
   subroutine compute_consistent_quantities(self, mesh)
 
-    use consistent_hori_ix_deppt_kernel_mod,  only: consistent_hori_ix_deppt_kernel_type
-    use consistent_hori_iy_deppt_kernel_mod,  only: consistent_hori_iy_deppt_kernel_type
-    use consistent_hori_ox_deppt_kernel_mod,  only: consistent_hori_ox_deppt_kernel_type
-    use consistent_hori_oy_deppt_kernel_mod,  only: consistent_hori_oy_deppt_kernel_type
-    use consistent_vertical_deppt_kernel_mod, only: consistent_vertical_deppt_kernel_type
-    use fem_constants_mod,                    only: get_detj_at_w3_r_tran
+    use hori_dep_dist_ffsl_kernel_mod,        only: hori_dep_dist_ffsl_kernel_type
+    use vert_dep_dist_ffsl_kernel_mod,        only: vert_dep_dist_ffsl_kernel_type
     use departure_points_config_mod,          only: horizontal_limit, &
                                                     horizontal_limit_cap
+    use psykal_lite_transport_mod,            only: invoke_ffsl_panel_swap_kernel_type
 
     implicit none
 
@@ -1615,41 +1632,50 @@ contains
     integer(kind=i_def)                :: mesh_id, i, step
     integer(kind=i_def)                :: function_space
     integer(kind=i_def)                :: stencil_extent
-    integer(kind=i_def)                :: full_stencil_extent_x
-    integer(kind=i_def)                :: full_stencil_extent_y
+    integer(kind=i_def)                :: max_stencil_extent
     real(kind=r_tran)                  :: dep_min, dep_max
     type(mesh_type),           pointer :: twod_mesh => null()
     type(function_space_type), pointer :: w2_fs => null()
     type(function_space_type), pointer :: w3_2d_fs => null()
-    type(r_tran_field_type),   pointer :: rho_d => null()
-    type(r_tran_field_type),   pointer :: rho_d_x => null()
-    type(r_tran_field_type),   pointer :: rho_d_y => null()
+    type(r_tran_field_type),   pointer :: dry_mass => null()
+    type(r_tran_field_type),   pointer :: dry_mass_copy => null()
+    type(r_tran_field_type),   pointer :: dry_mass_x => null()
+    type(r_tran_field_type),   pointer :: dry_mass_y => null()
     type(r_tran_field_type),   pointer :: dry_flux => null()
-    type(r_tran_field_type),   pointer :: detj_at_w3 => null()
+    type(field_type),          pointer :: panel_id => null()
+    type(integer_field_type),  pointer :: face_selector_ew => null()
+    type(integer_field_type),  pointer :: face_selector_ns => null()
     logical(kind=l_def)                :: any_eqn_consistent, cap_dep_points
-    logical(kind=l_def)                :: any_vert_dep_pts, any_hori_dep_pts
+    logical(kind=l_def)                :: any_vert_dep_dist, any_hori_dep_dist
     logical(kind=l_def)                :: any_consistent_swift
     logical(kind=l_def)                :: any_consistent_cosmic
+    character(len=str_def)             :: field_name
 
     if ( subroutine_timers ) call timer('transport.runtime_consistent')
 
     any_eqn_consistent = check_any_eqn_consistent()
     any_consistent_swift = check_any_consistent_swift()
     any_consistent_cosmic = check_any_consistent_cosmic()
-    any_vert_dep_pts = check_vert_dep_pts()
-    any_hori_dep_pts = check_horz_dep_pts()
+    any_vert_dep_dist = check_vert_dep_pts()
+    any_hori_dep_dist = check_horz_dep_pts()
 
     if (any_consistent_swift .or. any_consistent_cosmic .or. &
-        (any_eqn_consistent .and. any_vert_dep_pts)) then
+        (any_eqn_consistent .and. any_vert_dep_dist)) then
 
       mesh_id = mesh%get_id()
       i = self%idx_from_mesh_id(mesh_id)
-      detj_at_w3 => get_detj_at_w3_r_tran(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      face_selector_ew => get_face_selector_ew(mesh_id)
+      face_selector_ns => get_face_selector_ns(mesh_id)
 
       do step = 1, self%num_dry_steps
 
-        rho_d => self%get_rho_d(mesh_id, step)
+        dry_mass => self%get_dry_mass(mesh_id, step)
+        dry_mass_copy => self%get_dry_mass(mesh_id, step)
         dry_flux => self%get_dry_flux(mesh_id, step)
+        ! Check that mass isn't negative
+        write(field_name, '(A,I4)') 'dry_mass', step
+        call self%check_negative_field(dry_mass, field_name)
 
         ! Determine direction of step from function space
         function_space = dry_flux%which_function_space()
@@ -1658,172 +1684,116 @@ contains
         ! -------------------------------------------------------------------- !
         ! Vertical step
         ! -------------------------------------------------------------------- !
-        if (function_space == W2V .and. any_vert_dep_pts) then
-          if (.not. self%tracer_dep_pts_z(i,step)%is_initialised()) then
+        if (function_space == W2V .and. any_vert_dep_dist) then
+          if (.not. self%tracer_dep_dist_z(i,step)%is_initialised()) then
             w2_fs => dry_flux%get_function_space()
-            call self%tracer_dep_pts_z(i,step)%initialise( w2_fs )
+            call self%tracer_dep_dist_z(i,step)%initialise( w2_fs )
             call self%dry_frac_flux_z(i,step)%initialise( w2_fs )
           end if
 
-          call invoke( consistent_vertical_deppt_kernel_type(                  &
-                                          self%tracer_dep_pts_z(i,step),       &
+          call invoke( vert_dep_dist_ffsl_kernel_type(                         &
+                                          self%tracer_dep_dist_z(i,step),      &
                                           self%dry_frac_flux_z(i,step),        &
                                           dry_flux,                            &
-                                          rho_d,                               &
-                                          detj_at_w3) )
+                                          dry_mass) )
 
+          call log_field_minmax(LOG_LEVEL_DEBUG, 'tracer_dep_dist_z', &
+                                self%tracer_dep_dist_z(i,step))
         ! -------------------------------------------------------------------- !
         ! Horizontal step
         ! -------------------------------------------------------------------- !
-        else if (function_space == W2H .and. any_hori_dep_pts) then
+        else if (function_space == W2H .and. any_hori_dep_dist) then
 
           cap_dep_points = (horizontal_limit == horizontal_limit_cap)
 
           ! Inner step quantities ----------------------------------------------
-          if (.not. self%tracer_dep_pts_ix(i,step)%is_initialised()) then
+          if (.not. self%tracer_dep_dist_ixy(i,step)%is_initialised()) then
             w2_fs => dry_flux%get_function_space()
             twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
             w3_2d_fs => function_space_collection%get_fs(twod_mesh, 0, W3)
-            call self%tracer_dep_pts_ix(i,step)%initialise( w2_fs )
-            call self%tracer_dep_pts_iy(i,step)%initialise( w2_fs )
-            call self%dry_frac_flux_ix(i,step)%initialise( w2_fs )
-            call self%dry_frac_flux_iy(i,step)%initialise( w2_fs )
-            call self%tracer_istart_ix(i,step)%initialise( w3_2d_fs )
-            call self%tracer_iend_ix(i,step)%initialise( w3_2d_fs )
-            call self%tracer_istart_iy(i,step)%initialise( w3_2d_fs )
-            call self%tracer_iend_iy(i,step)%initialise( w3_2d_fs )
+            call self%tracer_dep_dist_ixy(i,step)%initialise( w2_fs )
+            call self%dry_frac_flux_ixy(i,step)%initialise( w2_fs )
           end if
 
+          ! Compute tracer departure points
           call invoke(                                                         &
-                  setval_c(self%tracer_dep_pts_ix(i,step), 0.0_r_tran),        &
-                  setval_c(self%tracer_dep_pts_iy(i,step), 0.0_r_tran),        &
-                  setval_c(self%dry_frac_flux_ix(i,step), 0.0_r_tran),         &
-                  setval_c(self%dry_frac_flux_iy(i,step), 0.0_r_tran),         &
-                  consistent_hori_ix_deppt_kernel_type(                        &
-                                          self%tracer_dep_pts_ix(i,step),      &
-                                          self%dry_frac_flux_ix(i,step),       &
+                  setval_c(self%tracer_dep_dist_ixy(i,step), 0.0_r_tran),      &
+                  setval_c(self%dry_frac_flux_ixy(i,step), 0.0_r_tran),        &
+                  hori_dep_dist_ffsl_kernel_type(                              &
+                                          self%tracer_dep_dist_ixy(i,step),    &
+                                          self%dry_frac_flux_ixy(i,step),      &
                                           dry_flux,                            &
-                                          rho_d, stencil_extent,               &
-                                          detj_at_w3, stencil_extent,          &
-                                          dep_pt_stencil_extent,               &
-                                          cap_dep_points),                     &
-                  consistent_hori_iy_deppt_kernel_type(                        &
-                                          self%tracer_dep_pts_iy(i,step),      &
-                                          self%dry_frac_flux_iy(i,step),       &
-                                          dry_flux,                            &
-                                          rho_d, stencil_extent,               &
-                                          detj_at_w3, stencil_extent,          &
+                                          dry_mass, stencil_extent,            &
+                                          dry_mass_copy, stencil_extent,       &
+                                          face_selector_ew,                    &
+                                          face_selector_ns,                    &
                                           dep_pt_stencil_extent,               &
                                           cap_dep_points) )
 
           ! Get the required stencil size from the departure points
-          call get_field_minmax( self%tracer_dep_pts_ix(i,step), dep_min, dep_max )
-          self%tracer_stencil_extent_ix(i,step) = &
-            MAX( int(abs(dep_max), i_def), int(abs(dep_min), i_def) )
-          call get_field_minmax( self%tracer_dep_pts_iy(i,step), dep_min, dep_max )
-          self%tracer_stencil_extent_iy(i,step) = &
+          call get_field_minmax(self%tracer_dep_dist_ixy(i,step), dep_min, dep_max)
+          self%tracer_stencil_extent_ixy(i,step) = &
             MAX( int(abs(dep_max), i_def), int(abs(dep_min), i_def) )
 
-          ! Compute indices for crossing panels
-          ! We don't need these fields when doing SWIFT tracer splitting
-          ! As the SWIFT inner step doesn't involve swapping x- and y-sweeps
-          if (any_consistent_cosmic) then
-            if ( special_edges_treatment ) then
-                full_stencil_extent_x = self%tracer_stencil_extent_ix(i,step) + 2 + outer_order
-                full_stencil_extent_y = self%tracer_stencil_extent_iy(i,step) + 2 + outer_order
-             else
-                full_stencil_extent_x = self%tracer_stencil_extent_ix(i,step) + 1 + outer_order
-                full_stencil_extent_y = self%tracer_stencil_extent_iy(i,step) + 1 + outer_order
-            end if
-
-            call cosmic_index_alg( self%tracer_istart_ix(i,step),              &
-                                   self%tracer_iend_ix(i,step),                &
-                                   self%tracer_istart_iy(i,step),              &
-                                   self%tracer_iend_iy(i,step),                &
-                                   full_stencil_extent_x,                      &
-                                   full_stencil_extent_y )
-          end if
+          call log_field_minmax(LOG_LEVEL_DEBUG, 'tracer_dep_dist_ixy', &
+                                self%tracer_dep_dist_ixy(i,step))
 
           ! Outer step quantities ----------------------------------------------
-          ! Determine if outer fields needed from initialisation of rho_d_ffsl
+          ! Determine if outer fields needed from initialisation of dry_mass_ffsl
           if (any_consistent_swift) then
-            if (.not. self%tracer_dep_pts_ox(i,step)%is_initialised()) then
+            if (.not. self%tracer_dep_dist_oxy(i,step)%is_initialised()) then
               w2_fs => dry_flux%get_function_space()
               twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
               w3_2d_fs => function_space_collection%get_fs(twod_mesh, 0, W3)
-              call self%tracer_dep_pts_ox(i,step)%initialise( w2_fs )
-              call self%tracer_dep_pts_oy(i,step)%initialise( w2_fs )
-              call self%dry_frac_flux_ox(i,step)%initialise( w2_fs )
-              call self%dry_frac_flux_oy(i,step)%initialise( w2_fs )
-              call self%tracer_istart_ox(i,step)%initialise( w3_2d_fs )
-              call self%tracer_iend_ox(i,step)%initialise( w3_2d_fs )
-              call self%tracer_istart_oy(i,step)%initialise( w3_2d_fs )
-              call self%tracer_iend_oy(i,step)%initialise( w3_2d_fs )
+              call self%tracer_dep_dist_oxy(i,step)%initialise( w2_fs )
+              call self%dry_frac_flux_oxy(i,step)%initialise( w2_fs )
             end if
 
-            rho_d_x => self%get_rho_d_ffsl_x(mesh_id, step)
-            rho_d_y => self%get_rho_d_ffsl_y(mesh_id, step)
+            dry_mass_x => self%get_dry_mass_ffsl_x(mesh_id, step)
+            dry_mass_y => self%get_dry_mass_ffsl_y(mesh_id, step)
 
+            ! Check that mass isn't negative
+            write(field_name, '(A,I4)') 'dry_mass_ffsl_x', step
+            call self%check_negative_field(dry_mass_x, field_name)
+            write(field_name, '(A,I4)') 'dry_mass_ffsl_y', step
+            call self%check_negative_field(dry_mass_y, field_name)
+
+            ! Swap the halo values of dry_mass_x and dry_mass_y here: this
+            ! reduces the number of different kernels required by FFSL
+            max_stencil_extent = get_required_stencil_depth()
+            call invoke_ffsl_panel_swap_kernel_type(dry_mass_x, dry_mass_y,    &
+                                                    panel_id, max_stencil_extent)
+
+            ! Compute tracer departure points
             call invoke(                                                       &
-                    setval_c(self%tracer_dep_pts_ox(i,step), 0.0_r_tran),      &
-                    setval_c(self%tracer_dep_pts_oy(i,step), 0.0_r_tran),      &
-                    setval_c(self%dry_frac_flux_ox(i,step), 0.0_r_tran),       &
-                    setval_c(self%dry_frac_flux_oy(i,step), 0.0_r_tran),       &
-                    consistent_hori_ox_deppt_kernel_type(                      &
-                                            self%tracer_dep_pts_ox(i,step),    &
-                                            self%dry_frac_flux_ox(i,step),     &
+                    setval_c(self%tracer_dep_dist_oxy(i,step), 0.0_r_tran),    &
+                    setval_c(self%dry_frac_flux_oxy(i,step), 0.0_r_tran),      &
+                    hori_dep_dist_ffsl_kernel_type(                            &
+                                            self%tracer_dep_dist_oxy(i,step),  &
+                                            self%dry_frac_flux_oxy(i,step),    &
                                             dry_flux,                          &
-                                            rho_d_y, stencil_extent,           &
-                                            rho_d_x, stencil_extent,           &
-                                            detj_at_w3, stencil_extent,        &
-                                            self%dep_pt_istart_y,              &
-                                            self%dep_pt_iend_y,                &
-                                            dep_pt_stencil_extent,             &
-                                            cap_dep_points),                   &
-                    consistent_hori_oy_deppt_kernel_type(                      &
-                                            self%tracer_dep_pts_oy(i,step),    &
-                                            self%dry_frac_flux_oy(i,step),     &
-                                            dry_flux,                          &
-                                            rho_d_x, stencil_extent,           &
-                                            rho_d_y, stencil_extent,           &
-                                            detj_at_w3, stencil_extent,        &
-                                            self%dep_pt_istart_x,              &
-                                            self%dep_pt_iend_x,                &
+                                            dry_mass_y, stencil_extent,        &
+                                            dry_mass_x, stencil_extent,        &
+                                            face_selector_ew,                  &
+                                            face_selector_ns,                  &
                                             dep_pt_stencil_extent,             &
                                             cap_dep_points) )
 
+            call log_field_minmax(LOG_LEVEL_DEBUG, 'tracer_dep_dist_oxy', &
+                                  self%tracer_dep_dist_oxy(i,step))
+
             ! Get the required stencil size from the departure points
-            call get_field_minmax( self%tracer_dep_pts_ox(i,step), dep_min, dep_max )
-            self%tracer_stencil_extent_ox(i,step) = &
+            call get_field_minmax(self%tracer_dep_dist_oxy(i,step), dep_min, dep_max)
+            self%tracer_stencil_extent_oxy(i,step) = &
               MAX( int(abs(dep_max), i_def), int(abs(dep_min), i_def) )
-            call get_field_minmax( self%tracer_dep_pts_oy(i,step), dep_min, dep_max )
-            self%tracer_stencil_extent_oy(i,step) = &
-              MAX( int(abs(dep_max), i_def), int(abs(dep_min), i_def) )
-
-            ! Compute indices for crossing panels
-
-            if ( special_edges_treatment ) then
-              full_stencil_extent_x = self%tracer_stencil_extent_ox(i,step) + 2 + outer_order
-              full_stencil_extent_y = self%tracer_stencil_extent_oy(i,step) + 2 + outer_order
-            else
-              full_stencil_extent_x = self%tracer_stencil_extent_ox(i,step) + 1 + outer_order
-              full_stencil_extent_y = self%tracer_stencil_extent_oy(i,step) + 1 + outer_order
-            end if
-
-            call cosmic_index_alg( self%tracer_istart_ox(i,step),         &
-                                   self%tracer_iend_ox(i,step),           &
-                                   self%tracer_istart_oy(i,step),         &
-                                   self%tracer_iend_oy(i,step),           &
-                                   full_stencil_extent_x,                 &
-                                   full_stencil_extent_y )
 
           end if  ! Outer step variables
         end if  ! Horizontal
       end do  ! Loop through steps
     end if  ! Whether consistent quantities need computing
 
-    nullify(w2_fs, w3_2d_fs, rho_d, rho_d_x, rho_d_y, detj_at_w3, dry_flux, &
-            twod_mesh)
+    nullify(w2_fs, w3_2d_fs, dry_mass, dry_mass_x, dry_mass_y, &
+            dry_flux, twod_mesh, panel_id, face_selector_ew, face_selector_ns)
 
     if ( subroutine_timers ) call timer('transport.runtime_consistent')
 
@@ -2044,64 +2014,53 @@ contains
 
   end function get_vertical_advecting_wind
 
-  !> @brief Returns a pointer to the x departure points at W2h DoFs
+  !> @brief Returns a pointer to the horizontal departure distances at W2h DoFs
   !> @param[in] mesh_id The ID of the mesh to get the object for
-  !> @return The departure points for the x direction at W2h DoFs
-  function get_departure_points_x_w2(self, mesh_id) result(departure_points_x_w2)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    type(r_tran_field_type),               pointer    :: departure_points_x_w2
-    character(str_def)                                :: field_name
-
-    field_name = 'departure_points_x_w2'
-    departure_points_x_w2 => self%departure_points_x_w2(self%idx_from_mesh_id(mesh_id))
-    call check_initialised_field(departure_points_x_w2, field_name, mesh_id)
-
-  end function get_departure_points_x_w2
-
-  !> @brief Returns a pointer to the y departure points at W2h DoFs
-  !> @param[in] mesh_id The ID of the mesh to get the object for
-  !> @return The departure points for the y direction at W2h DoFs
-  function get_departure_points_y_w2(self, mesh_id) result(departure_points_y_w2)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    type(r_tran_field_type),               pointer    :: departure_points_y_w2
-    character(str_def)                                :: field_name
-
-    field_name = 'departure_points_y_w2'
-    departure_points_y_w2 => self%departure_points_y_w2(self%idx_from_mesh_id(mesh_id))
-    call check_initialised_field(departure_points_y_w2, field_name, mesh_id)
-
-  end function get_departure_points_y_w2
-
-  !> @brief Returns a pointer to the z departure points at W2v DoFs
-  !> @param[in] mesh_id The ID of the mesh to get the object for
-  !> @return The departure points for the z direction at W2v DoFs
-  function get_departure_points_z_w2(self, mesh_id, strang) result(departure_points_z_w2)
+  !> @param[in] strang  Logical for whether to return Strang split points
+  !> @return The departure distances at W2h DoFs
+  function get_dep_dist_xy_w2(self, mesh_id, strang) result(dep_dist_xy_w2)
 
     implicit none
 
     class(transport_runtime_type), target, intent(in) :: self
     integer(kind=i_def),                   intent(in) :: mesh_id
     logical(kind=l_def),                   intent(in) :: strang
-    type(r_tran_field_type),               pointer    :: departure_points_z_w2
+    type(r_tran_field_type),               pointer    :: dep_dist_xy_w2
     character(str_def)                                :: field_name
 
-    field_name = 'get_departure_points_z_w2'
+    field_name = 'dep_dist_xy_w2'
     if (strang) then
-      departure_points_z_w2 => self%departure_points_z_half_w2(self%idx_from_mesh_id(mesh_id))
+      dep_dist_xy_w2 => self%dep_dist_xy_half_w2(self%idx_from_mesh_id(mesh_id))
     else
-      departure_points_z_w2 => self%departure_points_z_w2(self%idx_from_mesh_id(mesh_id))
+      dep_dist_xy_w2 => self%dep_dist_xy_w2(self%idx_from_mesh_id(mesh_id))
     end if
-    call check_initialised_field(departure_points_z_w2, field_name, mesh_id)
+    call check_initialised_field(dep_dist_xy_w2, field_name, mesh_id)
 
-  end function get_departure_points_z_w2
+  end function get_dep_dist_xy_w2
+
+  !> @brief Returns a pointer to the z departure distances at W2v DoFs
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @param[in] strang  Logical for whether to return Strang split distances
+  !> @return The departure distances for the z direction at W2v DoFs
+  function get_dep_dist_z_w2(self, mesh_id, strang) result(dep_dist_z_w2)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    logical(kind=l_def),                   intent(in) :: strang
+    type(r_tran_field_type),               pointer    :: dep_dist_z_w2
+    character(str_def)                                :: field_name
+
+    field_name = 'get_dep_dist_z_w2'
+    if (strang) then
+      dep_dist_z_w2 => self%dep_dist_z_half_w2(self%idx_from_mesh_id(mesh_id))
+    else
+      dep_dist_z_w2 => self%dep_dist_z_w2(self%idx_from_mesh_id(mesh_id))
+    end if
+    call check_initialised_field(dep_dist_z_w2, field_name, mesh_id)
+
+  end function get_dep_dist_z_w2
 
   !> @brief Returns a pointer to the fractional vertical wind
   !> @param[in] mesh_id The ID of the mesh to get the object for
@@ -2135,12 +2094,44 @@ contains
 
   end function get_frac_wind_z_half
 
-  !> @brief Returns a pointer to the consistent tracer inner x departure points
+  !> @brief Returns a pointer to the fractional horizontal wind flux
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The fractional wind flux at W2h DOFs
+  function get_frac_wind_xy(self, mesh_id) result(frac_wind_xy)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    type(r_tran_field_type),               pointer    :: frac_wind_xy
+
+    frac_wind_xy => self%frac_wind_xy(self%idx_from_mesh_id(mesh_id))
+
+  end function get_frac_wind_xy
+
+  !> @brief Returns a pointer to the fractional horizontal wind flux
+  !!        computed using half departure points and time step for
+  !!        the half steps of Strang splitting
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The half fractional wind flux at W2h DOFs
+  function get_frac_wind_xy_half(self, mesh_id) result(frac_wind_xy_half)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    type(r_tran_field_type),               pointer    :: frac_wind_xy_half
+
+    frac_wind_xy_half => self%frac_wind_xy_half(self%idx_from_mesh_id(mesh_id))
+
+  end function get_frac_wind_xy_half
+
+  !> @brief Returns a pointer to the consistent tracer departure points
   !> @param[in] mesh_id      The ID of the mesh to get the object for
   !> @param[in] step         The split step to get the departure points for
   !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The tracer departure points for the x direction at W2 DoFs
-  function get_tracer_dep_pts_x(self, mesh_id, step, outer_step) result(tracer_dep_points_x)
+  !> @return The tracer departure points at W2 DoFs
+  function get_tracer_dep_dist_xy(self, mesh_id, step, outer_step) result(tracer_dep_points_xy)
 
     implicit none
 
@@ -2148,54 +2139,26 @@ contains
     integer(kind=i_def),                   intent(in) :: mesh_id
     integer(kind=i_def),                   intent(in) :: step
     logical(kind=l_def),                   intent(in) :: outer_step
-    type(r_tran_field_type),               pointer    :: tracer_dep_points_x
+    type(r_tran_field_type),               pointer    :: tracer_dep_points_xy
     character(str_def)                                :: field_name
 
     if (outer_step) then
       field_name = 'tracer_dep_points_ox'
-      tracer_dep_points_x => self%tracer_dep_pts_ox(self%idx_from_mesh_id(mesh_id), step)
+      tracer_dep_points_xy => self%tracer_dep_dist_oxy(self%idx_from_mesh_id(mesh_id), step)
     else
       field_name = 'tracer_dep_points_ix'
-      tracer_dep_points_x => self%tracer_dep_pts_ix(self%idx_from_mesh_id(mesh_id), step)
+      tracer_dep_points_xy => self%tracer_dep_dist_ixy(self%idx_from_mesh_id(mesh_id), step)
     end if
 
-    call check_initialised_field(tracer_dep_points_x, field_name, mesh_id)
+    call check_initialised_field(tracer_dep_points_xy, field_name, mesh_id)
 
-  end function get_tracer_dep_pts_x
-
-  !> @brief Returns a pointer to the consistent tracer inner y departure points
-  !> @param[in] mesh_id      The ID of the mesh to get the object for
-  !> @param[in] step         The split step to get the departure points for
-  !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The tracer departure points for the y direction at W2 DoFs
-  function get_tracer_dep_pts_y(self, mesh_id, step, outer_step) result(tracer_dep_points_y)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   intent(in) :: step
-    logical(kind=l_def),                   intent(in) :: outer_step
-    type(r_tran_field_type),               pointer    :: tracer_dep_points_y
-    character(str_def)                                :: field_name
-
-    if (outer_step) then
-      field_name = 'tracer_dep_points_oy'
-      tracer_dep_points_y => self%tracer_dep_pts_oy(self%idx_from_mesh_id(mesh_id), step)
-    else
-      field_name = 'tracer_dep_points_iy'
-      tracer_dep_points_y => self%tracer_dep_pts_iy(self%idx_from_mesh_id(mesh_id), step)
-    end if
-
-    call check_initialised_field(tracer_dep_points_y, field_name, mesh_id)
-
-  end function get_tracer_dep_pts_y
+  end function get_tracer_dep_dist_xy
 
   !> @brief Returns a pointer to the consistent z departure points
   !> @param[in] mesh_id The ID of the mesh to get the object for
   !> @param[in] step    The split step to get the departure points for
   !> @return The consistent departure points for the z direction at W2 DoFs
-  function get_tracer_dep_pts_z(self, mesh_id, step) result(tracer_dep_points_z)
+  function get_tracer_dep_dist_z(self, mesh_id, step) result(tracer_dep_points_z)
 
     implicit none
 
@@ -2206,17 +2169,17 @@ contains
     character(str_def)                                :: field_name
 
     field_name = 'tracer_dep_points_z'
-    tracer_dep_points_z => self%tracer_dep_pts_z(self%idx_from_mesh_id(mesh_id), step)
+    tracer_dep_points_z => self%tracer_dep_dist_z(self%idx_from_mesh_id(mesh_id), step)
     call check_initialised_field(tracer_dep_points_z, field_name, mesh_id)
 
-  end function get_tracer_dep_pts_z
+  end function get_tracer_dep_dist_z
 
-  !> @brief Returns a pointer to the dry inner x fractional flux
+  !> @brief Returns a pointer to the dry inner fractional flux
   !> @param[in] mesh_id      The ID of the mesh to get the object for
   !> @param[in] step         The split step to get the fractional flux for
   !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The dry inner fractional flux for the x direction
-  function get_dry_frac_flux_x(self, mesh_id, step, outer_step) result(dry_frac_flux_x)
+  !> @return The dry inner fractional flux
+  function get_dry_frac_flux_xy(self, mesh_id, step, outer_step) result(dry_frac_flux_xy)
 
     implicit none
 
@@ -2224,48 +2187,20 @@ contains
     integer(kind=i_def),                   intent(in) :: mesh_id
     integer(kind=i_def),                   intent(in) :: step
     logical(kind=l_def),                   intent(in) :: outer_step
-    type(r_tran_field_type),               pointer    :: dry_frac_flux_x
+    type(r_tran_field_type),               pointer    :: dry_frac_flux_xy
     character(str_def)                                :: field_name
 
     if (outer_step) then
       field_name = 'dry_frac_flux_ox'
-      dry_frac_flux_x => self%dry_frac_flux_ox(self%idx_from_mesh_id(mesh_id), step)
+      dry_frac_flux_xy => self%dry_frac_flux_oxy(self%idx_from_mesh_id(mesh_id), step)
     else
       field_name = 'dry_frac_flux_ix'
-      dry_frac_flux_x => self%dry_frac_flux_ix(self%idx_from_mesh_id(mesh_id), step)
+      dry_frac_flux_xy => self%dry_frac_flux_ixy(self%idx_from_mesh_id(mesh_id), step)
     end if
 
-    call check_initialised_field(dry_frac_flux_x, field_name, mesh_id)
+    call check_initialised_field(dry_frac_flux_xy, field_name, mesh_id)
 
-  end function get_dry_frac_flux_x
-
-  !> @brief Returns a pointer to the dry inner y fractional flux
-  !> @param[in] mesh_id      The ID of the mesh to get the object for
-  !> @param[in] step         The split step to get the fractional flux for
-  !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The dry inner fractional flux for the y direction
-  function get_dry_frac_flux_y(self, mesh_id, step, outer_step) result(dry_frac_flux_y)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   intent(in) :: step
-    logical(kind=l_def),                   intent(in) :: outer_step
-    type(r_tran_field_type),               pointer    :: dry_frac_flux_y
-    character(str_def)                                :: field_name
-
-    if (outer_step) then
-      field_name = 'dry_frac_flux_oy'
-      dry_frac_flux_y => self%dry_frac_flux_oy(self%idx_from_mesh_id(mesh_id), step)
-    else
-      field_name = 'dry_frac_flux_iy'
-      dry_frac_flux_y => self%dry_frac_flux_iy(self%idx_from_mesh_id(mesh_id), step)
-    end if
-
-    call check_initialised_field(dry_frac_flux_y, field_name, mesh_id)
-
-  end function get_dry_frac_flux_y
+  end function get_dry_frac_flux_xy
 
   !> @brief Returns a pointer to the consistent z fractional flux
   !> @param[in] mesh_id The ID of the mesh to get the object for
@@ -2399,8 +2334,10 @@ contains
   !!        for semi-Lagrangian transport of a W3 or Wtheta field
   !> @param[in] field   The field to apply the coefficients to
   !> @param[in] order   The order of the coefficients
+  !> @param[in] number  Which coefficient number to get
+  !!                    (1-4 for cubic, 1-6 for quintic, 1-2 for linear)
   !> @return The SL interpolation coefficients
-  function get_vert_sl_coef(self, field, order) result(coef)
+  function get_vert_sl_coef(self, field, order, number) result(coef)
 
     use fs_continuity_mod,             only: W3, Wtheta
     use transport_config_mod,          only: vertical_sl_order_cubic,     &
@@ -2412,6 +2349,7 @@ contains
     class(transport_runtime_type), target, intent(in) :: self
     type(r_tran_field_type),               intent(in) :: field
     integer(kind=i_def),                   intent(in) :: order
+    integer(kind=i_def),                   intent(in) :: number
     type(r_tran_field_type),               pointer    :: coef
 
     integer(kind=i_def) :: mesh_id
@@ -2419,34 +2357,36 @@ contains
     ! Get mesh ID
     mesh_id = field%get_mesh_id()
 
+    ! self%vert_cubic/quintic_coef array has index (mesh,function_space,coefficient_number)
+
     select case ( field%which_function_space() )
     case ( W3 )
       if (order == vertical_sl_order_cubic) then
         ! Cubic coefficients
-        coef => self%vert_cubic_coef_w3(self%idx_from_mesh_id(mesh_id))
+        coef => self%vert_cubic_coef(self%idx_from_mesh_id(mesh_id), 1, number)
       else if (order == vertical_sl_order_cubic_hermite) then
         ! Cubic-Hermite coefficients
-        coef => self%vert_hermite_coef_w3(self%idx_from_mesh_id(mesh_id))
+        coef => self%vert_cubic_coef(self%idx_from_mesh_id(mesh_id), 3, number)
       else if (order == vertical_sl_order_quintic) then
         ! Quintic coefficients
-        coef => self%vert_quintic_coef_w3(self%idx_from_mesh_id(mesh_id))
+        coef => self%vert_quintic_coef(self%idx_from_mesh_id(mesh_id), 1, number)
       else
         ! Linear coefficients
-        coef => self%vert_linear_coef_w3(self%idx_from_mesh_id(mesh_id))
+        coef => self%vert_linear_coef(self%idx_from_mesh_id(mesh_id), 1, number)
       end if
     case ( Wtheta )
       if (order == vertical_sl_order_cubic) then
         ! Cubic coefficients
-        coef => self%vert_cubic_coef_wt(self%idx_from_mesh_id(mesh_id))
+        coef => self%vert_cubic_coef(self%idx_from_mesh_id(mesh_id), 2, number)
       else if (order == vertical_sl_order_cubic_hermite) then
         ! Cubic-Hermite coefficients
-        coef => self%vert_hermite_coef_wt(self%idx_from_mesh_id(mesh_id))
+        coef => self%vert_cubic_coef(self%idx_from_mesh_id(mesh_id), 4, number)
       else if (order == vertical_sl_order_quintic) then
         ! Quintic coefficients
-        coef => self%vert_quintic_coef_wt(self%idx_from_mesh_id(mesh_id))
+        coef => self%vert_quintic_coef(self%idx_from_mesh_id(mesh_id), 2, number)
       else
         ! Linear coefficients
-        coef => self%vert_linear_coef_wt(self%idx_from_mesh_id(mesh_id))
+        coef => self%vert_linear_coef(self%idx_from_mesh_id(mesh_id), 2, number)
       end if
     case default
       call log_event( "get_vert_sl_coef only valid for W3 & Wtheta spaces", LOG_LEVEL_ERROR )
@@ -2458,8 +2398,10 @@ contains
   !!        for semi-Lagrangian transport of a W3/Wtheta field
   !> @param[in] field   The field to apply the coefficients to
   !> @param[in] order   The order of the coefficients for the index
+  !> @param[in] number  Which coefficient index to get
+  !!                    (1-4 for cubic, 1-6 for quintic, 1-2 for linear)
   !> @return The SL indices
-  function get_vert_sl_index(self, field, order) result(index)
+  function get_vert_sl_index(self, field, order, number) result(index)
 
     use fs_continuity_mod,             only: W3, Wtheta
     use transport_config_mod,          only: vertical_sl_order_cubic,     &
@@ -2471,6 +2413,7 @@ contains
     class(transport_runtime_type), target, intent(in) :: self
     type(r_tran_field_type),               intent(in) :: field
     integer(kind=i_def),                   intent(in) :: order
+    integer(kind=i_def),                   intent(in) :: number
     type(integer_field_type),              pointer    :: index
 
     integer(kind=i_def) :: mesh_id
@@ -2478,30 +2421,32 @@ contains
     ! Get mesh ID
     mesh_id = field%get_mesh_id()
 
+    ! self%vert_cubic/quintic_index array has index (mesh,function_space,coefficient_number)
+
     select case ( field%which_function_space() )
     case ( W3 )
       select case ( order )
       case (vertical_sl_order_cubic)
         ! Cubic coefficients index
-        index => self%vert_cubic_index_w3(self%idx_from_mesh_id(mesh_id))
+        index => self%vert_cubic_index(self%idx_from_mesh_id(mesh_id),1,number)
       case (vertical_sl_order_cubic_hermite)
         ! Cubic-Hermite coefficients index
-        index => self%vert_hermite_index_w3(self%idx_from_mesh_id(mesh_id))
+        index => self%vert_cubic_index(self%idx_from_mesh_id(mesh_id),3,number)
       case (vertical_sl_order_quintic)
         ! Quintic coefficients index
-        index => self%vert_quintic_index_w3(self%idx_from_mesh_id(mesh_id))
+        index => self%vert_quintic_index(self%idx_from_mesh_id(mesh_id),1,number)
       end select
     case ( Wtheta )
       select case ( order )
       case (vertical_sl_order_cubic)
         ! Cubic coefficients index
-        index => self%vert_cubic_index_wt(self%idx_from_mesh_id(mesh_id))
+        index => self%vert_cubic_index(self%idx_from_mesh_id(mesh_id),2,number)
       case (vertical_sl_order_cubic_hermite)
         ! Cubic-Hermite coefficients index
-        index => self%vert_hermite_index_wt(self%idx_from_mesh_id(mesh_id))
+        index => self%vert_cubic_index(self%idx_from_mesh_id(mesh_id),4,number)
       case (vertical_sl_order_quintic)
         ! Quintic coefficients index
-        index => self%vert_quintic_index_wt(self%idx_from_mesh_id(mesh_id))
+        index => self%vert_quintic_index(self%idx_from_mesh_id(mesh_id),2,number)
       end select
     case default
       call log_event( "get_vert_sl_index only valid for W3 & Wtheta spaces", LOG_LEVEL_ERROR )
@@ -2509,205 +2454,29 @@ contains
 
   end function get_vert_sl_index
 
-  !> @brief Returns a pointer to the start index for a change in
-  !!        x orientation across a cubed sphere panel edge
-  !> @param[in] mesh_id The ID of the mesh to get the object for
-  !> @return The starting index
-  function get_cosmic_istart_x(self, mesh_id) result(index)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    type(integer_field_type),              pointer    :: index
-
-    index => self%cosmic_istart_x(self%idx_from_mesh_id(mesh_id))
-
-  end function get_cosmic_istart_x
-
-  !> @brief Returns a pointer to the end index for a change in
-  !!        x orientation across a cubed sphere panel edge
-  !> @param[in] mesh_id The ID of the mesh to get the object for
-  !> @return The starting index
-  function get_cosmic_iend_x(self, mesh_id) result(index)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    type(integer_field_type),              pointer    :: index
-
-    index => self%cosmic_iend_x(self%idx_from_mesh_id(mesh_id))
-
-  end function get_cosmic_iend_x
-
-  !> @brief Returns a pointer to the start index for a change in
-  !!        y orientation across a cubed sphere panel edge
-  !> @param[in] mesh_id The ID of the mesh to get the object for
-  !> @return The starting index
-  function get_cosmic_istart_y(self, mesh_id) result(index)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    type(integer_field_type),              pointer    :: index
-
-    index => self%cosmic_istart_y(self%idx_from_mesh_id(mesh_id))
-
-  end function get_cosmic_istart_y
-
-  !> @brief Returns a pointer to the end index for a change in
-  !!        y orientation across a cubed sphere panel edge
-  !> @param[in] mesh_id The ID of the mesh to get the object for
-  !> @return The starting index
-  function get_cosmic_iend_y(self, mesh_id) result(index)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    type(integer_field_type),              pointer    :: index
-
-    index => self%cosmic_iend_y(self%idx_from_mesh_id(mesh_id))
-
-  end function get_cosmic_iend_y
-
-  !> @brief Returns a pointer to the start index for a change in
-  !!        x orientation across a cubed sphere panel edge for tracer transport
-  !> @param[in] mesh_id      The ID of the mesh to get the object for
-  !> @param[in] step         The split step to get the extent for
-  !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The starting index
-  function get_tracer_istart_x(self, mesh_id, step, outer_step) result(index)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   intent(in) :: step
-    logical(kind=l_def),                   intent(in) :: outer_step
-    type(integer_field_type),              pointer    :: index
-
-    if (outer_step) then
-      index => self%tracer_istart_ox(self%idx_from_mesh_id(mesh_id), step)
-    else
-      index => self%tracer_istart_ix(self%idx_from_mesh_id(mesh_id), step)
-    end if
-
-  end function get_tracer_istart_x
-
-  !> @brief Returns a pointer to the end index for a change in
-  !!        x orientation across a cubed sphere panel edge for tracer transport
-  !> @param[in] mesh_id      The ID of the mesh to get the object for
-  !> @param[in] step         The split step to get the extent for
-  !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The ending index
-  function get_tracer_iend_x(self, mesh_id, step, outer_step) result(index)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   intent(in) :: step
-    logical(kind=l_def),                   intent(in) :: outer_step
-    type(integer_field_type),              pointer    :: index
-
-    if (outer_step) then
-      index => self%tracer_iend_ox(self%idx_from_mesh_id(mesh_id), step)
-    else
-      index => self%tracer_iend_ix(self%idx_from_mesh_id(mesh_id), step)
-    end if
-
-  end function get_tracer_iend_x
-
-  !> @brief Returns a pointer to the start index for a change in
-  !!        y orientation across a cubed sphere panel edge for tracer transport
-  !> @param[in] mesh_id      The ID of the mesh to get the object for
-  !> @param[in] step         The split step to get the extent for
-  !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The starting index
-  function get_tracer_istart_y(self, mesh_id, step, outer_step) result(index)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   intent(in) :: step
-    logical(kind=l_def),                   intent(in) :: outer_step
-    type(integer_field_type),              pointer    :: index
-
-    if (outer_step) then
-      index => self%tracer_istart_oy(self%idx_from_mesh_id(mesh_id), step)
-    else
-      index => self%tracer_istart_iy(self%idx_from_mesh_id(mesh_id), step)
-    end if
-
-  end function get_tracer_istart_y
-
-  !> @brief Returns a pointer to the end index for a change in
-  !!        y orientation across a cubed sphere panel edge for tracer transport
-  !> @param[in] mesh_id      The ID of the mesh to get the object for
-  !> @param[in] step         The split step to get the extent for
-  !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The ending index
-  function get_tracer_iend_y(self, mesh_id, step, outer_step) result(index)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   intent(in) :: step
-    logical(kind=l_def),                   intent(in) :: outer_step
-    type(integer_field_type),              pointer    :: index
-
-    if (outer_step) then
-      index => self%tracer_iend_oy(self%idx_from_mesh_id(mesh_id), step)
-    else
-      index => self%tracer_iend_iy(self%idx_from_mesh_id(mesh_id), step)
-    end if
-
-  end function get_tracer_iend_y
-
   !> @brief Returns a pointer to required stencil size for FFSL transport
-  !!        based on the maximum horizontal departure point in x
+  !!        based on the maximum horizontal departure distance
   !> @param[in] mesh_id The ID of the mesh to get the object for
   !> @return The required stencil depth
-  function get_dep_stencil_extent_x(self, mesh_id) result(dep_stencil_extent_x)
+  function get_dep_stencil_extent_xy(self, mesh_id) result(dep_stencil_extent_xy)
 
     implicit none
 
     class(transport_runtime_type), target, intent(in) :: self
     integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   pointer    :: dep_stencil_extent_x
+    integer(kind=i_def),                   pointer    :: dep_stencil_extent_xy
 
-    dep_stencil_extent_x => self%dep_stencil_extent_x(self%idx_from_mesh_id(mesh_id))
+    dep_stencil_extent_xy => self%dep_stencil_extent_xy(self%idx_from_mesh_id(mesh_id))
 
-  end function get_dep_stencil_extent_x
-
-  !> @brief Returns a pointer to required stencil size for FFSL transport
-  !!        based on the maximum horizontal departure point in y
-  !> @param[in] mesh_id The ID of the mesh to get the object for
-  !> @return The required stencil depth
-  function get_dep_stencil_extent_y(self, mesh_id) result(dep_stencil_extent_y)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   pointer    :: dep_stencil_extent_y
-
-    dep_stencil_extent_y => self%dep_stencil_extent_y(self%idx_from_mesh_id(mesh_id))
-
-  end function get_dep_stencil_extent_y
+  end function get_dep_stencil_extent_xy
 
   !> @brief Returns a pointer to required stencil size for consistent FFSL
-  !!        transport based on the maximum horizontal inner departure point in x
+  !!        transport based on the maximum horizontal inner departure distance
   !> @param[in] mesh_id      The ID of the mesh to get the object for
   !> @param[in] step         The split step to get the extent for
   !> @param[in] outer_step   Logical denoting outer SWIFT step
   !> @return The required stencil depth
-  function get_tracer_stencil_extent_x(self, mesh_id, step, outer_step) result(dep_stencil_extent_x)
+  function get_tracer_stencil_extent_xy(self, mesh_id, step, outer_step) result(dep_stencil_extent_xy)
 
     implicit none
 
@@ -2715,39 +2484,15 @@ contains
     integer(kind=i_def),                   intent(in) :: mesh_id
     integer(kind=i_def),                   intent(in) :: step
     logical(kind=l_def),                   intent(in) :: outer_step
-    integer(kind=i_def),                   pointer    :: dep_stencil_extent_x
+    integer(kind=i_def),                   pointer    :: dep_stencil_extent_xy
 
     if (outer_step) then
-      dep_stencil_extent_x => self%tracer_stencil_extent_ox(self%idx_from_mesh_id(mesh_id), step)
+      dep_stencil_extent_xy => self%tracer_stencil_extent_oxy(self%idx_from_mesh_id(mesh_id), step)
     else
-      dep_stencil_extent_x => self%tracer_stencil_extent_ix(self%idx_from_mesh_id(mesh_id), step)
+      dep_stencil_extent_xy => self%tracer_stencil_extent_ixy(self%idx_from_mesh_id(mesh_id), step)
     end if
 
-  end function get_tracer_stencil_extent_x
-
-  !> @brief Returns a pointer to required stencil size for consistent FFSL
-  !!        transport based on the maximum horizontal inner departure point in y
-  !> @param[in] mesh_id      The ID of the mesh to get the object for
-  !> @param[in] step         The split step to get the extent for
-  !> @param[in] outer_step   Logical denoting outer SWIFT step
-  !> @return The required stencil depth
-  function get_tracer_stencil_extent_y(self, mesh_id, step, outer_step) result(dep_stencil_extent_y)
-
-    implicit none
-
-    class(transport_runtime_type), target, intent(in) :: self
-    integer(kind=i_def),                   intent(in) :: mesh_id
-    integer(kind=i_def),                   intent(in) :: step
-    logical(kind=l_def),                   intent(in) :: outer_step
-    integer(kind=i_def),                   pointer    :: dep_stencil_extent_y
-
-    if (outer_step) then
-      dep_stencil_extent_y => self%tracer_stencil_extent_oy(self%idx_from_mesh_id(mesh_id), step)
-    else
-      dep_stencil_extent_y => self%tracer_stencil_extent_iy(self%idx_from_mesh_id(mesh_id), step)
-    end if
-
-  end function get_tracer_stencil_extent_y
+  end function get_tracer_stencil_extent_xy
 
   !> @brief Returns number of split transport steps for the dry density
   !> @return The number of split transport steps for the dry density
@@ -2795,45 +2540,65 @@ contains
 
   end function get_rho_d
 
-  !> @brief Returns a pointer to a dry density field from an FFSL x-sweep
+  !> @brief Returns a pointer to a dry mass field
   !> @param[in] mesh_id The ID of the mesh to get the object for
   !> @param[in] step The step from which to return the density
-  !> @return The dry density field after its transport
-  function get_rho_d_ffsl_x(self, mesh_id, step) result(rho_d_ffsl)
+  !> @return The dry mass field after its transport
+  function get_dry_mass(self, mesh_id, step) result(dry_mass)
 
     implicit none
 
     class(transport_runtime_type), target, intent(in) :: self
     integer(kind=i_def),                   intent(in) :: mesh_id
     integer(kind=i_def),                   intent(in) :: step
-    type(r_tran_field_type),               pointer    :: rho_d_ffsl
+    type(r_tran_field_type),               pointer    :: dry_mass
     character(str_def)                                :: field_name
 
-    field_name = 'rho_d_ffsl_x'
-    rho_d_ffsl => self%rho_d_ffsl_x(self%idx_from_mesh_id(mesh_id), step)
-    call check_initialised_field(rho_d_ffsl, field_name, mesh_id)
+    field_name = 'dry_mass'
+    dry_mass => self%dry_mass(self%idx_from_mesh_id(mesh_id), step)
+    call check_initialised_field(dry_mass, field_name, mesh_id)
 
-  end function get_rho_d_ffsl_x
+  end function get_dry_mass
+
+  !> @brief Returns a pointer to a dry density field from an FFSL x-sweep
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @param[in] step The step from which to return the density
+  !> @return The dry density field after its transport
+  function get_dry_mass_ffsl_x(self, mesh_id, step) result(dry_mass_ffsl)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    integer(kind=i_def),                   intent(in) :: step
+    type(r_tran_field_type),               pointer    :: dry_mass_ffsl
+    character(str_def)                                :: field_name
+
+    field_name = 'dry_mass_ffsl_x'
+    dry_mass_ffsl => self%dry_mass_ffsl_x(self%idx_from_mesh_id(mesh_id), step)
+    call check_initialised_field(dry_mass_ffsl, field_name, mesh_id)
+
+  end function get_dry_mass_ffsl_x
 
   !> @brief Returns a pointer to a dry density field from an FFSL y-sweep
   !> @param[in] mesh_id The ID of the mesh to get the object for
   !> @param[in] step The step from which to return the density
   !> @return The dry density field after its transport
-  function get_rho_d_ffsl_y(self, mesh_id, step) result(rho_d_ffsl)
+  function get_dry_mass_ffsl_y(self, mesh_id, step) result(dry_mass_ffsl)
 
     implicit none
 
     class(transport_runtime_type), target, intent(in) :: self
     integer(kind=i_def),                   intent(in) :: mesh_id
     integer(kind=i_def),                   intent(in) :: step
-    type(r_tran_field_type),               pointer    :: rho_d_ffsl
+    type(r_tran_field_type),               pointer    :: dry_mass_ffsl
     character(str_def)                                :: field_name
 
-    field_name = 'rho_d_ffsl_y'
-    rho_d_ffsl => self%rho_d_ffsl_y(self%idx_from_mesh_id(mesh_id), step)
-    call check_initialised_field(rho_d_ffsl, field_name, mesh_id)
+    field_name = 'dry_mass_ffsl_y'
+    dry_mass_ffsl => self%dry_mass_ffsl_y(self%idx_from_mesh_id(mesh_id), step)
+    call check_initialised_field(dry_mass_ffsl, field_name, mesh_id)
 
-  end function get_rho_d_ffsl_y
+  end function get_dry_mass_ffsl_y
 
   !> @brief Returns a pointer to a mass flux for a particular step
   !> @param[in] mesh_id The ID of the mesh to get the object for
@@ -3120,5 +2885,36 @@ contains
 
   end subroutine remap_on_extended_mesh
 
+  !> @brief Checks a field for values less than epsilon, and throws an error
+  !!        if these values exist
+  !> @details It is not possible to compute sensible consistent departure
+  !!          distances for tracers if the dry mass is no longer positive.
+  subroutine check_negative_field(self, field, field_name)
+
+    use field_minmax_alg_mod, only: get_local_field_minmax
+
+    implicit none
+
+    ! Arguments
+    class(transport_runtime_type), target, intent(in) :: self
+    type(r_tran_field_type),               intent(in) :: field
+    character(len=*),                      intent(in) :: field_name
+
+    ! Internal variables
+    real(kind=r_tran) :: field_min
+    real(kind=r_tran) :: field_max
+
+    call get_local_field_minmax(field, field_min, field_max)
+
+    if (field_min < EPS_R_TRAN) then
+      write(log_scratch_space, '(A,E16.8,A,E16.8,A)')                          &
+        'The minimum of field ' // adjustl(trim(field_name)) // ' is ',        &
+        field_min, ' which is below the accepted minimum of ', EPS_R_TRAN,     &
+        ' which makes it impossible to find consistent departure distances. '  &
+        // 'Stopping model rather than continuing'
+      call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+    end if
+
+  end subroutine check_negative_field
 
 end module transport_runtime_alg_mod

@@ -252,4 +252,148 @@ contains
 
   !--------------------------------------------------------------------------
 
+  !-----------------------------------------------------------------------------
+  subroutine invoke_r32_local_field_min_max(field_min_norm, &
+                                            field_max_norm, &
+                                            r32_field)
+
+    use scalar_r32_mod,     only: scalar_r32_type
+    use omp_lib,            only: omp_get_thread_num
+    use omp_lib,            only: omp_get_max_threads
+    use mesh_mod,           only: mesh_type
+    use field_r32_mod,      only: field_r32_type, field_r32_proxy_type
+
+    implicit none
+
+    real(kind=real32),              intent(out)  :: field_min_norm
+    real(kind=real32),              intent(out)  :: field_max_norm
+    type(field_r32_type),            intent(in)  :: r32_field
+    integer(kind=i_def)                          :: df
+    real(kind=real32), allocatable, dimension(:) :: l_field_min_norm
+    real(kind=real32), allocatable, dimension(:) :: l_field_max_norm
+    real(kind=real32)                            :: minv, maxv
+    integer(kind=i_def)                          :: th_idx
+    integer(kind=i_def)                          :: loop0_start, loop0_stop
+    integer(kind=i_def)                          :: nthreads
+    type(field_r32_proxy_type)                   :: field_proxy
+    !
+    ! Determine the number of OpenMP threads
+    !
+    nthreads = omp_get_max_threads()
+    !
+    ! Initialise field and/or operator proxies
+    !
+    field_proxy = r32_field%get_proxy()
+    maxv = huge(maxv)
+    minv = -huge(minv)
+    !
+    ! Set-up all of the loop bounds
+    !
+    loop0_start = 1
+    loop0_stop = field_proxy%vspace%get_last_dof_owned()
+    !
+    ! Call kernels and communication routines
+    !
+    ALLOCATE (l_field_min_norm(nthreads))
+    ALLOCATE (l_field_max_norm(nthreads))
+    !
+    l_field_min_norm(:) = maxv
+    l_field_max_norm(:) = minv
+    !
+    !$omp parallel default(shared), private(df,th_idx)
+    th_idx = omp_get_thread_num()+1
+    !$omp do schedule(static)
+    DO df = loop0_start, loop0_stop
+      l_field_min_norm(th_idx) = min(l_field_min_norm(th_idx), &
+                                     field_proxy%data(df))
+      l_field_max_norm(th_idx) = max(l_field_max_norm(th_idx), &
+                                     field_proxy%data(df))
+    END DO
+    !$omp end do
+    !$omp end parallel
+    !
+    ! Find minimum in the partial results sequentially
+    !
+    field_min_norm = l_field_min_norm(1)
+    field_max_norm = l_field_max_norm(1)
+    DO th_idx = 2, nthreads
+      field_min_norm = min(field_min_norm, l_field_min_norm(th_idx))
+      field_max_norm = max(field_max_norm, l_field_max_norm(th_idx))
+    END DO
+    DEALLOCATE (l_field_min_norm, l_field_max_norm)
+    !
+  end subroutine invoke_r32_local_field_min_max
+
+  !-----------------------------------------------------------------------------
+  subroutine invoke_r64_local_field_min_max(field_min_norm, &
+                                            field_max_norm, &
+                                            r64_field)
+
+    use scalar_r64_mod,     only: scalar_r64_type
+    use omp_lib,            only: omp_get_thread_num
+    use omp_lib,            only: omp_get_max_threads
+    use mesh_mod,           only: mesh_type
+    use field_r64_mod,      only: field_r64_type, field_r64_proxy_type
+
+    implicit none
+
+    real(kind=real64),               intent(out) :: field_min_norm
+    real(kind=real64),               intent(out) :: field_max_norm
+    type(field_r64_type),             intent(in) :: r64_field
+    integer(kind=i_def)                          :: df
+    real(kind=real64), allocatable, dimension(:) :: l_field_min_norm
+    real(kind=real64), allocatable, dimension(:) :: l_field_max_norm
+    real(kind=real64)                            :: minv, maxv
+    integer(kind=i_def)                          :: th_idx
+    integer(kind=i_def)                          :: loop0_start, loop0_stop
+    integer(kind=i_def)                          :: nthreads
+    type(field_r64_proxy_type)                   :: field_proxy
+    !
+    ! Determine the number of OpenMP threads
+    !
+    nthreads = omp_get_max_threads()
+    !
+    ! Initialise field and/or operator proxies
+    !
+    field_proxy = r64_field%get_proxy()
+    maxv = huge(maxv)
+    minv = -huge(minv)
+    !
+    ! Set-up all of the loop bounds
+    !
+    loop0_start = 1
+    loop0_stop = field_proxy%vspace%get_last_dof_owned()
+    !
+    ! Call kernels and communication routines
+    !
+    ALLOCATE (l_field_min_norm(nthreads))
+    ALLOCATE (l_field_max_norm(nthreads))
+    !
+    l_field_min_norm(:) = maxv
+    l_field_max_norm(:) = minv
+    !
+    !$omp parallel default(shared), private(df,th_idx)
+    th_idx = omp_get_thread_num()+1
+    !$omp do schedule(static)
+    DO df = loop0_start, loop0_stop
+      l_field_min_norm(th_idx) = min(l_field_min_norm(th_idx), &
+                                     field_proxy%data(df))
+      l_field_max_norm(th_idx) = max(l_field_max_norm(th_idx), &
+                                     field_proxy%data(df))
+    END DO
+    !$omp end do
+    !$omp end parallel
+    !
+    ! Find minimum in the partial results sequentially
+    !
+    field_min_norm = l_field_min_norm(1)
+    field_max_norm = l_field_max_norm(1)
+    DO th_idx = 2, nthreads
+      field_min_norm = min(field_min_norm, l_field_min_norm(th_idx))
+      field_max_norm = max(field_max_norm, l_field_max_norm(th_idx))
+    END DO
+    DEALLOCATE (l_field_min_norm, l_field_max_norm)
+    !
+  end subroutine invoke_r64_local_field_min_max
+
 end module psykal_builtin_light_mod

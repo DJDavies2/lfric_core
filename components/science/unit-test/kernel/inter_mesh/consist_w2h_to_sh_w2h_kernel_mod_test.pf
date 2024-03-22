@@ -73,9 +73,9 @@ contains
     real(kind=r_double), allocatable :: u_sh_field(:)
     real(kind=r_double), allocatable :: u_field(:)
     real(kind=r_double), allocatable :: answer(:)
-    real(kind=r_def),    allocatable :: rmultiplicity_w2h(:)
     real(kind=r_double), allocatable :: height_wt(:)
     real(kind=r_double), allocatable :: height_wt_sh(:)
+    integer(kind=i_def), allocatable :: face_selector(:)
 
     integer(kind=i_def) :: cell, k
     real(kind=r_double) :: dz
@@ -86,10 +86,11 @@ contains
     integer(kind=i_def) :: ndf_w2h, ndf_wt
     integer(kind=i_def) :: undf_w2h_sh, undf_wt_sh
     integer(kind=i_def) :: undf_w2h, undf_wt
+    integer(kind=i_def) :: ndf_w3_2d, undf_w3_2d
 
     ! Dofmaps
     integer(kind=i_def), allocatable :: map_w2h(:,:), map_w2h_sh(:,:)
-    integer(kind=i_def), allocatable :: map_wt(:,:), map_wt_sh(:,:)
+    integer(kind=i_def), allocatable :: map_wt(:,:), map_wt_sh(:,:), map_w3_2d(:,:)
 
     ! just consider a single column of three layers
     nlayers = 3
@@ -98,6 +99,8 @@ contains
     undf_w2h = 12
     ndf_w2h_sh = 4
     undf_w2h_sh = 16
+    ndf_w3_2d = 1
+    undf_w3_2d = 1
     ndf_wt = 2
     undf_wt = 4
     ndf_wt_sh = 1
@@ -109,17 +112,22 @@ contains
     allocate( u_sh_field(undf_w2h_sh) )
     allocate( u_field(undf_w2h) )
     allocate( answer(undf_w2h_sh) )
-    allocate( rmultiplicity_w2h(undf_w2h) )
     allocate( map_w2h_sh(ndf_w2h, ncells) )
     allocate( map_w2h(ndf_w2h, ncells) )
     allocate( map_wt_sh(ndf_wt, ncells) )
     allocate( map_wt(ndf_wt, ncells) )
+    allocate( map_w3_2d(ndf_w3_2d, ncells) )
+    allocate( face_selector(undf_w3_2d) )
 
     ! Only one cell so all maps are to first cell
     map_w2h_sh(:,:) = reshape( [1_i_def, 5_i_def, 9_i_def, 13_i_def], [4,1])
     map_wt_sh(:,:)  = reshape( [1_i_def, 2_i_def], [2,1])
     map_w2h(:,:)    = reshape( [1_i_def, 4_i_def, 7_i_def, 10_i_def], [4,1])
     map_wt(:,:)     = reshape( [1_i_def, 2_i_def], [2,1])
+    map_w3_2d(:,:)  = 1_i_def
+
+    ! Do all faces
+    face_selector = 2
 
     ! Set up the height fields for the meshes
     ! These are used for the initial conditions but not by the kernel
@@ -132,9 +140,6 @@ contains
     ! Vertical velocity varies linearly
     u_field(:) = 0.0_r_double
     answer(:) = 0.0_r_double
-    ! We only have one column so take multiplicity to be 1.0 for horizontal values
-    ! The vertical values are set below
-    rmultiplicity_w2h(:) = 1.0_r_def
 
     do k = 1, nlayers
       dz = height_wt(map_wt(2, cell)+k-1) - height_wt(map_wt(1, cell)+k-1)
@@ -159,13 +164,17 @@ contains
     call consist_w2h_to_sh_w2h_code(  nlayers_sh,        &
                                       u_sh_field,        &
                                       u_field,           &
-                                      rmultiplicity_w2h, &
+                                      face_selector,     &
+                                      face_selector,     &
                                       ndf_w2h_sh,        &
                                       undf_w2h_sh,       &
                                       map_w2h_sh(:,1),   &
                                       ndf_w2h,           &
                                       undf_w2h,          &
-                                      map_w2h(:,1)       &
+                                      map_w2h(:,1),      &
+                                      ndf_w3_2d,         &
+                                      undf_w3_2d,        &
+                                      map_w3_2d(:,1)     &
                                     )
 
     @assertEqual(answer(:), u_sh_field(:), tol)
@@ -173,7 +182,8 @@ contains
     deallocate( u_sh_field )
     deallocate( u_field )
     deallocate( answer )
-    deallocate( rmultiplicity_w2h )
+    deallocate( face_selector )
+    deallocate( map_w3_2d )
     deallocate( map_w2h_sh )
     deallocate( map_w2h )
     deallocate( map_wt_sh )

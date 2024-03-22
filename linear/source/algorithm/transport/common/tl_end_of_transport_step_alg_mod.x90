@@ -149,7 +149,7 @@ contains
 
       ! Get final field at end of transport
       ! First sum the fluxes from all previous steps
-      call build_up_flux(sum_flux, flux, tl_transport_runtime)
+      call build_up_flux(sum_flux, flux, tl_transport_runtime, transport_metadata)
 
       ! ---------------------------------------------------------------------- !
       ! Conservative clipping by limiting flux, if specified

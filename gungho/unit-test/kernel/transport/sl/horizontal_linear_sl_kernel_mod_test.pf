@@ -44,8 +44,7 @@ contains
     real(kind=r_tran),   dimension(undf_wf)  :: field_x
     real(kind=r_tran),   dimension(undf_wf)  :: field_y
     real(kind=r_tran),   dimension(undf_wfs) :: field
-    real(kind=r_tran),   dimension(undf_w2)  :: dep_pts_x
-    real(kind=r_tran),   dimension(undf_w2)  :: dep_pts_y
+    real(kind=r_tran),   dimension(undf_w2)  :: dep_pts
 
     ! Stencil map has form
     !         | 9 |
@@ -76,8 +75,10 @@ contains
     field_y = 0.0_r_tran
 
     ! Test with integer departure distance
-    dep_pts_x(:) = 1.0_r_tran
-    dep_pts_y(:) = 1.0_r_tran
+    dep_pts(1) = 1.0_r_tran
+    dep_pts(2) = -1.0_r_tran
+    dep_pts(3) = 1.0_r_tran
+    dep_pts(4) = -1.0_r_tran
 
     call horizontal_linear_sl_code( nlayers,        &
                                     field_x,        &
@@ -85,8 +86,7 @@ contains
                                     field,          &
                                     stencil_size_c, &
                                     stencil_map,    &
-                                    dep_pts_x,      &
-                                    dep_pts_y,      &
+                                    dep_pts,        &
                                     extent_size,    &
                                     ndf_wf,         &
                                     undf_wfs,       &
@@ -102,8 +102,10 @@ contains
     @assertEqual(answer, field_y, use_tol)
 
     ! Test with fractional, negative departure distance
-    dep_pts_x(:) = -0.5_r_tran
-    dep_pts_y(:) = -1.5_r_tran
+    dep_pts(1) = -0.5_r_tran
+    dep_pts(2) = 1.5_r_tran
+    dep_pts(3) = -0.5_r_tran
+    dep_pts(4) = 1.5_r_tran
 
     call horizontal_linear_sl_code( nlayers,        &
                                     field_x,        &
@@ -111,8 +113,7 @@ contains
                                     field,          &
                                     stencil_size_c, &
                                     stencil_map,    &
-                                    dep_pts_x,      &
-                                    dep_pts_y,      &
+                                    dep_pts,        &
                                     extent_size,    &
                                     ndf_wf,         &
                                     undf_wfs,       &

@@ -31,29 +31,27 @@ contains
     integer(kind=i_def), parameter :: ndf_w2v = 2
     integer(kind=i_def), parameter :: undf_w2v  = (ndf_w2v-1)*nlayers+1
     integer(kind=i_def), parameter :: ndf_wc = 1
-    integer(kind=i_def), parameter :: undf_wc  = 4*ndf_wc*nlayers
-    integer(kind=i_def), parameter :: ndf_wl = 1
-    integer(kind=i_def), parameter :: undf_wl  = 2*ndf_wl*nlayers
+    integer(kind=i_def), parameter :: undf_wc  = nlayers
     integer(kind=i_def), parameter :: ndf_wm = 2
-    integer(kind=i_def), parameter :: undf_wm  = 4*(ndf_wm-1)*nlayers+4
-    integer(kind=i_def), parameter :: ndf_wn = 2
-    integer(kind=i_def), parameter :: undf_wn  = 2*(ndf_wn-1)*nlayers+2
+    integer(kind=i_def), parameter :: undf_wm  = nlayers+1
 
     integer(kind=i_def), dimension(ndf_wt)  :: map_wt
     integer(kind=i_def), dimension(ndf_w2v) :: map_w2v
     integer(kind=i_def), dimension(ndf_wc)  :: map_wc
-    integer(kind=i_def), dimension(ndf_wl)  :: map_wl
     integer(kind=i_def), dimension(ndf_wm)  :: map_wm
-    integer(kind=i_def), dimension(ndf_wn)  :: map_wn
 
     real(kind=r_tran),   dimension(undf_w2v) :: dep_pts_z
     real(kind=r_tran),   dimension(undf_wt)  :: theta_height
-    real(kind=r_tran),   dimension(undf_wc)  :: cubic_coef_w3
-    real(kind=r_tran),   dimension(undf_wl)  :: linear_coef_w3
-    integer(kind=i_def), dimension(undf_wc)  :: cubic_indices_w3
-    real(kind=r_tran),   dimension(undf_wm)  :: cubic_coef_wt
-    real(kind=r_tran),   dimension(undf_wn)  :: linear_coef_wt
-    integer(kind=i_def), dimension(undf_wm)  :: cubic_indices_wt
+    real(kind=r_tran),   dimension(undf_wc)  :: cubic_coef_w3_1, cubic_coef_w3_2, &
+                                                cubic_coef_w3_3, cubic_coef_w3_4
+    real(kind=r_tran),   dimension(undf_wc)  :: linear_coef_w3_1, linear_coef_w3_2
+    integer(kind=i_def), dimension(undf_wc)  :: cubic_indices_w3_1, cubic_indices_w3_2, &
+                                                cubic_indices_w3_3, cubic_indices_w3_4
+    real(kind=r_tran),   dimension(undf_wm)  :: cubic_coef_wt_1, cubic_coef_wt_2, &
+                                                cubic_coef_wt_3, cubic_coef_wt_4
+    real(kind=r_tran),   dimension(undf_wm)  :: linear_coef_wt_1, linear_coef_wt_2
+    integer(kind=i_def), dimension(undf_wm)  :: cubic_indices_wt_1, cubic_indices_wt_2, &
+                                                cubic_indices_wt_3, cubic_indices_wt_4
     logical(kind=l_def) :: hermite
 
     ! Set tolerance
@@ -69,11 +67,8 @@ contains
     map_wt(1) = 1
     map_wt(2) = 2
     map_wc(1) = 1
-    map_wl(1) = 1
     map_wm(1) = 1
     map_wm(2) = 2
-    map_wn(1) = 1
-    map_wn(2) = 2
 
     ! Set up data
     theta_height = (/0.0_r_tran, 1.0_r_tran, 2.0_r_tran, 3.0_r_tran, 4.0_r_tran, 5.0_r_tran /)
@@ -84,47 +79,53 @@ contains
     call compute_vertical_cubic_coef_code( nlayers,                                         &
                                            dep_pts_z,                                       &
                                            theta_height,                                    &
-                                           cubic_coef_w3, cubic_indices_w3, linear_coef_w3, &
+                                           cubic_coef_w3_1, cubic_coef_w3_2,                &
+                                           cubic_coef_w3_3, cubic_coef_w3_4,                &
+                                           cubic_indices_w3_1, cubic_indices_w3_2,          &
+                                           cubic_indices_w3_3, cubic_indices_w3_4,          &
+                                           linear_coef_w3_1, linear_coef_w3_2,              &
                                            hermite,                                         &
                                            ndf_w2v, undf_w2v, map_w2v,                      &
                                            ndf_wt, undf_wt, map_wt,                         &
-                                           ndf_wc, undf_wc, map_wc,                         &
-                                           ndf_wl, undf_wl, map_wl )
+                                           ndf_wc, undf_wc, map_wc )
 
     ! Test selection of the W3 indices (indices are also tested in sl_support_mod_test)
-    @assertEqual(1.0_r_tran, real(cubic_indices_w3(1),r_tran), tol)
-    @assertEqual(1.0_r_tran, real(cubic_indices_w3(1+nlayers),r_tran), tol)
-    @assertEqual(2.0_r_tran, real(cubic_indices_w3(1+2*nlayers),r_tran), tol)
-    @assertEqual(5.0_r_tran, real(cubic_indices_w3(5+3*nlayers),r_tran), tol)
+    @assertEqual(1.0_r_tran, real(cubic_indices_w3_1(1),r_tran), tol)
+    @assertEqual(1.0_r_tran, real(cubic_indices_w3_2(1),r_tran), tol)
+    @assertEqual(2.0_r_tran, real(cubic_indices_w3_3(1),r_tran), tol)
+    @assertEqual(5.0_r_tran, real(cubic_indices_w3_4(5),r_tran), tol)
 
     ! Test selection of the W3 cubic coefficients (coefficients are also tested in sl_support_mod_test)
-    @assertEqual(0.0_r_tran, cubic_coef_w3(1), tol)
-    @assertEqual(0.25_r_tran, cubic_coef_w3(2+nlayers), tol)
-    @assertEqual(0.75_r_tran, cubic_coef_w3(2+2*nlayers), tol)
-    @assertEqual(1.0_r_tran, cubic_coef_w3(5+2*nlayers), tol)
+    @assertEqual(0.0_r_tran,  cubic_coef_w3_1(1), tol)
+    @assertEqual(0.25_r_tran, cubic_coef_w3_2(2), tol)
+    @assertEqual(0.75_r_tran, cubic_coef_w3_3(2), tol)
+    @assertEqual(1.0_r_tran,  cubic_coef_w3_3(5), tol)
 
     ! Get Wtheta coefficients
     call compute_vertical_cubic_coef_code( nlayers,                                         &
                                            dep_pts_z,                                       &
                                            theta_height,                                    &
-                                           cubic_coef_wt, cubic_indices_wt, linear_coef_wt, &
+                                           cubic_coef_wt_1, cubic_coef_wt_2,                &
+                                           cubic_coef_wt_3, cubic_coef_wt_4,                &
+                                           cubic_indices_wt_1, cubic_indices_wt_2,          &
+                                           cubic_indices_wt_3, cubic_indices_wt_4,          &
+                                           linear_coef_wt_1, linear_coef_wt_2,              &
                                            hermite,                                         &
                                            ndf_w2v, undf_w2v, map_w2v,                      &
                                            ndf_wt, undf_wt, map_wt,                         &
-                                           ndf_wm, undf_wm, map_wm,                         &
-                                           ndf_wn, undf_wn, map_wn )
+                                           ndf_wm, undf_wm, map_wm )
 
     ! Test selection of the Wtheta indices (indices are also tested in sl_support_mod_test)
-    @assertEqual(1.0_r_tran, real(cubic_indices_wt(1),r_tran), tol)
-    @assertEqual(1.0_r_tran, real(cubic_indices_wt(1+(nlayers+1)),r_tran), tol)
-    @assertEqual(2.0_r_tran, real(cubic_indices_wt(1+2*(nlayers+1)),r_tran), tol)
-    @assertEqual(6.0_r_tran, real(cubic_indices_wt(6+3*(nlayers+1)),r_tran), tol)
+    @assertEqual(1.0_r_tran, real(cubic_indices_wt_1(1),r_tran), tol)
+    @assertEqual(1.0_r_tran, real(cubic_indices_wt_2(1),r_tran), tol)
+    @assertEqual(2.0_r_tran, real(cubic_indices_wt_3(1),r_tran), tol)
+    @assertEqual(6.0_r_tran, real(cubic_indices_wt_4(6),r_tran), tol)
 
     ! Test selection of the Wtheta cubic coefficients (coefficients are also tested in sl_support_mod_test)
-    @assertEqual(0.0_r_tran, cubic_coef_wt(1), tol)
-    @assertEqual(0.5625_r_tran, cubic_coef_wt(3+(nlayers+1)), tol)
-    @assertEqual(0.864_r_tran, cubic_coef_wt(4+2*(nlayers+1)), tol)
-    @assertEqual(-0.0625_r_tran, cubic_coef_wt(3+3*(nlayers+1)), tol)
+    @assertEqual(0.0_r_tran,     cubic_coef_wt_1(1), tol)
+    @assertEqual(0.5625_r_tran,  cubic_coef_wt_2(3), tol)
+    @assertEqual(0.864_r_tran,   cubic_coef_wt_3(4), tol)
+    @assertEqual(-0.0625_r_tran, cubic_coef_wt_4(3), tol)
 
   end subroutine compute_vertical_cubic_coef_kernel_test
 

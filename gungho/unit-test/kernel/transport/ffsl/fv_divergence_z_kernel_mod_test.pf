@@ -21,7 +21,7 @@ module fv_divergence_z_kernel_mod_test
     private
     real(kind=r_tran), allocatable :: mass_divergence(:)
     real(kind=r_tran), allocatable :: mass_flux(:)
-    real(kind=r_tran), allocatable :: inv_m3(:,:,:)
+    real(kind=r_tran), allocatable :: detj_w3(:)
 
     integer(kind=i_def), allocatable :: map_w2(:)
     integer(kind=i_def), allocatable :: map_w3(:)
@@ -51,7 +51,7 @@ contains
 
     allocate( this%mass_flux(undf_w2) )
     allocate( this%mass_divergence(undf_w3) )
-    allocate( this%inv_m3(1,1,ncell) )
+    allocate( this%detj_w3(undf_w3) )
     allocate( this%map_w2(ndf_w2) )
     allocate( this%map_w3(ndf_w3) )
 
@@ -69,7 +69,7 @@ contains
 
     deallocate( this%mass_flux )
     deallocate( this%mass_divergence )
-    deallocate( this%inv_m3 )
+    deallocate( this%detj_w3 )
     deallocate( this%map_w2 )
     deallocate( this%map_w3 )
 
@@ -89,8 +89,8 @@ contains
 
     integer(kind=i_def), parameter :: cell = 1
 
-    ! Volume factor is 1/2
-    this%inv_m3(:,:,:) = 0.5
+    ! Volume factor is 2
+    this%detj_w3(:) = 2.0
 
     this%mass_flux = (/ 2.0_r_tran, 8.0_r_tran /)
     ! The fluxes have the following vertical setup:    !
@@ -100,12 +100,10 @@ contains
     ! Hence the z-direction divergence will be (8-2)*0.5 = 3.
 
 
-    call fv_divergence_z_code( cell,                 &
-                               nlayers,              &
+    call fv_divergence_z_code( nlayers,              &
                                this%mass_divergence, &
                                this%mass_flux,       &
-                               ncell,                &
-                               this%inv_m3,          &
+                               this%detj_w3,         &
                                ndf_w3,               &
                                undf_w3,              &
                                this%map_w3,          &
@@ -121,12 +119,10 @@ contains
     !           1.0
     ! Hence the z-direction divergence will be (-3-1)*0.5 = -2.
 
-    call fv_divergence_z_code( cell,                 &
-                               nlayers,              &
+    call fv_divergence_z_code( nlayers,              &
                                this%mass_divergence, &
                                this%mass_flux,       &
-                               ncell,                &
-                               this%inv_m3,          &
+                               this%detj_w3,         &
                                ndf_w3,               &
                                undf_w3,              &
                                this%map_w3,          &

@@ -157,11 +157,11 @@ test='cosine_hill',
 use_multires_coupling=.false.
 /
 &departure_points
-departure_grid='uniform',
 horizontal_limit='cap',
-method='euler',
+horizontal_method='euler',
 vertical_method='trapezoidal',
 vertical_limit='exponential',
+vertical_sorting=.false.
 n_dep_pt_iterations=1,
 /
 &solver

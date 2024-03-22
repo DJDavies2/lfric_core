@@ -25,6 +25,9 @@ module extract_uv_kernel_mod_test
 
     integer(i_def) :: map_w2(1:6)
     integer(i_def) :: map_w2h(1:4)
+    integer(i_def) :: map_w3_2d(1:1)
+
+    integer(i_def) :: face_selector(1:1)
 
   contains
     procedure setUp
@@ -37,6 +40,8 @@ module extract_uv_kernel_mod_test
     integer(i_def), parameter :: undf_w2 = 6
     integer(i_def), parameter :: ndf_w2h  = 4
     integer(i_def), parameter :: undf_w2h = 4
+    integer(i_def), parameter :: ndf_w3_2d = 1
+    integer(i_def), parameter :: undf_w3_2d = 1
 
 contains
 
@@ -49,6 +54,8 @@ contains
 
     this%map_w2 = (/ 1,2,3,4,5,6 /)
     this%map_w2h = (/ 1,2,3,4 /)
+    this%map_w3_2d = (/ 1 /)
+    this%face_selector = (/ 2 /)
 
     allocate( this%w2_field_in(1:6) )
     allocate( this%w2h_field_out(1:4) )
@@ -85,15 +92,20 @@ contains
     ! Set up the output W2H field with zeroes
     this%w2h_field_out = 0.0_r_def
 
-    call extract_uv_code( nlayers,                     &
-                         this%w2h_field_out,           &
-                         this%w2_field_in,             &
-                         undf_w2h,                     &
-                         ndf_w2h,                      &
-                         this%map_w2h,                 &
-                         undf_w2,                      &
-                         ndf_w2,                       &
-                         this%map_w2 )
+    call extract_uv_code( nlayers,                      &
+                          this%w2h_field_out,           &
+                          this%w2_field_in,             &
+                          this%face_selector,           &
+                          this%face_selector,           &
+                          undf_w2h,                     &
+                          ndf_w2h,                      &
+                          this%map_w2h,                 &
+                          undf_w2,                      &
+                          ndf_w2,                       &
+                          this%map_w2,                  &
+                          ndf_w3_2d,                    &
+                          undf_w3_2d,                   &
+                          this%map_w3_2d )
 
     @assertEqual(101.0_r_def, this%w2h_field_out(1), tol)
     @assertEqual(102.0_r_def, this%w2h_field_out(2), tol)

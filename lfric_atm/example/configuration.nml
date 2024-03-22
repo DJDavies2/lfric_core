@@ -82,12 +82,12 @@ number_of_convection_substeps=2,
 l_cosp=.false.,
 /
 &departure_points
-departure_grid='physical',
 horizontal_limit='none',
-method='timeaverage',
+horizontal_method='timeaverage',
 n_dep_pt_iterations=1,
 vertical_limit='exponential',
 vertical_method='timeaverage',
+vertical_sorting=.false.
 /
 &energy_correction
 encorr_usage='none',

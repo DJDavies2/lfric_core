@@ -16,12 +16,12 @@ dynamics='gungho',
 external_forcing=.false.,
 /
 &departure_points
-departure_grid='uniform',
 horizontal_limit='none',
-method='euler',
+horizontal_method='euler',
 n_dep_pt_iterations=1,
 vertical_limit='exponential',
 vertical_method='trapezoidal',
+vertical_sorting=.false.
 /
 &extrusion
 domain_top=10000.0,

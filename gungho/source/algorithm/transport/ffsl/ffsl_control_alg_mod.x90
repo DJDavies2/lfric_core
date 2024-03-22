@@ -16,9 +16,7 @@ module ffsl_control_alg_mod
   use fs_continuity_mod,                only: W3, Wtheta
   use geometric_constants_mod,          only: get_panel_id
   use log_mod,                          only: log_event,       &
-                                              LOG_LEVEL_INFO,  &
-                                              LOG_LEVEL_ERROR, &
-                                              LOG_LEVEL_WARNING
+                                              LOG_LEVEL_ERROR
   use mesh_mod,                         only: mesh_type
   use mesh_collection_mod,              only: mesh_collection
   use transport_metadata_mod,           only: transport_metadata_type
@@ -93,8 +91,6 @@ contains
     type(r_tran_field_type),   target  :: field_np1_w3_shifted
     type(r_tran_field_type)            :: mass_flux
     type(r_tran_field_type)            :: increment
-
-    call log_event('Conservative FFSL transport', LOG_LEVEL_INFO)
 
     mesh => field_n%get_mesh()
     transport_runtime => get_transport_runtime(mesh)

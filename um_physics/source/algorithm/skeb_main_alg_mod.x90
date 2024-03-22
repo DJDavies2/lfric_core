@@ -159,7 +159,6 @@ module skeb_main_alg_mod
   ! Kernels to derive the rotational and divergent wind increments
   use matrix_vector_kernel_mod,           only: matrix_vector_kernel_type
   use transpose_matrix_vector_kernel_mod, only: transpose_matrix_vector_kernel_type
-  use extract_uv_kernel_mod,              only: extract_uv_kernel_type
   use strong_curl_kernel_mod,             only: strong_curl_kernel_type
   use enforce_bc_kernel_mod,              only: enforce_bc_kernel_type
   ! element order to create vector spaces

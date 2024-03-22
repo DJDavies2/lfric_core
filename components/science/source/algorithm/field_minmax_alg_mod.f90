@@ -11,8 +11,10 @@
 
 module field_minmax_alg_mod
   use, intrinsic :: iso_fortran_env, only : real32, real64
-  use psykal_builtin_light_mod,      only : invoke_r32_field_min_max, &
-                                            invoke_r64_field_min_max
+  use psykal_builtin_light_mod,      only : invoke_r32_field_min_max,       &
+                                            invoke_r64_field_min_max,       &
+                                            invoke_r32_local_field_min_max, &
+                                            invoke_r64_local_field_min_max
   use log_mod,                       only : log_event, log_scratch_space, &
                                             log_level
   use field_r32_mod,                 only : field_r32_type
@@ -23,6 +25,10 @@ module field_minmax_alg_mod
   interface get_field_minmax
      module procedure get_field_minmax_r32, get_field_minmax_r64
   end interface get_field_minmax
+
+  interface get_local_field_minmax
+     module procedure get_local_field_minmax_r32, get_local_field_minmax_r64
+  end interface get_local_field_minmax
 
   interface log_field_minmax
      module procedure log_field_minmax_r32, log_field_minmax_r64
@@ -50,6 +56,24 @@ contains
     ! call the invoke in the psy layer
     call invoke_r64_field_min_max( fmin, fmax, field )
   end subroutine get_field_minmax_r64
+
+  subroutine get_local_field_minmax_r32( field, fmin, fmax )
+    implicit none
+    type(field_r32_type), intent(in) :: field
+    real(kind=real32),   intent(out) :: fmin, fmax
+
+    ! call the invoke in the PSy layer
+    call invoke_r32_local_field_min_max( fmin, fmax, field )
+  end subroutine get_local_field_minmax_r32
+
+  subroutine get_local_field_minmax_r64( field, fmin, fmax )
+    implicit none
+    type(field_r64_type), intent(in) :: field
+    real(kind=real64),   intent(out) :: fmin, fmax
+
+    ! call the invoke in the psy layer
+    call invoke_r64_local_field_min_max( fmin, fmax, field )
+  end subroutine get_local_field_minmax_r64
 
   subroutine log_field_minmax_r32( log_lev, label, field )
     integer,                     intent(in) :: log_lev

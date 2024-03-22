@@ -14,6 +14,9 @@ module ffsl_3d_alg_mod
   use fs_continuity_mod,                only: W2, W2H, W2V
   use function_space_mod,               only: function_space_type
   use function_space_collection_mod,    only: function_space_collection
+  use geometric_constants_mod,          only: get_face_selector_ew, &
+                                              get_face_selector_ns
+  use integer_field_mod,                only: integer_field_type
   use log_mod,                          only: log_event, LOG_LEVEL_ERROR
   use mesh_mod,                         only: mesh_type
   use r_tran_field_mod,                 only: r_tran_field_type
@@ -84,6 +87,8 @@ contains
     type(function_space_type), pointer :: w2_fs => null()
     type(function_space_type), pointer :: w2h_fs => null()
     type(function_space_type), pointer :: w2v_fs => null()
+    type(integer_field_type),  pointer :: face_selector_ew => null()
+    type(integer_field_type),  pointer :: face_selector_ns => null()
 
     ! Subroutine name for timer
     character(*), parameter :: routine_name = 'ffsl_3d_transport_alg'
@@ -111,8 +116,7 @@ contains
     type(r_tran_field_type) :: half_increment_xz
     type(r_tran_field_type) :: half_increment_yz
     type(r_tran_field_type) :: half_increment_zy
-    type(r_tran_field_type) :: flux_x
-    type(r_tran_field_type) :: flux_y
+    type(r_tran_field_type) :: flux
     type(r_tran_field_type) :: flux_z
     type(r_tran_field_type) :: mass_flux_h
     type(r_tran_field_type) :: dummy_np1
@@ -144,14 +148,12 @@ contains
     call field_y%initialise( vector_space = field_fs )
     call field_z%initialise( vector_space = field_fs )
     call field_xy%initialise( vector_space = field_fs )
-    call flux_x%initialise( vector_space = w2h_fs )
-    call flux_y%initialise( vector_space = w2h_fs )
+    call flux%initialise( vector_space = w2h_fs )
     call flux_z%initialise( vector_space = w2v_fs )
 
     ! Set fluxes to zero
-    call invoke( setval_c( flux_x, 0.0_r_tran ), &
-                 setval_c( flux_y, 0.0_r_tran ), &
-                 setval_c( flux_z, 0.0_r_tran ) )
+    call invoke( setval_c( flux_z, 0.0_r_tran ), &
+                 setval_c( flux, 0.0_r_tran )  )
 
     ! Set constants
     half_dt = 0.5_r_tran * step_dt
@@ -198,7 +200,7 @@ contains
                  X_minus_bY(field_z, field_n, third_dt, half_increment_z) )
 
     ! 2nd advective step -------------------------------------------------------
-    call ffsl_hori_final_alg( flux_x, flux_y,                                  &
+    call ffsl_hori_final_alg( flux,                                            &
                               half_increment_xy, half_increment_yx,            &
                               dummy_np1, field_n, field_x, field_y, step_dt,   &
                               transport_metadata, outer_order,                 &
@@ -225,7 +227,7 @@ contains
     ! Final step (advective or conservative) -----------------------------------
     compute_adv_inc = (transport_metadata%get_equation_form() == equation_form_advective)
 
-    call ffsl_hori_final_alg( flux_x, flux_y, increment_x, increment_y,        &
+    call ffsl_hori_final_alg( flux, increment_x, increment_y,                  &
                               dummy_np1, field_n, field_g, field_f, step_dt,   &
                               transport_metadata, outer_order,                 &
                               compute_adv_inc=compute_adv_inc,                 &
@@ -240,8 +242,12 @@ contains
     case ( equation_form_conservative, equation_form_consistent )
       call mass_flux%initialise( vector_space = w2_fs )
       call mass_flux_h%initialise( vector_space = w2h_fs )
-      call invoke( X_minus_Y(mass_flux_h, flux_x, flux_y), &
-                   combine_w2_field_kernel_type(mass_flux, mass_flux_h, flux_z) )
+      face_selector_ew => get_face_selector_ew(mesh%get_id())
+      face_selector_ns => get_face_selector_ns(mesh%get_id())
+      call invoke( setval_X(mass_flux_h, flux), &
+                   combine_w2_field_kernel_type(mass_flux, mass_flux_h,        &
+                                                flux_z, face_selector_ew,      &
+                                                face_selector_ns) )
 
     case ( equation_form_advective )
       call increment%initialise( vector_space = field_fs )
@@ -255,7 +261,8 @@ contains
 
     if ( subroutine_timers ) call timer(routine_name)
 
-    nullify( mesh, w2_fs, w2h_fs, w2v_fs, field_fs )
+    nullify( mesh, w2_fs, w2h_fs, w2v_fs, field_fs, &
+             face_selector_ew, face_selector_ns )
 
   end subroutine ffsl_3d_splitting_alg
 

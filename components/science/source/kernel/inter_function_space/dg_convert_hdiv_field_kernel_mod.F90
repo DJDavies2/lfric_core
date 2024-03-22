@@ -99,7 +99,7 @@ subroutine dg_convert_hdiv_field_code(nlayers,                                 &
                                       basis_chi, diff_basis_chi,               &
                                       ndf_pid, undf_pid, map_pid               &
                                    )
-  use coordinate_jacobian_mod, only: coordinate_jacobian
+  use coordinate_jacobian_mod, only: pointwise_coordinate_jacobian
   implicit none
 
   ! Arguments
@@ -127,8 +127,8 @@ subroutine dg_convert_hdiv_field_code(nlayers,                                 &
   real(kind=r_def), dimension(3,ndf2,ndf1),    intent(in)   :: basis2
 
   ! Internal variables
-  integer(kind=i_def) :: df, df2, k
-  real(kind=r_def) :: jacobian(3,3,ndf1), dj(ndf1)
+  integer(kind=i_def) :: df, df2, k, dfx
+  real(kind=r_def) :: jacobian(3,3), dj
   real(kind=r_def) :: vector_in(3), vector_out(3)
   real(kind=r_def), dimension(ndf_chi) :: chi1_e, chi2_e, chi3_e
 
@@ -136,21 +136,32 @@ subroutine dg_convert_hdiv_field_code(nlayers,                                 &
 
   ipanel = int(panel_id(map_pid(1)), i_def)
 
-  do k = 0, nlayers-1
-    do df = 1,ndf_chi
-      chi1_e(df) = chi1(map_chi(df) + k)
-      chi2_e(df) = chi2(map_chi(df) + k)
-      chi3_e(df) = chi3(map_chi(df) + k)
+  do df = 1,ndf1
+    do k = 0, nlayers-1
+      physical_field1(map1(df)+k) = 0.0_r_def
+      physical_field2(map1(df)+k) = 0.0_r_def
+      physical_field3(map1(df)+k) = 0.0_r_def
     end do
-    call coordinate_jacobian(ndf_chi, ndf1, chi1_e, chi2_e, chi3_e,    &
-                             ipanel, basis_chi, diff_basis_chi, jacobian, dj)
+  end do
 
-    do df = 1,ndf1
+  do df = 1,ndf1
+
+    do k = 0, nlayers-1
+      do dfx = 1,ndf_chi
+        chi1_e(dfx) = chi1(map_chi(dfx) + k)
+        chi2_e(dfx) = chi2(map_chi(dfx) + k)
+        chi3_e(dfx) = chi3(map_chi(dfx) + k)
+      end do
+      call pointwise_coordinate_jacobian(ndf_chi, chi1_e, chi2_e, chi3_e,      &
+                                         ipanel, basis_chi(:,:,df),            &
+                                         diff_basis_chi(:,:,df), jacobian, dj)
       vector_in(:) = 0.0_r_def
       do df2 = 1,ndf2
         vector_in(:) = vector_in(:) + computational_field(map2(df2)+k)*basis2(:,df2,df)
       end do
-      vector_out(:) = matmul(jacobian(:,:,df),vector_in)/dj(df)
+
+      vector_out(:) = matmul(jacobian,vector_in)/dj
+
       physical_field1(map1(df)+k) = physical_field1(map1(df)+k) + vector_out(1)
       physical_field2(map1(df)+k) = physical_field2(map1(df)+k) + vector_out(2)
       physical_field3(map1(df)+k) = physical_field3(map1(df)+k) + vector_out(3)

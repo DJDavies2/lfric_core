@@ -12,12 +12,13 @@
 !!          This method is only designed for the lowest order W2 spaces.
 module restrict_w2_kernel_mod
 
-use argument_mod,            only: arg_type,                  &
+use argument_mod,            only: arg_type, GH_INTEGER,      &
                                    GH_FIELD, GH_REAL,         &
                                    GH_READ, GH_WRITE,         &
                                    GH_COARSE, GH_FINE,        &
                                    ANY_SPACE_2, CELL_COLUMN,  &
-                                   ANY_DISCONTINUOUS_SPACE_2
+                                   ANY_DISCONTINUOUS_SPACE_2, &
+                                   ANY_DISCONTINUOUS_SPACE_3
 use constants_mod,           only: i_def, r_def, r_single, r_double
 use fs_continuity_mod,       only: W2
 use kernel_mod,              only: kernel_type
@@ -36,10 +37,15 @@ private
 
 type, public, extends(kernel_type) :: restrict_w2_kernel_type
   private
-  type(arg_type) :: meta_args(2) = (/                                          &
-       arg_type(GH_FIELD, GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_2,        &
-                                                          mesh_arg=GH_COARSE), &
-       arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_FINE  )  &
+  type(arg_type) :: meta_args(4) = (/                                          &
+       arg_type(GH_FIELD, GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_2,     &
+                                                        mesh_arg=GH_COARSE),   &
+       arg_type(GH_FIELD, GH_REAL,    GH_READ,  ANY_SPACE_2,                   &
+                                                        mesh_arg=GH_FINE  ),   &
+       arg_type(GH_FIELD, GH_INTEGER, GH_READ,  ANY_DISCONTINUOUS_SPACE_3,     &
+                                                        mesh_arg=GH_COARSE ),  &
+       arg_type(GH_FIELD, GH_INTEGER, GH_READ,  ANY_DISCONTINUOUS_SPACE_3,     &
+                                                        mesh_arg=GH_COARSE )   &
        /)
   integer :: operates_on = CELL_COLUMN
 end type restrict_w2_kernel_type
@@ -71,6 +77,10 @@ contains
   !!                                         for the fine grid
   !> @param[in,out] coarse_field             Coarse grid W2 field to compute
   !> @param[in]     fine_field               Fine grid  W2 field to restrict
+  !> @param[in]     face_selector_ew         2D field indicating which W/E faces
+  !!                                         to loop over in this column
+  !> @param[in]     face_selector_ns         2D field indicating which N/S faces
+  !!                                         to loop over in this column
   !> @param[in]     undf_coarse              Total num of DoFs on the coarse
   !!                                         grid for this mesh partition
   !> @param[in]     map_coarse               DoFmap of cells on the coarse grid
@@ -78,6 +88,9 @@ contains
   !> @param[in]     undf_fine                Total num of DoFs on the fine grid
   !!                                         for this mesh partition
   !> @param[in]     map_fine                 DoFmap of cells on the fine grid
+  !> @param[in]     undf_w3_2d               Num of DoFs for this partition for
+  !!                                         2D W3
+  !> @param[in]     map_w3_2d                Map for 2D W3
 
   ! R_SINGLE PRECISION
   ! ==================
@@ -88,11 +101,15 @@ contains
                                        ncell_fine,              &
                                        coarse_field,            &
                                        fine_field,              &
+                                       face_selector_ew,        &
+                                       face_selector_ns,        &
                                        undf_coarse,             &
                                        map_coarse,              &
                                        ndf,                     &
                                        undf_fine,               &
-                                       map_fine                 )
+                                       map_fine,                &
+                                       undf_w3_2d,              &
+                                       map_w3_2d               )
 
     implicit none
 
@@ -102,14 +119,18 @@ contains
     integer(kind=i_def), intent(in) :: ncell_fine
     integer(kind=i_def), intent(in) :: ndf
     integer(kind=i_def), intent(in) :: undf_fine, undf_coarse
+    integer(kind=i_def), intent(in) :: undf_w3_2d
 
     ! Fields
     real(kind=r_single), intent(inout) :: coarse_field(undf_coarse)
     real(kind=r_single), intent(in)    :: fine_field(undf_fine)
+    integer(kind=i_def), intent(in)    :: face_selector_ew(undf_w3_2d)
+    integer(kind=i_def), intent(in)    :: face_selector_ns(undf_w3_2d)
 
     ! Maps
     integer(kind=i_def), intent(in) :: map_fine(ndf, ncell_fine)
     integer(kind=i_def), intent(in) :: map_coarse(ndf)
+    integer(kind=i_def), intent(in) :: map_w3_2d(1)
     integer(kind=i_def), intent(in) :: cell_map(ncell_fine_per_coarse_x, ncell_fine_per_coarse_y)
 
     ! Internal variables
@@ -188,8 +209,11 @@ contains
     ! Horizontal components
     !---------------------------------------------------------------------------
 
-    do face = 1, 4
-      df = face_order(face)
+    do face = 1, face_selector_ew(map_w3_2d(1)) + face_selector_ns(map_w3_2d(1))
+      df = face
+      if (face == 3 .and. face_selector_ns(map_w3_2d(1)) == 2                  &
+                    .and. face_selector_ew(map_w3_2d(1)) == 1) df = N
+
       new_coarse(:) = 0.0_r_single
 
       ! Build up 1D array of new coarse values for this column and face
@@ -240,11 +264,15 @@ contains
                                        ncell_fine,              &
                                        coarse_field,            &
                                        fine_field,              &
+                                       face_selector_ew,        &
+                                       face_selector_ns,        &
                                        undf_coarse,             &
                                        map_coarse,              &
                                        ndf,                     &
                                        undf_fine,               &
-                                       map_fine                 )
+                                       map_fine,                &
+                                       undf_w3_2d,              &
+                                       map_w3_2d               )
 
     implicit none
 
@@ -254,14 +282,18 @@ contains
     integer(kind=i_def), intent(in) :: ncell_fine
     integer(kind=i_def), intent(in) :: ndf
     integer(kind=i_def), intent(in) :: undf_fine, undf_coarse
+    integer(kind=i_def), intent(in) :: undf_w3_2d
 
     ! Fields
     real(kind=r_double), intent(inout) :: coarse_field(undf_coarse)
     real(kind=r_double), intent(in)    :: fine_field(undf_fine)
+    integer(kind=i_def), intent(in)    :: face_selector_ew(undf_w3_2d)
+    integer(kind=i_def), intent(in)    :: face_selector_ns(undf_w3_2d)
 
     ! Maps
     integer(kind=i_def), intent(in) :: map_fine(ndf, ncell_fine)
     integer(kind=i_def), intent(in) :: map_coarse(ndf)
+    integer(kind=i_def), intent(in) :: map_w3_2d(1)
     integer(kind=i_def), intent(in) :: cell_map(ncell_fine_per_coarse_x, ncell_fine_per_coarse_y)
 
     ! Internal variables
@@ -340,8 +372,11 @@ contains
     ! Horizontal components
     !---------------------------------------------------------------------------
 
-    do face = 1, 4
-      df = face_order(face)
+    do face = 1, face_selector_ew(map_w3_2d(1)) + face_selector_ns(map_w3_2d(1))
+      df = face
+      if (face == 3 .and. face_selector_ns(map_w3_2d(1)) == 2                  &
+                    .and. face_selector_ew(map_w3_2d(1)) == 1) df = N
+
       new_coarse(:) = 0.0_r_double
 
       ! Build up 1D array of new coarse values for this column and face

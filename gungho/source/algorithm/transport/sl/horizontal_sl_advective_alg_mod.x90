@@ -32,6 +32,10 @@ module horizontal_sl_advective_alg_mod
   use end_of_transport_step_alg_mod,    only: end_of_advective_step_alg
   use horizontal_cubic_sl_kernel_mod,   only: horizontal_cubic_sl_kernel_type
   use horizontal_linear_sl_kernel_mod,  only: horizontal_linear_sl_kernel_type
+  use psykal_lite_transport_mod,        only: invoke_ffsl_panel_swap_kernel_type
+
+  ! Pointers to other objects
+  use geometric_constants_mod,          only: get_panel_id
 
   ! Configs
   use transport_config_mod,             only: extended_mesh
@@ -74,17 +78,17 @@ module horizontal_sl_advective_alg_mod
     type(r_tran_field_type) :: increment_x
     type(r_tran_field_type) :: increment_y
     type(r_tran_field_type) :: increment
-    type(r_tran_field_type) :: dep_pts_x, &
-                               dep_pts_y
 
     ! Fields for remapping
     type(r_tran_field_type), target  :: field_big_halo
     type(r_tran_field_type), target  :: field_x_big_halo
     type(r_tran_field_type), target  :: field_y_big_halo
+    type(field_type),        pointer :: panel_id => null()
 
     ! Stencil sizes
-    integer(kind=i_def) :: stencil_extent, stencil_extent_x, stencil_extent_y
+    integer(kind=i_def) :: stencil_extent
     integer(kind=i_def) :: cfl_stencil_extent
+    logical(kind=l_def) :: strang
 
     ! Time step and CFL
     real(kind=r_tran)   :: one_over_dt, half_dt
@@ -95,56 +99,32 @@ module horizontal_sl_advective_alg_mod
 
     ! Transport runtime and metadata
     type(transport_runtime_type), pointer :: transport_runtime => null()
-    type(r_tran_field_type),      pointer :: dep_pts_x_get => null()
-    type(r_tran_field_type),      pointer :: dep_pts_y_get => null()
-    integer(kind=i_def),          pointer :: dep_stencil_extent_x => null()
-    integer(kind=i_def),          pointer :: dep_stencil_extent_y => null()
-    type(integer_field_type),     pointer :: cosmic_istart_x => null()
-    type(integer_field_type),     pointer :: cosmic_iend_x   => null()
-    type(integer_field_type),     pointer :: cosmic_istart_y => null()
-    type(integer_field_type),     pointer :: cosmic_iend_y   => null()
+    type(r_tran_field_type),      pointer :: dep_dist_xy
+    integer(kind=i_def),          pointer :: dep_stencil_extent_xy
     integer(kind=i_def) :: hori_monotone
     logical(kind=l_def) :: monotone_remap
 
     if ( subroutine_timers ) call timer('transport.sl_horizontal')
 
-    ! Get mesh ID
+    ! Get mesh ID and panel ID
     mesh_id = field_n%get_mesh_id()
+    panel_id => get_panel_id(mesh_id)
 
     ! Get transport_runtime and reversible option
     mesh => field_n%get_mesh()
     transport_runtime => get_transport_runtime(mesh)
 
     ! Get departure points
-    dep_pts_x_get => transport_runtime%get_departure_points_x_w2(mesh_id)
-    dep_pts_y_get => transport_runtime%get_departure_points_y_w2(mesh_id)
+    strang = ( transport_metadata%get_splitting() ==  splitting_strang_hvh )
+    dep_dist_xy => transport_runtime%get_dep_dist_xy_w2(mesh_id, strang)
     ! Get stencil extent
-    dep_stencil_extent_x => transport_runtime%get_dep_stencil_extent_x(mesh_id)
-    dep_stencil_extent_y => transport_runtime%get_dep_stencil_extent_y(mesh_id)
-    ! Get COSMIC index for panel orientation change
-    cosmic_istart_x => transport_runtime%get_cosmic_istart_x(mesh_id)
-    cosmic_iend_x   => transport_runtime%get_cosmic_iend_x(mesh_id)
-    cosmic_istart_y => transport_runtime%get_cosmic_istart_y(mesh_id)
-    cosmic_iend_y   => transport_runtime%get_cosmic_iend_y(mesh_id)
-
-    ! Copy departure points so they can be corrected if Strang splitting is used
-    call dep_pts_x%initialise( vector_space = dep_pts_x_get%get_function_space() )
-    call dep_pts_y%initialise( vector_space = dep_pts_y_get%get_function_space() )
-    call invoke( setval_X(dep_pts_x, dep_pts_x_get), &
-                 setval_X(dep_pts_y, dep_pts_y_get) )
-    ! If using Strang splitting divide departure distance by 2
-    if ( transport_metadata%get_splitting() ==  splitting_strang_hvh ) then
-      call invoke( inc_a_times_X(0.5_r_tran, dep_pts_x), &
-                   inc_a_times_X(0.5_r_tran, dep_pts_y) )
-    end if
+    dep_stencil_extent_xy => transport_runtime%get_dep_stencil_extent_xy(mesh_id)
 
     ! Get monotone option
     hori_monotone = transport_metadata%get_horizontal_monotone()
 
     ! Get stencil size
-    stencil_extent_x  = dep_stencil_extent_x
-    stencil_extent_y  = dep_stencil_extent_y
-    stencil_extent = max( stencil_extent_x, stencil_extent_y ) + 1_i_def
+    stencil_extent  = dep_stencil_extent_xy + 1_i_def
     cfl_stencil_extent = int(stencil_extent)
 
     ! Initialise fields
@@ -173,12 +153,11 @@ module horizontal_sl_advective_alg_mod
     end if
 
     ! First advective step with linear interpolation
-    call invoke( horizontal_linear_sl_kernel_type( field_xp,       &
-                                                   field_yp,       &
-                                                   field_big_halo, &
-                                                   stencil_extent, &
-                                                   dep_pts_x,      &
-                                                   dep_pts_y,      &
+    call invoke( horizontal_linear_sl_kernel_type( field_xp,        &
+                                                   field_yp,        &
+                                                   field_big_halo,  &
+                                                   stencil_extent,  &
+                                                   dep_dist_xy,     &
                                                    cfl_stencil_extent ) )
 
     ! Constants to get increments
@@ -217,24 +196,22 @@ module horizontal_sl_advective_alg_mod
                    setval_x( field_y_big_halo, field_y ) )
     end if
 
+    call invoke_ffsl_panel_swap_kernel_type(field_x_big_halo, field_y_big_halo, &
+                                            panel_id, stencil_extent)
+
     call invoke( horizontal_cubic_sl_kernel_type( increment_x,        &
                                                   increment_y,        &
                                                   field_x_big_halo,   &
                                                   stencil_extent,     &
                                                   field_y_big_halo,   &
                                                   stencil_extent,     &
-                                                  cosmic_istart_x,    &
-                                                  cosmic_iend_x,      &
-                                                  cosmic_istart_y,    &
-                                                  cosmic_iend_y,      &
-                                                  dep_pts_x,          &
-                                                  dep_pts_y,          &
+                                                  dep_dist_xy,        &
                                                   hori_monotone,      &
                                                   cfl_stencil_extent, &
                                                   dt ) )
 
     ! Collect the increments
-    call invoke( X_plus_Y( increment, increment_x, increment_y ), &
+    call invoke( X_plus_Y( increment, increment_x, increment_y ),     &
                  X_minus_bY( field_np1, field_n, dt, increment ) )
 
     ! End of step: if necessary enforce min val and overwrite in blending zone
@@ -242,9 +219,8 @@ module horizontal_sl_advective_alg_mod
 
     if ( subroutine_timers ) call timer('transport.sl_horizontal')
 
-    nullify( mesh, transport_runtime, dep_pts_x_get, dep_pts_y_get,          &
-             cosmic_istart_x, cosmic_iend_x, cosmic_istart_y, cosmic_iend_y, &
-             dep_stencil_extent_x, dep_stencil_extent_y )
+    nullify( mesh, transport_runtime, dep_dist_xy,         &
+             dep_stencil_extent_xy, panel_id )
 
   end subroutine horizontal_sl_advective_alg
 

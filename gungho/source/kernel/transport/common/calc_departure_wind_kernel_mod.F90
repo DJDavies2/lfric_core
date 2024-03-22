@@ -155,14 +155,3 @@ contains
 
 end module calc_departure_wind_kernel_mod
 
-
-
-
-
-
-
-
-
-
-
-

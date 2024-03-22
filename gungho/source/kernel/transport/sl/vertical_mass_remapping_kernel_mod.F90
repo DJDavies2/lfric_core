@@ -72,7 +72,7 @@ contains
   !!          vertical motion only, then interpolates theta at the
   !!          departure point using 1D cubic-Lagrange interpolation.
   !> @param[in]     nlayers      The number of layers
-  !> @param[in]     dep_pts_z    The vertical departure distance used for SL advection
+  !> @param[in]     dep_dist_z   The vertical departure distance used for SL advection
   !> @param[in,out] mass         The mass field that needs to be remapped
   !> @param[in,out] flux         The mass flux corresponding to the transport
   !> @param[in]     order        Order of the reconstruction of underlying function
@@ -94,7 +94,7 @@ contains
   !-------------------------------------------------------------------------------
 
   subroutine vertical_mass_remapping_code( nlayers,                     &
-                                           dep_pts_z,                   &
+                                           dep_dist_z,                  &
                                            mass,                        &
                                            flux,                        &
                                            order,                       &
@@ -115,7 +115,7 @@ contains
   integer(kind=i_def), intent(in)                         :: undf_w2v
   integer(kind=i_def), dimension(ndf_w2v), intent(in)     :: map_w2v
 
-  real(kind=r_tran), dimension(undf_w2v), intent(in)      :: dep_pts_z
+  real(kind=r_tran), dimension(undf_w2v), intent(in)      :: dep_dist_z
   real(kind=r_tran), dimension(undf_w3),  intent(inout)   :: mass
   real(kind=r_tran), dimension(undf_w2v), intent(inout)   :: flux
   integer(kind=i_def), intent(in)                         :: order
@@ -133,7 +133,7 @@ contains
 
   ! Extract and fill local column from global data
   do k=0,nlayers
-    dist(k+1) = dep_pts_z(map_w2v(1)+k)
+    dist(k+1) = dep_dist_z(map_w2v(1)+k)
   end do
   do k=0,nlayers - 1
     m0(k+1) = mass(map_w3(1)+k)

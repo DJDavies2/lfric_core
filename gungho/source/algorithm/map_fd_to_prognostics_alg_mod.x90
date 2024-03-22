@@ -21,6 +21,7 @@ module map_fd_to_prognostics_alg_mod
                                              topology_fully_periodic
   ! Derived Types
   use field_mod,                       only: field_type
+  use integer_field_mod,               only: integer_field_type
   use field_collection_mod,            only: field_collection_type
   use mesh_mod,                        only: mesh_type
   use operator_mod,                    only: operator_type
@@ -30,10 +31,12 @@ module map_fd_to_prognostics_alg_mod
   use quadrature_xyoz_mod,             only: quadrature_xyoz_type
   use quadrature_rule_gaussian_mod,    only: quadrature_rule_gaussian_type
   use fem_constants_mod,               only: get_rmultiplicity
-  use geometric_constants_mod,         only: get_height,          &
-                                             get_coordinates,     &
-                                             get_panel_id,        &
-                                             get_da_at_w2,        &
+  use geometric_constants_mod,         only: get_height,           &
+                                             get_coordinates,      &
+                                             get_panel_id,         &
+                                             get_da_at_w2,         &
+                                             get_face_selector_ew, &
+                                             get_face_selector_ns, &
                                              get_w3_to_w2_displacement
   use physical_op_constants_mod,       only: get_coriolis,         &
                                              get_geopotential,     &
@@ -85,24 +88,27 @@ contains
     type( field_collection_type),   intent( inout ) :: fd_fields
 
     ! Local dereferenced fields
-    type( field_type ), pointer :: theta                  => null()
-    type( field_type ), pointer :: rho                    => null()
-    type( field_type ), pointer :: u                      => null()
-    type( field_type ), pointer :: exner                  => null()
+    type( field_type ), pointer :: theta
+    type( field_type ), pointer :: rho
+    type( field_type ), pointer :: u
+    type( field_type ), pointer :: exner
 
     ! FD  fields
-    type( field_type ), pointer :: h_wind_in_w2h          => null()
-    type( field_type ), pointer :: ew_wind_in_w3          => null()
-    type( field_type ), pointer :: ns_wind_in_w3          => null()
-    type( field_type ), pointer :: dry_rho_in_w3          => null()
-    type( field_type ), pointer :: upward_wind_in_wtheta  => null()
-    type( field_type ), pointer :: theta_in_wtheta        => null()
-    type( field_type ), pointer :: mv_in_wtheta           => null()
-    type( field_type ), pointer :: mcl_in_wtheta          => null()
-    type( field_type ), pointer :: mcf_in_wtheta          => null()
-    type( field_type ), pointer :: mr_in_wtheta           => null()
-    type( field_type ), pointer :: dA => null()
+    type( field_type ), pointer :: h_wind_in_w2h
+    type( field_type ), pointer :: ew_wind_in_w3
+    type( field_type ), pointer :: ns_wind_in_w3
+    type( field_type ), pointer :: dry_rho_in_w3
+    type( field_type ), pointer :: upward_wind_in_wtheta
+    type( field_type ), pointer :: theta_in_wtheta
+    type( field_type ), pointer :: mv_in_wtheta
+    type( field_type ), pointer :: mcl_in_wtheta
+    type( field_type ), pointer :: mcf_in_wtheta
+    type( field_type ), pointer :: mr_in_wtheta
+    type( field_type ), pointer :: dA
     integer(i_def)              :: mesh_id
+
+    type(integer_field_type), pointer :: face_selector_ew
+    type(integer_field_type), pointer :: face_selector_ns
 
     integer(i_def)               :: model_eos_height
     logical(l_def)               :: read_w2h_wind
@@ -151,12 +157,17 @@ contains
                  setval_c(upward_wind_in_wtheta, 0.0_r_def))
 
     if ( read_w2h_wind )then
-     ! We read in the horizontal (normal to face) winds on the w2h points
-     mesh_id = u%get_mesh_id()
-     dA => get_da_at_w2(mesh_id)
-     call invoke( combine_w2_field_kernel_type( u, h_wind_in_w2h, &
-                                                upward_wind_in_wtheta),    &
-                  inc_X_times_Y(u, dA) )
+      ! We read in the horizontal (normal to face) winds on the w2h points
+      mesh_id = u%get_mesh_id()
+      dA => get_da_at_w2(mesh_id)
+      face_selector_ew => get_face_selector_ew(mesh_id)
+      face_selector_ns => get_face_selector_ns(mesh_id)
+
+      call invoke( combine_w2_field_kernel_type(u, h_wind_in_w2h,              &
+                                                upward_wind_in_wtheta,         &
+                                                face_selector_ew,              &
+                                                face_selector_ns),             &
+                   inc_X_times_Y(u, dA) )
     else
      ! We read in cell centred zonal/meridional winds
       call set_wind( u, ew_wind_in_w3, ns_wind_in_w3, upward_wind_in_wtheta )
@@ -213,16 +224,16 @@ contains
     type( field_type )                   :: r_u
     type( field_type )                   :: u_broken
     type( field_type )                   :: u_lat_w2, u_lon_w2, u_up_w2
-    type( field_type ),          pointer :: rmultiplicity_w2 => null()
-    type( field_type ),          pointer :: displacement => null()
-    type( field_type ),          pointer :: chi(:) => null()
-    type( field_type ),          pointer :: panel_id => null()
-    type( operator_type ),       pointer :: u_lon_map => null()
-    type( operator_type ),       pointer :: u_lat_map => null()
-    type( operator_type ),       pointer :: u_up_map => null()
-    type( function_space_type ), pointer :: w2b_fs => null()
+    type( field_type ),          pointer :: rmultiplicity_w2
+    type( field_type ),          pointer :: displacement
+    type( field_type ),          pointer :: chi(:)
+    type( field_type ),          pointer :: panel_id
+    type( operator_type ),       pointer :: u_lon_map
+    type( operator_type ),       pointer :: u_lat_map
+    type( operator_type ),       pointer :: u_up_map
+    type( function_space_type ), pointer :: w2b_fs
 
-    type( mesh_type ), pointer :: mesh => null()
+    type( mesh_type ), pointer :: mesh
 
     if ( subroutine_timers ) call timer("set_wind")
 
@@ -299,9 +310,6 @@ contains
                    enforce_bc_kernel_type( r_u ) )
       call mass_matrix_solver_alg(u, r_u)
     end if
-
-    nullify( mesh, rmultiplicity_w2, u_lon_map, u_lat_map, u_up_map, &
-             panel_id, displacement, chi )
 
     if ( subroutine_timers ) call timer("set_wind")
 

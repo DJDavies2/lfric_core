@@ -15,8 +15,7 @@ module compute_vertical_quintic_coef_kernel_mod
                                     GH_FIELD, GH_WRITE,           &
                                     GH_REAL, GH_READ,             &
                                     GH_INTEGER, CELL_COLUMN,      &
-                                    ANY_DISCONTINUOUS_SPACE_1,    &
-                                    ANY_DISCONTINUOUS_SPACE_2
+                                    ANY_DISCONTINUOUS_SPACE_1
   use fs_continuity_mod,     only : W2v, Wtheta
   use constants_mod,         only : r_tran, i_def, l_def, EPS_R_TRAN
   use kernel_mod,            only : kernel_type
@@ -33,12 +32,23 @@ module compute_vertical_quintic_coef_kernel_mod
   !>                                      by the PSy layer.
   type, public, extends(kernel_type) :: compute_vertical_quintic_coef_kernel_type
     private
-    type(arg_type) :: meta_args(5) = (/                                        &
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2v),                       & ! dep_pts_z
+    type(arg_type) :: meta_args(16) = (/                                       &
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2v),                       & ! dep_dist_z
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,  Wtheta),                    & ! theta_height
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_coef
          arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_indices
-         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_2)  & ! linear_coef
+         arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_indices
+         arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_indices
+         arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_indices
+         arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_indices
+         arg_type(GH_FIELD,  GH_INTEGER, GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! quintic_indices
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), & ! linear_coef
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1)  & ! linear_coef
          /)
     integer :: operates_on = CELL_COLUMN
   contains
@@ -57,13 +67,12 @@ module compute_vertical_quintic_coef_kernel_mod
   !!          only w (i.e., vertical motion only), then interpolate theta at the
   !!          departure point using 1d-Cubic-Lagrange interpolation.
   !> @param[in]     nlayers       The number of layers
-  !> @param[in]     dep_pts_z     The vertical departure distance used for SL advection
+  !> @param[in]     dep_dist_z    The vertical departure distance used for SL advection
   !> @param[in]     theta_height  The height of theta-points
-  !> @param[inout]  quintic_coef
-  !!                              The cubic interpolation coefficients
+  !> @param[inout]  quintic_coef  The cubic interpolation coefficients (1-6)
   !> @param[inout]  quintic_indices
-  !!                              The cubic interpolation indices
-  !> @param[inout]  linear_coef   The linear interpolation coefficients (used for monotonicity)
+  !!                              The cubic interpolation indices (1-6)
+  !> @param[inout]  linear_coef   The linear interpolation coefficients (1-2, used for monotonicity)
   !> @param[in]     ndf_w2v       The number of degrees of freedom per cell
   !!                              on W2v space
   !> @param[in]     undf_w2v      The number of unique degrees of freedom
@@ -77,27 +86,26 @@ module compute_vertical_quintic_coef_kernel_mod
   !> @param[in]     map_wt        The dofmap for the cell at the base of the column
   !!                              on Wtheta space
   !> @param[in]     ndf_wq        The number of degrees of freedom per cell
-  !!                              for the quintic coefficients space
+  !!                              for the coefficients space
   !> @param[in]     undf_wq       The number of unique degrees of freedom
-  !!                              for the quintic coefficients space
+  !!                              for the coefficients space
   !> @param[in]     map_wq        The dofmap for the cell at the base of the column
-  !!                              for the quintic coefficients space
-  !> @param[in]     ndf_wl        The number of degrees of freedom per cell
-  !!                              for the linear coefficients space
-  !> @param[in]     undf_wl       The number of unique degrees of freedom
-  !!                              for the linear coefficients space
-  !> @param[in]     map_wl        The dofmap for the cell at the base of the column
-  !!                              for the linear coefficients space
+  !!                              for the coefficients space
   !-------------------------------------------------------------------------------
 
-  subroutine compute_vertical_quintic_coef_code( nlayers,                                    &
-                                                 dep_pts_z,                                  &
-                                                 theta_height,                               &
-                                                 quintic_coef, quintic_indices, linear_coef, &
-                                                 ndf_w2v, undf_w2v, map_w2v,                 &
-                                                 ndf_wt, undf_wt, map_wt,                    &
-                                                 ndf_wq, undf_wq, map_wq,                    &
-                                                 ndf_wl, undf_wl, map_wl )
+  subroutine compute_vertical_quintic_coef_code( nlayers,                              &
+                                                 dep_dist_z,                           &
+                                                 theta_height,                         &
+                                                 quintic_coef_1, quintic_coef_2,       &
+                                                 quintic_coef_3, quintic_coef_4,       &
+                                                 quintic_coef_5, quintic_coef_6,       &
+                                                 quintic_indices_1, quintic_indices_2, &
+                                                 quintic_indices_3, quintic_indices_4, &
+                                                 quintic_indices_5, quintic_indices_6, &
+                                                 linear_coef_1, linear_coef_2,         &
+                                                 ndf_w2v, undf_w2v, map_w2v,           &
+                                                 ndf_wt, undf_wt, map_wt,              &
+                                                 ndf_wq, undf_wq, map_wq )
 
     implicit none
 
@@ -112,14 +120,22 @@ module compute_vertical_quintic_coef_kernel_mod
     integer(kind=i_def),                      intent(in) :: ndf_wq
     integer(kind=i_def),                      intent(in) :: undf_wq
     integer(kind=i_def), dimension(ndf_wq),   intent(in) :: map_wq
-    integer(kind=i_def),                      intent(in) :: ndf_wl
-    integer(kind=i_def),                      intent(in) :: undf_wl
-    integer(kind=i_def), dimension(ndf_wl),   intent(in) :: map_wl
-    real(kind=r_tran),   dimension(undf_w2v), intent(in) :: dep_pts_z
+    real(kind=r_tran),   dimension(undf_w2v), intent(in) :: dep_dist_z
     real(kind=r_tran),   dimension(undf_wt),  intent(in) :: theta_height
-    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: quintic_coef
-    integer(kind=i_def), dimension(undf_wq),  intent(inout) :: quintic_indices
-    real(kind=r_tran),   dimension(undf_wl),  intent(inout) :: linear_coef
+    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: quintic_coef_1
+    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: quintic_coef_2
+    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: quintic_coef_3
+    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: quintic_coef_4
+    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: quintic_coef_5
+    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: quintic_coef_6
+    integer(kind=i_def), dimension(undf_wq),  intent(inout) :: quintic_indices_1
+    integer(kind=i_def), dimension(undf_wq),  intent(inout) :: quintic_indices_2
+    integer(kind=i_def), dimension(undf_wq),  intent(inout) :: quintic_indices_3
+    integer(kind=i_def), dimension(undf_wq),  intent(inout) :: quintic_indices_4
+    integer(kind=i_def), dimension(undf_wq),  intent(inout) :: quintic_indices_5
+    integer(kind=i_def), dimension(undf_wq),  intent(inout) :: quintic_indices_6
+    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: linear_coef_1
+    real(kind=r_tran),   dimension(undf_wq),  intent(inout) :: linear_coef_2
 
     ! Local arrays and indices
     real(kind=r_tran),  dimension(nlayers+1)    :: zm, zmd
@@ -142,7 +158,7 @@ module compute_vertical_quintic_coef_kernel_mod
     ! Map departure points into 1d-array dist
     ! Map theta-height to 1d-zl (zl is cell-edges in the vertical)
     do k = 0, nlayers
-      dist(k+1) = dep_pts_z(map_w2v(1)+k)
+      dist(k+1) = dep_dist_z(map_w2v(1)+k)
       zl(k+1)   = theta_height(map_wt(1)+k)
     end do
 
@@ -192,23 +208,22 @@ module compute_vertical_quintic_coef_kernel_mod
       call compute_quintic_coeffs(zld,zl,dz,sq,qc,cl,nzl,nzl)
     end if
 
-    ! Coeffs are on a layer-first W3/Wtheta multidata field
-    ! so the indices are: map_md(1) + index*nlp + k
+    ! Coeffs are W3/Wtheta fields
     do k = 0, nl
-      quintic_coef(map_wq(1)+k)       = qc(1,k+1)
-      quintic_coef(map_wq(1)+nlp+k)   = qc(2,k+1)
-      quintic_coef(map_wq(1)+2*nlp+k) = qc(3,k+1)
-      quintic_coef(map_wq(1)+3*nlp+k) = qc(4,k+1)
-      quintic_coef(map_wq(1)+4*nlp+k) = qc(5,k+1)
-      quintic_coef(map_wq(1)+5*nlp+k) = qc(6,k+1)
-      quintic_indices(map_wq(1)+k)       = sq(1,k+1)
-      quintic_indices(map_wq(1)+nlp+k)   = sq(2,k+1)
-      quintic_indices(map_wq(1)+2*nlp+k) = sq(3,k+1)
-      quintic_indices(map_wq(1)+3*nlp+k) = sq(4,k+1)
-      quintic_indices(map_wq(1)+4*nlp+k) = sq(5,k+1)
-      quintic_indices(map_wq(1)+5*nlp+k) = sq(6,k+1)
-      linear_coef(map_wl(1)+k)     = cl(1,k+1)
-      linear_coef(map_wl(1)+nlp+k) = cl(2,k+1)
+      quintic_coef_1(map_wq(1)+k) = qc(1,k+1)
+      quintic_coef_2(map_wq(1)+k) = qc(2,k+1)
+      quintic_coef_3(map_wq(1)+k) = qc(3,k+1)
+      quintic_coef_4(map_wq(1)+k) = qc(4,k+1)
+      quintic_coef_5(map_wq(1)+k) = qc(5,k+1)
+      quintic_coef_6(map_wq(1)+k) = qc(6,k+1)
+      quintic_indices_1(map_wq(1)+k) = sq(1,k+1)
+      quintic_indices_2(map_wq(1)+k) = sq(2,k+1)
+      quintic_indices_3(map_wq(1)+k) = sq(3,k+1)
+      quintic_indices_4(map_wq(1)+k) = sq(4,k+1)
+      quintic_indices_5(map_wq(1)+k) = sq(5,k+1)
+      quintic_indices_6(map_wq(1)+k) = sq(6,k+1)
+      linear_coef_1(map_wq(1)+k) = cl(1,k+1)
+      linear_coef_2(map_wq(1)+k) = cl(2,k+1)
     end do
 
   end subroutine compute_vertical_quintic_coef_code

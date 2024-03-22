@@ -130,11 +130,8 @@ contains
           call u_w3_np1(dir)%initialise( w3_fs )
         end do
         call log_field_minmax( LOG_LEVEL_TRACE, 'advected u', wind_n )
-        call invoke( setval_c(u_w3_n(1), 0.0_r_def), &
-                     setval_c(u_w3_n(2), 0.0_r_def), &
-                     setval_c(u_w3_n(3), 0.0_r_def), &
-                     dg_convert_hdiv_field_kernel_type(u_w3_n, wind_n, &
-                                                    chi, panel_id) )
+        call invoke( dg_convert_hdiv_field_kernel_type(u_w3_n, wind_n, &
+                                                       chi, panel_id) )
         call log_field_minmax( LOG_LEVEL_TRACE, 'xdot', u_w3_n(1) )
         call log_field_minmax( LOG_LEVEL_TRACE, 'ydot', u_w3_n(2) )
         call log_field_minmax( LOG_LEVEL_TRACE, 'zdot', u_w3_n(3) )

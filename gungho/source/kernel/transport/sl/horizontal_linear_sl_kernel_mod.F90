@@ -32,12 +32,11 @@ module horizontal_linear_sl_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the PSy layer
   type, public, extends(kernel_type) :: horizontal_linear_sl_kernel_type
     private
-    type(arg_type) :: meta_args(6) = (/                                                        &
+    type(arg_type) :: meta_args(5) = (/                                                        &
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1),                 & ! field_out_x
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1),                 & ! field_out_y
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,  ANY_DISCONTINUOUS_SPACE_1, STENCIL(CROSS)), & ! field
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2h),                                       & ! dep_pts_x
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2h),                                       & ! dep_pts_y
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2h),                                       & ! dep_pts
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ     )                                         & ! extent_size
          /)
     integer :: operates_on = CELL_COLUMN
@@ -59,8 +58,7 @@ contains
   !> @param[in]     field          Field to transport
   !> @param[in]     stencil_size_c Local length of field cross stencil
   !> @param[in]     stencil_map    Dofmap for the field stencil
-  !> @param[in]     dep_pts_x      Departure points in x
-  !> @param[in]     dep_pts_y      Departure points in y
+  !> @param[in]     dep_pts        Departure points
   !> @param[in]     extent_size    Stencil extent needed for the LAM edge
   !> @param[in]     ndf_wf         Number of degrees of freedom for field per cell
   !> @param[in]     undf_wf        Number of unique degrees of freedom for field
@@ -75,8 +73,7 @@ contains
                                         field,          &
                                         stencil_size_c, &
                                         stencil_map,    &
-                                        dep_pts_x,      &
-                                        dep_pts_y,      &
+                                        dep_pts,        &
                                         extent_size,    &
                                         ndf_wf,         &
                                         undf_wf,        &
@@ -104,20 +101,18 @@ contains
     real(kind=r_tran), dimension(undf_wf),  intent(inout) :: field_x
     real(kind=r_tran), dimension(undf_wf),  intent(inout) :: field_y
     real(kind=r_tran), dimension(undf_wf),  intent(in)    :: field
-    real(kind=r_tran), dimension(undf_w2h), intent(in)    :: dep_pts_x
-    real(kind=r_tran), dimension(undf_w2h), intent(in)    :: dep_pts_y
+    real(kind=r_tran), dimension(undf_w2h), intent(in)    :: dep_pts
     integer(kind=i_def), intent(in)                       :: extent_size
 
     ! Local fields
-    real(kind=r_tran)   :: field_local(1:(stencil_size_c+ 1) / 2)
     real(kind=r_tran)   :: departure_dist, departure_dist_w3, departure_dist_wt
 
     ! Interpolation coefficients
-    real(kind=r_tran)   :: frac_d, x0, x1, xx, q0, q1
+    real(kind=r_tran)   :: frac_d, xx, yy
 
     ! Indices
-    integer(kind=i_def) :: ind_lo, ind_hi, nl, k_w2h
-    integer(kind=i_def) :: k, km1, kp1, jj, int_d
+    integer(kind=i_def) :: nl, k_w2h, k, km1, kp1, int_d
+    integer(kind=i_def) :: rel_idx_hi, rel_idx_lo, sten_idx_hi, sten_idx_lo
 
     ! Stencils
     integer(kind=i_def) :: stencil_size, stencil_half, lam_edge_size
@@ -133,9 +128,10 @@ contains
     !                           |  8 |
     !                           |  9 |
     !
-    ! Local fields have order e.g.  | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | for extent 4
-    ! in x and y
-    ! Advection calculated for centre cell, e.g. cell 1 for stencil, cell 5 for local
+    ! Relative idx is     | -4 | -3 | -2 | -1 |  0 |  1 |  2 |  3 |  4 |
+    ! Stencil x has order |  5 |  4 |  3 |  2 |  1 | 10 | 11 | 12 | 13 |
+    ! Stencil y has order |  9 |  8 |  7 |  6 |  1 | 14 | 15 | 16 | 17 |
+    ! Advection calculated for centre cell, e.g. cell 1 of stencil
 
     ! nl = nlayers-1  for w3
     !    = nlayers    for wtheta
@@ -166,76 +162,84 @@ contains
         kp1 = min(k,nlayers-1)
 
         ! x direction departure distance at centre
-        departure_dist_w3 = ( dep_pts_x( map_w2h(1) + k_w2h)+dep_pts_x( map_w2h(3) + k_w2h) )/2.0_r_tran
-        departure_dist_wt = ( dep_pts_x( map_w2h(1) + km1)+dep_pts_x( map_w2h(3) + km1) + &
-                              dep_pts_x( map_w2h(1) + kp1)+dep_pts_x( map_w2h(3) + kp1) )/4.0_r_tran
-        departure_dist = (2 - ndf_wf) * departure_dist_w3 + (ndf_wf - 1) * departure_dist_wt
+        departure_dist_w3 = ( dep_pts( map_w2h(1) + k_w2h)+dep_pts( map_w2h(3) + k_w2h) )/2.0_r_tran
+        departure_dist_wt = ( dep_pts( map_w2h(1) + km1)+dep_pts( map_w2h(3) + km1) + &
+                              dep_pts( map_w2h(1) + kp1)+dep_pts( map_w2h(3) + kp1) )/4.0_r_tran
+        ! Combine W3 and Wtheta distances so that this works for either space
+        departure_dist = ((2 - ndf_wf) * departure_dist_w3                     &
+                          + (ndf_wf - 1) * departure_dist_wt)
 
         ! Calculates number of cells of interest to move
         frac_d = departure_dist - int(departure_dist)
         int_d = int(departure_dist,i_def)
 
-        ! Get local field values from cross stencil
-        do jj = 1, stencil_half
-          field_local(jj) = field(stencil_map(1,stencil_half+1-jj) + k)
-        end do
-        do jj = stencil_half+1, stencil_size
-          field_local(jj) = field(stencil_map(1,stencil_half-1+jj) + k)
-        end do
-
         ! Set up linear interpolation in correct cell
-        x0 = 0.0_r_tran
-        x1 = 1.0_r_tran
+        ! For extent=4 the indices are:
+        ! Relative id  is   | -4 | -3 | -2 | -1 |  0 |  1 |  2 |  3 |  4 |
+        ! Stencil has order |  5 |  4 |  3 |  2 |  1 | 10 | 11 | 12 | 13 |
+        ! Get relative id depending on sign
         if (departure_dist >= 0.0_r_tran) then
-          ind_hi = stencil_half - int_d
-          ind_lo = ind_hi - 1
-          xx = x1 - frac_d
+          rel_idx_hi = - int_d
+          rel_idx_lo = rel_idx_hi - 1
+          xx = 1.0_r_tran - frac_d
         else
-          ind_hi = stencil_half - int_d + 1
-          ind_lo = ind_hi - 1
-          xx = x0 - frac_d
+          rel_idx_hi = 1 - int_d
+          rel_idx_lo = rel_idx_hi - 1
+          xx = - frac_d
         end if
+        ! Convert relative id into stencil id
+        sten_idx_hi = 1 + ABS(rel_idx_hi) + (stencil_size - 1)*(1 - SIGN(1, -rel_idx_hi))/2
+        sten_idx_lo = 1 + ABS(rel_idx_lo) + (stencil_size - 1)*(1 - SIGN(1, -rel_idx_lo))/2
 
-        q0 = field_local(ind_lo)
-        q1 = field_local(ind_hi)
-
-        field_x(map_wf(1)+k) = (xx-x1)/(x0-x1)*q0 + (xx-x0)/(x1-x0)*q1
+        ! Linear interpolation in x
+        ! interp = (x-x1) / (x0-x1) f(x0) + (x-x0) / (x1-x0) f(x1)
+        ! Set x0 = 0, x1 = 1, and 0 <= x <= 1
+        ! interp = - (x-1) f(0) + x f(1)
+        field_x(map_wf(1)+k) = -(xx-1.0_r_tran)*field(stencil_map(1,sten_idx_lo) + k) &
+                               + xx*field(stencil_map(1,sten_idx_hi) + k)
 
         ! y direction departure distance at centre
-        departure_dist_w3 = ( dep_pts_y( map_w2h(2) + k_w2h)+dep_pts_y( map_w2h(4) + k_w2h) )/2.0_r_tran
-        departure_dist_wt = ( dep_pts_y( map_w2h(2) + km1)+dep_pts_y( map_w2h(4) + km1) + &
-                              dep_pts_y( map_w2h(2) + kp1)+dep_pts_y( map_w2h(4) + kp1) )/4.0_r_tran
-        departure_dist = (2 - ndf_wf) * departure_dist_w3 + (ndf_wf - 1) * departure_dist_wt
+        departure_dist_w3 = ( dep_pts( map_w2h(2) + k_w2h)+dep_pts( map_w2h(4) + k_w2h) )/2.0_r_tran
+        departure_dist_wt = ( dep_pts( map_w2h(2) + km1)+dep_pts( map_w2h(4) + km1) + &
+                              dep_pts( map_w2h(2) + kp1)+dep_pts( map_w2h(4) + kp1) )/4.0_r_tran
+        ! NB: minus sign as y-direction of stencils is defined in the opposite
+        ! direction to the y-direction of the wind field
+        ! Combine W3 and Wtheta distances so that this works for either space
+        departure_dist = -((2 - ndf_wf) * departure_dist_w3                    &
+                           + (ndf_wf - 1) * departure_dist_wt)
 
         ! Calculates number of cells of interest to move
         frac_d = departure_dist - int(departure_dist)
         int_d = int(departure_dist,i_def)
 
-        ! Get local field values from cross stencil
-        field_local(stencil_half) = field(stencil_map(1,1) + k)
-        do jj = 1, stencil_half-1
-          field_local(jj) = field(stencil_map(1,stencil_size+1-jj) + k)
-        end do
-        do jj = stencil_half+1, stencil_size
-          field_local(jj) = field(stencil_map(1,stencil_size-1+jj) + k)
-        end do
-
         ! Set up linear interpolation in correct cell
-        x0 = 0.0_r_tran
-        x1 = 1.0_r_tran
+        ! For extent=4 the indices are:
+        ! Relative id  is   | -4 | -3 | -2 | -1 |  0 |  1 |  2 |  3 |  4 |
+        ! Stencil has order |  9 |  8 |  7 |  6 |  1 | 14 | 15 | 16 | 17 |
+        ! Get relative id depending on sign
         if (departure_dist >= 0.0_r_tran) then
-          ind_hi = stencil_half - int_d
-          ind_lo = ind_hi - 1
-          xx = x1 - frac_d
+          rel_idx_hi = - int_d
+          rel_idx_lo = rel_idx_hi - 1
+          yy = 1.0_r_tran - frac_d
         else
-          ind_hi = stencil_half - int_d + 1
-          ind_lo = ind_hi - 1
-          xx = x0 - frac_d
+          rel_idx_hi = 1 - int_d
+          rel_idx_lo = rel_idx_hi - 1
+          yy = - frac_d
         end if
-        q0 = field_local(ind_lo)
-        q1 = field_local(ind_hi)
+        ! Convert relative id into stencil id
+        sten_idx_hi = stencil_half + ABS(rel_idx_hi)                    &
+                      + (stencil_size - 1)*(1 - SIGN(1, -rel_idx_hi))/2 &
+                      - (stencil_half - 1)*(1 - SIGN(1, abs(rel_idx_hi)-1))/2
+        sten_idx_lo = stencil_half + ABS(rel_idx_lo)                    &
+                      + (stencil_size - 1)*(1 - SIGN(1, -rel_idx_lo))/2 &
+                      - (stencil_half - 1)*(1 - SIGN(1, abs(rel_idx_lo)-1))/2
 
-        field_y(map_wf(1)+k) = (xx-x1)/(x0-x1)*q0 + (xx-x0)/(x1-x0)*q1
+        ! Linear interpolation in y
+        ! interp = (y-y1) / (y0-y1) f(y0) + (y-y0) / (y1-y0) f(y1)
+        ! Set y0 = 0, y1 = 1, and 0 <= y <= 1
+        ! interp = - (y-1) f(0) + y f(1)
+        field_y(map_wf(1)+k) = -(yy-1.0_r_tran)*field(stencil_map(1,sten_idx_lo) + k) &
+                               + yy*field(stencil_map(1,sten_idx_hi) + k)
 
       end do ! vertical levels k
 
