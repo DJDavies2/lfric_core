@@ -17,6 +17,7 @@
     <!-- Include grid definitions -->
     <grid_definition src="$METADATA/grid_def_main.xml"/>
     <grid_definition src="$METADATA/grid_def_aero_ctl.xml"/>
+    <grid_definition src="$METADATA/grid_def_radaer_ctl.xml"/>
 
     <!-- Include field definitions -->
     <field_definition src="$METADATA/lfric_dictionary.xml"/>
