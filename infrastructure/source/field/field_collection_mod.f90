@@ -48,8 +48,9 @@ module field_collection_mod
     character(str_def)     :: name = 'unnamed_collection'
     !> A hash table of linked lists of fields contained within the collection
     type(linked_list_type), allocatable :: field_list(:)
-    !> The size of the hash table to use
-    integer(i_def) :: table_len
+    !> The size of the hash table to use.
+    ! (Default to a value that represents an uninitialised hash table)
+    integer(i_def) :: table_len = 0
     !> Whether object has been initialised or not
     logical :: isinitialised = .false.
   contains
@@ -151,7 +152,7 @@ subroutine add_field(self, field)
   end if
 
   ! Finished checking - so the field must be good to add - so add it
-  hash = mod(sum_string(trim(name)),self%table_len)
+  hash = mod(sum_string(trim(name)),self%get_table_len())
   call self%field_list(hash)%insert_item( field )
 
 end subroutine add_field
@@ -174,7 +175,7 @@ function field_exists(self, field_name) result(exists)
   type(linked_list_item_type), pointer :: loop => null()
 
   ! Calculate the hash of the field being searched for
-  hash = mod(sum_string(trim(field_name)),self%table_len)
+  hash = mod(sum_string(trim(field_name)),self%get_table_len())
 
   ! start at the head of the mesh collection linked list
   loop => self%field_list(hash)%get_head()
@@ -260,7 +261,7 @@ subroutine remove_field(self, field_name)
   character(len=str_def)   :: name
 
   ! Calculate the hash of the field being removed
-  hash = mod(sum_string(trim(field_name)),self%table_len)
+  hash = mod(sum_string(trim(field_name)),self%get_table_len())
 
   ! start at the head of the field collection linked list
   loop => self%field_list(hash)%get_head()
@@ -308,9 +309,9 @@ function get_next_item(self, start) result(item)
     if (.not.associated(new_item) ) then
       ! Next item is in the following linked list. Calculate the hash of 'start'
       name = get_field_name(start%payload)
-      hash = mod(sum_string(trim(name)),self%table_len)
+      hash = mod(sum_string(trim(name)),self%get_table_len())
       ! Find next valid item - or end of collection
-      do i = hash+1, self%table_len-1
+      do i = hash+1, self%get_table_len()-1
         new_item => self%field_list(i)%get_head()
         ! If a field is found, this is the next one - so exit the loop
         if (associated(new_item)) then
@@ -320,7 +321,7 @@ function get_next_item(self, start) result(item)
     end if
   else
     ! Find the first item in the collection
-    do i = 0, self%table_len-1
+    do i = 0, self%get_table_len()-1
       new_item => self%field_list(i)%get_head()
       ! If a field is found, this is the first one - so exit the loop
       if (associated(new_item)) then
@@ -352,7 +353,7 @@ subroutine get_r32_field(self, field_name, field)
   integer(i_def) :: hash
 
   ! Calculate the hash of the field being searched for
-  hash = mod(sum_string(trim(field_name)),self%table_len)
+  hash = mod(sum_string(trim(field_name)),self%get_table_len())
 
   ! start at the head of the mesh collection linked list
   loop => self%field_list(hash)%get_head()
@@ -407,7 +408,7 @@ subroutine get_r64_field(self, field_name, field)
   integer(i_def) :: hash
 
   ! Calculate the hash of the field being searched for
-  hash = mod(sum_string(trim(field_name)),self%table_len)
+  hash = mod(sum_string(trim(field_name)),self%get_table_len())
 
   ! start at the head of the mesh collection linked list
   loop => self%field_list(hash)%get_head()
@@ -462,7 +463,7 @@ subroutine get_integer_field(self, field_name, field)
   integer(i_def) :: hash
 
   ! Calculate the hash of the field being searched for
-  hash = mod(sum_string(trim(field_name)),self%table_len)
+  hash = mod(sum_string(trim(field_name)),self%get_table_len())
 
   ! start at the head of the field collection linked list
   loop => self%field_list(hash)%get_head()
@@ -516,7 +517,7 @@ subroutine get_field_array(self, field_array_name, field_array)
   integer(i_def) :: hash
 
   ! Calculate the hash of the field being searched for
-  hash = mod(sum_string(trim(field_array_name)),self%table_len)
+  hash = mod(sum_string(trim(field_array_name)),self%get_table_len())
 
   ! start at the head of the mesh collection linked list
   loop => self%field_list(hash)%get_head()
@@ -561,7 +562,7 @@ function get_length(self) result(length)
                     LOG_LEVEL_ERROR)
   end if
 
-  do i = 0, self%table_len-1
+  do i = 0, self%get_table_len()-1
     length = length + self%field_list(i)%get_length()
   end do
 
@@ -586,6 +587,11 @@ function get_table_len(self) result(table_len)
 
   class(field_collection_type), intent(in) :: self
   integer(i_def) :: table_len
+
+  if ( self%table_len == 0 ) then
+    call log_event("field_collection: Attempt to use uninitialised collection", &
+                    LOG_LEVEL_ERROR)
+  end if
 
   table_len = self%table_len
 
@@ -660,7 +666,7 @@ subroutine clear(self)
   integer(i_def) :: i
 
   if(allocated(self%field_list))then
-    do i = 0, self%table_len-1
+    do i = 0, self%get_table_len()-1
       call self%field_list(i)%clear()
     end do
     deallocate(self%field_list)

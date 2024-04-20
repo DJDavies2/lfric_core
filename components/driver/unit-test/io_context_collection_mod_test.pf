@@ -59,6 +59,9 @@ contains
 
     call context_collection%initialise("context_collection", 100_i_def)
 
+    ! Check collection has the correct table length
+    @assertEqual(100_i_def, context_collection%get_table_len())
+
     ! Check empty contexts aren't already in collection
     @assertFalse(context_collection%context_exists(empty_context1%get_context_name()))
     @assertFalse(context_collection%context_exists(empty_context2%get_context_name()))

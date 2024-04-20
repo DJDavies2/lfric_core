@@ -57,8 +57,9 @@ module inventory_by_mesh_mod
     character(str_def)     :: name = 'unnamed_inventory'
     !> A hash table of linked lists of objects contained within the databse
     type(linked_list_type), allocatable :: paired_object_list(:)
-    !> The size of the hash table to use
-    integer(kind=i_def) :: table_len
+    !> The size of the hash table to use.
+    ! (Default to a value that represents an uninitialised hash table)
+    integer(kind=i_def) :: table_len = 0
   contains
     ! Generic routines -- the same between different types of inventory
     procedure, public :: initialise
@@ -211,7 +212,7 @@ subroutine add_paired_object(self, paired_object)
   end if
 
   ! Finished checking - so the object must be good to add - so add it
-  hash = mod(id, self%table_len)
+  hash = mod(id, self%get_table_len())
   call self%paired_object_list(hash)%insert_item( paired_object )
   write(log_scratch_space, '(A,I8,2A)') &
     'Adding object on mesh [', id, '] to inventory_by_mesh: ', trim(self%name)
@@ -230,7 +231,7 @@ function get_length(self) result(length)
   integer(kind=i_def) :: i
 
   length = 0
-  do i = 0, self%table_len-1
+  do i = 0, self%get_table_len()-1
     length = length + self%paired_object_list(i)%get_length()
   end do
 
@@ -257,6 +258,11 @@ function get_table_len(self) result(table_len)
 
   class(inventory_by_mesh_type), intent(in) :: self
   integer(kind=i_def) :: table_len
+
+  if ( self%table_len == 0 ) then
+    call log_event("inventory_by_mesh: Attempt to use uninitialised collection", &
+                    LOG_LEVEL_ERROR)
+  end if
 
   table_len = self%table_len
 
@@ -304,7 +310,7 @@ subroutine clear(self)
   integer(i_def) :: i
 
   if (allocated(self%paired_object_list)) then
-    do i = 0, self%table_len-1
+    do i = 0, self%get_table_len()-1
       call self%paired_object_list(i)%clear()
     end do
     deallocate(self%paired_object_list)
@@ -346,7 +352,7 @@ function get_paired_object(self, id) result(paired_object)
   class(id_abstract_pair_type), pointer :: paired_object
   integer(kind=i_def) :: hash, loop_id
 
-  hash = mod(id, self%table_len)
+  hash = mod(id, self%get_table_len())
 
   ! start at the head of the inventory linked list
   loop => self%paired_object_list(hash)%get_head()
@@ -449,7 +455,7 @@ function paired_object_exists(self, id) result(exists)
   type(linked_list_item_type),  pointer :: loop => null()
 
   ! Calculate the hash of the object being searched for
-  hash = mod(id, self%table_len)
+  hash = mod(id, self%get_table_len())
 
   ! start at the head of the inventory linked list
   loop => self%paired_object_list(hash)%get_head()
@@ -547,7 +553,7 @@ subroutine remove_paired_object(self, id)
   integer(kind=i_def) :: hash, loop_id
 
   ! Calculate the hash of the field being removed
-  hash = mod(id, self%table_len)
+  hash = mod(id, self%get_table_len())
 
   ! start at the head of the inventory linked list
   loop => self%paired_object_list(hash)%get_head()

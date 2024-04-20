@@ -46,8 +46,9 @@ module namelist_collection_mod
 
     character(str_def) :: head_name
 
-    !> The size of the hash table to use
-    integer(i_def) :: table_len
+    !> The size of the hash table to use.
+    ! (Default to a value that represents an uninitialised hash table)
+    integer(i_def) :: table_len = 0
 
     !> Whether object has been initialised or not
     logical :: isinitialised = .false.
@@ -151,7 +152,7 @@ subroutine add_namelist( self, namelist_obj )
 
   full_name = namelist_obj%get_listname()
 
-  hash = mod( sum_string( trim(full_name) ), self%table_len )
+  hash = mod( sum_string( trim(full_name) ), self%get_table_len() )
 
   call self%namelist_list(hash)%insert_item( namelist_obj )
 
@@ -195,7 +196,7 @@ function namelist_exists( self, name, profile_name ) result( exists )
     full_name = trim(name)
   end if
 
-  hash = mod( sum_string(trim(name)), self%table_len )
+  hash = mod( sum_string(trim(name)), self%get_table_len() )
 
   ! Start at the head of the linked list identified
   ! by the hash number.
@@ -260,10 +261,10 @@ function get_next_item( self, start ) result( item )
         listname = payload%get_listname()
       end select
 
-      hash = mod( sum_string(trim(listname)), self%table_len )
+      hash = mod( sum_string(trim(listname)), self%get_table_len() )
 
       ! Find next valid item - or end of collection
-      do i=hash+1, self%table_len-1
+      do i=hash+1, self%get_table_len()-1
 
         new_item => self%namelist_list(i)%get_head()
 
@@ -279,7 +280,7 @@ function get_next_item( self, start ) result( item )
   else
 
     ! Find the first item in the collection
-    do i=0, self%table_len-1
+    do i=0, self%get_table_len()-1
 
       new_item => self%namelist_list(i)%get_head()
       ! If a namelist is found, this is the first one,
@@ -332,7 +333,7 @@ function get_namelist( self, name, profile_name ) result( namelist_obj )
   end if
 
   ! Calculate the hash of the namelist being searched for.
-  hash = mod( sum_string(trim(name)), self%table_len )
+  hash = mod( sum_string(trim(name)), self%get_table_len() )
 
   ! Start at the head of the linked list identified by the hash.
   loop => self%namelist_list(hash)%get_head()
@@ -380,7 +381,7 @@ function get_n_namelists( self ) result( n_namelists )
   integer( i_def ) :: i
 
   n_namelists = 0
-  do i=0, self%table_len-1
+  do i=0, self%get_table_len()-1
     n_namelists = n_namelists + self%namelist_list(i)%get_length()
   end do
 
@@ -448,7 +449,7 @@ function get_namelist_names( self, show_full ) result( namelist_names )
     allocate(tmp_names_found(n_lists))
     tmp_names_found(:) = cmdi
 
-    do i=0, self%table_len-1
+    do i=0, self%get_table_len()-1
 
       loop => self%namelist_list(i)%get_head()
 
@@ -541,7 +542,7 @@ function get_namelist_profiles( self, name ) result( profile_names )
     lists_found = 0
     allocate(tmp_names_found(n_lists))
 
-    do i=0, self%table_len-1
+    do i=0, self%get_table_len()-1
 
       loop => self%namelist_list(i)%get_head()
 
@@ -610,6 +611,11 @@ function get_table_len( self ) result( table_len )
   class(namelist_collection_type), intent(in) :: self
   integer(i_def) :: table_len
 
+  if ( self%table_len == 0 ) then
+    call log_event("namelist_collection: Attempt to use uninitialised collection", &
+                    LOG_LEVEL_ERROR)
+  end if
+
   table_len = self%table_len
 
 end function get_table_len
@@ -625,7 +631,7 @@ subroutine clear(self)
   integer(i_def) :: i
 
   if (allocated(self%namelist_list)) then
-    do i=0, self%table_len-1
+    do i=0, self%get_table_len()-1
       call self%namelist_list(i)%clear()
     end do
     deallocate(self%namelist_list)

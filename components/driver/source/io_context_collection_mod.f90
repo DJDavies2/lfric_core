@@ -31,7 +31,7 @@ module io_context_collection_mod
 
     character(str_def) :: name = 'unamed_io_collection'
     type(linked_list_type), allocatable :: context_list(:)
-    integer(i_def) :: table_len
+    integer(i_def) :: table_len = 0
 
   contains
     procedure, public :: initialise
@@ -42,6 +42,7 @@ module io_context_collection_mod
     generic           :: get_io_context => get_empty_io_context, &
                                            get_lfric_xios_context
     procedure, public :: context_exists
+    procedure, public :: get_table_len
     procedure, public :: clear
     final :: destructor
 
@@ -96,7 +97,7 @@ contains
       call log_event(log_scratch_space, LOG_LEVEL_ERROR)
     end if
 
-    hash = mod(hash_string(trim(name)), this%table_len)
+    hash = mod(hash_string(trim(name)), this%get_table_len())
     call this%context_list(hash)%insert_item(context)
 
   end subroutine add_context
@@ -112,7 +113,7 @@ contains
     integer(i_def) :: hash
     character(str_def) :: name
 
-    hash = mod(hash_string(trim(context_name)), this%table_len)
+    hash = mod(hash_string(trim(context_name)), this%get_table_len())
 
     loop => this%context_list(hash)%get_head()
 
@@ -147,7 +148,7 @@ contains
     integer(i_def) :: hash
 
     ! Calculate hash of context to be searched for
-    hash = mod(hash_string(trim(context_name)), this%table_len)
+    hash = mod(hash_string(trim(context_name)), this%get_table_len())
 
     ! Start at the head of the collection linked list
     loop => this%context_list(hash)%get_head()
@@ -191,7 +192,7 @@ contains
     integer(i_def) :: hash
 
     ! Calculate hash of context to be searched for
-    hash = mod(hash_string(trim(context_name)), this%table_len)
+    hash = mod(hash_string(trim(context_name)), this%get_table_len())
 
     ! Start at the head of the collection linked list
     loop => this%context_list(hash)%get_head()
@@ -234,7 +235,7 @@ contains
 
     type(linked_list_item_type), pointer :: loop => null()
 
-    hash = mod(hash_string(trim(context_name)), this%table_len)
+    hash = mod(hash_string(trim(context_name)), this%get_table_len())
 
     loop => this%context_list(hash)%get_head()
     do
@@ -267,6 +268,24 @@ contains
     end select
   end function get_context_name
 
+  !> @brief Queries the size of the hash table used by the collection.
+  !> @return table_length  The length of hash table used by
+  !>                       io_context collection
+  !=====================================================================
+  function get_table_len( this ) result( table_len )
+    implicit none
+
+    class(io_context_collection_type), intent(in) :: this
+    integer(i_def) :: table_len
+
+    if ( this%table_len == 0 ) then
+      call log_event("io_context_collection: Attempt to use uninitialised collection", &
+                      LOG_LEVEL_ERROR)
+    end if
+    table_len = this%table_len
+
+  end function get_table_len
+
   !> Clears all items from the context collection
   subroutine clear(this)
     implicit none
@@ -274,7 +293,7 @@ contains
     integer(i_def) :: i
 
     if(allocated(this%context_list))then
-      do i=0,this%table_len-1
+      do i=0,this%get_table_len()-1
         call this%context_list(i)%clear
       end do
       deallocate(this%context_list)

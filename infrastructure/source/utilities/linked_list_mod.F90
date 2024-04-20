@@ -24,7 +24,7 @@ module linked_list_mod
 
   type, public                           :: linked_list_type
     private
-    integer(i_def) :: length ! The number of items in the list
+    integer(i_def) :: length = 0 ! The number of items in the list
 
     ! The first entry in the linked list
     type(linked_list_item_type), pointer :: head => null()

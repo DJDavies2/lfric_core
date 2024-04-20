@@ -48,8 +48,9 @@ module key_value_collection_mod
     character(str_def)     :: name = 'unnamed_collection'
     !> A hash table of linked lists of key-value pairs
     type(linked_list_type), allocatable :: key_value_list(:)
-    !> The size of the hash table to use
-    integer(i_def) :: table_len
+    !> The size of the hash table to use.
+    ! (Default to a value that represents an uninitialised hash table)
+    integer(i_def) :: table_len = 0
     !> Whether object has been initialised or not
     logical :: isinitialised = .false.
   contains
@@ -821,7 +822,7 @@ function get_length(self) result(length)
   integer(kind=i_def) :: i
 
   length = 0
-  do i = 0, self%table_len-1
+  do i = 0, self%get_table_len()-1
     length = length + self%key_value_list(i)%get_length()
   end do
 
@@ -849,6 +850,11 @@ function get_table_len(self) result(table_len)
   class(key_value_collection_type), intent(in) :: self
   integer(i_def) :: table_len
 
+  if ( self%table_len == 0 ) then
+    call log_event("key_value_collection: Attempt to use uninitialised collection", &
+                    LOG_LEVEL_ERROR)
+  end if
+
   table_len = self%table_len
 
 end function get_table_len
@@ -861,7 +867,7 @@ function get_hash(self, key) result(hash)
   class(key_value_collection_type), intent(in) :: self
   character(*), intent(in) :: key
   integer(i_def) :: hash
-  hash = mod(sum_string(trim(key)),self%table_len)
+  hash = mod(sum_string(trim(key)),self%get_table_len())
 end function get_hash
 
 !> Clears all items from the collection
@@ -873,7 +879,7 @@ subroutine clear(self)
   integer(i_def) :: i
 
   if(allocated(self%key_value_list))then
-    do i = 0, self%table_len-1
+    do i = 0, self%get_table_len()-1
       call self%key_value_list(i)%clear()
     end do
     deallocate(self%key_value_list)
