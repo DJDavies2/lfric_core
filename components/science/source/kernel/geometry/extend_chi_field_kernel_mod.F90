@@ -83,7 +83,6 @@ contains
       call extend_chi_field_code(nlayers,                    &
                                  extended_chi_proxy(1)%data, &
                                  extended_chi_proxy(2)%data, &
-                                 extended_chi_proxy(3)%data, &
                                  panel_id_proxy%data,        &
                                  ndf_wx,                     &
                                  undf_wx,                    &
@@ -112,7 +111,6 @@ contains
 !! @param[in]     nlayers    Number of layers
 !! @param[in,out] alpha_ext  Extension of the alpha (chi(1)) coodinate field
 !! @param[in,out] beta_ext   Extension of the beta (chi(2)) coodinate field
-!! @param[in,out] height_ext Extension of the height (chi(3)) coodinate field
 !! @param[in]     panel_id   Indicator of the panel for each cell column
 !! @param[in]     ndf_wx     Number of degrees of freedom per cell for the coordinate fields
 !! @param[in]     undf_wx    Number of unique degrees of freedom for the coordinate space
@@ -121,7 +119,7 @@ contains
 !! @param[in]     undf_pid   Number of unique degrees of freedom for the panel_id field
 !! @param[in]     map_pid    Dofmap for the cell at the base of the column for the panel_id field
 subroutine extend_chi_field_code(nlayers,                         &
-                                 alpha_ext, beta_ext, height_ext, &
+                                 alpha_ext, beta_ext,             &
                                  panel_id,                        &
                                  ndf_wx, undf_wx, map_wx,         &
                                  ndf_pid, undf_pid, map_pid       &
@@ -138,17 +136,21 @@ subroutine extend_chi_field_code(nlayers,                         &
   integer(kind=i_def), dimension(ndf_wx),  intent(in) :: map_wx
   integer(kind=i_def), dimension(ndf_pid), intent(in) :: map_pid
 
-  real(kind=r_def), dimension(undf_wx),  intent(inout) :: alpha_ext, beta_ext, height_ext
+  real(kind=r_def), dimension(undf_wx),  intent(inout) :: alpha_ext, beta_ext
   real(kind=r_def), dimension(undf_pid), intent(in)    :: panel_id
 
   integer(kind=i_def) :: owned_panel, halo_panel, panel_edge, df, k
 
   real(kind=r_def)                    :: x, y, z
   real(kind=r_def), parameter         :: unit_radius = 1.0_r_def
-  real(kind=r_def), dimension(ndf_wx) :: alpha_halo, beta_halo, h_halo
+  real(kind=r_def), dimension(ndf_wx) :: alpha_halo, beta_halo
   real(kind=r_def), dimension(ndf_wx) :: alpha_owned, beta_owned
   real(kind=r_def), dimension(ndf_wx) :: alpha_extended, beta_extended
 
+  ! This dummy variable is needed to be an output for the xyz2alphabetar
+  ! subroutine. The transformation to change (alpha,beta) is only in the
+  ! horizontal so the height value doesn't matter
+  real(kind=r_def) :: h_dummy
 
   ! Assume the first entry in panel id corresponds to an owned (not halo cell)
   owned_panel = int(panel_id(1),i_def)
@@ -161,14 +163,14 @@ subroutine extend_chi_field_code(nlayers,                         &
     do df = 1, ndf_wx
       alpha_halo(df) = alpha_ext(map_wx(df))
       beta_halo(df)  = beta_ext(map_wx(df))
-      h_halo(df)     = height_ext(map_wx(df)) + unit_radius
 
       ! Convert (alpha,beta,h) on panel halo_panel to xyz
-      call alphabetar2xyz(alpha_halo(df), beta_halo(df), h_halo(df), &
+      ! The h value is not important as the transformation is only horizontal
+      call alphabetar2xyz(alpha_halo(df), beta_halo(df), unit_radius, &
                           halo_panel, x, y, z)
       ! Now convert back to (alpha, beta, h) on owned panel
       call xyz2alphabetar(x, y, z, owned_panel, &
-                          alpha_owned(df), beta_owned(df), h_halo(df) )
+                          alpha_owned(df), beta_owned(df), h_dummy )
     end do
 
     ! alpha_halo now contains the (alpha,beta) coordinates from the halo panel
