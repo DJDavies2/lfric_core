@@ -24,6 +24,7 @@ module partition_mod
   use global_mesh_mod, only : global_mesh_type
   use sort_mod,        only : bubble_sort
   use log_mod,         only : log_event,         &
+                              log_scratch_space, &
                               LOG_LEVEL_ERROR
   use constants_mod,   only: i_def, r_def, l_def
 
@@ -546,8 +547,6 @@ contains
                                              num_halo,          &
                                              num_ghost )
 
-    use log_mod, only : log_event, LOG_LEVEL_ERROR
-
   ! The general partitioner for a cubed-sphere mesh returns a minimum of one
   ! partition per cubed-sphere "face". In order to run the code serially
   ! a special case for creating a single partition with all points is required.
@@ -766,6 +765,15 @@ contains
       end do
 
     endif
+
+    if(xproc > num_cells_x .or. yproc > num_cells_y) then
+      write(log_scratch_space, '(2a,i0,a,i0,a,i0,a,i0,a)')      &
+        "There needs to be more cells than partitions",         &
+        " in each direction of the mesh. This panel has ",      &
+        num_cells_x,"x",num_cells_y," cells to share between ", &
+        xproc,"x",yproc," partitions"
+      call log_event( log_scratch_space, LOG_LEVEL_ERROR)
+    end if
 
     !convert the local rank number into a face number and a local xproc and yproc
     face = ((num_panels*local_rank)/total_ranks) + 1
