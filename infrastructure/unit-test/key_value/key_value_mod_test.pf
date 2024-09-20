@@ -16,7 +16,8 @@ module key_value_mod_test
                            real32_arr_key_value_type,  real64_arr_key_value_type, &
                            logical_key_value_type,     str_key_value_type,        &
                            logical_arr_key_value_type, str_arr_key_value_type,    &
-                           abstract_key_value_type,    abstract_value_type
+                           abstract_key_value_type,    abstract_value_type,       &
+                           create_key_value
 
   use pFUnit_mod
 
@@ -24,7 +25,8 @@ module key_value_mod_test
 
   private
 
-  public :: test_integer, test_real, test_logical, test_string, test_abstract
+  public :: test_integer, test_real, test_logical, test_string, test_abstract, &
+            test_create_key_value
 
   type, extends(abstract_value_type) :: test_type
     integer, public :: int_number
@@ -240,6 +242,104 @@ contains
     end select
 
   end subroutine test_abstract
+
+  @test
+  subroutine test_create_key_value()
+
+    implicit none
+
+    class(key_value_type), pointer :: instance
+
+    instance => create_key_value( "int32_val", 41_int32 )
+    select type (instance)
+    type is (int32_key_value_type)
+      @assertEqual( 41_int32, instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "int32_arr_val", [41_int32, 79_int32] )
+    select type (instance)
+    type is (int32_arr_key_value_type)
+      @assertEqual( [41_int32, 79_int32], instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "int64_val", 43_int64 )
+    select type (instance)
+    type is (int64_key_value_type)
+      @assertEqual( 43_int64, instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "int64_arr_val", [47_int64, 73_int64] )
+    select type (instance)
+    type is (int64_arr_key_value_type)
+      @assertEqual( [47_int64, 73_int64], instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "real32_val", 29.0_real32 )
+    select type (instance)
+    type is (real32_key_value_type)
+      @assertEqual( 29.0_real32, instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "real32_arr_val", [29.0_real32, 87.0_real32] )
+    select type (instance)
+    type is (real32_arr_key_value_type)
+      @assertEqual( [29.0_real32, 87.0_real32], instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "real64_val", 17.0_real64 )
+    select type (instance)
+    type is (real64_key_value_type)
+      @assertEqual( 17.0_real64, instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "real64_arr_val", [17.0_real64, 93.0_real64] )
+    select type (instance)
+    type is (real64_arr_key_value_type)
+      @assertEqual( [17.0_real64, 93.0_real64], instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "logical_val", .true. )
+    select type (instance)
+    type is (logical_key_value_type)
+      @assertTrue( instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "logical_arr_val", [.true., .false.] )
+    select type (instance)
+    type is (logical_arr_key_value_type)
+      ! (No assert for arrays of logicals - do them individually)
+      @assertTrue ( instance%value(1) )
+      @assertFalse( instance%value(2) )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "str_val", "Bob" )
+    select type (instance)
+    type is (str_key_value_type)
+      @assertEqual( "Bob", instance%value )
+    end select
+    deallocate(instance)
+
+    instance => create_key_value( "str_arr_val", &
+                                  [character(9) :: "Cardboard", "Box"] )
+    select type (instance)
+    type is (str_arr_key_value_type)
+      ! (No assert for arrays of strings - do them individually)
+      @assertEqual( "Cardboard", instance%value(1) )
+      @assertEqual( "Box", instance%value(2) )
+    end select
+    deallocate(instance)
+
+  end subroutine test_create_key_value
 
 end module key_value_mod_test
 

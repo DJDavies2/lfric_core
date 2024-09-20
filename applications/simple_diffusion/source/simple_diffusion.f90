@@ -37,7 +37,7 @@ program simple_diffusion
         trim(precision_real)
   call log_event( log_scratch_space, log_level_trace )
   modeldb%mpi => global_mpi
-  call init_comm(program_name, modeldb%mpi)
+  call init_comm(program_name, modeldb)
   call get_initial_filename( filename )
   call init_config( filename,                            &
                     simple_diffusion_required_namelists, &
@@ -65,6 +65,6 @@ program simple_diffusion
   call final_collections()
   call final_logger( program_name )
   call final_config()
-  call final_comm( modeldb%mpi )
+  call final_comm( modeldb )
 
 end program simple_diffusion

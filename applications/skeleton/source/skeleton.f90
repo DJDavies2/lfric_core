@@ -45,7 +45,7 @@ program skeleton
 
   modeldb%mpi => global_mpi
 
-  call init_comm( "skeleton", modeldb%mpi )
+  call init_comm( "skeleton", modeldb )
   call get_initial_filename( filename )
   call init_config( filename, skeleton_required_namelists, &
                     modeldb%configuration )
@@ -73,6 +73,6 @@ program skeleton
   call final_collections()
   call final_logger( program_name )
   call final_config()
-  call final_comm( modeldb%mpi )
+  call final_comm( modeldb )
 
 end program skeleton

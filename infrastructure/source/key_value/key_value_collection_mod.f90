@@ -164,7 +164,9 @@ subroutine add_key_value_object(self, key_value)
 end subroutine add_key_value_object
 
 
-!>
+!> Create a key-value pair object, then adds it to the collection
+!> @param [in] key The key of the pair to be added
+!> @param [in] value The value of the pair to be added
 !>
 subroutine create_key_value_object( self, key, value )
 

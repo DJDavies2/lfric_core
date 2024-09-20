@@ -53,7 +53,7 @@ program io_dev
       '-bit real numbers.'
   call log_event( log_scratch_space, log_level_trace )
 
-  call init_comm( "io_dev", global_mpi )
+  call init_comm( "io_dev", modeldb )
   call get_initial_filename( filename )
   call init_config( filename, io_dev_required_namelists, &
                     modeldb%configuration )
@@ -80,6 +80,6 @@ program io_dev
   call final_timers( program_name )
   call final_logger( program_name )
   call final_config()
-  call final_comm( global_mpi )
+  call final_comm( modeldb )
 
 end program io_dev

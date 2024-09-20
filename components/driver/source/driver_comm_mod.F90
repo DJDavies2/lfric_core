@@ -17,15 +17,17 @@
 !>
 module driver_comm_mod
 
-  use constants_mod,         only: i_def, l_def
+  use constants_mod,         only: i_def, l_def, str_def
+  use driver_modeldb_mod,    only: modeldb_type
   use halo_comms_mod,        only: initialise_halo_comms, &
                                    finalise_halo_comms
-  use mpi_mod,               only: mpi_type, create_comm, destroy_comm
+  use mpi_mod,               only: create_comm, destroy_comm
 
-! MCT flag used for models coupled to OASIS-MCT ocean model
 #ifdef MCT
-  use coupler_mod,           only: cpl_initialize, cpl_finalize
+  use coupling_mod,          only: coupling_type, &
+                                   get_coupling_from_collection
 #endif
+
 ! USE_XIOS flag used for models using the XIOS I/O server
 #ifdef USE_XIOS
   use lfric_xios_driver_mod, only: lfric_xios_initialise, lfric_xios_finalise
@@ -44,24 +46,30 @@ contains
 
   !> @brief  Initialises the model communicator
   !>
-  !> @param[in]    program_name  The model name
-  !> @param[inout] mpi           The object that holds MPI information
-  !> @param[in]    input_comm    An optional argument that can be supplied if
-  !>                             mpi has been initialised outside the model.
-  !>                             In that case, this provides the communicator
-  !>                             that should be used
-  subroutine init_comm( program_name, mpi, input_comm )
+  !> @param[in]     program_name  The model name
+  !> @param[in,out] modeldb       The structure that holds model state
+  !> @param[in]     input_comm    An optional argument that can be supplied if
+  !>                              mpi has been initialised outside the model.
+  !>                              In that case, this provides the communicator
+  !>                              that should be used
+  subroutine init_comm( program_name, modeldb, input_comm )
 
     implicit none
 
     character(len=*),         intent(in)    :: program_name
-    type(mpi_type),           intent(inout) :: mpi
+    class(modeldb_type),      intent(inout) :: modeldb
     integer(i_def), optional, intent(in)    :: input_comm
 
     integer(i_def) :: start_communicator = -999
     integer(i_def) :: model_communicator = -999
 
     logical :: comm_is_split
+
+#ifdef MCT
+    type(coupling_type)          :: coupling
+    type(coupling_type), pointer :: coupling_ptr
+    character(str_def),  pointer :: cpl_name
+#endif
 
     ! Comm has not been split yet
     comm_is_split = .false.
@@ -83,11 +91,19 @@ contains
     ! spilt the communicator and return a communicator for the model to run in.
 
 #ifdef MCT
+    ! Add a place to store the coupling object in modeldb
+    call modeldb%values%add_key_value('coupling', coupling)
+    ! Extract the version that was actaully placed in the collection
+    coupling_ptr => get_coupling_from_collection(modeldb%values, "coupling" )
+    ! Get the coupling component name
+    call modeldb%values%get_value("cpl_name", cpl_name)
     ! Initialise OASIS coupling and get back the split communicator
-    call cpl_initialize( model_communicator, start_communicator )
-    comm_is_split = .true.
-#endif
+    call coupling_ptr%initialise( trim(cpl_name),     &
+                                  model_communicator, &
+                                  start_communicator, &
+                                  comm_is_split )
 
+#endif
 #ifdef USE_XIOS
     ! Initialise XIOS and get back the split communicator
     ! (At the moment, XIOS2 can only cope with starting from a split
@@ -95,14 +111,14 @@ contains
     ! splits MPI_COMM_WORLD)
     call lfric_xios_initialise( program_name, model_communicator, comm_is_split )
     comm_is_split = .true.
-#endif
 
+#endif
     ! If neither OASIS nor XIOS has split the communicator, set the model's
     ! communicator to the starting one created (or input) above
     if (.not. comm_is_split) model_communicator = start_communicator
 
     !Store the MPI communicator for later use
-    call mpi%initialise( model_communicator )
+    call modeldb%mpi%initialise( model_communicator )
 
     ! Initialise halo functionality
     call initialise_halo_comms( model_communicator )
@@ -110,12 +126,16 @@ contains
   end subroutine init_comm
 
   !> @brief  Finalises the model communicator
-  !> @param[inout] mpi The object that holds MPI information
-  subroutine final_comm(mpi)
+  !> @param[in,out] modeldb       The structure that holds model state
+  subroutine final_comm(modeldb)
 
     implicit none
 
-    type(mpi_type), intent(inout) :: mpi
+    class(modeldb_type), intent(inout) :: modeldb
+
+#ifdef MCT
+    type(coupling_type), pointer :: coupling_ptr
+#endif
 
 #ifdef USE_XIOS
     ! Finalise XIOS
@@ -123,15 +143,17 @@ contains
 #endif
 
 #ifdef MCT
+    ! Extract the coupling object from the modeldb key-value pair collection
+    coupling_ptr => get_coupling_from_collection(modeldb%values, "coupling" )
     ! FInalise OASIS coupling
-    call cpl_finalize()
+    call coupling_ptr%finalise()
 #endif
 
     ! Finalise halo exchange functionality
     call finalise_halo_comms()
 
     ! Finalise the mpi object
-    call mpi%finalise()
+    call modeldb%mpi%finalise()
     ! Release the communicator if it is ours to release. If a communicator has
     ! been provided to LFRic, then that is someone else's responsibility
     if(comm_created)call destroy_comm()

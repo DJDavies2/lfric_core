@@ -41,7 +41,11 @@ module key_value_mod
   public :: logical_key_value_type,    logical_arr_key_value_type
   public :: str_key_value_type,        str_arr_key_value_type
   public :: abstract_key_value_type
-  public :: create_key_value
+  public :: create_key_value, create_key_value_sca, create_key_value_arr
+
+  interface create_key_value
+   module procedure create_key_value_sca, create_key_value_arr
+  end interface
 
   !=========================================
   ! Key-Value pair abstract type
@@ -197,20 +201,20 @@ module key_value_mod
 contains
 
 
-!> Instantiates correct object for given value type.
+!> Instantiates correct object for given scalar value type.
 !>
 !> Note that this routine allocates a pointer but it does not manage the
 !> freeing of that pointer. That is the calling routine's responsibility if
 !> memory leaks are to be avoided.
 !>
-!> @todo This is a partial implementation. Additional value types will need to
-!>       be added as needed.
-!>
 !> @todo Fortran "block" syntax was used to keep scoping neat but in order to
 !>       make progress in face of an fParser which doesn't recognise the syntax
 !>       they were removed. When fParser is fixed they could be put back again.
 !>
-function create_key_value( key, value ) result(instance)
+!> @param [in] key      String used for key
+!> @param [in] value    Scalar value to be stored in key-value pair
+!>
+function create_key_value_sca( key, value ) result(instance)
 
   implicit none
 
@@ -223,6 +227,8 @@ function create_key_value( key, value ) result(instance)
   type(int64_key_value_type)    :: concrete_int64
   type(real32_key_value_type)   :: concrete_real32
   type(real64_key_value_type)   :: concrete_real64
+  type(logical_key_value_type)  :: concrete_logical
+  type(str_key_value_type)      :: concrete_str
   type(abstract_key_value_type) :: abstract_object
 
   select type (value)
@@ -243,6 +249,14 @@ function create_key_value( key, value ) result(instance)
     call concrete_real64%initialise( key, value )
     allocate( instance, source=concrete_real64 )
 
+  type is (logical)
+    call concrete_logical%initialise( key, value )
+    allocate( instance, source=concrete_logical )
+
+  type is (character(*))
+    call concrete_str%initialise( key, value )
+    allocate( instance, source=concrete_str )
+
   class is (abstract_value_type)
     call abstract_object%initialise( key, value )
     allocate( instance, source=abstract_object )
@@ -253,8 +267,66 @@ function create_key_value( key, value ) result(instance)
     call log_event( log_scratch_space, log_level_error )
   end select
 
-end function create_key_value
+end function create_key_value_sca
 
+
+!> Instantiates correct object for given array value type.
+!>
+!> Note that this routine allocates a pointer but it does not manage the
+!> freeing of that pointer. That is the calling routine's responsibility if
+!> memory leaks are to be avoided.
+!>
+!> @param [in] key      String used for key
+!> @param [in] value    Array value to be stored in key-value pair
+function create_key_value_arr( key, value ) result(instance)
+
+  implicit none
+
+  character(*), intent(in) :: key
+  class(*),     intent(in) :: value(:)
+
+  class(key_value_type), pointer :: instance
+
+  type(int32_arr_key_value_type)    :: concrete_int32_arr
+  type(int64_arr_key_value_type)    :: concrete_int64_arr
+  type(real32_arr_key_value_type)   :: concrete_real32_arr
+  type(real64_arr_key_value_type)   :: concrete_real64_arr
+  type(logical_arr_key_value_type)  :: concrete_logical_arr
+  type(str_arr_key_value_type)      :: concrete_str_arr
+
+  select type (value)
+
+  type is (integer(int32))
+    call concrete_int32_arr%initialise( key, value )
+    allocate( instance, source=concrete_int32_arr )
+
+  type is (integer(int64))
+    call concrete_int64_arr%initialise( key, value )
+    allocate( instance, source=concrete_int64_arr )
+
+  type is (real(real32))
+    call concrete_real32_arr%initialise( key, value )
+    allocate( instance, source=concrete_real32_arr )
+
+  type is (real(real64))
+    call concrete_real64_arr%initialise( key, value )
+    allocate( instance, source=concrete_real64_arr )
+
+  type is (logical)
+    call concrete_logical_arr%initialise( key, value )
+    allocate( instance, source=concrete_logical_arr )
+
+  type is (character(*))
+    call concrete_str_arr%initialise( key, value )
+    allocate( instance, source=concrete_str_arr )
+
+  class default
+    write( log_scratch_space, &
+           '("Unable to pair key ''", A, "'' with unsupported value")' ) key
+    call log_event( log_scratch_space, log_level_error )
+  end select
+
+end function create_key_value_arr
 
 !=========================================
 ! Abstract Initialiser

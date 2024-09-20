@@ -19,6 +19,7 @@ OPERATE_ON ?= infrastructure                \
               components/driver             \
               components/lfric-xios         \
               components/inventory          \
+              components/coupling           \
               mesh_tools                    \
               applications/skeleton         \
               applications/simple_diffusion \

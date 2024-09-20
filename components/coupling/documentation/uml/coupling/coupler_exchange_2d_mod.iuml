@@ -1,0 +1,19 @@
+' (C) Crown copyright 2024 Met Office. All rights reserved.
+' The file LICENCE, distributed with this code, contains details of the terms
+' under which the code may be used.
+
+abstract class abstract_external_field_mod::abstract_external_field_type {
+}
+
+class coupler_exchange_2d_mod::coupler_exchange_2d_type {
+  -coupling_time: integer
+  -coupling_size: integer
+  -sorting_index: integer[] <<allocatable>>
+
+  +initialise( <<in>> lfric_field_ptr : field_type, <<in>> sorting_index : integer[] ) :
+  +copy_from_lfric => coupler_send_2d( <<out>> return_code : integer ) :
+  +copy_to_lfric => coupler_receive_2d( <<out>> return_code : integer ) :
+  +set_time(model_clock : model_clock_type)
+  +is_coupling_time() : logical
+  <<destroy>>+finalise()
+}

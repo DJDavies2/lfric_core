@@ -1,0 +1,17 @@
+' (C) Crown copyright 2024 Met Office. All rights reserved.
+' The file LICENCE, distributed with this code, contains details of the terms
+' under which the code may be used.
+
+class coupling_mod::coupling_type {
+  -comp_id: integer
+  -part_0d_id: integer
+  -part_2d_id: integer
+  -cpl_size: integer
+  -local_index : integer[] <<allocatable>>
+
+  +initialise(<<out>> comm_out : integer, <<in>> comm_in : integer ) :
+  +define_partitions( <<inout>> mpi : mpi_type, <<in>> twod_mesh : mesh_type ) :
+  +define_variables( <<inout>> cpl_snd_2d : field_collection_type, <<inout>> cpl_rcv_2d : field_collection_type, <<inout>> cpl_snd_0d : field_collection_type ) :
+  +get_local_index() : integer[] <<pointer>>
+  <<destroy>>+finalise()
+}
