@@ -49,6 +49,8 @@ contains
   !>
   subroutine read_test_namelist( file_unit, local_rank, scan )
 
+    use constants_mod, only: i_def
+
     implicit none
 
     integer(i_def), intent(in) :: file_unit
@@ -63,23 +65,17 @@ contains
   !
   subroutine read_namelist( file_unit, local_rank, scan )
 
-    use constants_mod, only: i_def
-
     implicit none
 
     integer(i_def), intent(in) :: file_unit
     integer(i_def), intent(in) :: local_rank
     logical,        intent(in) :: scan
 
-    integer(i_def) :: missing_data
-
     integer(i_def) :: buffer_integer_i_def(1)
 
     namelist /test/ foo
 
     integer(i_def) :: condition
-
-    missing_data = 0
 
     foo = imdi
 
@@ -97,7 +93,6 @@ contains
     call global_mpi%broadcast( buffer_integer_i_def, 1, 0 )
 
     foo = buffer_integer_i_def(1)
-
 
     if (scan) then
       nml_loaded = .false.
@@ -137,8 +132,13 @@ contains
   !>
   subroutine postprocess_test_namelist()
 
+    use constants_mod, only: i_def
+
     implicit none
 
+    ! Computed fields are resolved after everything has been loaded since they
+    ! can refer to fields in other namelists.
+    !
 
   end subroutine postprocess_test_namelist
 

@@ -51,6 +51,8 @@ contains
   !>
   subroutine read_cheese_namelist( file_unit, local_rank, scan )
 
+    use constants_mod, only: i_def
+
     implicit none
 
     integer(i_def), intent(in) :: file_unit
@@ -65,23 +67,17 @@ contains
   !
   subroutine read_namelist( file_unit, local_rank, scan )
 
-    use constants_mod, only: i_def
-
     implicit none
 
     integer(i_def), intent(in) :: file_unit
     integer(i_def), intent(in) :: local_rank
     logical,        intent(in) :: scan
 
-    integer(i_def) :: missing_data
-
     real(r_def) :: buffer_real_r_def(1)
 
     namelist /cheese/ fred
 
     integer(i_def) :: condition
-
-    missing_data = 0
 
     fred = rmdi
     wilma = rmdi
@@ -100,9 +96,6 @@ contains
     call global_mpi%broadcast( buffer_real_r_def, 1, 0 )
 
     fred = buffer_real_r_def(1)
-
-    ! Parameter name wilma: derived by computation
-    wilma = fred * FUDGE
 
     if (scan) then
       nml_loaded = .false.
@@ -145,8 +138,14 @@ contains
   !>
   subroutine postprocess_cheese_namelist()
 
+    use constants_mod, only: i_def
+
     implicit none
 
+    ! Computed fields are resolved after everything has been loaded since they
+    ! can refer to fields in other namelists.
+    !! Parameter name wilma: derived by computation
+    wilma = fred * FUDGE
 
   end subroutine postprocess_cheese_namelist
 

@@ -226,6 +226,8 @@ contains
   !>
   subroutine read_twoenum_namelist( file_unit, local_rank, scan )
 
+    use constants_mod, only: i_def
+
     implicit none
 
     integer(i_def), intent(in) :: file_unit
@@ -244,8 +246,6 @@ contains
                             dummy_first, &
                             dummy_second )
 
-    use constants_mod, only: i_def
-
     implicit none
 
     integer(i_def), intent(in) :: file_unit
@@ -253,8 +253,6 @@ contains
     logical,        intent(in) :: scan
     integer(i_def), intent(out) :: dummy_first
     integer(i_def), intent(out) :: dummy_second
-
-    integer(i_def) :: missing_data
 
     integer(i_def) :: buffer_integer_i_def(2)
 
@@ -265,8 +263,6 @@ contains
                        second
 
     integer(i_def) :: condition
-
-    missing_data = 0
 
     first = unset_key
     second = unset_key
@@ -290,7 +286,6 @@ contains
 
     dummy_first = buffer_integer_i_def(1)
     dummy_second = buffer_integer_i_def(2)
-
 
     if (scan) then
       nml_loaded = .false.
@@ -333,8 +328,13 @@ contains
   !>
   subroutine postprocess_twoenum_namelist()
 
+    use constants_mod, only: i_def
+
     implicit none
 
+    ! Computed fields are resolved after everything has been loaded since they
+    ! can refer to fields in other namelists.
+    !
 
   end subroutine postprocess_twoenum_namelist
 

@@ -446,18 +446,18 @@ contains
   !> @param[in]    eta                Non-dimensional vertical coordinate
   !> @param[in]    nlayers            Number of layers
   !> @param[in]    surface_height     Surface height above flat surface
-  !> @param[in]    domain_top         Top of atmosphere above flat surface
+  !> @param[in]    domain_height         Top of atmosphere above flat surface
   subroutine set_dz( dz,             &
                      eta,            &
                      nlayers,        &
                      surface_height, &
-                     domain_top )
+                     domain_height )
 
     implicit none
 
     integer(i_def), intent(in)    :: nlayers
     real(r_def),    intent(in)    :: surface_height
-    real(r_def),    intent(in)    :: domain_top
+    real(r_def),    intent(in)    :: domain_height
     real(r_def),    intent(inout) :: dz(nlayers)
     real(r_def),    intent(in)    :: eta(0:nlayers)
 
@@ -469,7 +469,7 @@ contains
     !       after the application of orography.
 
     ! Calculate domain depth
-    domain_depth = domain_top - surface_height
+    domain_depth = domain_height - surface_height
     ! Calculate dz
     dz = ( eta(1:nlayers) - eta(0:nlayers-1) )*domain_depth
 

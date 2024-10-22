@@ -52,6 +52,8 @@ contains
   !>
   subroutine read_teapot_namelist( file_unit, local_rank, scan )
 
+    use constants_mod, only: i_def
+
     implicit none
 
     integer(i_def), intent(in) :: file_unit
@@ -66,15 +68,11 @@ contains
   !
   subroutine read_namelist( file_unit, local_rank, scan )
 
-    use constants_mod, only: i_def
-
     implicit none
 
     integer(i_def), intent(in) :: file_unit
     integer(i_def), intent(in) :: local_rank
     logical,        intent(in) :: scan
-
-    integer(i_def) :: missing_data
 
     real(r_def) :: buffer_real_r_def(2)
 
@@ -82,8 +80,6 @@ contains
                       fum
 
     integer(i_def) :: condition
-
-    missing_data = 0
 
     bar = rmdi
     foo = rmdi
@@ -105,9 +101,6 @@ contains
 
     foo = buffer_real_r_def(1)
     fum = buffer_real_r_def(2)
-
-    ! Parameter name bar: derived by computation
-    bar = foo ** 2
 
     if (scan) then
       nml_loaded = .false.
@@ -153,8 +146,14 @@ contains
   !>
   subroutine postprocess_teapot_namelist()
 
+    use constants_mod, only: i_def
+
     implicit none
 
+    ! Computed fields are resolved after everything has been loaded since they
+    ! can refer to fields in other namelists.
+    !! Parameter name bar: derived by computation
+    bar = foo ** 2
 
   end subroutine postprocess_teapot_namelist
 

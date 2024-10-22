@@ -6,10 +6,11 @@
 !-------------------------------------------------------------------------------
 module chi_transform_mod_test
 
-  use pFUnit_Mod
   use, intrinsic :: iso_fortran_env, only : real64
-  use constants_mod,             only : r_def, i_def, PI, str_long
 
+  use constants_mod, only : i_def, r_def, str_long, PI
+
+  use pFUnit_Mod
 
   implicit none
 
@@ -58,7 +59,7 @@ module chi_transform_mod_test
   integer(i_def), parameter :: LLH_rot = 5
   integer(i_def), parameter :: ABH_stretch_rot = 6
 
-  real(r_def), parameter :: planet_radius = 14_r_def
+  real(r_def), parameter :: planet_radius = 14.0_r_def
   real(r_def), parameter :: scaling       = 1.0_r_def
 
 contains
@@ -68,7 +69,7 @@ contains
     implicit none
 
     type(chi_parameters_type), intent(in) :: test_parameter
-    type(chi_transform_mod_test_type)   :: new_test
+    type(chi_transform_mod_test_type)     :: new_test
 
     new_test%source_coord_system = test_parameter%source_coord_system
     new_test%target_coord_system = test_parameter%target_coord_system
@@ -220,17 +221,20 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use sci_chi_transform_mod,     only : init_chi_transforms
     use base_mesh_config_mod,      only : geometry_spherical,      &
                                           geometry_planar,         &
                                           topology_fully_periodic, &
                                           topology_non_periodic
+    use extrusion_config_mod,      only : method_uniform, &
+                                          stretching_method_linear
     use finite_element_config_mod, only : cellshape_quadrilateral, &
-                                          coord_system_native,   &
+                                          coord_system_native,     &
                                           coord_system_xyz
-    use feign_config_mod,          only : feign_finite_element_config, &
-                                          feign_planet_config,         &
-                                          feign_base_mesh_config
+    use feign_config_mod,          only : feign_base_mesh_config,      &
+                                          feign_extrusion_config,      &
+                                          feign_finite_element_config, &
+                                          feign_planet_config
+    use sci_chi_transform_mod,     only : init_chi_transforms
 
     implicit none
 
@@ -239,6 +243,12 @@ contains
     integer(i_def) :: coord_system, topology
     real(r_def)    :: north_pole(2), equatorial_latitude
 
+    call feign_extrusion_config( method=method_uniform,                      &
+                                 planet_radius=planet_radius,                &
+                                 domain_height=10.0_r_def,                   &
+                                 number_of_layers=5_i_def,                   &
+                                 stretching_method=stretching_method_linear, &
+                                 stretching_height=15.0_r_def )
 
     select case ( this%source_coord_system )
     case ( XYZ )
@@ -266,7 +276,7 @@ contains
              coord_order=0_i_def,               &
              coord_system=coord_system )
 
-    call feign_planet_config( radius=planet_radius, scaling_factor=scaling )
+    call feign_planet_config( scaling_factor=scaling )
 
     if ( this%source_coord_system == LLH_rot ) then
       north_pole(1) = PI/2.0_r_def

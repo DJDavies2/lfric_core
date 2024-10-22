@@ -12,37 +12,29 @@ module coordinate_jacobian_lonlatz_mod_test
 
   implicit none
 
-  public :: jacobian_lonlatz_test_type, test_all
+  public :: set_up, tear_down, test_all
 
-  @TestCase
-  type, extends(TestCase) :: jacobian_lonlatz_test_type
-    private
-  contains
-    procedure setUp
-    procedure tearDown
-    procedure test_all
-  end type jacobian_lonlatz_test_type
-
-  real(r_def), parameter :: radius   = 270_r_def
-  real(r_def), parameter :: scaling  = 1.0_r_def
+  real(r_def), parameter :: radius = 270_r_def
 
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine setUp( this )
+  @before
+  subroutine set_up()
 
     use base_mesh_config_mod,      only : geometry_spherical, &
                                           topology_non_periodic
+    use extrusion_config_mod,      only : method_uniform, &
+                                          stretching_method_linear
     use finite_element_config_mod, only : cellshape_quadrilateral, &
                                           coord_system_native
-    use feign_config_mod,          only : feign_finite_element_config, &
-                                          feign_planet_config,         &
-                                          feign_base_mesh_config
+    use feign_config_mod,          only : feign_base_mesh_config,      &
+                                          feign_extrusion_config,      &
+                                          feign_finite_element_config, &
+                                          feign_planet_config
     use sci_chi_transform_mod,     only : init_chi_transforms
 
     implicit none
-
-    class(jacobian_lonlatz_test_type), intent(inout) :: this
 
     call feign_base_mesh_config( file_prefix='foo',                &
                                  prime_mesh_name='unit_test',      &
@@ -51,6 +43,13 @@ contains
                                  topology=topology_non_periodic, &
                                  fplane=.false., f_lat_deg=0.0_r_def )
 
+    call feign_extrusion_config( method=method_uniform,                      &
+                                 planet_radius=radius,                       &
+                                 domain_height=10.0_r_def,                   &
+                                 number_of_layers=5_i_def,                   &
+                                 stretching_method=stretching_method_linear, &
+                                 stretching_height=15.0_r_def )
+
     call feign_finite_element_config(           &
              cellshape=cellshape_quadrilateral, &
              coord_order=0_i_def,               &
@@ -58,30 +57,29 @@ contains
              element_order=0_i_def,             &
              rehabilitate=.true. )
 
-    call feign_planet_config( radius=radius, scaling_factor=scaling )
+    call feign_planet_config( scaling_factor=1.0_r_def )
 
     call init_chi_transforms()
 
-  end subroutine setUp
+  end subroutine set_up
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine tearDown( this )
+  @after
+  subroutine tear_down()
 
     use configuration_mod,        only: final_configuration
     use sci_chi_transform_mod,    only: final_chi_transforms
 
     implicit none
 
-    class(jacobian_lonlatz_test_type), intent(inout) :: this
-
     call final_configuration()
     call final_chi_transforms()
 
-  end subroutine tearDown
+  end subroutine tear_down
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @Test
-  subroutine test_all( this )
+  @test
+  subroutine test_all()
 
     use, intrinsic :: iso_fortran_env, only: real64
     use sci_coordinate_jacobian_mod,                                           &
@@ -91,8 +89,6 @@ contains
                                         pointwise_coordinate_jacobian_inverse
 
     implicit none
-
-    class(jacobian_lonlatz_test_type), intent(inout) :: this
 
     real(kind=r_def), parameter :: tol = 1.0e-12_r_def  ! r_def 64bit
     real(kind=r_def)    :: use_tol, answer_dj

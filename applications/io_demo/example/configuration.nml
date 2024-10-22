@@ -9,9 +9,10 @@ topology='fully_periodic',
 /
 
 &extrusion
-domain_top=1000.0,
+domain_height=1000.0,
 method='uniform',
 number_of_layers=10,
+planet_radius=6371229.0,
 /
 
 &finite_element
@@ -72,6 +73,5 @@ coord_system='native'
 /
 
 &planet
-  radius=6371229.0,
   scaling_factor=125.0,
 /

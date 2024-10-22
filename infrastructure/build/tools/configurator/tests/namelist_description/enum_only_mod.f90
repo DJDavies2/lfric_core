@@ -139,6 +139,8 @@ contains
   !>
   subroutine read_enum_namelist( file_unit, local_rank, scan )
 
+    use constants_mod, only: i_def
+
     implicit none
 
     integer(i_def), intent(in) :: file_unit
@@ -155,16 +157,12 @@ contains
   subroutine read_namelist( file_unit, local_rank, scan, &
                             dummy_value )
 
-    use constants_mod, only: i_def
-
     implicit none
 
     integer(i_def), intent(in) :: file_unit
     integer(i_def), intent(in) :: local_rank
     logical,        intent(in) :: scan
     integer(i_def), intent(out) :: dummy_value
-
-    integer(i_def) :: missing_data
 
     integer(i_def) :: buffer_integer_i_def(1)
 
@@ -173,8 +171,6 @@ contains
     namelist /enum/ value
 
     integer(i_def) :: condition
-
-    missing_data = 0
 
     value = unset_key
 
@@ -194,7 +190,6 @@ contains
     call global_mpi%broadcast( buffer_integer_i_def, 1, 0 )
 
     dummy_value = buffer_integer_i_def(1)
-
 
     if (scan) then
       nml_loaded = .false.
@@ -234,8 +229,13 @@ contains
   !>
   subroutine postprocess_enum_namelist()
 
+    use constants_mod, only: i_def
+
     implicit none
 
+    ! Computed fields are resolved after everything has been loaded since they
+    ! can refer to fields in other namelists.
+    !
 
   end subroutine postprocess_enum_namelist
 

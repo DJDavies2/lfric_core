@@ -160,6 +160,8 @@ contains
   !>
   subroutine read_test_namelist( file_unit, local_rank, scan )
 
+    use constants_mod, only: i_def
+
     implicit none
 
     integer(i_def), intent(in) :: file_unit
@@ -176,16 +178,12 @@ contains
   subroutine read_namelist( file_unit, local_rank, scan, &
                             dummy_enum )
 
-    use constants_mod, only: i_def
-
     implicit none
 
     integer(i_def), intent(in) :: file_unit
     integer(i_def), intent(in) :: local_rank
     logical,        intent(in) :: scan
     integer(i_def), intent(out) :: dummy_enum
-
-    integer(i_def) :: missing_data
 
     character(str_def) :: buffer_character_str_def(2)
     character(str_max_filename) :: buffer_character_str_max_filename(1)
@@ -216,8 +214,6 @@ contains
                     vstr
 
     integer(i_def) :: condition
-
-    missing_data = 0
 
     dint = imdi
     dlog = .false.
@@ -285,7 +281,6 @@ contains
     vint = buffer_integer_i_def(1)
     vreal = buffer_real_r_def(1)
     vstr = buffer_character_str_def(1)
-
 
     if (scan) then
       nml_loaded = .false.
@@ -364,8 +359,13 @@ contains
   !>
   subroutine postprocess_test_namelist()
 
+    use constants_mod, only: i_def
+
     implicit none
 
+    ! Computed fields are resolved after everything has been loaded since they
+    ! can refer to fields in other namelists.
+    !
 
   end subroutine postprocess_test_namelist
 

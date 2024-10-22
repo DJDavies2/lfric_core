@@ -46,7 +46,7 @@ contains
 !> @brief  Creates vertical mesh extrusion.
 !> @return  Resulting extrusion object
 function create_extrusion( extrusion_method, &
-                           domain_top,       &
+                           domain_height,       &
                            domain_bottom,    &
                            n_layers,         &
                            extrusion_id ) result(new)
@@ -56,7 +56,7 @@ function create_extrusion( extrusion_method, &
   class(extrusion_type), allocatable :: new
 
   integer(i_def), intent(in) :: extrusion_method
-  real(r_def),    intent(in) :: domain_top
+  real(r_def),    intent(in) :: domain_height
   real(r_def),    intent(in) :: domain_bottom
   integer(i_def), intent(in) :: n_layers
   integer(i_def), intent(in) :: extrusion_id
@@ -66,15 +66,15 @@ function create_extrusion( extrusion_method, &
   select case (extrusion_method)
     case (METHOD_UNIFORM)
       allocate( new, source=uniform_extrusion_type(        &
-                                domain_bottom, domain_top, &
+                                domain_bottom, domain_height, &
                                 n_layers, extrusion_id ) )
     case (METHOD_QUADRATIC)
       allocate( new, source=quadratic_extrusion_type(      &
-                                domain_bottom, domain_top, &
+                                domain_bottom, domain_height, &
                                 n_layers, extrusion_id ) )
     case (METHOD_GEOMETRIC)
       allocate( new, source=geometric_extrusion_type(      &
-                                domain_bottom, domain_top, &
+                                domain_bottom, domain_height, &
                                 n_layers, extrusion_id ) )
     case default
       call log_event("Invalid method for simple extrusion", LOG_LEVEL_ERROR)

@@ -62,7 +62,7 @@ contains
 !> @param[in]     undf_w2 Number of unique degrees of freedom for w2
 !> @param[in]     map_w2  Dofmap for the cell at the base of the column for w2
 subroutine calc_da_msl_proj_code(nlayers, dA_at_w2, dA_msl_proj, &
-                                 radius, domain_top,             &
+                                 radius, domain_height,             &
                                  geometry, geometry_spherical,   &
                                  ndf_w2, undf_w2, map_w2,        &
                                  ndf_2d, undf_2d, map_2d)
@@ -79,12 +79,12 @@ subroutine calc_da_msl_proj_code(nlayers, dA_at_w2, dA_msl_proj, &
   real(kind=r_def), dimension(undf_2d), intent(inout)  :: dA_msl_proj
   real(kind=r_def), dimension(undf_w2), intent(in)     :: dA_at_w2
 
-  real(kind=r_def)    :: radius, domain_top
+  real(kind=r_def)    :: radius, domain_height
   integer(kind=i_def) :: geometry, geometry_spherical
 
   if (geometry == geometry_spherical) then
     dA_msl_proj(map_2d(1)) = dA_at_w2(map_w2(B) + nlayers) *           &
-                             ( radius / (radius+domain_top) )**2_i_def
+                             ( radius / (radius+domain_height) )**2_i_def
   else
     dA_msl_proj(map_2d(1)) = dA_at_w2(map_w2(B) + nlayers)
   end if

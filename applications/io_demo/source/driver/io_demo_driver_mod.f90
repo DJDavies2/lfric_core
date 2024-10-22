@@ -93,7 +93,7 @@ contains
     integer(i_def) :: method
     integer(i_def) :: number_of_layers
     real(r_def)    :: domain_bottom
-    real(r_def)    :: domain_top
+    real(r_def)    :: domain_height
     real(r_def)    :: scaled_radius
     logical        :: check_partitions
     logical        :: multifile_io
@@ -112,7 +112,7 @@ contains
     call base_mesh_nml%get_value( 'prime_mesh_name', prime_mesh_name )
     call base_mesh_nml%get_value( 'geometry', geometry )
     call extrusion_nml%get_value( 'method', method )
-    call extrusion_nml%get_value( 'domain_top', domain_top )
+    call extrusion_nml%get_value( 'domain_height', domain_height )
     call extrusion_nml%get_value( 'number_of_layers', number_of_layers )
     call planet_nml%get_value( 'scaled_radius', scaled_radius )
     call io_nml%get_value( 'multifile_io', multifile_io)
@@ -152,7 +152,7 @@ contains
     end select
 
     allocate( extrusion, source=create_extrusion( method,           &
-                                                  domain_top,       &
+                                                  domain_height,    &
                                                   domain_bottom,    &
                                                   number_of_layers, &
                                                   PRIME_EXTRUSION ) )

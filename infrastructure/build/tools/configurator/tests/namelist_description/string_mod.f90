@@ -56,6 +56,8 @@ contains
   !>
   subroutine read_mirth_namelist( file_unit, local_rank, scan )
 
+    use constants_mod, only: i_def
+
     implicit none
 
     integer(i_def), intent(in) :: file_unit
@@ -70,15 +72,11 @@ contains
   !
   subroutine read_namelist( file_unit, local_rank, scan )
 
-    use constants_mod, only: i_def
-
     implicit none
 
     integer(i_def), intent(in) :: file_unit
     integer(i_def), intent(in) :: local_rank
     logical,        intent(in) :: scan
-
-    integer(i_def) :: missing_data
 
     character(str_def) :: buffer_character_str_def(1)
 
@@ -88,8 +86,6 @@ contains
                      hysterics
 
     integer(i_def) :: condition
-
-    missing_data = 0
 
     if (allocated(hysterics)) deallocate(hysterics)
     allocate( hysterics(max_array_size), stat=condition )
@@ -125,7 +121,6 @@ contains
     call global_mpi%broadcast( buffer_character_str_def, 1*str_def, 0 )
 
     chuckle = buffer_character_str_def(1)
-
 
     call global_mpi%broadcast( chortle, size(chortle, 1)*str_def, 0 )
     call global_mpi%broadcast( guffaw, size(guffaw, 1)*str_def, 0 )
@@ -178,16 +173,26 @@ contains
   !>
   subroutine postprocess_mirth_namelist()
 
+    use constants_mod, only: i_def
+
     implicit none
 
     integer(i_def) :: condition
     integer(i_def) :: array_size
+
+
     character(str_def), allocatable :: new_hysterics(:)
     integer(i_def) :: index_hysterics
     character(str_def), allocatable :: new_chortle(:)
 
+    ! Computed fields are resolved after everything has been loaded since they
+    ! can refer to fields in other namelists.
+    !
+    ! Arrays are re-sized to fit data.
+    !
     condition  = 0
     array_size = 0
+
 
     do index_hysterics=ubound(hysterics, 1), 1, -1
       if (hysterics(index_hysterics) /= cmdi) exit

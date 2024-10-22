@@ -460,7 +460,7 @@ contains
     self%nlayers              = extrusion%get_number_of_layers()
     self%ncells               = self%ncells_2d * self%nlayers
     self%ncells_with_ghost    = self%ncells_2d_with_ghost * self%nlayers
-    self%domain_depth           = extrusion%get_atmosphere_top()
+    self%domain_depth         = extrusion%get_atmosphere_top()
     self%domain_base_height   = extrusion%get_atmosphere_bottom()
     self%extrusion_id         = extrusion%get_id()
     self%ncolours             = -1     ! Initialise ncolours to error status
@@ -1262,7 +1262,7 @@ contains
 
 
   !> @param[out] eta Array of dimensions (0:nlayers) of non-dimensional
-  !>                 vertical coordinate normalised using the @c domain_top
+  !>                 vertical coordinate normalised using the @c domain_height
   !============================================================================
   subroutine get_eta(self,eta)
 
