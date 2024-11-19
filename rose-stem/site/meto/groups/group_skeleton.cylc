@@ -27,10 +27,10 @@
         "skeleton_canned_spice_gnu_fast-debug-64bit",
     ],
     "skeleton_spice_build": [
-        "build_skeleton_spice_intel_fast-debug-64-bit",
-        "build_skeleton_spice_gnu_fast-debug-64-bit",
-        "build_skeleton_spice_intel_full-debug-64-bit",
-        "build_skeleton_spice_gnu_full-debug-64-bit",
+        "build_skeleton_spice_intel_fast-debug-64bit",
+        "build_skeleton_spice_gnu_fast-debug-64bit",
+        "build_skeleton_spice_intel_full-debug-64bit",
+        "build_skeleton_spice_gnu_full-debug-64bit",
     ]
     }) %}
 
@@ -53,8 +53,8 @@
         "skeleton_canned_xc40_intel_fast-debug-64bit",
     ],
     "skeleton_xc40_build": [
-        "build_skeleton_xc40_intel_fast-debug-64-bit",
-        "build_skeleton_xc40_intel_full-debug-64-bit",
+        "build_skeleton_xc40_intel_fast-debug-64bit",
+        "build_skeleton_xc40_intel_full-debug-64bit",
     ]
     }) %}
 
@@ -75,8 +75,8 @@
         "skeleton_canned_ex1a_gnu_fast-debug-64bit",
     ],
     "skeleton_ex1a_build": [
-        "build_skeleton_ex1a_gnu_fast-debug-64-bit",
-        "build_skeleton_ex1a_gnu_full-debug-64-bit",
+        "build_skeleton_ex1a_gnu_fast-debug-64bit",
+        "build_skeleton_ex1a_gnu_full-debug-64bit",
     ]
     }) %}
 

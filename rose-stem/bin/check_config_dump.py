@@ -15,15 +15,11 @@ import subprocess
 import argparse
 
 APPLICATIONS = [
-    "applications/jedi_lfric_tests",
-    "applications/gravity_wave",
-    "applications/gungho_model",
-    "applications/lfric_atm",
-    "applications/linear_model",
-    "applications/shallow_water",
-    "applications/solver",
-    "applications/transport",
-    "science/linear",
+    "applications/io_demo",
+    "applications/io_dev",
+    "applications/simple_diffusion",
+    "applications/skeleton",
+    "mesh_tools",
     "rose-stem",
 ]
 

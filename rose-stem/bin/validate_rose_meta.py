@@ -15,10 +15,8 @@ import subprocess
 import argparse
 
 DEFAULT_APPS = {
-    "skeleton": ["skeleton"],
-#    "mesh_tools": ["cubedsphere_mesh_generator",
-#                   "planar_mesh_generator",
-#                   "summarise_ugrid"]
+   "skeleton": ["skeleton"],
+   "mesh_tools": ["mesh_tools"]
 }
 
 COMPONENTS = [
@@ -27,12 +25,12 @@ COMPONENTS = [
 
 APPLICATIONS = [
     "skeleton",
-#    "mesh_tools"
+    "mesh_tools"
 ]
 
 OTHERS = [
-#    "infrastructure",
-#    "mesh_tools"
+    "infrastructure",
+    "mesh_tools"
 ]
 
 

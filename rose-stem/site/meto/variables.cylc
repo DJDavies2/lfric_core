@@ -11,6 +11,7 @@
                                                "io_demo",
                                                "lfric_xios",
                                                "mesh",
+                                               "mesh_tools",
                                                "science",
                                                "simple_diffusion",
                                                "skeleton"]}) %}

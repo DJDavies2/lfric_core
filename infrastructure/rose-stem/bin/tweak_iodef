@@ -17,20 +17,28 @@ case $# in
 esac
 
 set -e
-temp_file=$(mktemp)
-trap 'rm -f $temp_file; exit 1' INT TERM EXIT
-# examples substitutions
-#   ../../../lfric_atm/metadata              used in gungho_model/example 
-#   ../metadata -> $METADATA                 used in lfric_atm/example
-if  sed 's@\.\./\(\.\./\)*lfric_atm/metadata@$METADATA@' $iodef |\
-    sed 's@\.\./\(\.\./\)*metadata@$METADATA@' |\
-    rose env-cat - >$temp_file
-then
-    trap '' INT TERM EXIT
-    cp $temp_file $iodef
+if [ -e $iodef ] ; then
+
+  temp_file=$(mktemp)
+  trap 'rm -f $temp_file; exit 1' INT TERM EXIT
+  # examples substitutions
+  #   ../../../lfric_atm/metadata              used in gungho_model/example 
+  #   ../metadata -> $METADATA                 used in lfric_atm/example
+  if  sed 's@\.\./\(\.\./\)*lfric_atm/metadata@$METADATA@' $iodef |\
+      sed 's@\.\./\(\.\./\)*metadata@$METADATA@' |\
+      rose env-cat - >$temp_file
+  then
+      trap '' INT TERM EXIT
+      cp $temp_file $iodef
+  else
+      echo "tweak_iodef: editing failed, $iodef unchanged" 1>&2
+      rm -f $temp_file
+      exit 1
+  fi
+  rm -f $temp_file
+
 else
-    echo "tweak_iodef: editing failed, $iodef unchanged" 1>&2
-    rm -f $temp_file
-    exit 1
+  
+  echo No iodef file skipped tweak_iodef script.
+
 fi
-rm -f $temp_file

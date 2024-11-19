@@ -109,5 +109,4 @@
 
 {% endif %}
 
-
 {% do LOG.debug("Finished in templates/runtime/generate_runtime.cylc") %}

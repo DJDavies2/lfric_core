@@ -14,6 +14,7 @@
 {# Set the family inheritance for this task #}
 {% set inherit = namespace(str="") %}
 {% set inherit.str = task_family|upper %}
+
 {% for family in task_values["run_families"] %}
     {% set inherit.str = inherit.str~","~family|upper %}
 {% endfor %}
@@ -22,18 +23,9 @@
 {% set script_str = namespace(name="") %}
 {% set script_str.name = "$CYLC_WORKFLOW_RUN_DIR/bin/application_results_setup.sh ; " %}
 {% set script_str.name = script_str.name~"rose task-run --app-key="~task_values["app_name"] %}
-{% if task_values["app_name"] == "canned_test" %}
-    {% set script_str.name = script_str.name~" --command-key=$RUN_METHOD" %}
-{% else %}
-    {% for opt_conf in task_values["opt_confs"] %}
-        {% set script_str.name = script_str.name~" --opt-conf-key="~opt_conf %}
-    {% endfor %}
-    {% set script_str.name = script_str.name~" --opt-conf-key="~task_values["resolution"] %}
-    {% if task_values["use_xios"] %}
-        {% set script_str.name = script_str.name~" --opt-conf-key=xios_server" %}
-    {% endif %}
-    {% set script_str.name = script_str.name~" --opt-conf-key=suite_controlled" %}
-{% endif %}
+
+{% set env_application = task_ns.application %}
+{% set configuration_file = "configuration.nml" %}
 
 {# The PANEL_DECOMP variable expects it to be quoted #}
 {% set panel_decomp = "'"~task_values["panel_decomp"]~"'" %}
@@ -63,6 +55,36 @@
         'cp $CYLC_TASK_WORK_DIR/timer.txt $TASK_OUTPUT_DIR || true'
     ] %}
 
+{% if task_values["app_name"] == "canned_test" %}
+
+    {% if task_ns.application == "mesh_tools" %}
+      {% set env_application    = task_values["env_application"] %}
+      {% set configuration_file = task_values["configuration_file"] %}
+      {% set post_script_commands = [] %}
+    {% endif %}
+
+    {% set script_str.name = script_str.name~" --command-key=$RUN_METHOD" %}
+
+{% elif task_values["app_name"] == "mesh_tools" %}
+
+    {% set env_application    = task_values["env_application"] %}
+    {% set configuration_file = task_values["configuration_file"] %}
+
+    {% set script_str.name = script_str.name~" --command-key=$RUN_METHOD"~
+                                             " --opt-conf-key="~task_values["opt_confs"] %}
+    {% set post_script_commands = [] %}
+
+{% else %}
+    {% for opt_conf in task_values["opt_confs"] %}
+        {% set script_str.name = script_str.name~" --opt-conf-key="~opt_conf %}
+    {% endfor %}
+    {% set script_str.name = script_str.name~" --opt-conf-key="~task_values["resolution"] %}
+    {% if task_values["use_xios"] %}
+        {% set script_str.name = script_str.name~" --opt-conf-key=xios_server" %}
+    {% endif %}
+    {% set script_str.name = script_str.name~" --opt-conf-key=suite_controlled" %}
+{% endif %}
+
 
 {# Define the task runtime section #}
     [[{{task}}]]
@@ -80,7 +102,9 @@
             MESH_DIR              = {{mesh_dir}}
             TASK_OUTPUT_DIR       = {{task_output_dir}}
             APP_NAME              = {{task_values["app_name"]}}
-            APPLICATION           = {{task_ns.application}}
+            APPLICATION           = {{env_application}}
+            CONFIGURATION_FILE    = {{configuration_file}}
+            OUTPUT_FILE_PREFIX    = {{task_output_dir}}/mesh_{{task_ns.conf_name}}
             LOG_LEVEL             = {{task_values["log_level"]}}
             RESOLUTION            = {{task_values["resolution"]|replace("_MG","")}}
             DT                    = {{task_values["DT"]}}
@@ -104,14 +128,17 @@
             XIOS_SERVER_RANKS     = {{task_values["xios_server_ranks"]}}
             xios_nodes            = {{task_values["xios_nodes"]}}
             mpi_parts_xios        = {{task_values["mpi_parts_xios"]}}
+      {% if task_ns.application == "mesh_tools" %}
+            ROSE_LAUNCHER         = mpiexec
+            RUN_METHOD            = mpiexec
+            PROCESSES             = {{task_values["mpi_parts"]}}
+      {% endif %}
 
 {# Set any directives using macros imported in generate_runtime for this platform #}
         [[[directives]]]
-
 {{ set_task_cores(task_values["mpi_parts"],
                   threads=task_values["threads"],
                   xios_nodes=task_values["xios_nodes"]) }}
-
 
 {% if "wallclock" in task_values %}
     {{ set_wallclock(task_values["wallclock"]) }}
@@ -119,6 +146,13 @@
 
 {% if "memory" in task_values %}
     {{ set_memory(task_values["memory"]) }}
+{% endif %}
+
+{% if task_ns.application == "mesh_tools" and
+      task_values["app_name"] != "canned_test" and
+      task_ns.platform == "xc40" %}
+    -l select=1:ncpus=1:mem=6GB:tmpsize=6GB
+    -q=shared
 {% endif %}
 
 {% do LOG.debug("Finished in templates/runtime/generate_runtime_application.cylc") %}

@@ -1,0 +1,93 @@
+{# ########################################################################### #}
+{# (c) Crown copyright 2024 Met Office. All rights reserved. #}
+{# The file LICENCE, distributed with this code, contains details of the terms #}
+{# under which the code may be used. #}
+{# ########################################################################### #}
+{% do LOG.debug("Entered site/common/mesh_tools/tasks_mesh_tools.cylc") %}
+
+{% if task_ns.conf_name == "cubedsphere-c1" or
+      task_ns.conf_name == "cubedsphere-c2" or
+      task_ns.conf_name == "cubedsphere-c3" or
+      task_ns.conf_name == "cubedsphere-rotated" or
+      task_ns.conf_name == "cubedsphere-maps" or
+      task_ns.conf_name == "cubedsphere-op" or
+      task_ns.conf_name == "cubedsphere" %}
+
+    {% do task_dict.update({
+        "resolution": "",
+        "env_application": "cubedsphere_mesh_generator",
+        "configuration_file": "mesh_generation.nml",
+        "opt_confs": task_ns.conf_name
+    }) %}
+
+{% elif task_ns.conf_name == "planar-op-lam" or
+        task_ns.conf_name == "equator" or
+        task_ns.conf_name == "equator-band" or
+        task_ns.conf_name == "lam" or
+        task_ns.conf_name == "polar" or
+        task_ns.conf_name == "uk" or
+        task_ns.conf_name == "london-model" or
+        task_ns.conf_name == "nzlam4" or
+        task_ns.conf_name == "falklands" or
+        task_ns.conf_name == "var-seuk" or
+        task_ns.conf_name == "planar-lbc" or
+        task_ns.conf_name == "planar-maps" or
+        task_ns.conf_name == "planar-stretch-centres" or
+        task_ns.conf_name == "planar-stretch-nodes" or
+        task_ns.conf_name == "planar-stretch-points" or
+        task_ns.conf_name == "planar-trench-x" or
+        task_ns.conf_name == "planar-trench-y" or
+        task_ns.conf_name == "planar-bi-periodic" or
+        task_ns.conf_name == "planar-non-periodic" %}
+
+    {% do task_dict.update({
+        "resolution": "",
+        "env_application": "planar_mesh_generator",
+        "configuration_file": "mesh_generation.nml",
+        "opt_confs": task_ns.conf_name,
+    }) %}
+
+{% elif task_ns.conf_name == "unit_tests" %}
+
+    {% do task_dict.update({
+        "placeholder": true,
+    }) %}
+
+{% elif task_ns.conf_name == "canned_planar" %}
+
+    {% do task_dict.update({
+        "app_name": "canned_test",
+        "env_application": "planar_mesh_generator",
+        "configuration_file": "planar_mesh_gen.nml",
+        "kgo_checks": [],
+    }) %}
+
+{% elif task_ns.conf_name == "canned_cubedsphere" %}
+
+    {% do task_dict.update({
+        "app_name": "canned_test",
+        "env_application": "cubedsphere_mesh_generator",
+        "configuration_file": "cubedsphere_mesh_gen.nml",
+        "kgo_checks": [],
+    }) %}
+
+{% elif task.startswith("build") %}
+
+    {% do task_dict.update({
+        "placeholder": true,
+    }) %}
+
+{% endif %}
+
+{# Set default values for Mesh_Tools tasks #}
+{% if task_dict %}
+    {% do task_dict.update({"application_dir": "mesh_tools"}) %}
+    {% if "app_name" not in task_dict %}
+        {% do task_dict.update({"app_name": "mesh_tools"}) %}
+    {% endif %}
+    {% if "kgo_checks" not in task_dict %}
+        {% do task_dict.update({"kgo_checks": ["checksum"]}) %}
+    {% endif %}
+{% endif %}
+
+{% do LOG.debug("Finished in site/common/mesh_tools/tasks_mesh_tools.cylc") %}

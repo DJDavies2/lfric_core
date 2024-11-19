@@ -27,6 +27,38 @@
             PLOT_DIR       = {{task_output_dir}}/plots
             PLOT_CONFIG    = {{task_values["plot_str"]}}
 
+{% elif task.startswith("check_mesh_tools") %}
+
+{# KGO on then mesh file(s) #}
+
+    {% for family in task_values["checksum_families"] %}
+        {% set inherit.str = inherit.str~","~family|upper %}
+    {% endfor %}
+
+    {# Mesh kgo file location                         #}
+    {# rose-stem/site/SITE/kgos/mesh_tools/PLATFORM/  #}
+
+    {# Mesh test file location #}
+    {# task output dir         #}
+
+    {% set kgo_dir = "$SOURCE_ROOT/rose-stem/site/"~
+                      SITE~"/kgos/"~
+                      task_ns.application~"/"~
+                      task_ns.platform %}
+
+    [[{{task}}]]
+        inherit={{inherit.str|upper}}
+        script = 'rose task-run --app-key=check_mesh_kgo'
+        [[[environment]]]
+            KGO_DIR          = {{kgo_dir}}
+            MESH_DIR         = {{task_output_dir}}
+            CONFIG           = {{task_ns.conf_name}}
+            TOLERANCE        = 1.0E-30
+            PROJECT_NAME     = {{task_ns.application}}
+            TARGET_OPT       = {{task_ns.platform}}
+            COMPILER         = {{task_ns.compiler}}
+            MESH_FILE_PREFIX = mesh_{{task_ns.conf_name}}
+
 {% elif task.startswith("check") %}
 {# Check KGO Checksum tasks #}
 

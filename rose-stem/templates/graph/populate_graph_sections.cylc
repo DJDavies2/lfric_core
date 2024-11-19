@@ -70,11 +70,15 @@
 
 {# Do we need to build the mesh? #}
 {# Do this for everything except non-mesh build tasks and canned tests #}
-{% if not (task.startswith("build") and task_ns.application != "mesh") and
-      task_values["app_name"] != "canned_test" %}
+{% if not (task.startswith("build") and
+           task_ns.application != "mesh") and
+           task_ns.application != "mesh_tools" and
+           task_values["app_name"] != "canned_test" %}
+
     {% set mesh_build_task = "build_mesh_"~
                              task_ns.platform~"_"~
                              site_vars["mesh_build"][task_ns.platform] %}
+
 {# If the task is the mesh build task then use the task dictionary #}
 {# Otherwise use an empty dict to be populated later #}
     {% if mesh_build_task not in tasks_to_run %}
@@ -106,11 +110,16 @@
 
 {# Do we need to run the mesh? #}
 {# Any run task will need mesh unless it is a canned test #}
-{% if task.startswith("run") and task_values["app_name"] != "canned_test" %}
+{# or it is a mesh_tools test #}
+{% if task.startswith("run") and not
+      (task_values["app_name"] == "canned_test" or
+      task_ns.application == "mesh_tools") %}
+
     {% set mesh_run_task = "run_mesh_"~
                            task_values["resolution"]~"_"~
                            task_ns.platform~"_"~
                            site_vars["mesh_build"][task_ns.platform] %}
+
 {# If the task is the mesh run task then use the task dictionary #}
 {# Otherwise use an empty dict to be populated later #}
     {% if mesh_run_task not in tasks_to_run %}
@@ -124,7 +133,8 @@
 
 {# Do we need to run an application? #}
 {# Mesh run tasks covered above #}
-{% if task.startswith("run") and task_ns.application != "mesh" %}
+{% if task.startswith("run") and
+      task_ns.application != "mesh" %}
     {% set application_run_task = task %}
     {% if running_nrun %}
         {% if application_run_task not in tasks_to_run %}
@@ -156,7 +166,7 @@
 {% endif %}
 
 {# If running the nrun task, define application, plot, check and phystest #}
-{% if running_nrun %}
+{% if running_nrun and task.startswith("run") %}
     {% if application_run_task %}
         {% do graph_sections.append([
             application_build_task,

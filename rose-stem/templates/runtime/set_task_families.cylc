@@ -36,7 +36,7 @@
             {% if application in task and platform in task %}
                 {% if app_ns.found and application|length > app_ns.name|length %}
                     {% set app_ns.name = application %}
-                {% else %}
+                {% elif not app_ns.found %}
                     {% set app_ns.found = true %}
                     {% set app_ns.name = application %}
                 {% endif %}

@@ -83,7 +83,7 @@
 
     [[XC40_RUN_INTEL]]
         inherit=XC40_BASE,XC40_RUN,XC40_INTEL
-        {{ generate_script("pre-script", [xc40_base, xc40_compiler_intel]) }}
+        {{ generate_script("pre-script", [xc40_base, xc40_compiler_intel, xc40_tech]) }}
 
     [[XC40_RUN_CCE]]
         inherit=XC40_BASE,XC40_RUN,XC40_CCE
@@ -130,7 +130,7 @@
 
     [[XC40_TECH]]
         inherit=XC40_TECH_BASE
-        {{ generate_script("pre-script", [xc40_base, xc40_scitools, xc40_tech]) }}
+        {{ generate_script("pre-script", [xc40_base, xc40_scitools, xc40_tech, xc40_compiler_intel]) }}
 
     [[XC40_PLOT]]
         inherit=XC40_TECH_BASE
