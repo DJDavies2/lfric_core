@@ -19,7 +19,9 @@ ifeq ($(shell test $(PGFORTRAN_VERSION) -lt 015007000; echo $$?), 0)
 endif
 
 F_MOD_DESTINATION_ARG = -module$(SPACE)
-OPENMP_ARG            = -mp
+
+FFLAGS_OPENMP  = -mp
+LDFLAGS_OPENMP = -mp
 
 FFLAGS_COMPILER           =
 FFLAGS_NO_OPTIMISATION    = -O0

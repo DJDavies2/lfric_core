@@ -60,10 +60,12 @@ ALL_OBJECTS = $(foreach proj, $(shell echo $(PROGRAMS) | tr a-z A-Z), $($(proj)_
 
 .PHONY: applications
 applications: FFLAGS_BASE = $(FFLAGS) $(foreach group, $(FFLAG_GROUPS), $(FFLAGS_$(group)))
+applications: LDFLAGS_BASE = $(foreach group, $(LDFLAGS_GROUPS), $(LDFLAGS_$(group)))
 applications: $(addprefix $(BIN_DIR)/, $(PROGRAMS))
 
 .PHONY: libraries
 libraries: FFLAGS_BASE = $(FFLAGS) $(foreach group, $(FFLAG_GROUPS), $(FFLAGS_$(group)))
+libraries: LDFLAGS_BASE = $(foreach group, $(LDFLAGS_GROUPS), $(LDFLAGS_$(group)))
 libraries: $(addsuffix .a, $(addprefix $(LIB_DIR)/lib, $(PROGRAMS)))
 
 ##############################################################################
@@ -128,7 +130,7 @@ endif
 $(BIN_DIR)/%: %.o $$(LIB_DIR)/lib$$(*F).a
 	$(call MESSAGE,Linking,$*)
 	$(Q)mkdir -p $(@D)
-	$(Q)$(LDMPI) $(LDFLAGS) $(LDFLAGS_COMPILER) -o $@ $^ \
+	$(Q)$(LDMPI) $(LDFLAGS) $(LDFLAGS_BASE) $(LDFLAGS_COMPILER) -o $@ $^ \
 	            $(patsubst %,-l%,$(EXTERNAL_STATIC_LIBRARIES)) \
 	            $(patsubst %,-l%,$(EXTERNAL_DYNAMIC_LIBRARIES))
 

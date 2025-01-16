@@ -20,7 +20,9 @@ endif
 
 F_MOD_DESTINATION_ARG     = -J
 F_MOD_SOURCE_ARG          = -p
-OPENMP_ARG            = -h omp
+
+FFLAGS_OPENMP  = -h omp
+LDFLAGS_OPENMP = -h omp
 
 FFLAGS_COMPILER           =
 FFLAGS_NO_OPTIMISATION    = -O0

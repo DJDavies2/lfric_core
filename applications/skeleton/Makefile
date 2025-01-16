@@ -117,12 +117,14 @@ build: export CXX_LINK     = TRUE
 build: export PROGRAMS    := $(basename $(notdir $(shell find source -maxdepth 1 -name '*.[Ff]90' -print)))
 build: export PROJECT      = $(PROJECT_NAME)
 build: export WORKING_DIR := $(WORKING_DIR)/skeleton
+
+build: export LDFLAGS_GROUPS = OPENMP
 ifeq "$(PROFILE)" "full-debug"
-build: export FFLAG_GROUPS = DEBUG WARNINGS INIT RUNTIME NO_OPTIMISATION FORTRAN_STANDARD
+build: export FFLAG_GROUPS = OPENMP DEBUG WARNINGS INIT RUNTIME NO_OPTIMISATION FORTRAN_STANDARD
 else ifeq "$(PROFILE)" "fast-debug"
-build: export FFLAG_GROUPS = DEBUG WARNINGS SAFE_OPTIMISATION FORTRAN_STANDARD
+build: export FFLAG_GROUPS = OPENMP DEBUG WARNINGS SAFE_OPTIMISATION FORTRAN_STANDARD
 else ifeq "$(PROFILE)" "production"
-build: export FFLAG_GROUPS = DEBUG WARNINGS RISKY_OPTIMISATION
+build: export FFLAG_GROUPS = OPENMP DEBUG WARNINGS RISKY_OPTIMISATION
 else
   $(error Unrecognised profile "$(PROFILE)". Must be one of full-debug, fast-debug or production)
 endif

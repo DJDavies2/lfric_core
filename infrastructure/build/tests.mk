@@ -73,9 +73,11 @@ ALL_INTEGRATION_TESTS = $(patsubst $(TEST_DIR)/%,%,$(basename                 \
                                          -exec egrep -l "^\s*program\s" {} \; \
                                          2>/dev/null)))
 .PHONY: do-integration-tests/%
-do-integration-tests/%: export PYTHONPATH  := $(PYTHONPATH):$(LFRIC_BUILD)
-do-integration-tests/%: export PROGRAMS     = $(ALL_INTEGRATION_TESTS)
-do-integration-tests/%: export TEST_RUN_DIR = $(BIN_DIR)/test_files
+do-integration-tests/%: export PYTHONPATH    := $(PYTHONPATH):$(LFRIC_BUILD)
+do-integration-tests/%: export PROGRAMS       = $(ALL_INTEGRATION_TESTS)
+do-integration-tests/%: export TEST_RUN_DIR   = $(BIN_DIR)/test_files
+do-integration-tests/%: export FFLAG_GROUPS   = OPENMP
+do-integration-tests/%: export LDFLAGS_GROUPS = OPENMP
 
 do-integration-tests/run: $(foreach test,$(ALL_INTEGRATION_TESTS),do-integration-tests/run/$(test))
 

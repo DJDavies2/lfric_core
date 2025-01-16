@@ -291,7 +291,8 @@ configuration:
 # make decisions.
 #
 .PHONY: unit-tests/%
-unit-tests/%: export FFLAG_GROUPS = DEBUG RUNTIME NO_OPTIMISATION INIT UNIT_WARNINGS
+unit-tests/%: export LDFLAGS_GROUPS = OPENMP
+unit-tests/%: export FFLAG_GROUPS = OPENMP DEBUG RUNTIME NO_OPTIMISATION INIT UNIT_WARNINGS
 unit-tests/%:
 	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/tests.mk do-unit-test/$*
 
@@ -304,7 +305,8 @@ unit-tests/%:
 # make decisions.
 #
 .PHONY: integration-tests/%
-integration-tests/%: export FFLAG_GROUPS = DEBUG RUNTIME NO_OPTIMISATION INIT UNIT_WARNINGS
+integration-tests/%: export LDFLAGS_GROUPS = OPENMP
+integration-tests/%: export FFLAG_GROUPS = OPENMP DEBUG RUNTIME NO_OPTIMISATION INIT UNIT_WARNINGS
 integration-tests/%:
 	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/tests.mk do-integration-tests/$*
 

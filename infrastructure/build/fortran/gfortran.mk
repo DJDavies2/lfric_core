@@ -19,7 +19,9 @@ endif
 
 F_MOD_DESTINATION_ARG     = -J
 F_MOD_SOURCE_ARG          = -I
-OPENMP_ARG = -fopenmp
+
+FFLAGS_OPENMP  = -fopenmp
+LDFLAGS_OPENMP = -fopenmp
 
 FFLAGS_COMPILER           = -ffree-line-length-none
 FFLAGS_NO_OPTIMISATION    = -O0

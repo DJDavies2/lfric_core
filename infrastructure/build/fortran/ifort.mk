@@ -21,8 +21,10 @@ endif
 
 F_MOD_DESTINATION_ARG = -module$(SPACE)
 F_MOD_SOURCE_ARG      = -I
-OPENMP_ARG            = -qopenmp
 FORTRAN_RUNTIME       =
+
+FFLAGS_OPENMP  = -qopenmp
+LDFLAGS_OPENMP = -qopenmp
 
 FFLAGS_NO_OPTIMISATION    = -O0
 FFLAGS_SAFE_OPTIMISATION  = -O2 -fp-model strict
