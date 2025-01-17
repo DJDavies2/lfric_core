@@ -12,7 +12,9 @@ module sci_calc_detj_at_w3_kernel_mod
                                 GH_READ, ANY_SPACE_1,        &
                                 GH_DIFF_BASIS, GH_BASIS,     &
                                 ANY_DISCONTINUOUS_SPACE_3,   &
-                                CELL_COLUMN, GH_EVALUATOR
+                                OWNED_AND_HALO_CELL_COLUMN,  &
+                                GH_EVALUATOR,                &
+                                GH_SCALAR, GH_INTEGER
 
   use constants_mod,     only : r_def, r_single, r_double, i_def
   use fs_continuity_mod, only : W3
@@ -30,15 +32,15 @@ module sci_calc_detj_at_w3_kernel_mod
   !>
   type, public, extends(kernel_type) :: calc_detj_at_w3_kernel_type
     private
-    type(arg_type) :: meta_args(3) = (/                                    &
-         arg_type(GH_FIELD,   GH_REAL, GH_WRITE,  W3),                     &
-         arg_type(GH_FIELD*3, GH_REAL, GH_READ, ANY_SPACE_1),              &
-         arg_type(GH_FIELD,   GH_REAL, GH_READ, ANY_DISCONTINUOUS_SPACE_3) &
+    type(arg_type) :: meta_args(3) = (/                                        &
+         arg_type(GH_FIELD,   GH_REAL,    GH_WRITE,  W3),                      &
+         arg_type(GH_FIELD*3, GH_REAL,    GH_READ, ANY_SPACE_1),               &
+         arg_type(GH_FIELD,   GH_REAL,    GH_READ, ANY_DISCONTINUOUS_SPACE_3)  &
          /)
-    type(func_type) :: meta_funcs(1) = (/                                  &
-         func_type(ANY_SPACE_1, GH_BASIS, GH_DIFF_BASIS)                   &
+    type(func_type) :: meta_funcs(1) = (/                                      &
+         func_type(ANY_SPACE_1, GH_BASIS, GH_DIFF_BASIS)                       &
          /)
-    integer :: operates_on = CELL_COLUMN
+    integer :: operates_on = OWNED_AND_HALO_CELL_COLUMN
     integer :: gh_shape = GH_EVALUATOR
   end type
 
