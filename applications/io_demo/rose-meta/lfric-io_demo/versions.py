@@ -1,6 +1,8 @@
-import re
 import sys
+
 from metomi.rose.upgrade import MacroUpgrade
+
+from .version20_21 import *
 
 
 class UpgradeError(Exception):
@@ -29,28 +31,3 @@ class vnXX_txxx(MacroUpgrade):
         # Add settings
         return config, self.reports
 """
-
-
-class vn20_t358(MacroUpgrade):
-    """Upgrade macro for ticket #358 by Joshua Dendy."""
-
-    BEFORE_TAG = "vn2.0"
-    AFTER_TAG = "vn2.0_t358"
-
-    def upgrade(self, config, meta_config=None):
-        # Commands From: components/driver/rose-meta/lfric-driver
-        """
-        Add element_order_h and element_order_v to namelist finite_element,
-        replacing element_order
-        """
-        self.add_setting(
-            config, ["namelist:finite_element", "element_order_h"], "0"
-        )
-        self.add_setting(
-            config, ["namelist:finite_element", "element_order_v"], "0"
-        )
-        self.remove_setting(
-            config, ["namelist:finite_element", "element_order"]
-        )
-
-        return config, self.reports

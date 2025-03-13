@@ -1,8 +1,7 @@
+import re
 import sys
 
 from metomi.rose.upgrade import MacroUpgrade
-
-from .version20_21 import *
 
 
 class UpgradeError(Exception):
@@ -20,14 +19,23 @@ class UpgradeError(Exception):
 
 """
 Copy this template and complete to add your macro
-
 class vnXX_txxx(MacroUpgrade):
     # Upgrade macro for <TICKET> by <Author>
-
     BEFORE_TAG = "vnX.X"
     AFTER_TAG = "vnX.X_txxx"
-
     def upgrade(self, config, meta_config=None):
         # Add settings
         return config, self.reports
 """
+
+
+class vn20_t649(MacroUpgrade):
+    """Upgrade macro for ticket None by None."""
+
+    BEFORE_TAG = "vn2.0"
+    AFTER_TAG = "vn2.1"
+
+    def upgrade(self, config, meta_config=None):
+        # Commands From: rose-meta/lfric-mesh_tools
+        # Blank Upgrade Macro
+        return config, self.reports
