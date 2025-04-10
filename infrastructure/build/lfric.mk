@@ -275,7 +275,7 @@ configuration:
 %/import: $$**/source  # In the absense of special instructions.
 	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
 	          SOURCE_DIR=$<
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone/psyclone.mk \
+	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone/psyclone_psykal.mk \
 	          SOURCE_DIR=$<
 
 ##############################################################################
@@ -286,7 +286,7 @@ configuration:
 #
 .PHONY: %/psyclone
 %/psyclone: $$(addsuffix /extract, $$*)
-	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone/psyclone.mk \
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone/psyclone_psykal.mk \
 	            SOURCE_DIR=$* \
 	            WORKING_DIR=$(WORKING_DIR)
 

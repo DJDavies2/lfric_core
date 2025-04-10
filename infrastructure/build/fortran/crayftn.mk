@@ -60,6 +60,6 @@ else
   LDFLAGS_COMPILER =
 endif
 
-FPPFLAGS = -P
-
 DEPRULE_FLAGS = -moduleobjects
+
+FPPFLAGS    = -P

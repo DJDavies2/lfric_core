@@ -46,8 +46,6 @@ FFLAGS_FORTRAN_STANDARD   = -std=f2008
 
 LDFLAGS_COMPILER =
 
-FPPFLAGS = -P
-
 utilities/traceback_mod.o utilities/traceback_mod.mod: private FFLAGS_EXTRA = -fall-intrinsics
 
 # TODO - Remove the -fallow-arguments-mismatch flag when MPICH no longer fails
@@ -56,3 +54,5 @@ utilities/traceback_mod.o utilities/traceback_mod.mod: private FFLAGS_EXTRA = -f
 ifeq ($(shell test $(GFORTRAN_VERSION) -ge 100000; echo $$?), 0)
 	FFLAGS_COMPILER += -fallow-argument-mismatch
 endif
+
+FPPFLAGS = -P

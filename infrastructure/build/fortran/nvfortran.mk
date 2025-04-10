@@ -27,7 +27,6 @@ FFLAGS_RUNTIME            =
 FFLAGS_FORTRAN_STANDARD   =
 
 LDFLAGS_COMPILER = -g
-FPPFLAGS = -P -D__NVCOMPILER
 
 # Flags for OpenMP threading / OpenMP offloading / OpenACC Offloading
 # The LFRIC_OFFLOAD_DIRECTIVES env_variable is also queried in the PSyclone
@@ -42,3 +41,6 @@ else
 	FFLAGS_OPENMP  = -mp
 	LDFLAGS_OPENMP = -mp
 endif
+
+FPP = nvfortran -F
+FPPFLAGS = -P -D__NVCOMPILER
