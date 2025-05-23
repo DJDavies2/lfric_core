@@ -10,6 +10,7 @@
     {% do task_dict.update({
         "opt_confs": ["default"],
         "resolution": "C24",
+        "tsteps": 10,
     }) %}
 
 {% elif task_ns.conf_name == "unit_tests" %}
