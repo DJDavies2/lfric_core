@@ -7,8 +7,8 @@
 
 {% set azspice_coupled_base_gnu = 'module purge ; '~
                                   'module use /home/users/lfricadmin/lmod ; '~
-                                  'ml lfric/vn2.1 ; '~
-                                  'ml xios/2252-oasis ; '~
+                                  'ml lfric/vn2.2 ; '~
+                                  'ml xios/2701-oasis ; '~
                                   'ml oasis/3-mct5.0' %}
 
 {% set ex1a_coupled_base = "module use /common/internal/spack/ngms ; " ~
