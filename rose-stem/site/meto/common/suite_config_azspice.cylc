@@ -27,6 +27,9 @@
             ROSE_LAUNCHER = mpiexec
 
     [[AZSPICE_BUILD]]
+        [[[environment]]]
+            USE_VERNIER = yes
+            USE_TIMING_WRAPPER=yes
         [[[directives]]]
             --time=00:45:00
             --ntasks=6

@@ -11,6 +11,13 @@ ifndef NO_MPI
 endif
 export EXTERNAL_DYNAMIC_LIBRARIES += netcdff netcdf
 
+$(call MESSAGE, Vernier, $(USE_VERNIER))
+ifdef USE_VERNIER
+  export IGNORE_DEPENDENCIES += vernier_mod
+  $(call MESSAGE, Vernier, $(USE_VERNIER))
+  export EXTERNAL_DYNAMIC_LIBRARIES += vernier_f vernier_c vernier
+endif
+
 TEMPLATE_TOOL = $(LFRIC_BUILD)/tools/Templaterator
 TYPE_TABLE_real32 = real
 TYPE_TABLE_real64 = real

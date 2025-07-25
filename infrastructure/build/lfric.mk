@@ -92,6 +92,15 @@ ifndef USE_MPI_F08
   export PRE_PROCESS_MACROS += LEGACY_MPI
 endif
 
+ifdef USE_VERNIER
+  export PRE_PROCESS_MACROS += VERNIER
+endif
+
+ifdef USE_TIMING_WRAPPER
+  export PRE_PROCESS_MACROS += TIMING_ON
+endif
+
+
 # Set the default precision for reals
 RDEF_PRECISION ?= 64
 export PRE_PROCESS_MACROS += RDEF_PRECISION=$(RDEF_PRECISION)
