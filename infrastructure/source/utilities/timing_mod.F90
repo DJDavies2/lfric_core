@@ -88,8 +88,15 @@ contains
         write(log_scratch_space, '(A)') 'Timing Mod: Runtime timing is turned on but no profiling tool (such as Vernier) is turned on!'
         call log_event(log_scratch_space, LOG_LEVEL_WARNING)
 #endif
-
 #endif
+
+#ifndef TIMING_ON
+#ifdef VERNIER
+        write(log_scratch_space, '(A)') 'Timing Mod: Vernier is on but Timing is not!'
+        call log_event(log_scratch_space, LOG_LEVEL_WARNING)
+#endif
+#endif
+
     end subroutine init_timing
 
 !=============================================================================!
@@ -98,7 +105,7 @@ contains
 
         implicit none
 
-
+#ifdef TIMING_ON
 #ifdef VERNIER
         !If Vernier is on then it will write to a file and then finalise
         call vernier_write()
@@ -110,9 +117,8 @@ contains
 
         write(log_scratch_space, '(A)') 'Timing Mod: Vernier finalised'
         call log_event(log_scratch_space, LOG_LEVEL_DEBUG)
-
 #endif
-
+#endif
 
     end subroutine final_timing
 
@@ -130,11 +136,8 @@ contains
 #ifdef VERNIER
         !If Vernier is on will start a calliper
         call vernier_start( timing_section_handle , timing_section_name )
-
 #else
-
         timing_section_handle = IMDI
-
 #endif
 
     end subroutine start_timing
@@ -152,7 +155,6 @@ contains
 #ifdef VERNIER
         !If Vernier is on will end a calliper
         call vernier_stop( timing_section_handle )
-
 #endif
 
     end subroutine stop_timing
