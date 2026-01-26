@@ -1,6 +1,6 @@
 ##############################################################################
 # Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
-# For further details please refer to the file LICENCE which you
+# For further details please refer to the file LICENCE.original which you
 # should have received as part of this distribution.
 ##############################################################################
 # Various things specific to the Intel Fortran compiler.
@@ -35,7 +35,7 @@ FFLAGS_DEBUG              = -g -traceback
 # created. This adds unecessary files to the build so we disable that
 # behaviour.
 #
-FFLAGS_WARNINGS           = -warn all -warn errors -gen-interfaces nosource
+FFLAGS_WARNINGS           = -warn all -gen-interfaces nosource
 FFLAGS_UNIT_WARNINGS      = -warn all -gen-interfaces nosource
 FFLAGS_INIT               = -ftrapuv
 
