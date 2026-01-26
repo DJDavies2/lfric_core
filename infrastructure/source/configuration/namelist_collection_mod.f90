@@ -64,7 +64,7 @@ module namelist_collection_mod
     procedure, public :: get_n_namelists
     procedure, public :: get_table_len
 
-    procedure, public :: get_namelist
+    procedure, public :: get_namelist, get_namelist_sub
     procedure, public :: get_next_item
 
     procedure, public :: clear
@@ -311,7 +311,7 @@ function get_namelist( self, name, profile_name ) result( namelist_obj )
 
   implicit none
 
-  class(namelist_collection_type), intent(in) :: self
+  class(namelist_collection_type), target, intent(in) :: self
   character(*),                    intent(in) :: name
   character(*), optional,          intent(in) :: profile_name
 
@@ -366,6 +366,64 @@ function get_namelist( self, name, profile_name ) result( namelist_obj )
 
 end function get_namelist
 
+subroutine get_namelist_sub( self, name, namelist_obj, profile_name )
+
+  implicit none
+
+  class(namelist_collection_type), target, intent(in) :: self
+  character(*),                    intent(in) :: name
+  character(*), optional,          intent(in) :: profile_name
+
+  type(namelist_type), intent(inout) :: namelist_obj
+
+  character(str_def) :: full_name
+
+  ! Pointer to linked list - used for looping through the list
+  type(linked_list_item_type), pointer :: loop => null()
+
+  integer(i_def) :: hash
+
+!  nullify(namelist_obj)
+
+  if ( present(profile_name) ) then
+    full_name = trim(name) // ':' // trim(profile_name)
+  else
+    full_name = trim(name)
+  end if
+
+  ! Calculate the hash of the namelist being searched for.
+  hash = mod( sum_string(trim(name)), self%get_table_len() )
+
+  ! Start at the head of the linked list identified by the hash.
+  loop => self%namelist_list(hash)%get_head()
+
+  do
+    ! If list is empty or the end of list was reached without
+    ! finding the namelist, fail with an error.
+    if ( .not. associated(loop) ) then
+      write( log_scratch_space, '(A)')           &
+          'Namelist '//trim(full_name)//         &
+          ' not found in namelist collection '// &
+          trim(self%name)
+      call log_event( log_scratch_space, LOG_LEVEL_ERROR )
+    end if
+
+    ! Otherwise search list for the namelist we want
+    ! 'cast' to the namelist_type
+    select type( payload => loop%payload)
+    type is (namelist_type)
+      if ( trim(full_name) == trim(payload%get_full_name()) ) then
+        namelist_obj = payload
+        exit
+      end if
+    end select
+
+    loop => loop%next
+  end do
+
+  nullify(loop)
+
+end subroutine get_namelist_sub
 
 !> @brief Queries the namelist collection for the total number
 !>        of namelists stored.

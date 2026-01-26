@@ -35,14 +35,18 @@ contains
     logical              :: success
     integer              :: i
 
+write(0, '(a)') "in init_config 1"; flush(0)
     allocate( success_map(size(required_namelists)) )
+write(0, '(a)') "in init_config 2"; flush(0)
 
     call log_event( 'Loading configuration ...', &
                     log_level_debug )
 
     call read_configuration( filename, configuration )
+write(0, '(a)') "in init_config 3"; flush(0)
 
     success = ensure_configuration( required_namelists, success_map )
+write(0, '(a)') "in init_config 4"; flush(0)
     if (.not. success) then
       write( log_scratch_space, &
              '("The following required namelists were not loaded:")' )
@@ -53,6 +57,7 @@ contains
       end do
       call log_event( log_scratch_space, log_level_error )
     end if
+write(0, '(a)') "in init_config 5"; flush(0)
 
     deallocate( success_map )
 

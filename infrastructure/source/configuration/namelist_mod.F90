@@ -39,7 +39,6 @@ module namelist_mod
 
     character(:), allocatable :: listname
     character(str_def) :: profile_name = trim(cmdi)
-
 #ifdef __NVCOMPILER
     class(namelist_item_type), allocatable :: members(:)
 #else
@@ -121,9 +120,15 @@ contains
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     end if
 
-    allocate( self%listname, source=listname )
+    !allocate( self%listname, source=listname )
+    if (allocated(self % listname)) deallocate (self % listname)
+    allocate(character(len=len(listname)) :: self % listname)
+    self % listname(1:len(listname)) = listname
 #ifndef __NVCOMPILER
-    allocate( self%members,  source=members )
+    !allocate( self%members,  source=members )
+    if (allocated(self % members)) deallocate (self % members)
+    allocate(self % members(size(members)))
+    self % members(:) = members
 #else
     self%members = members
 #endif
@@ -304,8 +309,11 @@ contains
 
     integer(i_def) :: i
 
+write(0, '(a,a)') "in get_str_value 1, trim(name) = ", trim(name); flush(0)
     i = self%locate_member( name )
+write(0, '(a,i0)') "in get_str_value 2, i = ", i; flush(0)
     call self%members(i)%get_value(value)
+write(0, '(a,a)') "in get_str_value 1, trim(value) = ", trim(value); flush(0)
 
   end subroutine get_str_value
 
@@ -522,9 +530,12 @@ contains
     implicit none
 
     type (namelist_type), intent(inout) :: self
+#ifndef AOCC
+    write(0, '(a)') "in namelist_destructore 1"; flush(0)
 
     call self%clear()
-
+    write(0, '(a)') "in namelist_destructore 2"; flush(0)
+#endif
     return
   end subroutine namelist_destructor
 

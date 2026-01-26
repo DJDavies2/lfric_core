@@ -34,7 +34,8 @@ module {{listname}}_config_mod
 {{' '*12}}{{listname}}_is_loadable, {{listname}}_is_loaded, &
 {{' '*12}}{{listname}}_reset_load_status, &
 {{' '*12}}{{listname}}_multiples_allowed, {{listname}}_final, &
-{{' '*12}}get_{{listname}}_nml
+{{' '*12}}get_{{listname}}_nml, &
+{{' '*12}}get_{{listname}}_nml_sub
 
 {%- for name in enumerations | sort %}
 {%-   if loop.first %}{{'\n'}}{%- endif %}
@@ -363,22 +364,64 @@ contains
     type(namelist_type)      :: namelist_obj
     type(namelist_item_type) :: members({{parameters|length}})
 
+write(0, '(a)') "in get_{{listname}}_nml 1"; flush(0)
 {%- for name, parameter in parameters | dictsort %}
 {%-   if loop.first %}{{'\n'}}{% endif %}
       call members({{loop.index}})%initialise( &
                   '{{parameter.name}}', {{parameter.name}} )
 {{- '\n'}}
 {%- endfor %}
+write(0, '(a)') "in get_{{listname}}_nml 2"; flush(0)
     if (trim(profile_name) /= trim(cmdi) ) then
+write(0, '(a)') "in get_{{listname}}_nml 2.1"; flush(0)
       call namelist_obj%initialise( trim(listname), &
                                     members, &
                                     profile_name = profile_name )
+write(0, '(a)') "in get_{{listname}}_nml 2.2"; flush(0)
     else
+write(0, '(a)') "in get_{{listname}}_nml 2.3"; flush(0)
       call namelist_obj%initialise( trim(listname), &
                                     members )
+write(0, '(a)') "in get_{{listname}}_nml 2.4"; flush(0)
     end if
+write(0, '(a)') "in get_{{listname}}_nml 3"; flush(0)
 
   end function get_{{listname}}_nml
+
+
+  !> @brief Returns a <<namelist_type>> object populated with the
+  !>        current contents of this configuration module.
+  !> @return namelist_obj <<namelist_type>> with current namelist contents.
+  subroutine get_{{listname}}_nml_sub(namelist_obj)
+
+    implicit none
+
+    type(namelist_type), intent(inout) :: namelist_obj
+    type(namelist_item_type) :: members({{parameters|length}})
+
+write(0, '(a)') "in get_{{listname}}_nml 11"; flush(0)
+{%- for name, parameter in parameters | dictsort %}
+{%-   if loop.first %}{{'\n'}}{% endif %}
+      call members({{loop.index}})%initialise( &
+                  '{{parameter.name}}', {{parameter.name}} )
+{{- '\n'}}
+{%- endfor %}
+write(0, '(a)') "in get_{{listname}}_nml 12"; flush(0)
+    if (trim(profile_name) /= trim(cmdi) ) then
+write(0, '(a)') "in get_{{listname}}_nml 12.1"; flush(0)
+      call namelist_obj%initialise( trim(listname), &
+                                    members, &
+                                    profile_name = profile_name )
+write(0, '(a)') "in get_{{listname}}_nml 12.2"; flush(0)
+    else
+write(0, '(a)') "in get_{{listname}}_nml 12.3"; flush(0)
+      call namelist_obj%initialise( trim(listname), &
+                                    members )
+write(0, '(a)') "in get_{{listname}}_nml 12.4"; flush(0)
+    end if
+write(0, '(a)') "in get_{{listname}}_nml 13"; flush(0)
+
+  end subroutine get_{{listname}}_nml_sub
 
 
   !> Performs any processing to be done once all namelists are loaded

@@ -27,7 +27,8 @@ module {{moduleName}}
 {{' '*indent}}{{listname}}_is_loaded, &
 {{' '*indent}}{{listname}}_reset_load_status, &
 {{' '*indent}}{{listname}}_final, &
-{{' '*indent}}get_{{listname}}_nml
+{{' '*indent}}get_{{listname}}_nml, &
+{{' '*indent}}get_{{listname}}_nml_sub
 {%-   endfor %}
 {%- endif %}
 
@@ -60,18 +61,24 @@ contains
     character(str_def), allocatable :: namelists(:)
     integer(i_def) :: unit = -1
 
+write(0, '(a)') "in read_configuration 1"; flush(0)
     local_rank = global_mpi%get_comm_rank()
 
+write(0, '(a)') "in read_configuration 2"; flush(0)
     if (local_rank == 0) unit = open_file( filename )
 
+write(0, '(a)') "in read_configuration 3"; flush(0)
     call get_namelist_names( unit, local_rank, namelists )
 
+write(0, '(a)') "in read_configuration 4"; flush(0)
     call read_configuration_namelists( unit, local_rank,    &
                                        namelists, filename, &
                                        nml_bank )
 
+write(0, '(a)') "in read_configuration 5"; flush(0)
     if (local_rank == 0) call close_file( unit )
 
+write(0, '(a)') "in read_configuration 6"; flush(0)
   end subroutine read_configuration
 
   ! Finds names of all namelists present in file.
@@ -197,6 +204,7 @@ contains
 
     logical :: scan
 
+write(0, '(a)') "in read_configuration_namelists 1"; flush(0)
 {%- if namelists %}
 {{-'\n'}}
     ! Reset load status from any previous file reads
@@ -205,9 +213,11 @@ contains
 {%-   endfor %}
 {%- endif %}
 
+write(0, '(a)') "in read_configuration_namelists 2"; flush(0)
     ! Read the namelists
     do j=1, 2
 
+write(0, '(a,i0)') "in read_configuration_namelists 2.1, j = ", j; flush(0)
       select case(j)
       case(1)
         scan = .true.
@@ -215,19 +225,34 @@ contains
         scan = .false.
       end select
 
+write(0, '(a,i0)') "in read_configuration_namelists 2.2, size(namelists) = ", size(namelists); flush(0)
       do i=1, size(namelists)
 
+write(0, '(a,i0,a,a)') "in read_configuration_namelists 2.2, i = ", i, " trim(namelists(i)) = ", trim(namelists(i)); flush(0)
         select case (trim(namelists(i)))
 {%- for listname in namelists %}
         case ('{{listname}}')
+write(0, '(a)') "in read_configuration_namelists 2.3"; flush(0)
           if ({{listname}}_is_loadable()) then
+write(0, '(a)') "in read_configuration_namelists 2.4"; flush(0)
             call read_{{listname}}_namelist( unit, local_rank, scan )
+write(0, '(a)') "in read_configuration_namelists 2.5"; flush(0)
             if (.not. scan) then
+write(0, '(a)') "in read_configuration_namelists 2.6"; flush(0)
               call postprocess_{{listname}}_namelist()
-              nml_obj = get_{{listname}}_nml()
+write(0, '(a)') "in read_configuration_namelists 2.7"; flush(0)
+!              call nml_obj % clear()
+!              nml_obj = get_{{listname}}_nml()
+               call get_{{listname}}_nml_sub(nml_obj)
+write(0, '(a)') "in read_configuration_namelists 2.8"; flush(0)
               call nml_bank%add_namelist(nml_obj)
+write(0, '(a)') "in read_configuration_namelists 2.9"; flush(0)
             end if
+write(0, '(a)') "in read_configuration_namelists 2.10"; flush(0)
           else
+            write(0, '(A)' )      &
+                'Namelist "'//trim(namelists(i))// &
+                '" can not be read. Too many instances?'
             write( log_scratch_space, '(A)' )      &
                 'Namelist "'//trim(namelists(i))// &
                 '" can not be read. Too many instances?'
@@ -235,6 +260,9 @@ contains
           end if
 {%- endfor %}
         case default
+          write(0, '(A)' )                   &
+              'Unrecognised namelist "'//trim(namelists(i))// &
+              '" found in file '//trim(filename)//'.'
           write( log_scratch_space, '(A)' )                   &
               'Unrecognised namelist "'//trim(namelists(i))// &
               '" found in file '//trim(filename)//'.'
@@ -249,6 +277,7 @@ contains
 
     end do ! Reading passes
 
+write(0, '(a)') "in read_configuration_namelists 3"; flush(0)
   end subroutine read_configuration_namelists
 
   subroutine final_configuration()
