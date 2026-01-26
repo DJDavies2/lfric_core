@@ -363,12 +363,14 @@ contains
     type(namelist_type)      :: namelist_obj
     type(namelist_item_type) :: members({{parameters|length}})
 
+write(0, '(a)') "in get_{{listname}}_nml 1"; flush(0)
 {%- for name, parameter in parameters | dictsort %}
 {%-   if loop.first %}{{'\n'}}{% endif %}
       call members({{loop.index}})%initialise( &
                   '{{parameter.name}}', {{parameter.name}} )
 {{- '\n'}}
 {%- endfor %}
+write(0, '(a)') "in get_{{listname}}_nml 2"; flush(0)
     if (trim(profile_name) /= trim(cmdi) ) then
       call namelist_obj%initialise( trim(listname), &
                                     members, &
@@ -377,6 +379,7 @@ contains
       call namelist_obj%initialise( trim(listname), &
                                     members )
     end if
+write(0, '(a)') "in get_{{listname}}_nml 3"; flush(0)
 
   end function get_{{listname}}_nml
 

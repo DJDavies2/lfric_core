@@ -318,11 +318,14 @@ function get_namelist( self, name, profile_name ) result( namelist_obj )
   type(namelist_type), pointer :: namelist_obj
 
   character(str_def) :: full_name
+  character(len=str_def) :: test_str
 
   ! Pointer to linked list - used for looping through the list
   type(linked_list_item_type), pointer :: loop => null()
 
   integer(i_def) :: hash
+  
+  write(0, '(a,a)') "in get_namelist 1, trim(name) = ", trim(name); flush(0)
 
   nullify(namelist_obj)
 
@@ -331,6 +334,7 @@ function get_namelist( self, name, profile_name ) result( namelist_obj )
   else
     full_name = trim(name)
   end if
+  write(0, '(a,a)') "in get_namelist 2, trim(full_name) = ", trim(full_name); flush(0)
 
   ! Calculate the hash of the namelist being searched for.
   hash = mod( sum_string(trim(name)), self%get_table_len() )
@@ -353,14 +357,23 @@ function get_namelist( self, name, profile_name ) result( namelist_obj )
     ! 'cast' to the namelist_type
     select type( payload => loop%payload)
     type is (namelist_type)
+  write(0, '(a,a)') "in get_namelist 3, trim(name) = ", trim(name); flush(0)
+  write(0, '(a,a)') "in get_namelist 3, trim(payload%get_full_name()) = ", trim(payload%get_full_name()); flush(0)
       if ( trim(full_name) == trim(payload%get_full_name()) ) then
+!        call payload%get_value( 'forecast_length', test_str )
+  write(0, '(a,a)') "in get_namelist 3.1, trim(test_str) = ", trim(test_str); flush(0)
         namelist_obj => payload
+!        call namelist_obj%get_value( 'forecast_length', test_str )
+  write(0, '(a,a)') "in get_namelist 3.2, trim(test_str) = ", trim(test_str); flush(0)
         exit
       end if
     end select
 
     loop => loop%next
   end do
+  write(0, '(a,l1)') "in get_namelist 3.3, associated(namelist_obj) = ", associated(namelist_obj); flush(0)
+!  call namelist_obj%get_value( 'forecast_length', test_str )
+  write(0, '(a,a)') "in get_namelist 4, trim(test_str) = ", trim(test_str); flush(0)
 
   nullify(loop)
 

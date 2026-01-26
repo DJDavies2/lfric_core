@@ -40,11 +40,11 @@ module namelist_mod
     character(:), allocatable :: listname
     character(str_def) :: profile_name = trim(cmdi)
 
-#ifdef __NVCOMPILER
-    class(namelist_item_type), allocatable :: members(:)
-#else
+!#ifdef __NVCOMPILER
+!    class(namelist_item_type), allocatable :: members(:)
+!#else
     type(namelist_item_type), allocatable :: members(:)
-#endif
+!#endif
 
   contains
 
@@ -481,6 +481,8 @@ contains
     if ( allocated(self%members) ) then
       do i=1, size(self%members)
         key = self%members(i)%get_key()
+        write(0, '(a,a)') "in locate_member, trim(key) = ", trim(key); flush(0)
+        write(0, '(a,a)') "in locate_member, trim(name) = ", trim(name); flush(0)
         if ( trim(key) == trim(name) ) then
           member_index = i
           return

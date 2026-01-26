@@ -37,6 +37,8 @@ ifdef CRAY_ENVIRONMENT
     FORTRAN_COMPILER = gfortran
   else ifeq '$(PE_ENV)' 'PGI'
     FORTRAN_COMPILER = pgfortran
+  else ifeq '$(PE_ENV)' 'NVIDIA'
+    FORTRAN_COMPILER = nvfortran
   else
     $(error Unrecognised Cray programming environment)
   endif

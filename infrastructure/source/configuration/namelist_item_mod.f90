@@ -583,7 +583,9 @@ subroutine value_str( self, value )
 
   select type( clay => self%key_value_pair )
   class is (str_key_value_type)
+write(0, '(a,a)') "in value_str, trim(clay % value) = ", trim(clay % value); flush(0)
     value = trim(clay%value)
+write(0, '(a,a)') "in value_str, trim(value) = ", trim(value); flush(0)
   class default
     write( log_scratch_space, '(A)' ) &
         'Object is not the expected str_key_value_type.'

@@ -9,15 +9,15 @@
 # This macro is evaluated now (:= syntax) so it may be used as many times as
 # desired without wasting time rerunning it.
 #
-NVFORT_VERSION := $(shell nvfortran -V | awk '/^nvfortran +[0-9]+\.[0-9]+/ { split($$2, a, "[.-]"); printf "%03i%02i%02i\n", a[1],a[2],a[3] }')
-$(info ** Chosen Nvidia Fortran compiler version $(NVFORT_VERSION))
-ifeq ($(shell test $(NVFORT_VERSION) -lt 0241100; echo $$?), 0)
-  $(error nvFort is too old to build LFRic. Must be at least 24.11)
-endif
+#NVFORT_VERSION := $(shell nvfortran -V | awk '/^nvfortran +[0-9]+\.[0-9]+/ { split($$2, a, "[.-]"); printf "%03i%02i%02i\n", a[1],a[2],a[3] }')
+#$(info ** Chosen Nvidia Fortran compiler version $(NVFORT_VERSION))
+#ifeq ($(shell test $(NVFORT_VERSION) -lt 0241100; echo $$?), 0)
+#  $(error nvFort is too old to build LFRic. Must be at least 24.11)
+#endif
 
 F_MOD_DESTINATION_ARG = -module$(SPACE)
 
-FFLAGS_COMPILER           =
+FFLAGS_COMPILER           = -DNVHPC
 FFLAGS_COMPILER          += -Mfree -Mpreprocess
 FFLAGS_NO_OPTIMISATION    = -O0
 FFLAGS_SAFE_OPTIMISATION  = -O2
@@ -43,5 +43,5 @@ else
 	LDFLAGS_OPENMP = -mp
 endif
 
-FPP = nvfortran -E
-FPPFLAGS = -P -D__NVCOMPILER
+FPPFLAGS = -P -DNVHPC
+
