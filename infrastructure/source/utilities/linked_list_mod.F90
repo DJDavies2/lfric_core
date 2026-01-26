@@ -1,6 +1,6 @@
 !-----------------------------------------------------------------------------
 ! Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
-! For further details please refer to the file LICENCE which you
+! For further details please refer to the file LICENCE.original which you
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
 
@@ -429,7 +429,7 @@ subroutine remove_item(self, item )
 end subroutine remove_item
 
 !> Clears the list
-subroutine clear(self)
+recursive subroutine clear(self)
 
   implicit none
 

@@ -1,6 +1,6 @@
 !-----------------------------------------------------------------------------
 ! Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
-! For further details please refer to the file LICENCE which you
+! For further details please refer to the file LICENCE.original which you
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
 !>  @brief Abstract ugrid file type.
@@ -70,8 +70,8 @@ abstract interface
 
     ! Arguments
     class(ugrid_file_type), intent(in)  :: self
-    character(str_def),     intent(in)  :: source_mesh_name
-    character(str_def),     intent(in)  :: target_mesh_name
+    character(*),     intent(in)  :: source_mesh_name
+    character(*),     intent(in)  :: target_mesh_name
 
     integer(i_def),         intent(out), allocatable :: mesh_map(:,:,:)
 
@@ -108,7 +108,7 @@ abstract interface
     ! Arguments
     class(ugrid_file_type), intent(inout) :: self
 
-    character(str_def), intent(in)  :: mesh_name
+    character(*), intent(in)  :: mesh_name
     integer(i_def),     intent(out) :: num_nodes
     integer(i_def),     intent(out) :: num_edges
     integer(i_def),     intent(out) :: num_faces
@@ -251,16 +251,16 @@ abstract interface
     class(ugrid_file_type), intent(inout) :: self
 
     ! Common mesh related variables
-    character(str_def), intent(in)  :: mesh_name
-    character(str_def), intent(out) :: geometry
-    character(str_def), intent(out) :: coord_sys
+    character(*), intent(in)  :: mesh_name
+    character(*), intent(out) :: geometry
+    character(*), intent(out) :: coord_sys
     real(r_def),        intent(out) :: north_pole(2)
     real(r_def),        intent(out) :: null_island(2)
     real(r_def),        intent(out) :: equatorial_latitude
     real(r_def),        intent(out) :: node_coordinates(:,:)
     real(r_def),        intent(out) :: face_coordinates(:,:)
-    character(str_def), intent(out) :: coord_units_x
-    character(str_def), intent(out) :: coord_units_y
+    character(*), intent(out) :: coord_units_x
+    character(*), intent(out) :: coord_units_y
     integer(i_def),     intent(out) :: void_cell
     integer(i_def),     intent(out) :: face_node_connectivity(:,:)
     integer(i_def),     intent(out) :: face_edge_connectivity(:,:)
@@ -268,16 +268,16 @@ abstract interface
     integer(i_def),     intent(out) :: edge_node_connectivity(:,:)
 
     ! Variables referring to global mesh types
-    character(str_def), intent(out) :: topology
+    character(*), intent(out) :: topology
     logical(l_def),     intent(out) :: periodic_xy(2)
     real(r_def),        intent(out) :: domain_extents(2,4)
     integer(i_def),     intent(out) :: npanels
     integer(i_def),     intent(out) :: rim_depth
 
-    character(str_longlong), intent(out) :: constructor_inputs
+    character(*), intent(out) :: constructor_inputs
 
     ! Partition variables
-    character(str_def), intent(out) :: partition_of
+    character(*), intent(out) :: partition_of
     integer(i_def),     intent(out) :: num_faces_global
     integer(i_def),     intent(out) :: max_stencil_depth
 
@@ -300,7 +300,7 @@ abstract interface
 
     integer(i_def), intent(out) :: num_targets
 
-    character(str_def), intent(out), allocatable :: target_mesh_names(:)
+    character(*), intent(out), allocatable :: target_mesh_names(:)
 
   end subroutine read_mesh_interface
 
@@ -406,9 +406,9 @@ abstract interface
     class(ugrid_file_type), intent(inout) :: self
 
     ! Common mesh variables.
-    character(str_def), intent(in) :: mesh_name
-    character(str_def), intent(in) :: geometry
-    character(str_def), intent(in) :: coord_sys
+    character(*), intent(in) :: mesh_name
+    character(*), intent(in) :: geometry
+    character(*), intent(in) :: coord_sys
     real(r_def),        intent(in) :: north_pole(2)
     real(r_def),        intent(in) :: null_island(2)
     real(r_def),        intent(in) :: equatorial_latitude
@@ -418,8 +418,8 @@ abstract interface
     integer(i_def),     intent(in) :: num_faces
     real(r_def),        intent(in) :: node_coordinates(:,:)
     real(r_def),        intent(in) :: face_coordinates(:,:)
-    character(str_def), intent(in) :: coord_units_x
-    character(str_def), intent(in) :: coord_units_y
+    character(*), intent(in) :: coord_units_x
+    character(*), intent(in) :: coord_units_y
     integer(i_def),     intent(in) :: void_cell
     integer(i_def),     intent(in) :: face_node_connectivity(:,:)
     integer(i_def),     intent(in) :: face_edge_connectivity(:,:)
@@ -427,16 +427,16 @@ abstract interface
     integer(i_def),     intent(in) :: edge_node_connectivity(:,:)
 
     ! Global mesh only variables
-    character(str_def), intent(in) :: topology
+    character(*), intent(in) :: topology
     logical(l_def),     intent(in) :: periodic_xy(2)
     real(r_def),        intent(in) :: domain_extents(2,4)
     integer(i_def),     intent(in) :: npanels
     integer(i_def),     intent(in) :: rim_depth
 
-    character(str_longlong), intent(in) :: constructor_inputs
+    character(*), intent(in) :: constructor_inputs
 
     ! Partition variables
-    character(str_def), intent(in) :: partition_of
+    character(*), intent(in) :: partition_of
     integer(i_def),     intent(in) :: num_faces_global
     integer(i_def),     intent(in) :: max_stencil_depth
 
@@ -452,7 +452,7 @@ abstract interface
 
     ! Inter-grid maps
     integer(i_def),     intent(in) :: num_targets
-    character(str_def), intent(in), allocatable :: target_mesh_names(:)
+    character(*), intent(in), allocatable :: target_mesh_names(:)
     type(global_mesh_map_collection_type), &
                         intent(in), pointer :: target_global_mesh_maps
     type(local_mesh_map_collection_type),  &
