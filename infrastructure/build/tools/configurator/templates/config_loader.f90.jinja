@@ -15,10 +15,13 @@ module {{moduleName}}
 
   use namelist_collection_mod, only: namelist_collection_type
   use namelist_mod,            only: namelist_type
-
-{%- if namelists %}
+  use config_mod,              only: config_type
 {{-'\n'}}
-{%-   for listname in namelists %}
+{%- for listname in namelists %}
+  use {{listname}}_nml_mod, only: {{listname}}_nml_type
+{%- endfor %}
+{{-'\n'}}
+{%- for listname in namelists %}
   use {{listname}}_config_mod, only : read_{{listname}}_namelist, &
 {%-   set indent = '  use '+listname+'_config_mod, only : ' %}
 {%-   set indent = indent | length() %}
@@ -27,9 +30,9 @@ module {{moduleName}}
 {{' '*indent}}{{listname}}_is_loaded, &
 {{' '*indent}}{{listname}}_reset_load_status, &
 {{' '*indent}}{{listname}}_final, &
-{{' '*indent}}get_{{listname}}_nml
-{%-   endfor %}
-{%- endif %}
+{{' '*indent}}get_{{listname}}_nml, &
+{{' '*indent}}get_new_{{listname}}_nml
+{%- endfor %}
 
   implicit none
 
@@ -42,38 +45,65 @@ contains
   !
   ! [in] filename File holding the namelists.
   !
-  ! TODO: Assumes namelist tags come at the start of lines.
   ! TODO: Support "namelist file" namelists which recursively call this
   !       procedure to load other namelist files.
   !
-  subroutine read_configuration( filename, nml_bank )
+  subroutine read_configuration( filename, configuration, config )
 
     use io_utility_mod, only : open_file, close_file
 
     implicit none
 
     character(*), intent(in) :: filename
-    type(namelist_collection_type), intent(inout) :: nml_bank
+
+    type(namelist_collection_type), optional, intent(inout) :: configuration
+    type(config_type),              optional, intent(inout) :: config
 
     integer(i_def) :: local_rank
 
     character(str_def), allocatable :: namelists(:)
-    integer(i_def) :: unit = -1
+    integer(i_def) :: unit
+
+    if (.not. present(configuration) .and. .not. present(config)) then
+      write(log_scratch_space,'(A)')                               &
+          'At least one optional argument must be provided for ' //&
+          'read_configuration.'
+      call log_event(log_scratch_space, log_level_error)
+    end if
 
 write(0, '(a)') "in read_configuration 1"; flush(0)
     local_rank = global_mpi%get_comm_rank()
 write(0, '(a)') "in read_configuration 2"; flush(0)
 
+    unit = -1
     if (local_rank == 0) unit = open_file( filename )
 write(0, '(a)') "in read_configuration 3"; flush(0)
 
     call get_namelist_names( unit, local_rank, namelists )
 write(0, '(a)') "in read_configuration 4"; flush(0)
 
-    call read_configuration_namelists( unit, local_rank,    &
-                                       namelists, filename, &
-                                       nml_bank )
-write(0, '(a)') "in read_configuration 5"; flush(0)
+    if (present(configuration) .and. present(config)) then
+      ! TODO Transition, remove when all code ported to config
+      ! access pattern
+      call read_configuration_namelists( unit, local_rank,       &
+                                         namelists, filename,    &
+                                         nml_bank=configuration, &
+                                         config=config )
+
+    else if (present(configuration) .and. .not. present(config)) then
+      ! TODO Deprecated, remove when all code ported to config
+      ! access pattern
+      call read_configuration_namelists( unit, local_rank,    &
+                                         namelists, filename, &
+                                         nml_bank=configuration )
+
+    else if (.not. present(configuration) .and. present(config)) then
+      call read_configuration_namelists( unit, local_rank,    &
+                                         namelists, filename, &
+                                         config=config )
+
+    end if
+>>>>>>> origin/main:infrastructure/build/tools/configurator/templates/config_loader.f90.jinja
 
     if (local_rank == 0) call close_file( unit )
 write(0, '(a)') "in read_configuration 6"; flush(0)
@@ -112,8 +142,7 @@ write(0, '(a)') "in read_configuration 6"; flush(0)
         continue_read = read_line( unit, buffer )
         if ( .not. continue_read ) exit text_line_loop
 
-        ! TODO: Assumes namelist tags are at the start of lines. #1753
-        !
+        buffer = adjustl(buffer)
         if (buffer(1:1) == '&') then
           namecount = namecount + 1
           allocate(names_temp(namecount))
@@ -170,6 +199,7 @@ write(0, '(a)') "in read_configuration 6"; flush(0)
       case ('{{listname}}')
         configuration_found = {{listname}}_is_loaded()
 {%- endfor %}
+
       case default
         write( log_scratch_space, '(A)' )               &
             'Tried to ensure unrecognised namelist "'// &
@@ -187,7 +217,7 @@ write(0, '(a)') "in read_configuration 6"; flush(0)
 
   subroutine read_configuration_namelists( unit, local_rank,    &
                                            namelists, filename, &
-                                           nml_bank )
+                                           nml_bank, config )
     implicit none
 
     integer(i_def),     intent(in) :: unit
@@ -195,22 +225,23 @@ write(0, '(a)') "in read_configuration 6"; flush(0)
     character(str_def), intent(in) :: namelists(:)
     character(*),       intent(in) :: filename
 
-    type(namelist_collection_type), intent(inout) :: nml_bank
+    type(namelist_collection_type), optional, intent(inout) :: nml_bank
+    type(config_type),              optional, intent(inout) :: config
 
     type(namelist_type) :: nml_obj
+
+{%- for listname in namelists %}
+    type({{listname}}_nml_type) :: {{listname}}_nml_obj
+{%- endfor %}
 
     integer(i_def) :: i, j
 
     logical :: scan
 
-write(0, '(a)') "in read_configuration_namelists 1"; flush(0)
-{%- if namelists %}
-{{-'\n'}}
     ! Reset load status from any previous file reads
-{%-   for listname in namelists %}
+{%- for listname in namelists %}
     call {{listname}}_reset_load_status()
-{%-   endfor %}
-{%- endif %}
+{%- endfor %}
 
 write(0, '(a)') "in read_configuration_namelists 2"; flush(0)
     ! Read the namelists
@@ -229,7 +260,7 @@ write(0, '(a)') "in read_configuration_namelists 4"; flush(0)
 write(0, '(a)') "in read_configuration_namelists 5"; flush(0)
 
         select case (trim(namelists(i)))
-{%- for listname in namelists %}
+{%  for listname in namelists %}
         case ('{{listname}}')
 write(0, '(a)') "in read_configuration_namelists 6"; flush(0)
           if ({{listname}}_is_loadable()) then
@@ -239,11 +270,17 @@ write(0, '(a)') "in read_configuration_namelists 8"; flush(0)
             if (.not. scan) then
 write(0, '(a)') "in read_configuration_namelists 9"; flush(0)
               call postprocess_{{listname}}_namelist()
-write(0, '(a)') "in read_configuration_namelists 10"; flush(0)
-              nml_obj = get_{{listname}}_nml()
-write(0, '(a)') "in read_configuration_namelists 11"; flush(0)
-              call nml_bank%add_namelist(nml_obj)
-write(0, '(a)') "in read_configuration_namelists 12"; flush(0)
+
+              if (present(nml_bank)) then
+                nml_obj = get_{{listname}}_nml()
+                call nml_bank%add_namelist(nml_obj)
+              end if
+
+              if (present(config)) then
+                {{listname}}_nml_obj = get_new_{{listname}}_nml()
+                call config%add_namelist({{listname}}_nml_obj)
+              end if
+
             end if
 write(0, '(a)') "in read_configuration_namelists 13"; flush(0)
           else
@@ -254,6 +291,7 @@ write(0, '(a)') "in read_configuration_namelists 13"; flush(0)
           end if
 write(0, '(a)') "in read_configuration_namelists 14"; flush(0)
 {%- endfor %}
+
         case default
           write( log_scratch_space, '(A)' )                   &
               'Unrecognised namelist "'//trim(namelists(i))// &
@@ -276,13 +314,10 @@ write(0, '(a)') "in read_configuration_namelists 16"; flush(0)
   subroutine final_configuration()
 
     implicit none
-
-{%- if namelists %}
 {{-'\n'}}
-{%-   for listname in namelists %}
+{%- for listname in namelists %}
     call {{listname}}_final()
-{%-   endfor %}
-{%- endif %}
+{%- endfor %}
 
     return
   end subroutine final_configuration
