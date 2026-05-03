@@ -70,7 +70,7 @@ contains
           'At least one optional argument must ' //&
           'be provided for read_configuration.'
       flush(error_unit)
-      stop
+      stop 1
     end if
 
 write(0, '(a)') "in read_configuration 1"; flush(0)
@@ -191,7 +191,7 @@ write(0, '(a)') "in read_configuration 6"; flush(0)
           'Arguments "names" and "success_mask" to function' //&
           '"ensure_configuration" are different shapes.'
       flush(error_unit)
-      stop
+      stop 1
     end if
 
     ensure_configuration = .true.
@@ -208,7 +208,7 @@ write(0, '(a)') "in read_configuration 6"; flush(0)
             'Tried to ensure unrecognised namelist "' //&
             trim(names(i))//'" was loaded.'
         flush(error_unit)
-        stop
+        stop 1
       end select
 
       ensure_configuration = ensure_configuration .and. configuration_found
@@ -292,7 +292,7 @@ write(0, '(a)') "in read_configuration_namelists 13"; flush(0)
                 'Namelist "'//trim(namelists(i)) //&
                 '" can not be read. Too many instances?'
             flush(error_unit)
-            stop
+            stop 1
           end if
 write(0, '(a)') "in read_configuration_namelists 14"; flush(0)
 {%- endfor %}
@@ -302,7 +302,7 @@ write(0, '(a)') "in read_configuration_namelists 14"; flush(0)
               'Unrecognised namelist "'//trim(namelists(i)) //&
               '" found in file '//trim(filename)//'.'
           flush(error_unit)
-          stop
+          stop 1
         end select
 write(0, '(a)') "in read_configuration_namelists 15"; flush(0)
 
