@@ -194,7 +194,8 @@ subroutine init_mesh( config,                  &
   !============================================================================
   if (present(alt_names)) then
     if (size(alt_names) == size(mesh_names)) then
-      allocate(names, source=alt_names)
+      allocate(names(size(alt_names)))
+      names(:) = alt_names(:)
     else
       write(log_scratch_space, '(A)')                   &
           'Specified alternative mesh names to does '// &
@@ -202,7 +203,8 @@ subroutine init_mesh( config,                  &
       call log_event(log_scratch_space, LOG_LEVEL_ERROR)
     end if
   else
-    allocate(names, source=mesh_names)
+    allocate(names(size(mesh_names)))
+    names(:) = mesh_names(:)
   end if
 
 

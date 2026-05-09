@@ -436,7 +436,7 @@ module sci_iterative_solver_mod
   ! type is allocated. The workaround is to have an array of this DDT
   ! and then allocate one at the time the abstract type. See ticket
   ! #4451 for details.
-  type, private :: array_abstract_vector_type
+  type :: array_abstract_vector_type
     class(abstract_vector_type), allocatable :: vt
   end type array_abstract_vector_type
 
