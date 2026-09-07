@@ -36,6 +36,8 @@ ifdef CRAY_ENVIRONMENT
     CXX_COMPILER = g++
   else ifeq '$(PE_ENV)' 'PGI'
     CXX_COMPILER = pgc++
+  else ifeq '$(PE_ENV)' 'NVIDIA'
+    CXX_COMPILER = nvc++
   else
     $(error Unrecognised Cray programming environment)
   endif
