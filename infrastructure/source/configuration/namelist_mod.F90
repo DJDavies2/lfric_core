@@ -122,11 +122,8 @@ contains
     end if
 
     allocate( self%listname, source=listname )
-#ifndef __NVCOMPILER
-    allocate( self%members,  source=members )
-#else
-    self%members = members
-#endif
+    allocate( self%members(size(members)))
+    self % members(:) = members(:)
 
   end subroutine namelist_initialise
 
