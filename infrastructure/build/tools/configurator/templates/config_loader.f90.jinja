@@ -32,7 +32,8 @@ module {{moduleName}}
 {{' '*indent}}{{listname}}_reset_load_status, &
 {{' '*indent}}{{listname}}_final, &
 {{' '*indent}}get_{{listname}}_nml, &
-{{' '*indent}}get_new_{{listname}}_nml
+{{' '*indent}}get_new_{{listname}}_nml, &
+{{' '*indent}}get_new_{{listname}}_nml_sub
 {%- endfor %}
 
   implicit none
@@ -64,7 +65,7 @@ contains
 
     character(str_def), allocatable :: namelists(:)
     integer(i_def) :: unit
-
+    
     if (.not. present(configuration) .and. .not. present(config)) then
       write(error_unit, '(A)') &
           'At least one optional argument must ' //&
@@ -254,7 +255,7 @@ contains
 
       do i=1, size(namelists)
 
-        select case (trim(namelists(i)))
+        select case (namelists(i))
 {%  for listname in namelists %}
         case ('{{listname}}')
           if ({{listname}}_is_loadable()) then
@@ -268,16 +269,17 @@ contains
               end if
 
               if (present(config)) then
-                {{listname}}_nml_obj = get_new_{{listname}}_nml()
+!                {{listname}}_nml_obj = get_new_{{listname}}_nml()
+                 call get_new_{{listname}}_nml_sub({{listname}}_nml_obj)
                 call config%add_namelist({{listname}}_nml_obj)
               end if
 
             end if
           else
-            write(error_unit, '(A)') &
+            write(0, '(A)') &
                 'Namelist "'//trim(namelists(i)) //&
                 '" can not be read. Too many instances?'
-            flush(error_unit)
+            flush(0)
             stop 1
           end if
 {%- endfor %}

@@ -36,7 +36,7 @@ module {{listname}}_config_mod
 {{' '*12}}{{listname}}_is_loadable, {{listname}}_is_loaded, &
 {{' '*12}}{{listname}}_reset_load_status, &
 {{' '*12}}{{listname}}_multiples_allowed, {{listname}}_final, &
-{{' '*12}}get_{{listname}}_nml, get_new_{{listname}}_nml
+{{' '*12}}get_{{listname}}_nml, get_new_{{listname}}_nml, get_new_{{listname}}_nml_sub
 
 {%- for name in enumerations | sort %}
 {%-   if loop.first %}{{'\n'}}{%- endif %}
@@ -124,10 +124,10 @@ contains
 
     if (key == unset_key) then
       if (log_level() >= LOG_LEVEL_DEBUG ) then
-        write(output_unit, '(A)') &
-            'Missing key for {{name}} enumeration ' // &
-            'in {{listname}} namelist.'
-        flush(output_unit)
+!        write(output_unit, '(A)') &
+!            'Missing key for {{name}} enumeration ' // &
+!            'in {{listname}} namelist.'
+!        flush(output_unit)
       end if
       return
     end if
@@ -421,6 +421,36 @@ contains
     end if
 
   end function get_new_{{listname}}_nml
+
+
+  !> @brief Returns a <<{{listname}}_nml_type>> object populated with the
+  !>        current contents of this configuration module.
+  !> @return namelist_obj <<{{listname}}_nml_type>> with current namelist contents.
+  subroutine get_new_{{listname}}_nml_sub(namelist_obj)
+
+    use {{listname}}_nml_mod, only: {{listname}}_nml_type
+
+    implicit none
+
+    type({{listname}}_nml_type), intent(out) :: namelist_obj
+    type(namelist_item_type) :: members({{parameters|length}})
+
+{%- for name, parameter in parameters | dictsort %}
+{%-   if loop.first %}{{'\n'}}{% endif %}
+    call members({{loop.index}})%initialise( &
+                '{{parameter.name}}', {{parameter.name}} )
+{{- '\n'}}
+{%- endfor %}
+    if (trim(profile_name) /= trim(cmdi) ) then
+      call namelist_obj%initialise( trim(listname), &
+                                    members, &
+                                    profile_name = profile_name )
+    else
+      call namelist_obj%initialise( trim(listname), &
+                                    members )
+    end if
+
+  end subroutine get_new_{{listname}}_nml_sub
 
 
   !> Performs any processing to be done once all namelists are loaded
