@@ -41,7 +41,7 @@ abstract interface
     import abstract_external_field_type
     import :: i_def
     implicit none
-    class( abstract_external_field_type ), intent(inout) :: self
+    class( abstract_external_field_type ), intent(inout), target :: self
     integer(i_def), intent(out), optional :: return_code
   end subroutine copy_from_lfric_interface
   subroutine copy_to_lfric_interface( self, return_code )

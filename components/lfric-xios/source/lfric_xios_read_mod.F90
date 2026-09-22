@@ -443,7 +443,7 @@ subroutine read_state(state, prefix, suffix)
 
   implicit none
 
-  type( field_collection_type ), intent(inout) :: state
+  type( field_collection_type ), intent(inout), target :: state
   character( len=* ), optional,  intent(in)    :: prefix
   character( len=* ), optional,  intent(in)    :: suffix
 

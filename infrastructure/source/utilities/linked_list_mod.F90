@@ -429,7 +429,7 @@ subroutine remove_item(self, item )
 end subroutine remove_item
 
 !> Clears the list
-subroutine clear(self)
+recursive subroutine clear(self)
 
   implicit none
 
