@@ -86,7 +86,7 @@ def setup_script_nvidia(build_config: BuildConfig,
 
     # Production
     # ==========
-    nvfortran.add_flags(["-O4"], "production")
+    nvfortran.add_flags(["-O2"], "production")
 
     # Set up the linker
     # =================

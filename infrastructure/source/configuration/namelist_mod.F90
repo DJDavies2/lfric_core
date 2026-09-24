@@ -40,11 +40,11 @@ module namelist_mod
     character(:), allocatable :: listname
     character(str_def) :: profile_name = trim(cmdi)
 
-#ifdef __NVCOMPILER
-    class(namelist_item_type), allocatable :: members(:)
-#else
+!#ifdef __NVCOMPILER
+!    class(namelist_item_type), allocatable :: members(:)
+!#else
     type(namelist_item_type), allocatable :: members(:)
-#endif
+!#endif
 
   contains
 
