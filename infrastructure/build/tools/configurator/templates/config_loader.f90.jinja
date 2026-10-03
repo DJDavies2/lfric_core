@@ -32,7 +32,8 @@ module {{moduleName}}
 {{' '*indent}}{{listname}}_reset_load_status, &
 {{' '*indent}}{{listname}}_final, &
 {{' '*indent}}get_{{listname}}_nml, &
-{{' '*indent}}get_new_{{listname}}_nml
+{{' '*indent}}get_new_{{listname}}_nml, &
+{{' '*indent}}get_new_{{listname}}_nml_sub
 {%- endfor %}
 
   implicit none
@@ -268,7 +269,7 @@ contains
               end if
 
               if (present(config)) then
-                {{listname}}_nml_obj = get_new_{{listname}}_nml()
+                call get_new_{{listname}}_nml_sub({{listname}}_nml_obj)
                 call config%add_namelist({{listname}}_nml_obj)
               end if
 
