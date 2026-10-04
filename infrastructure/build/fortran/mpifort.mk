@@ -17,7 +17,8 @@ else ifeq '$(MPIFORT_COMPILER)' 'Cray'
 else ifeq '$(MPIFORT_COMPILER)' 'nvfortran'
   FORTRAN_COMPILER = nvfortran
 else
-  $(error Unrecognised mpifort compiler option: "$(MPIFORT_COMPILER)")
+  # hack: nagfor doesn't support --version, so MPIFORT_VN_STR isn't set correctly.
+  FORTRAN_COMPILER = nagfor
 endif
 
 include $(LFRIC_BUILD)/fortran/$(FORTRAN_COMPILER).mk
