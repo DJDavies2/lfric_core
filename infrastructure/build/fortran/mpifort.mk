@@ -16,6 +16,8 @@ else ifeq '$(MPIFORT_COMPILER)' 'Cray'
   FORTRAN_COMPILER = crayftn
 else ifeq '$(MPIFORT_COMPILER)' 'nvfortran'
   FORTRAN_COMPILER = nvfortran
+else ifeq '$(MPIFORT_COMPILER)' 'flang'
+  FORTRAN_COMPILER = flang
 else
   $(error Unrecognised mpifort compiler option: "$(MPIFORT_COMPILER)")
 endif
