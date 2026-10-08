@@ -14,8 +14,8 @@ F_MOD_DESTINATION_ARG = -module$(SPACE)
 FFLAGS_COMPILER           = -DNVHPC
 FFLAGS_COMPILER          += -Mfree -Mpreprocess
 FFLAGS_NO_OPTIMISATION    = -O0
-FFLAGS_SAFE_OPTIMISATION  = -O2
-FFLAGS_RISKY_OPTIMISATION = -O4
+FFLAGS_SAFE_OPTIMISATION  = -O0
+FFLAGS_RISKY_OPTIMISATION = -O0
 FFLAGS_DEBUG              = -g -traceback
 FFLAGS_RUNTIME            =
 # Option for checking code meets Fortran standard (not available for PGI)
