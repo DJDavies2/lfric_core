@@ -14,6 +14,8 @@ else ifeq '$(MPIC_COMPILER)' 'icc'
   CXX_COMPILER = icc
 else ifeq '$(MPIC_COMPILER)' 'Cray'
   CXX_COMPILER = craycc
+else ifeq '$(MPIC_COMPILER)' 'clang'
+  CXX_COMPILER = clang
 else
   $(error Unrecognised mpic++ compiler option: "$MPIC_COMPILER")
 endif
