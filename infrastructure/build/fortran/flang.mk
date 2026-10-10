@@ -34,7 +34,7 @@ FFLAGS_FORTRAN_STANDARD   =
 
 LDFLAGS_COMPILER =
 
-utilities/traceback_mod.o utilities/traceback_mod.mod: private FFLAGS_EXTRA = -fall-intrinsics
+utilities/traceback_mod.o utilities/traceback_mod.mod: private FFLAGS_EXTRA =
 
 # TODO - Remove the -fallow-arguments-mismatch flag when MPICH no longer fails
 #        to build as a result of its mismatched arguments (see ticket summary
