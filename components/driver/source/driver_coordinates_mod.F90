@@ -65,7 +65,7 @@ contains
 
     type(config_type), intent(in) :: config
     type(mesh_type),   intent(in), pointer :: mesh
-    type(field_type),  intent(inout) :: chi(3)
+    type(field_type),  intent(inout), target :: chi(3)
     type(field_type),  intent(inout) :: panel_id
 
     integer(i_def),                pointer :: map(:,:)
