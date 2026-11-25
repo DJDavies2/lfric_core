@@ -41,3 +41,9 @@ endif
 #FPPFLAGS = -P -D__NVCOMPILER -DNVHPC
 FPPFLAGS = -P -DNVHPC
 
+# Because Fortran source is preprocessed on import, it is done by a Fortran
+# preprocessor, not the compiler. As such we have to set up the compiler
+# identification macros as though the compiler had done so.
+#
+#FPPFLAGS = -P -D__NVCOMPILER
+
