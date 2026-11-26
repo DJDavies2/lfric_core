@@ -124,9 +124,9 @@ contains
 
     if (key == unset_key) then
       if (log_level() >= LOG_LEVEL_DEBUG ) then
-        write(output_unit, '(A)') &
-            'Missing key for {{name}} enumeration ' // &
-            'in {{listname}} namelist.'
+!        write(output_unit, '(A)') &
+!            'Missing key for {{name}} enumeration ' // &
+!            'in {{listname}} namelist.'
         flush(output_unit)
       end if
       return
